@@ -69,24 +69,37 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch orders
+    // Fetch orders - include address for distance calculation
     let orders = await Order.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .populate('restaurantId', 'name slug profileImage address location phone ownerPhone')
       .populate('userId', 'name phone')
+      .select('+address') // Ensure address field is included
       .lean();
 
-    // Ensure restaurant location is present (handle case where restaurantId is a custom string ID)
+    // Helper function to calculate distance between two coordinates (Haversine formula)
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Earth's radius in kilometers
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    // Ensure restaurant location is present and calculate estimated earnings
     orders = await Promise.all(orders.map(async (order) => {
+      let finalOrder = order;
+      
       // If restaurantId was populated correctly (became an object)
       if (order.restaurantId && typeof order.restaurantId === 'object') {
-        return order;
-      }
-
-      // If restaurantId is still a string (population failed)
-      if (order.restaurantId && typeof order.restaurantId === 'string') {
+        finalOrder = order;
+      } else if (order.restaurantId && typeof order.restaurantId === 'string') {
+        // If restaurantId is still a string (population failed)
         const restaurant = await Restaurant.findOne({
           $or: [
             { _id: mongoose.isValidObjectId(order.restaurantId) ? order.restaurantId : null },
@@ -95,11 +108,51 @@ export const getOrders = asyncHandler(async (req, res) => {
         }).select('name slug profileImage address location phone ownerPhone').lean();
 
         if (restaurant) {
-          return { ...order, restaurantId: restaurant };
+          finalOrder = { ...order, restaurantId: restaurant };
         }
       }
 
-      return order;
+      // Calculate estimated earnings if not already present
+      if (!finalOrder.estimatedEarnings) {
+        let deliveryDistance = null;
+        
+        // Priority 1: Use assignmentInfo.distance if available
+        if (finalOrder.assignmentInfo?.distance) {
+          deliveryDistance = finalOrder.assignmentInfo.distance;
+        }
+        // Priority 2: Calculate distance from restaurant to customer location
+        else if (finalOrder.restaurantId?.location?.coordinates && finalOrder.address?.location?.coordinates) {
+          const [restaurantLng, restaurantLat] = finalOrder.restaurantId.location.coordinates;
+          const [customerLng, customerLat] = finalOrder.address.location.coordinates;
+          deliveryDistance = calculateDistance(restaurantLat, restaurantLng, customerLat, customerLng);
+        }
+        // Priority 3: Try restaurant location and customer address coordinates
+        else if (finalOrder.restaurantId?.location?.latitude && finalOrder.address?.location?.latitude) {
+          deliveryDistance = calculateDistance(
+            finalOrder.restaurantId.location.latitude,
+            finalOrder.restaurantId.location.longitude,
+            finalOrder.address.location.latitude,
+            finalOrder.address.location.longitude
+          );
+        }
+
+        // Calculate earnings if distance is available
+        if (deliveryDistance !== null && deliveryDistance > 0) {
+          try {
+            const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
+            finalOrder.estimatedEarnings = {
+              totalEarning: commissionResult.commission,
+              distance: Math.round(deliveryDistance * 100) / 100,
+              breakdown: commissionResult.breakdown
+            };
+            console.log(`💰 Calculated earnings for order ${finalOrder.orderId}: ₹${finalOrder.estimatedEarnings.totalEarning} for ${deliveryDistance.toFixed(2)} km`);
+          } catch (error) {
+            console.error(`Error calculating earnings for order ${finalOrder.orderId}:`, error);
+          }
+        }
+      }
+
+      return finalOrder;
     }));
 
     // Get total count
@@ -1816,6 +1869,54 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       } catch (paymentUpdateError) {
         console.warn('⚠️ Could not update COD payment status:', paymentUpdateError.message);
       }
+    }
+
+    // Calculate/Update settlement with delivery partner earnings BEFORE releasing escrow
+    // IMPORTANT: Recalculate settlement AFTER order is updated to ensure deliveryPartnerId is set
+    try {
+      // First, ensure order has deliveryPartnerId set (it should already be set, but double-check)
+      if (!updatedOrder.deliveryPartnerId || updatedOrder.deliveryPartnerId.toString() !== delivery._id.toString()) {
+        console.warn(`⚠️ Order ${orderIdForLog} deliveryPartnerId mismatch. Order: ${updatedOrder.deliveryPartnerId}, Delivery: ${delivery._id}`);
+        // Update order with correct deliveryPartnerId if missing
+        await Order.findByIdAndUpdate(orderMongoId, {
+          $set: { deliveryPartnerId: delivery._id }
+        });
+        // Refetch order
+        updatedOrder = await Order.findById(orderMongoId)
+          .populate('restaurantId', 'name location address phone ownerPhone')
+          .populate('userId', 'name phone')
+          .lean();
+      }
+
+      const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
+      // Recalculate settlement to ensure deliveryPartnerEarning is set correctly
+      const settlement = await calculateOrderSettlement(orderMongoId);
+      const earningsAmount = settlement.deliveryPartnerEarning?.totalEarning || 0;
+      console.log(`✅ Settlement calculated/updated for order ${orderIdForLog}`);
+      console.log(`💰 Delivery earnings in settlement: ₹${earningsAmount}`);
+      console.log(`📊 Settlement details:`, {
+        orderId: settlement.orderId?.toString(),
+        deliveryPartnerId: settlement.deliveryPartnerId?.toString(),
+        totalEarning: earningsAmount,
+        distance: settlement.deliveryPartnerEarning?.distance,
+        basePayout: settlement.deliveryPartnerEarning?.basePayout
+      });
+      
+      // Ensure settlement is saved (it should be saved by calculateOrderSettlement, but verify)
+      if (settlement.isModified && settlement.isModified()) {
+        await settlement.save();
+        console.log(`✅ Settlement saved successfully`);
+      } else {
+        // Force save if earnings were calculated
+        if (earningsAmount > 0) {
+          await settlement.save();
+          console.log(`✅ Settlement force-saved with earnings`);
+        }
+      }
+    } catch (settlementError) {
+      console.error(`❌ Error calculating settlement for order ${orderIdForLog}:`, settlementError);
+      console.error(`❌ Settlement error details:`, settlementError.stack);
+      // Continue - settlement might already exist
     }
 
     // Release escrow and distribute funds (this handles all wallet credits)

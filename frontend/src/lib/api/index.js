@@ -1506,6 +1506,15 @@ export const adminAPI = {
     return apiClient.post(API_ENDPOINTS.ADMIN.FOOD_APPROVAL_REJECT.replace(':id', id), { reason });
   },
 
+  // Restaurant Menu Management (Admin)
+  getRestaurantMenu: (restaurantId) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.RESTAURANT_MENU.replace(':restaurantId', restaurantId));
+  },
+
+  updateRestaurantMenu: (restaurantId, menuData) => {
+    return apiClient.put(API_ENDPOINTS.ADMIN.RESTAURANT_MENU.replace(':restaurantId', restaurantId), menuData);
+  },
+
   // Feedback Experience Management
   createFeedbackExperience: (data) => {
     return apiClient.post(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE, data);

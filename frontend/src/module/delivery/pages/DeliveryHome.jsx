@@ -2716,13 +2716,35 @@ export default function DeliveryHome() {
                             deliveryPhase === 'completed' ||
                             deliveryStateStatus === 'delivered'
 
-                          if (!isDelivered) {
+                          // Check if order is accepted before showing route
+                          const isOrderAccepted = orderStatus === 'accepted' ||
+                            deliveryStateStatus === 'accepted' ||
+                            deliveryPhase === 'en_route_to_pickup' ||
+                            deliveryPhase === 'at_pickup' ||
+                            deliveryPhase === 'en_route_to_delivery' ||
+                            deliveryPhase === 'at_delivery' ||
+                            deliveryPhase === 'picked_up'
+
+                          if (!isDelivered && isOrderAccepted) {
                             directionsRendererRef.current.setMap(window.deliveryMapInstance);
                           } else {
                             directionsRendererRef.current.setMap(null);
                           }
                         } else {
-                          directionsRendererRef.current.setMap(window.deliveryMapInstance);
+                          // Check if order is accepted before showing route
+                          const isOrderAccepted = selectedRestaurant?.orderStatus === 'accepted' ||
+                            selectedRestaurant?.deliveryState?.status === 'accepted' ||
+                            selectedRestaurant?.deliveryPhase === 'en_route_to_pickup' ||
+                            selectedRestaurant?.deliveryPhase === 'at_pickup' ||
+                            selectedRestaurant?.deliveryPhase === 'en_route_to_delivery' ||
+                            selectedRestaurant?.deliveryPhase === 'at_delivery' ||
+                            selectedRestaurant?.acceptedAt
+
+                          if (isOrderAccepted) {
+                            directionsRendererRef.current.setMap(window.deliveryMapInstance);
+                          } else {
+                            directionsRendererRef.current.setMap(null);
+                          }
                         }
                       }
                     } catch (e) {
@@ -3759,7 +3781,16 @@ export default function DeliveryHome() {
                         deliveryPhase === 'completed' ||
                         deliveryStateStatus === 'delivered'
 
-                      if (!isDelivered) {
+                      // Check if order is accepted before showing route
+                      const isOrderAccepted = orderStatus === 'accepted' ||
+                        deliveryStateStatus === 'accepted' ||
+                        deliveryPhase === 'en_route_to_pickup' ||
+                        deliveryPhase === 'at_pickup' ||
+                        deliveryPhase === 'en_route_to_delivery' ||
+                        deliveryPhase === 'at_delivery' ||
+                        deliveryPhase === 'picked_up'
+
+                      if (!isDelivered && isOrderAccepted) {
                         // Set map for directions renderer to ensure it shows
                         directionsRendererRef.current.setMap(window.deliveryMapInstance);
                         directionsRendererRef.current.setDirections(directionsResult);
@@ -5818,6 +5849,35 @@ export default function DeliveryHome() {
       return;
     }
 
+    // CRITICAL: Don't create/update polyline if order is NOT accepted yet
+    if (selectedRestaurant) {
+      const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || ''
+      const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
+      const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
+      
+      // Check if order is accepted
+      const isOrderAccepted = orderStatus === 'accepted' ||
+        deliveryStateStatus === 'accepted' ||
+        deliveryPhase === 'en_route_to_pickup' ||
+        deliveryPhase === 'at_pickup' ||
+        deliveryPhase === 'en_route_to_delivery' ||
+        deliveryPhase === 'at_delivery' ||
+        deliveryPhase === 'picked_up' ||
+        selectedRestaurant.acceptedAt
+
+      if (!isOrderAccepted) {
+        console.log('🚫 Order not accepted yet, clearing live tracking polyline')
+        // Clear live tracking polylines
+        if (liveTrackingPolylineRef.current) {
+          liveTrackingPolylineRef.current.setMap(null);
+        }
+        if (liveTrackingPolylineShadowRef.current) {
+          liveTrackingPolylineShadowRef.current.setMap(null);
+        }
+        return;
+      }
+    }
+
     // CRITICAL: Don't create/update polyline if there's no active order or order is delivered
     // Check selectedRestaurant for delivered status
     if (selectedRestaurant && isOrderDelivered(selectedRestaurant)) {
@@ -6621,8 +6681,17 @@ export default function DeliveryHome() {
         console.log('✅ Map bounds fitted to route');
       }
 
-      // CRITICAL: Don't set map or update polyline if order is delivered
-      if (!isDelivered) {
+      // CRITICAL: Don't set map or update polyline if order is NOT accepted or delivered
+      // Check if order is accepted
+      const isOrderAccepted = selectedRestaurant?.orderStatus === 'accepted' ||
+        selectedRestaurant?.deliveryState?.status === 'accepted' ||
+        selectedRestaurant?.deliveryPhase === 'en_route_to_pickup' ||
+        selectedRestaurant?.deliveryPhase === 'at_pickup' ||
+        selectedRestaurant?.deliveryPhase === 'en_route_to_delivery' ||
+        selectedRestaurant?.deliveryPhase === 'at_delivery' ||
+        selectedRestaurant?.acceptedAt
+
+      if (!isDelivered && isOrderAccepted) {
         // Ensure DirectionsRenderer is attached to map (Zomato style)
         if (directionsRendererRef.current) {
           directionsRendererRef.current.setMap(window.deliveryMapInstance);
@@ -6731,10 +6800,23 @@ export default function DeliveryHome() {
           console.log('✅ Restored selectedRestaurant from localStorage');
         }
 
-        // Enable route path display if flag is set
-        if (activeOrderData.showRoutePath || activeOrderData.showRoute) {
+        // Enable route path display if flag is set AND order is actually accepted
+        // Check if order is accepted by checking deliveryPhase or orderStatus
+        const isOrderAccepted = activeOrderData.restaurantInfo && (
+          activeOrderData.restaurantInfo.deliveryPhase === 'en_route_to_pickup' ||
+          activeOrderData.restaurantInfo.deliveryPhase === 'at_pickup' ||
+          activeOrderData.restaurantInfo.deliveryPhase === 'en_route_to_delivery' ||
+          activeOrderData.restaurantInfo.deliveryPhase === 'at_delivery' ||
+          activeOrderData.restaurantInfo.orderStatus === 'accepted' ||
+          activeOrderData.acceptedAt // If acceptedAt is set, order is accepted
+        );
+        
+        if (isOrderAccepted && (activeOrderData.showRoutePath || activeOrderData.showRoute)) {
           setShowRoutePath(true);
-          console.log('✅ Route path display enabled');
+          console.log('✅ Route path display enabled (order is accepted)');
+        } else {
+          setShowRoutePath(false);
+          console.log('🚫 Route path display disabled (order not accepted yet)');
         }
 
         // Wait for map to be ready
@@ -6773,7 +6855,17 @@ export default function DeliveryHome() {
 
           // Recalculate route using Directions API (preferred) or use saved coordinates (fallback)
           // Don't restore directionsResponse from localStorage - Google Maps objects can't be serialized
-          if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && currentRiderLocation && currentRiderLocation.length === 2) {
+          // CRITICAL: Only calculate route if order is actually accepted
+          const isOrderAccepted = activeOrderData.restaurantInfo && (
+            activeOrderData.restaurantInfo.deliveryPhase === 'en_route_to_pickup' ||
+            activeOrderData.restaurantInfo.deliveryPhase === 'at_pickup' ||
+            activeOrderData.restaurantInfo.deliveryPhase === 'en_route_to_delivery' ||
+            activeOrderData.restaurantInfo.deliveryPhase === 'at_delivery' ||
+            activeOrderData.restaurantInfo.orderStatus === 'accepted' ||
+            activeOrderData.acceptedAt
+          );
+
+          if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && currentRiderLocation && currentRiderLocation.length === 2 && isOrderAccepted) {
             // Try to recalculate with Directions API first (if flag indicates we had Directions API before)
             if (activeOrderData.hasDirectionsAPI || activeOrderData.shouldShowPolyline) {
               console.log('🔄 Recalculating route with Directions API for restored order...');
@@ -7144,13 +7236,28 @@ export default function DeliveryHome() {
     }
 
     // Always use custom polyline (DirectionsRenderer is never active - it adds dots)
+    // CRITICAL: Only show polyline if order is actually accepted
+    const isOrderAccepted = selectedRestaurant && (
+      selectedRestaurant.deliveryPhase === 'en_route_to_pickup' ||
+      selectedRestaurant.deliveryPhase === 'at_pickup' ||
+      selectedRestaurant.deliveryPhase === 'en_route_to_delivery' ||
+      selectedRestaurant.deliveryPhase === 'at_delivery' ||
+      selectedRestaurant.orderStatus === 'accepted' ||
+      selectedRestaurant.deliveryState?.status === 'accepted' ||
+      selectedRestaurant.deliveryState?.currentPhase === 'en_route_to_pickup' ||
+      selectedRestaurant.deliveryState?.currentPhase === 'at_pickup' ||
+      selectedRestaurant.deliveryState?.currentPhase === 'en_route_to_delivery' ||
+      selectedRestaurant.deliveryState?.currentPhase === 'at_delivery'
+    );
+
     if (routePolylineRef.current) {
-      if (showRoutePath && routeHistoryRef.current.length >= 2) {
+      if (isOrderAccepted && showRoutePath && routeHistoryRef.current.length >= 2) {
         routePolylineRef.current.setMap(window.deliveryMapInstance);
-      } else if (routePolyline && routePolyline.length > 0) {
-        // Show route polyline if we have route data (from order acceptance)
+      } else if (isOrderAccepted && routePolyline && routePolyline.length > 0) {
+        // Show route polyline if we have route data (from order acceptance) AND order is accepted
         routePolylineRef.current.setMap(window.deliveryMapInstance);
       } else {
+        // Hide polyline if order is not accepted
         routePolylineRef.current.setMap(null);
       }
     }
@@ -8245,11 +8352,37 @@ export default function DeliveryHome() {
       return;
     }
 
-    // CRITICAL: Don't show route if order is already delivered/completed
+    // CRITICAL: Don't show route if order is NOT accepted yet
     const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || ''
     const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
     const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
     
+    // Check if order is accepted
+    const isOrderAccepted = orderStatus === 'accepted' ||
+      deliveryStateStatus === 'accepted' ||
+      deliveryPhase === 'en_route_to_pickup' ||
+      deliveryPhase === 'at_pickup' ||
+      deliveryPhase === 'en_route_to_delivery' ||
+      deliveryPhase === 'at_delivery' ||
+      deliveryPhase === 'picked_up' ||
+      selectedRestaurant.acceptedAt // If acceptedAt timestamp exists
+
+    if (!isOrderAccepted) {
+      console.log('🚫 Order not accepted yet, clearing route polyline')
+      // Clear all route polylines
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+      }
+      if (liveTrackingPolylineRef.current) {
+        liveTrackingPolylineRef.current.setMap(null);
+      }
+      if (liveTrackingPolylineShadowRef.current) {
+        liveTrackingPolylineShadowRef.current.setMap(null);
+      }
+      return;
+    }
+
+    // CRITICAL: Don't show route if order is already delivered/completed
     const isDelivered = orderStatus === 'delivered' ||
       orderStatus === 'completed' ||
       deliveryPhase === 'delivered' ||

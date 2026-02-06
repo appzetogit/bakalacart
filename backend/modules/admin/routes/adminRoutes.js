@@ -128,6 +128,10 @@ import {
   rejectFoodItem
 } from '../controllers/foodApprovalController.js';
 import {
+  getRestaurantMenu,
+  updateRestaurantMenu
+} from '../controllers/menuController.js';
+import {
   getAllComplaints,
   getComplaintDetails,
   updateComplaintStatus,
@@ -391,6 +395,10 @@ router.put('/restaurant-complaints/:id/notes', updateInternalNotes);
 router.get('/food-approvals', getPendingFoodApprovals);
 router.post('/food-approvals/:id/approve', approveFoodItem);
 router.post('/food-approvals/:id/reject', rejectFoodItem);
+
+// Restaurant Menu Management (Admin)
+router.get('/restaurants/:restaurantId/menu', getRestaurantMenu);
+router.put('/restaurants/:restaurantId/menu', updateRestaurantMenu);
 
 // Offers Management
 router.get('/offers', getAllOffers);

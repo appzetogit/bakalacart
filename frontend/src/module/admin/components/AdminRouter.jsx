@@ -26,6 +26,7 @@ import RestaurantCommission from "../pages/restaurant/RestaurantCommission";
 import RestaurantComplaints from "../pages/restaurant/RestaurantComplaints";
 import RestaurantsBulkImport from "../pages/restaurant/RestaurantsBulkImport";
 import RestaurantsBulkExport from "../pages/restaurant/RestaurantsBulkExport";
+import MenuAdd from "../pages/restaurant/MenuAdd";
 // Food Management
 import FoodsList from "../pages/foods/FoodsList";
 import AddonsList from "../pages/addons/AddonsList";
@@ -170,6 +171,7 @@ export default function AdminRouter() {
         <Route path="zone-setup/add" element={<AddZone />} />
         <Route path="zone-setup/edit/:id" element={<AddZone />} />
         <Route path="zone-setup/view/:id" element={<ViewZone />} />
+        <Route path="menu-add" element={<MenuAdd />} />
         <Route path="food-approval" element={<FoodApproval />} />
         {/* Restaurants */}
         <Route path="restaurants" element={<RestaurantsList />} />

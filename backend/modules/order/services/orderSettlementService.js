@@ -13,7 +13,11 @@ import { calculateDistance } from './orderCalculationService.js';
  */
 export const calculateOrderSettlement = async (orderId) => {
   try {
-    const order = await Order.findById(orderId).lean();
+    // Fetch order with all necessary fields populated
+    const order = await Order.findById(orderId)
+      .populate('restaurantId', 'name location address')
+      .populate('deliveryPartnerId', 'name')
+      .lean();
     if (!order) {
       throw new Error('Order not found');
     }
@@ -26,9 +30,12 @@ export const calculateOrderSettlement = async (orderId) => {
     const platformFee = feeSettings?.platformFee || 5;
     const gstRate = (feeSettings?.gstRate || 5) / 100;
 
-    // Get restaurant details
+    // Get restaurant details (use populated data if available, otherwise fetch)
     let restaurant = null;
-    if (mongoose.Types.ObjectId.isValid(order.restaurantId) && order.restaurantId.length === 24) {
+    if (order.restaurantId && typeof order.restaurantId === 'object' && order.restaurantId._id) {
+      // Already populated
+      restaurant = order.restaurantId;
+    } else if (mongoose.Types.ObjectId.isValid(order.restaurantId) && order.restaurantId.length === 24) {
       restaurant = await Restaurant.findById(order.restaurantId).lean();
     }
     if (!restaurant) {
@@ -88,9 +95,47 @@ export const calculateOrderSettlement = async (orderId) => {
       status: 'pending'
     };
 
-    if (order.deliveryPartnerId && order.assignmentInfo?.distance) {
-      const distance = order.assignmentInfo.distance;
-      const deliveryCommission = await DeliveryBoyCommission.calculateCommission(distance);
+    // Try multiple sources for distance and delivery partner ID
+    let deliveryDistance = 0;
+    // Handle both populated and non-populated deliveryPartnerId
+    let deliveryPartnerId = null;
+    if (order.deliveryPartnerId) {
+      if (typeof order.deliveryPartnerId === 'object' && order.deliveryPartnerId._id) {
+        // Already populated
+        deliveryPartnerId = order.deliveryPartnerId._id;
+      } else {
+        // String or ObjectId
+        deliveryPartnerId = order.deliveryPartnerId;
+      }
+    }
+
+    // Priority 1: Get distance from assignmentInfo
+    if (order.assignmentInfo?.distance) {
+      deliveryDistance = order.assignmentInfo.distance;
+    }
+    // Priority 2: Get distance from deliveryState.routeToDelivery
+    else if (order.deliveryState?.routeToDelivery?.distance) {
+      deliveryDistance = order.deliveryState.routeToDelivery.distance;
+    }
+    // Priority 3: Calculate distance from restaurant to customer if coordinates available
+    else if (order.restaurantId?.location?.coordinates && order.address?.location?.coordinates) {
+      const [restaurantLng, restaurantLat] = order.restaurantId.location.coordinates;
+      const [customerLng, customerLat] = order.address.location.coordinates;
+
+      // Calculate distance using Haversine formula
+      const R = 6371; // Earth radius in km
+      const dLat = (customerLat - restaurantLat) * Math.PI / 180;
+      const dLng = (customerLng - restaurantLng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(restaurantLat * Math.PI / 180) * Math.cos(customerLat * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      deliveryDistance = R * c;
+    }
+
+    // Calculate earnings if we have delivery partner and distance
+    if (deliveryPartnerId && deliveryDistance > 0) {
+      const deliveryCommission = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
       
       // Get surge multiplier (can be configured in order or settings)
       const surgeMultiplier = order.assignmentInfo?.surgeMultiplier || 1;
@@ -99,7 +144,7 @@ export const calculateOrderSettlement = async (orderId) => {
 
       deliveryPartnerEarning = {
         basePayout: deliveryCommission.breakdown.basePayout,
-        distance: distance,
+        distance: deliveryDistance,
         commissionPerKm: deliveryCommission.breakdown.commissionPerKm,
         distanceCommission: deliveryCommission.breakdown.distanceCommission,
         surgeMultiplier: surgeMultiplier,
@@ -133,12 +178,15 @@ export const calculateOrderSettlement = async (orderId) => {
     // Create or update settlement
     let settlement = await OrderSettlement.findOne({ orderId });
     
+    // Get delivery partner ID (handle both populated and non-populated cases)
+    let deliveryPartnerIdValue = deliveryPartnerId; // Already extracted above
+
     const settlementData = {
       orderNumber: order.orderId,
       userId: order.userId,
       restaurantId: restaurant._id,
       restaurantName: restaurant.name || order.restaurantName,
-      deliveryPartnerId: order.deliveryPartnerId || null,
+      deliveryPartnerId: deliveryPartnerIdValue,
       userPayment,
       restaurantEarning,
       deliveryPartnerEarning,
@@ -167,13 +215,48 @@ export const calculateOrderSettlement = async (orderId) => {
     };
 
     if (settlement) {
-      Object.assign(settlement, settlementData);
+      // Always update deliveryPartnerId if it exists in order (even if it was null before)
+      if (deliveryPartnerIdValue) {
+        settlement.deliveryPartnerId = deliveryPartnerIdValue;
+        console.log(`✅ Updated deliveryPartnerId in settlement: ${deliveryPartnerIdValue.toString()}`);
+      }
+      
+      // Always update earnings if delivery partner exists and we have earnings
+      if (deliveryPartnerIdValue && deliveryPartnerEarning.totalEarning > 0) {
+        settlement.deliveryPartnerEarning = deliveryPartnerEarning;
+        console.log(`✅ Updated deliveryPartnerEarning: ₹${deliveryPartnerEarning.totalEarning}`);
+      } else if (deliveryPartnerIdValue && deliveryPartnerEarning.totalEarning === 0) {
+        // Even if earnings is 0, update it to ensure distance and other fields are set
+        settlement.deliveryPartnerEarning = deliveryPartnerEarning;
+        console.log(`⚠️ Updated deliveryPartnerEarning with 0 (distance might be missing)`);
+      }
+      
+      // Update other fields (but don't overwrite deliveryPartnerId if we just set it)
+      const fieldsToUpdate = { ...settlementData };
+      if (deliveryPartnerIdValue) {
+        fieldsToUpdate.deliveryPartnerId = deliveryPartnerIdValue; // Ensure it's set
+      }
+      Object.assign(settlement, fieldsToUpdate);
+      
       await settlement.save();
+      console.log(`✅ Settlement updated for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
     } else {
       settlement = await OrderSettlement.create({
         orderId,
         ...settlementData
       });
+      console.log(`✅ Settlement created for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
+    }
+
+    // Verify settlement was saved correctly
+    const verifySettlement = await OrderSettlement.findOne({ orderId }).lean();
+    if (verifySettlement) {
+      console.log(`✅ Verified settlement exists for order ${order.orderId}`);
+      console.log(`   DeliveryPartnerId: ${verifySettlement.deliveryPartnerId?.toString() || 'null'}`);
+      console.log(`   Earnings: ₹${verifySettlement.deliveryPartnerEarning?.totalEarning || 0}`);
+      console.log(`   Distance: ${verifySettlement.deliveryPartnerEarning?.distance || 0} km`);
+    } else {
+      console.error(`❌ Settlement verification failed for order ${order.orderId}`);
     }
 
     return settlement;

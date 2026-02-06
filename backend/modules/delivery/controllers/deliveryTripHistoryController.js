@@ -4,6 +4,7 @@ import Order from '../../order/models/Order.js';
 import Payment from '../../payment/models/Payment.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import OrderSettlement from '../../order/models/OrderSettlement.js';
+import DeliveryWallet from '../models/DeliveryWallet.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 
@@ -25,6 +26,7 @@ const logger = winston.createLogger({
 export const getTripHistory = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
+    const deliveryId = delivery._id;
     const { 
       period = 'daily', 
       date, 
@@ -120,22 +122,117 @@ export const getTripHistory = asyncHandler(async (req, res) => {
       logger.warn('Could not fetch payment records for COD check:', e.message);
     }
 
-    // Fetch OrderSettlement records to get delivery boy earnings
+    // Fetch OrderSettlement records to get delivery boy earnings with full breakdown
     const settlementMap = new Map();
+    const settlementDetailsMap = new Map();
+    const orderNumberMap = new Map(); // Map orderNumber to orderId for lookup
+    
+    // Create orderNumber to orderId mapping
+    orders.forEach(order => {
+      if (order.orderId) {
+        orderNumberMap.set(order.orderId, order._id.toString());
+      }
+    });
+    
     try {
+      // Convert orderIds to ObjectIds for proper matching
+      const orderObjectIds = orderIds.map(id => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return new mongoose.Types.ObjectId(id);
+        }
+        return id;
+      });
+
+      // Also get orderNumbers for lookup
+      const orderNumbers = orders.map(o => o.orderId).filter(Boolean);
+
+      // Query settlements by both orderId and orderNumber
       const settlements = await OrderSettlement.find({
-        orderId: { $in: orderIds }
-      }).select('orderId deliveryPartnerEarning.totalEarning').lean();
+        $or: [
+          { orderId: { $in: orderObjectIds } },
+          { orderNumber: { $in: orderNumbers } }
+        ]
+      }).select('orderId orderNumber deliveryPartnerEarning').lean();
+      
+      logger.info(`Found ${settlements.length} settlements for ${orderIds.length} orders`);
       
       settlements.forEach(settlement => {
+        let orderIdKeys = [];
+        
+        // Try to match by orderId first
         if (settlement.orderId) {
-          // Handle both ObjectId and string formats
           const orderIdKey = settlement.orderId.toString ? settlement.orderId.toString() : String(settlement.orderId);
-          settlementMap.set(orderIdKey, settlement.deliveryPartnerEarning?.totalEarning || 0);
+          orderIdKeys.push(orderIdKey);
         }
+        
+        // Also try to match by orderNumber
+        if (settlement.orderNumber && orderNumberMap.has(settlement.orderNumber)) {
+          const mappedOrderId = orderNumberMap.get(settlement.orderNumber);
+          if (mappedOrderId && !orderIdKeys.includes(mappedOrderId)) {
+            orderIdKeys.push(mappedOrderId);
+          }
+        }
+        
+        const totalEarning = settlement.deliveryPartnerEarning?.totalEarning || 0;
+        
+        // Set earnings for all matching order IDs
+        orderIdKeys.forEach(orderIdKey => {
+          logger.info(`Settlement found for order ${orderIdKey} (orderNumber: ${settlement.orderNumber}): earnings = ₹${totalEarning}`);
+          
+          // Only set if not already set (prefer orderId match over orderNumber match)
+          if (!settlementMap.has(orderIdKey)) {
+            settlementMap.set(orderIdKey, totalEarning);
+            // Store full settlement details for breakdown
+            if (settlement.deliveryPartnerEarning && settlement.deliveryPartnerEarning.totalEarning > 0) {
+              settlementDetailsMap.set(orderIdKey, {
+                deliveryPartnerEarning: settlement.deliveryPartnerEarning
+              });
+            }
+          }
+        });
       });
+      
+      // Log all order IDs and their earnings for debugging
+      if (settlementMap.size > 0) {
+        logger.info(`Settlement map entries: ${Array.from(settlementMap.entries()).map(([id, earning]) => `${id}: ₹${earning}`).join(', ')}`);
+      } else {
+        logger.warn(`⚠️ No settlements found in map! Check if settlements exist for these orders.`);
+      }
+      
+      // Fallback: If settlement doesn't have earnings, try to get from wallet transactions
+      const hasZeroEarnings = Array.from(settlementMap.values()).every(e => e === 0);
+      if (settlementMap.size === 0 || hasZeroEarnings) {
+        logger.info(`⚠️ No earnings in settlement, checking wallet transactions as fallback...`);
+        try {
+          const wallet = await DeliveryWallet.findOne({ deliveryPartnerId: deliveryId }).lean();
+          if (wallet && wallet.transactions && wallet.transactions.length > 0) {
+            // Create a map of orderId to transaction amount
+            const walletEarningsMap = new Map();
+            wallet.transactions.forEach(transaction => {
+              if (transaction.type === 'payment' && transaction.orderId && transaction.amount > 0) {
+                const txOrderId = transaction.orderId.toString ? transaction.orderId.toString() : String(transaction.orderId);
+                // Only set if not already in settlementMap or if settlement has 0
+                if (!settlementMap.has(txOrderId) || settlementMap.get(txOrderId) === 0) {
+                  walletEarningsMap.set(txOrderId, transaction.amount);
+                }
+              }
+            });
+            
+            // Merge wallet earnings into settlement map
+            walletEarningsMap.forEach((amount, orderId) => {
+              if (!settlementMap.has(orderId) || settlementMap.get(orderId) === 0) {
+                settlementMap.set(orderId, amount);
+                logger.info(`💰 Found earnings from wallet for order ${orderId}: ₹${amount}`);
+              }
+            });
+          }
+        } catch (walletError) {
+          logger.warn('Could not fetch wallet transactions for earnings fallback:', walletError.message);
+        }
+      }
     } catch (e) {
-      // Ignore settlement lookup errors
+      // Log error details for debugging
+      logger.error('Could not fetch settlement records for earnings:', e);
       logger.warn('Could not fetch settlement records for earnings:', e.message);
     }
 
@@ -217,8 +314,36 @@ export const getTripHistory = asyncHandler(async (req, res) => {
 
       // Get delivery boy's earning from settlement, fallback to delivery fee
       const orderIdStr = order._id.toString();
-      const earning = settlementMap.get(orderIdStr) || order.pricing?.deliveryFee || 0;
+      let earning = settlementMap.get(orderIdStr);
+      
+      // If not found by orderId, try by orderNumber
+      if (earning === undefined && order.orderId) {
+        const mappedOrderId = orderNumberMap.get(order.orderId);
+        if (mappedOrderId) {
+          earning = settlementMap.get(mappedOrderId);
+        }
+      }
+      
+      // Final fallback
+      if (earning === undefined || earning === null) {
+        earning = order.pricing?.deliveryFee || 0;
+      }
+      
       const amount = earning; // Keep 'amount' field for backward compatibility, but it now represents earning
+
+      // Debug logging
+      if (earning === 0 && order.status === 'delivered') {
+        logger.warn(`⚠️ Zero earnings found for delivered order ${order.orderId} (${orderIdStr})`);
+        logger.warn(`   Settlement map has ${settlementMap.size} entries`);
+        logger.warn(`   Settlement map keys: ${Array.from(settlementMap.keys()).slice(0, 5).join(', ')}...`);
+        logger.warn(`   Order _id: ${orderIdStr}, orderId: ${order.orderId}`);
+        logger.warn(`   Checking if settlement exists for orderNumber: ${order.orderId}`);
+      } else if (earning > 0) {
+        logger.info(`✅ Earnings found for order ${order.orderId}: ₹${earning}`);
+      }
+
+      // Get settlement details for earnings breakdown (already fetched in batch above)
+      const settlementDetails = settlementDetailsMap.get(orderIdStr) || settlementDetailsMap.get(order._id.toString()) || null;
 
       // Get payment method - check Payment collection as fallback (for COD orders)
       let paymentMethod = order.payment?.method || 'razorpay';
@@ -229,7 +354,7 @@ export const getTripHistory = asyncHandler(async (req, res) => {
 
       // Get restaurant location
       const restaurantLocation = order.restaurantId?.location || null;
-      
+
       return {
         id: order._id.toString(),
         orderId: order.orderId,
@@ -247,7 +372,9 @@ export const getTripHistory = asyncHandler(async (req, res) => {
         pricing: order.pricing || null, // Include pricing details
         status: displayStatus,
         time,
-        amount,
+        amount, // Actual earnings from settlement
+        earnings: amount, // Alias for backward compatibility
+        settlement: settlementDetails, // Include settlement details for earnings breakdown
         paymentMethod: paymentMethod,
         payment: {
           method: paymentMethod

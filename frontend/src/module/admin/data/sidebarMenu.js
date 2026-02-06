@@ -52,6 +52,12 @@ export const sidebarMenuData = [
         icon: "MapPin",
       },
       {
+        type: "link",
+        label: "Menu Add",
+        path: "/admin/menu-add",
+        icon: "Utensils",
+      },
+      {
         type: "expandable",
         label: "Restaurants",
         icon: "UtensilsCrossed",

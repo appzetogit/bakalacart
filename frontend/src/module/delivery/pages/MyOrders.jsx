@@ -72,6 +72,15 @@ export default function MyOrders() {
           if (response?.data?.success && response?.data?.data?.orders) {
             ordersData = response.data.data.orders || []
             console.log('✅ Found active orders:', ordersData.length)
+            // Debug: Log estimated earnings for first order
+            if (ordersData.length > 0) {
+              console.log('💰 First order earnings:', {
+                orderId: ordersData[0].orderId,
+                estimatedEarnings: ordersData[0].estimatedEarnings,
+                assignmentInfo: ordersData[0].assignmentInfo,
+                distance: ordersData[0].estimatedEarnings?.distance || ordersData[0].assignmentInfo?.distance
+              })
+            }
           }
         } else {
           // Fetch all orders (delivered/cancelled) using Trip History API
@@ -86,12 +95,13 @@ export default function MyOrders() {
           if (response?.data?.success && response?.data?.data?.trips) {
             ordersData = response.data.data.trips || []
             console.log(`✅ Found ${activeTab} orders:`, ordersData.length)
-            // Debug: Log first few orders to check their status
+            // Debug: Log first few orders to check their status and earnings
             if (ordersData.length > 0) {
               console.log('📋 Sample orders from API:', ordersData.slice(0, 3).map(o => ({
                 orderId: o.orderId,
                 status: o.status,
-                deliveryState: o.deliveryState
+                deliveryState: o.deliveryState,
+                earnings: o.amount || o.earnings || o.pricing?.deliveryFee
               })))
             }
           } else if (response?.data?.data?.orders) {
@@ -905,17 +915,19 @@ export default function MyOrders() {
       }
 
       // Store order data in localStorage for DeliveryHome to use
+      // IMPORTANT: Only set route flags if order is already accepted
+      const isOrderAccepted = isAcceptedByDeliveryBoy(order)
       localStorage.setItem('deliveryActiveOrder', JSON.stringify({
         restaurantInfo: orderData,
         showMap: true,
-        showRoute: true,
-        showRoutePath: true, // Enable route path display
+        showRoute: isOrderAccepted, // Only show route if order is accepted
+        showRoutePath: isOrderAccepted, // Only enable route path if order is accepted
         hasDirectionsAPI: true,
-        acceptedAt: new Date().toISOString(),
+        acceptedAt: isOrderAccepted ? new Date().toISOString() : null,
         currentLocation: currentLocation,
         navigationMode: 'restaurant', // Route to restaurant
-        shouldShowPolyline: true, // Flag to show polyline
-        enableLiveTracking: true // Enable live tracking
+        shouldShowPolyline: isOrderAccepted, // Only show polyline if order is accepted
+        enableLiveTracking: isOrderAccepted // Only enable live tracking if order is accepted
       }))
 
       // Navigate to DeliveryHome
@@ -963,14 +975,18 @@ export default function MyOrders() {
       }
 
       // Store order data in localStorage for DeliveryHome to use
+      // IMPORTANT: Only set route flags if order is already accepted
+      const isOrderAccepted = isAcceptedByDeliveryBoy(order)
       localStorage.setItem('deliveryActiveOrder', JSON.stringify({
         restaurantInfo: orderData,
         showMap: true,
-        showRoute: true,
+        showRoute: isOrderAccepted, // Only show route if order is accepted
+        showRoutePath: isOrderAccepted, // Only enable route path if order is accepted
         hasDirectionsAPI: true,
-        acceptedAt: new Date().toISOString(),
+        acceptedAt: isOrderAccepted ? new Date().toISOString() : null,
         currentLocation: currentLocation,
-        navigationMode: 'customer' // Route to customer
+        navigationMode: 'customer', // Route to customer
+        shouldShowPolyline: isOrderAccepted // Only show polyline if order is accepted
       }))
 
       // Navigate to DeliveryHome
@@ -1206,6 +1222,28 @@ export default function MyOrders() {
               const isActive = isActiveOrder(order)
               const rating = order.rating || order.deliveryState?.rating || null
               const orderId = order.orderId || order._id || 'N/A'
+              
+              // Calculate estimated earnings from commission rules
+              const estimatedEarnings = order.estimatedEarnings?.totalEarning || 
+                                      (typeof order.estimatedEarnings === 'number' ? order.estimatedEarnings : null) ||
+                                      order.pricing?.deliveryFee || 
+                                      order.earnings || 
+                                      0
+              const deliveryDistance = order.estimatedEarnings?.distance || 
+                                     order.assignmentInfo?.distance || 
+                                     order.deliveryDistance || 
+                                     null
+              
+              // Debug log for first order
+              if (order === filteredOrders[0]) {
+                console.log('🔍 Order earnings debug:', {
+                  orderId: order.orderId,
+                  estimatedEarnings: order.estimatedEarnings,
+                  calculatedEarnings: estimatedEarnings,
+                  distance: deliveryDistance,
+                  assignmentInfo: order.assignmentInfo
+                })
+              }
 
               return (
                 <div
@@ -1379,11 +1417,6 @@ export default function MyOrders() {
                               {item.quantity || 1} x {item.name}
                             </span>
                           </div>
-                          {item.price && (
-                            <span className="text-sm text-gray-600 font-medium">
-                              ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                            </span>
-                          )}
                         </div>
                       ))
                     ) : (
@@ -1463,7 +1496,7 @@ export default function MyOrders() {
                     </>
                   )}
 
-                  {/* Date and Price */}
+                  {/* Date and Earnings */}
                   {activeTab === "delivered" ? (
                     <div className="px-4 py-2">
                       <div className="flex items-center justify-between">
@@ -1471,7 +1504,16 @@ export default function MyOrders() {
                           {orderStatus}
                         </span>
                         {(() => {
-                          const earnings = order.pricing?.deliveryFee || order.estimatedEarnings || order.earnings || 0
+                          // For delivered orders, get earnings from settlement (amount field from trip history)
+                          // Trip history API returns earnings in 'amount' field from OrderSettlement
+                          const earnings = order.amount || 
+                                         order.settlement?.deliveryPartnerEarning?.totalEarning ||
+                                         order.deliveryPartnerEarning?.totalEarning ||
+                                         order.pricing?.deliveryFee || 
+                                         order.estimatedEarnings?.totalEarning || 
+                                         order.estimatedEarnings || 
+                                         order.earnings || 
+                                         0
                           return (
                             <span className="text-green-600 font-bold text-lg">
                               Earnings: ₹{Number(earnings).toFixed(2)}
@@ -1481,27 +1523,58 @@ export default function MyOrders() {
                       </div>
                     </div>
                   ) : (
-                    <div className="px-4 py-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-400">Order placed on {orderDate}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-xs font-medium ${isDelivered ? 'text-green-600' :
-                            isCancelled ? 'text-red-600' :
-                              'text-orange-600'
-                            }`}>
-                            {orderStatus}
-                          </span>
-                          {isActive && activeTab === "pending" && (
-                            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
-                              Active
+                    <div className="px-4 py-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-xs text-gray-400">Order placed on {orderDate}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs font-medium ${isDelivered ? 'text-green-600' :
+                              isCancelled ? 'text-red-600' :
+                                'text-orange-600'
+                              }`}>
+                              {orderStatus}
                             </span>
-                          )}
+                            {isActive && activeTab === "pending" && (
+                              <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                                Active
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center">
-                        <span className="text-sm font-semibold text-gray-800">₹{orderPrice.toFixed(2)}</span>
-                        <ChevronRight className="w-4 h-4 text-gray-400 ml-1" />
-                      </div>
+                      {/* Estimated Earnings Display - Show for pending orders */}
+                      {activeTab === "pending" && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 bg-green-50 rounded-lg p-2">
+                          {estimatedEarnings > 0 ? (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <IndianRupee className="w-4 h-4 text-green-600" />
+                                  <span className="text-sm font-semibold text-gray-700">Estimated Earnings:</span>
+                                </div>
+                                <span className="text-green-600 font-bold text-lg">
+                                  ₹{Number(estimatedEarnings).toFixed(2)}
+                                </span>
+                              </div>
+                              {deliveryDistance && (
+                                <div className="flex items-center justify-between mt-1.5">
+                                  <span className="text-xs text-gray-600">Distance:</span>
+                                  <span className="text-xs text-gray-700 font-medium">
+                                    {Number(deliveryDistance).toFixed(2)} km
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <IndianRupee className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-500">Calculating earnings...</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1745,11 +1818,6 @@ export default function MyOrders() {
                               {item.quantity || 1} x {item.name}
                             </span>
                           </div>
-                          {item.price && (
-                            <span className="text-sm text-gray-600 font-medium">
-                              ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                            </span>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -1769,18 +1837,56 @@ export default function MyOrders() {
                   </div>
                 )}
 
-                {/* Earnings */}
-                {(selectedOrderForDetails.pricing?.deliveryFee || selectedOrderForDetails.estimatedEarnings) && (
-                  <div className="border-b pb-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <IndianRupee className="w-4 h-4 text-green-600" />
-                      <span className="text-sm font-semibold text-gray-700">Earnings</span>
-                    </div>
-                    <p className="text-sm text-green-600 font-semibold ml-6">
-                      ₹{(selectedOrderForDetails.pricing?.deliveryFee || selectedOrderForDetails.estimatedEarnings || 0).toFixed(2)}
-                    </p>
-                  </div>
-                )}
+                {/* Earnings - Show actual earnings from settlement for delivered orders */}
+                {(() => {
+                  // For delivered orders, get actual earnings from settlement (amount field from trip history)
+                  // For pending orders, show estimated earnings
+                  const actualEarnings = selectedOrderForDetails.amount || 
+                                        selectedOrderForDetails.settlement?.deliveryPartnerEarning?.totalEarning ||
+                                        selectedOrderForDetails.deliveryPartnerEarning?.totalEarning ||
+                                        selectedOrderForDetails.pricing?.deliveryFee || 
+                                        selectedOrderForDetails.estimatedEarnings?.totalEarning || 
+                                        selectedOrderForDetails.estimatedEarnings || 
+                                        0
+                  
+                  if (actualEarnings > 0) {
+                    return (
+                      <div className="border-b pb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <IndianRupee className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-semibold text-gray-700">
+                            {selectedOrderForDetails.status === 'Completed' || selectedOrderForDetails.status === 'Delivered' ? 'Earnings' : 'Estimated Earnings'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-green-600 font-semibold ml-6">
+                          ₹{Number(actualEarnings).toFixed(2)}
+                        </p>
+                        {/* Show earnings breakdown if available from settlement */}
+                        {selectedOrderForDetails.settlement?.deliveryPartnerEarning && (
+                          <div className="ml-6 mt-2 space-y-1 text-xs text-gray-600">
+                            <div className="flex justify-between">
+                              <span>Base Payout:</span>
+                              <span>₹{Number(selectedOrderForDetails.settlement.deliveryPartnerEarning.basePayout || 0).toFixed(2)}</span>
+                            </div>
+                            {selectedOrderForDetails.settlement.deliveryPartnerEarning.distanceCommission > 0 && (
+                              <div className="flex justify-between">
+                                <span>Distance Commission:</span>
+                                <span>₹{Number(selectedOrderForDetails.settlement.deliveryPartnerEarning.distanceCommission || 0).toFixed(2)}</span>
+                              </div>
+                            )}
+                            {selectedOrderForDetails.settlement.deliveryPartnerEarning.distance > 0 && (
+                              <div className="flex justify-between">
+                                <span>Distance:</span>
+                                <span>{Number(selectedOrderForDetails.settlement.deliveryPartnerEarning.distance || 0).toFixed(2)} km</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
 
                 {/* Payment Method */}
                 <div className="border-b pb-3">
@@ -1807,49 +1913,7 @@ export default function MyOrders() {
                   </div>
                 </div>
 
-                {/* Price Breakdown */}
-                {selectedOrderForDetails.pricing && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-semibold text-gray-700">Price Breakdown</span>
-                    </div>
-                    <div className="ml-6 space-y-1">
-                      {/* Only show Subtotal if it exists and is greater than 0 */}
-                      {selectedOrderForDetails.pricing.subtotal != null && Number(selectedOrderForDetails.pricing.subtotal) > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Subtotal:</span>
-                          <span className="text-gray-800">₹{Number(selectedOrderForDetails.pricing.subtotal).toFixed(2)}</span>
-                        </div>
-                      )}
-                      {/* Only show Delivery Fee if it exists and is greater than 0 */}
-                      {selectedOrderForDetails.pricing.deliveryFee != null && Number(selectedOrderForDetails.pricing.deliveryFee) > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Delivery Fee:</span>
-                          <span className="text-green-600 font-medium">₹{Number(selectedOrderForDetails.pricing.deliveryFee).toFixed(2)}</span>
-                        </div>
-                      )}
-                      {/* Only show Tax if it exists and is greater than 0 */}
-                      {selectedOrderForDetails.pricing.tax != null && Number(selectedOrderForDetails.pricing.tax) > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Tax:</span>
-                          <span className="text-gray-800">₹{Number(selectedOrderForDetails.pricing.tax).toFixed(2)}</span>
-                        </div>
-                      )}
-                      {/* Only show Discount if it exists and is greater than 0 */}
-                      {selectedOrderForDetails.pricing.discount != null && Number(selectedOrderForDetails.pricing.discount) > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Discount:</span>
-                          <span className="text-red-600">-₹{Number(selectedOrderForDetails.pricing.discount).toFixed(2)}</span>
-                        </div>
-                      )}
-                      {/* Always show Total */}
-                      <div className="flex items-center justify-between text-sm font-semibold pt-2 border-t border-gray-200">
-                        <span className="text-gray-800">Total:</span>
-                        <span className="text-gray-900">₹{(selectedOrderForDetails.pricing.total || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Price Breakdown - Hidden for delivery partners */}
               </div>
             </>
           )}
