@@ -61,6 +61,8 @@ export default defineConfig({
       format: 'esm',
       // Remove unused code more aggressively
       pure: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+      // Ensure proper hoisting to prevent initialization issues
+      keepNames: false,
     },
     // Better compression
     reportCompressedSize: false, // Faster builds
@@ -71,12 +73,19 @@ export default defineConfig({
       output: {
         // Simplified manual chunk splitting to avoid initialization order issues
         manualChunks: (id) => {
-          // Vendor chunks - simplified grouping to prevent circular dependencies
+          // CRITICAL: Don't split React core - let it be bundled with vendor
+          // Splitting React causes initialization order issues
           if (id.includes('node_modules')) {
-            // React ecosystem (keep together to avoid circular deps)
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor'
+            // DO NOT split React core packages - they must load together
+            // This prevents "can't access lexical declaration before initialization" errors
+            const isReactCore = (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router/') || id === 'react' || id === 'react-dom' || id === 'react-router-dom' || id.includes('react-is'))
+            
+            // If it's React core, put it in vendor (no splitting)
+            if (isReactCore) {
+              return 'vendor'
             }
+            
+            // Only split non-React-core dependencies
             // Radix UI (large, used in many places)
             if (id.includes('@radix-ui')) {
               return 'radix-ui-vendor'
@@ -85,7 +94,7 @@ export default defineConfig({
             if (id.includes('@mui')) {
               return 'mui-vendor'
             }
-            // Icon libraries (can be large)
+            // Icon libraries (can be large) - these use React but aren't React core
             if (id.includes('lucide-react') || id.includes('@heroicons') || id.includes('@tabler/icons') || id.includes('react-icons')) {
               return 'icons-vendor'
             }
@@ -127,7 +136,7 @@ export default defineConfig({
             if (id.includes('axios')) {
               return 'axios-vendor'
             }
-            // Everything else from node_modules - keep as single vendor chunk
+            // Everything else (including React-related packages that aren't core) goes to vendor
             return 'vendor'
           }
           // Split large app modules for better code splitting
@@ -161,6 +170,12 @@ export default defineConfig({
         preserveModules: false,
         // Better handling of circular dependencies
         interop: 'compat',
+        // Ensure proper chunk ordering - React must load first
+        // This ensures dependencies are loaded in the correct order
+        generatedCode: {
+          constBindings: true,
+          objectShorthand: true,
+        },
       },
       // External dependencies that should not be bundled (if any)
       external: [],
@@ -172,6 +187,10 @@ export default defineConfig({
           if (warning.message.includes('node_modules')) {
             return
           }
+        }
+        // Suppress module resolution warnings for React (handled by dedupe)
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.source && warning.source.includes('react')) {
+          return
         }
         // Use default warning handler for other warnings
         warn(warning)

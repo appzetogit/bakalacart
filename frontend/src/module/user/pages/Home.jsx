@@ -251,7 +251,6 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                   ? "w-6 bg-white"
                   : "w-1.5 bg-white/50 hover:bg-white/75"
               }`}
-              aria-label={`Go to image ${index + 1}`}
             />
           ))}
         </div>

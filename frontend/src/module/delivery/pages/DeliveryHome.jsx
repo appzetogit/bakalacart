@@ -10252,7 +10252,6 @@ export default function DeliveryHome() {
           </>
         )}
       </AnimatePresence>
-      )}
 
       {/* Directions Map View */}
       <AnimatePresence>
