@@ -10,7 +10,9 @@ import {
   Utensils,
   ChevronDown,
   ChevronRight,
-  Save
+  Save,
+  Edit2,
+  Trash2
 } from "lucide-react"
 import { adminAPI, restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -29,6 +31,8 @@ export default function MenuAdd() {
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [creatingCategory, setCreatingCategory] = useState(false)
+  const [editingDish, setEditingDish] = useState(null) // { dish, section }
+  const [deletingDish, setDeletingDish] = useState(false)
 
   // Preparation time options
   const preparationTimeOptions = [
@@ -123,6 +127,7 @@ export default function MenuAdd() {
 
   const handleAddDish = (section) => {
     setSelectedSection(section)
+    setEditingDish(null)
     setFormData({
       name: "",
       image: "",
@@ -139,6 +144,73 @@ export default function MenuAdd() {
     setShowNewCategoryInput(false)
     setNewCategoryName("")
     setShowAddDishModal(true)
+  }
+
+  const handleEditDish = (dish, section) => {
+    setSelectedSection(section)
+    setEditingDish({ dish, section })
+    setFormData({
+      name: dish.name || "",
+      image: dish.image || "",
+      images: Array.isArray(dish.images) ? dish.images : (dish.image ? [dish.image] : []),
+      price: dish.price || 0,
+      foodType: dish.foodType || "Non-Veg",
+      category: dish.category || section.name,
+      description: dish.description || "",
+      preparationTime: dish.preparationTime || "",
+      isAvailable: dish.isAvailable !== false,
+      isRecommended: dish.isRecommended || false,
+      stock: dish.stock === "Unlimited" || dish.stock === 0 || dish.stock === "0" ? true : (typeof dish.stock === 'number' && dish.stock > 0),
+    })
+    setShowNewCategoryInput(false)
+    setNewCategoryName("")
+    setShowAddDishModal(true)
+  }
+
+  const handleDeleteDish = async (dish, section) => {
+    if (!confirm(`Are you sure you want to delete "${dish.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    if (!selectedRestaurant?._id) {
+      toast.error("Please select a restaurant")
+      return
+    }
+
+    try {
+      setDeletingDish(true)
+      
+      // Get current menu
+      const currentMenu = menu || { sections: [] }
+      
+      // Remove item from section
+      const updatedSections = currentMenu.sections.map(sec => {
+        if (sec.id === section.id || sec.name === section.name) {
+          return {
+            ...sec,
+            items: (sec.items || []).filter(item => String(item.id) !== String(dish.id))
+          }
+        }
+        return sec
+      })
+
+      // Update menu via Admin API
+      const updateResponse = await adminAPI.updateRestaurantMenu(selectedRestaurant._id, {
+        sections: updatedSections
+      })
+
+      if (updateResponse.data?.success) {
+        toast.success("Dish deleted successfully!")
+        fetchMenu() // Refresh menu
+      } else {
+        toast.error("Failed to delete dish")
+      }
+    } catch (error) {
+      console.error("Error deleting dish:", error)
+      toast.error(error.response?.data?.message || "Failed to delete dish")
+    } finally {
+      setDeletingDish(false)
+    }
   }
 
   const handleCreateCategory = async () => {
@@ -230,71 +302,94 @@ export default function MenuAdd() {
       setSaving(true)
       
       // Prepare dish data
+      const existingDish = editingDish ? editingDish.dish : null
       const dishData = {
-        id: Date.now().toString(),
+        id: editingDish ? editingDish.dish.id : Date.now().toString(),
         name: formData.name.trim(),
-        nameArabic: "",
+        nameArabic: existingDish?.nameArabic || "",
         image: formData.image || (formData.images?.[0] || ""),
         images: formData.images.length > 0 ? formData.images : (formData.image ? [formData.image] : []),
         price: parseFloat(formData.price),
         stock: formData.stock ? "Unlimited" : 0,
-        discount: null,
-        originalPrice: null,
-        discountType: "Percent",
-        discountAmount: 0,
+        discount: existingDish?.discount || null,
+        originalPrice: existingDish?.originalPrice || null,
+        discountType: existingDish?.discountType || "Percent",
+        discountAmount: existingDish?.discountAmount || 0,
         foodType: formData.foodType,
         category: formData.category,
         description: formData.description || "",
-        availabilityTimeStart: "12:01 AM",
-        availabilityTimeEnd: "11:57 PM",
+        availabilityTimeStart: existingDish?.availabilityTimeStart || "12:01 AM",
+        availabilityTimeEnd: existingDish?.availabilityTimeEnd || "11:57 PM",
         isAvailable: formData.isAvailable !== false,
         isRecommended: formData.isRecommended || false,
-        variations: [],
-        tags: [],
-        nutrition: [],
-        allergies: [],
-        subCategory: "",
-        servesInfo: "",
-        itemSize: "",
-        itemSizeQuantity: "",
-        itemSizeUnit: "piece",
-        gst: 0,
+        variations: existingDish?.variations || [],
+        tags: existingDish?.tags || [],
+        nutrition: existingDish?.nutrition || [],
+        allergies: existingDish?.allergies || [],
+        subCategory: existingDish?.subCategory || "",
+        servesInfo: existingDish?.servesInfo || "",
+        itemSize: existingDish?.itemSize || "",
+        itemSizeQuantity: existingDish?.itemSizeQuantity || "",
+        itemSizeUnit: existingDish?.itemSizeUnit || "piece",
+        gst: existingDish?.gst || 0,
         preparationTime: formData.preparationTime || "",
         photoCount: formData.images.length || 1,
-        rating: 0,
-        reviews: 0,
-        approvalStatus: 'approved', // Admin adding directly, so approved
-        approvedAt: new Date(),
+        rating: existingDish?.rating || 0,
+        reviews: existingDish?.reviews || 0,
+        approvalStatus: existingDish?.approvalStatus || 'approved',
+        approvedAt: existingDish?.approvedAt || new Date(),
+        requestedAt: existingDish?.requestedAt,
+        approvedBy: existingDish?.approvedBy,
+        rejectedAt: existingDish?.rejectedAt,
+        rejectionReason: existingDish?.rejectionReason || "",
       }
 
       // Get current menu
       const currentMenu = menu || { sections: [] }
       
-      // Find section by name (category) and add item
-      // If section doesn't exist, create it
-      let sectionFound = false
-      const updatedSections = currentMenu.sections.map(section => {
-        if (section.name === formData.category) {
-          sectionFound = true
-          return {
-            ...section,
-            items: [...(section.items || []), dishData]
+      let updatedSections = []
+      
+      if (editingDish) {
+        // Editing existing dish - replace it
+        updatedSections = currentMenu.sections.map(section => {
+          if (section.id === editingDish.section.id || section.name === editingDish.section.name) {
+            return {
+              ...section,
+              items: (section.items || []).map(item => 
+                String(item.id) === String(editingDish.dish.id) ? dishData : item
+              )
+            }
           }
-        }
-        return section
-      })
+          return section
+        })
+      } else {
+        // Adding new dish
+        // Find section by name (category) and add item
+        // If section doesn't exist, create it
+        let sectionFound = false
+        updatedSections = currentMenu.sections.map(section => {
+          if (section.name === formData.category || section.id === selectedSection?.id) {
+            sectionFound = true
+            return {
+              ...section,
+              items: [...(section.items || []), dishData]
+            }
+          }
+          return section
+        })
 
-      // If section not found, create new section
-      if (!sectionFound) {
-        const newSection = {
-          id: `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: formData.category,
-          items: [dishData],
-          subsections: [],
-          isEnabled: true,
-          order: updatedSections.length,
+        // If section not found, create new section
+        if (!sectionFound) {
+          const newSection = {
+            id: `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: formData.category,
+            items: [dishData],
+            subsections: [],
+            isEnabled: true,
+            order: updatedSections.length,
+          }
+          updatedSections.push(newSection)
         }
-        updatedSections.push(newSection)
       }
 
       // Update menu via Admin API
@@ -304,8 +399,9 @@ export default function MenuAdd() {
         })
 
         if (updateResponse.data?.success) {
-          toast.success("Dish added successfully!")
+          toast.success(editingDish ? "Dish updated successfully!" : "Dish added successfully!")
           setShowAddDishModal(false)
+          setEditingDish(null)
           fetchMenu() // Refresh menu
           // Reset form
           setFormData({
@@ -324,7 +420,7 @@ export default function MenuAdd() {
           setShowNewCategoryInput(false)
           setNewCategoryName("")
         } else {
-          toast.error("Failed to add dish")
+          toast.error(editingDish ? "Failed to update dish" : "Failed to add dish")
         }
       } catch (apiError) {
         throw apiError
@@ -460,7 +556,7 @@ export default function MenuAdd() {
                             section.items.map((item) => (
                               <div
                                 key={item.id}
-                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                               >
                                 {item.image && (
                                   <img
@@ -469,14 +565,35 @@ export default function MenuAdd() {
                                     className="w-16 h-16 object-cover rounded"
                                   />
                                 )}
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{item.name}</div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 truncate">{item.name}</div>
                                   <div className="text-sm text-gray-600">
                                     ₹{item.price} • {item.foodType}
                                   </div>
                                 </div>
-                                <div className="text-sm font-semibold text-gray-900">
-                                  ₹{item.price}
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-semibold text-gray-900">
+                                    ₹{item.price}
+                                  </div>
+                                  <button
+                                    onClick={() => handleEditDish(item, section)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteDish(item, section)}
+                                    disabled={deletingDish}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                    title="Delete"
+                                  >
+                                    {deletingDish ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             ))
@@ -524,9 +641,14 @@ export default function MenuAdd() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Add Dish</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingDish ? "Edit Dish" : "Add Dish"}
+              </h2>
               <button
-                onClick={() => setShowAddDishModal(false)}
+                onClick={() => {
+                  setShowAddDishModal(false)
+                  setEditingDish(null)
+                }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-gray-600" />
@@ -804,7 +926,7 @@ export default function MenuAdd() {
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    Save Dish
+                    {editingDish ? "Update Dish" : "Save Dish"}
                   </>
                 )}
               </button>
