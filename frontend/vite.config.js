@@ -1,16 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(), 
+    tailwindcss(),
+    nodePolyfills({
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],
+    // Better module resolution to prevent initialization issues
+    preserveSymlinks: false,
+    // Ensure consistent module resolution
+    mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
+  },
+  // Define empty objects for Node.js modules that axios might reference
+  define: {
+    'process.env': {},
   },
   optimizeDeps: {
     include: [
@@ -20,7 +36,14 @@ export default defineConfig({
       '@mui/x-date-pickers', 
       'mapbox-gl', 
       'react-map-gl',
+      'react',
+      'react-dom',
+      'react-router-dom',
     ],
+    // Exclude problematic dependencies from pre-bundling if needed
+    exclude: [],
+    // Force re-optimization when dependencies change
+    force: false,
   },
   build: {
     // Use esbuild for faster builds, with aggressive minification
@@ -34,35 +57,25 @@ export default defineConfig({
       minifyWhitespace: true,
       treeShaking: true,
       // More aggressive minification
-      target: 'es2015',
+      target: 'es2020', // Updated to es2020 for better compatibility
       format: 'esm',
       // Remove unused code more aggressively
       pure: ['console.log', 'console.info', 'console.debug', 'console.warn'],
     },
-    // Reduce chunk size warnings
-    chunkSizeWarningLimit: 500,
     // Better compression
     reportCompressedSize: false, // Faster builds
     // CSS minification
     cssMinify: 'lightningcss',
-    // Code splitting configuration
+    // Code splitting configuration - simplified to avoid circular dependencies
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching and tree shaking
+        // Simplified manual chunk splitting to avoid initialization order issues
         manualChunks: (id) => {
-          // Vendor chunks - more granular splitting
+          // Vendor chunks - simplified grouping to prevent circular dependencies
           if (id.includes('node_modules')) {
-            // React core (smallest, most frequently used)
-            if (id.includes('react') && !id.includes('react-dom') && !id.includes('react-router')) {
-              return 'react-core'
-            }
-            // React DOM (separate from React core)
-            if (id.includes('react-dom')) {
-              return 'react-dom-vendor'
-            }
-            // React Router (separate chunk)
-            if (id.includes('react-router')) {
-              return 'react-router-vendor'
+            // React ecosystem (keep together to avoid circular deps)
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor'
             }
             // Radix UI (large, used in many places)
             if (id.includes('@radix-ui')) {
@@ -114,7 +127,7 @@ export default defineConfig({
             if (id.includes('axios')) {
               return 'axios-vendor'
             }
-            // Everything else from node_modules
+            // Everything else from node_modules - keep as single vendor chunk
             return 'vendor'
           }
           // Split large app modules for better code splitting
@@ -142,6 +155,26 @@ export default defineConfig({
           }
           return `assets/[name]-[hash][extname]`
         },
+        // Ensure proper module format to avoid initialization issues
+        format: 'es',
+        // Preserve module structure
+        preserveModules: false,
+        // Better handling of circular dependencies
+        interop: 'compat',
+      },
+      // External dependencies that should not be bundled (if any)
+      external: [],
+      // Better handling of circular dependencies
+      onwarn(warning, warn) {
+        // Suppress circular dependency warnings for known safe cases
+        if (warning.code === 'CIRCULAR_DEPENDENCY') {
+          // Only warn for critical circular dependencies
+          if (warning.message.includes('node_modules')) {
+            return
+          }
+        }
+        // Use default warning handler for other warnings
+        warn(warning)
       },
     },
     // Increase chunk size warning limit
@@ -151,12 +184,26 @@ export default defineConfig({
     // CSS code splitting
     cssCodeSplit: true,
     // Target modern browsers for smaller output
-    target: 'es2015',
-    // Enable aggressive tree shaking
+    target: 'es2020', // Updated to es2020 for better compatibility
+    // Enable aggressive tree shaking but with safer defaults
     treeshake: {
-      moduleSideEffects: false,
+      moduleSideEffects: (id) => {
+        // Preserve side effects for certain modules
+        if (id.includes('node_modules')) {
+          // Some libraries need side effects preserved
+          if (id.includes('@radix-ui') || id.includes('@mui') || id.includes('firebase')) {
+            return true
+          }
+        }
+        return false
+      },
       propertyReadSideEffects: false,
       tryCatchDeoptimization: false,
+    },
+    // CommonJS options for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
     },
   },
   server: {
