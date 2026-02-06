@@ -1,0 +1,12 @@
+# robots.txt for BakalaCart
+# Allow all search engine crawlers to access all content
+
+User-agent: *
+# Disallow admin and API routes
+Disallow: /admin/
+Disallow: /api/
+# Allow all other content
+Allow: /
+
+# Sitemap location (update with your actual sitemap URL when available)
+# Sitemap: https://yourdomain.com/sitemap.xml
