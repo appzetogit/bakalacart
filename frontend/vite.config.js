@@ -79,8 +79,8 @@ export default defineConfig({
       format: 'esm',
       // Remove unused code more aggressively
       pure: ['console.log', 'console.info', 'console.debug', 'console.warn'],
-      // Ensure proper hoisting to prevent initialization issues
-      keepNames: false,
+      // CRITICAL FIX: Keep names for React to prevent initialization issues
+      keepNames: true, // Keep function names to prevent TDZ issues with React
     },
     // Better compression
     reportCompressedSize: false, // Faster builds
@@ -112,6 +112,12 @@ export default defineConfig({
             // This ensures React is fully initialized before any other code uses it
             if (isReactCore) {
               return 'react-vendor' // Single chunk for all React dependencies
+            }
+            
+            // CRITICAL: Also bundle React-dependent packages that might cause issues
+            // These packages MUST load after React but before app code
+            if (id.includes('sonner')) {
+              return 'react-vendor' // Sonner uses React, bundle with React
             }
             
             // Only split non-React dependencies
@@ -209,6 +215,9 @@ export default defineConfig({
         },
         // CRITICAL FIX: Enable hoisting for React to ensure proper initialization order
         hoistTransitiveImports: true, // Hoist React imports to prevent initialization errors
+        // CRITICAL: Ensure React vendor chunk is loaded before entry chunk
+        // This is handled by Vite's dependency graph, but we ensure it explicitly
+        chunkGroupingSize: 50000, // Smaller chunks for better loading order control
       },
       // External dependencies that should not be bundled (if any)
       external: [],

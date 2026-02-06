@@ -1,3 +1,6 @@
+// CRITICAL FIX: Import React explicitly first to ensure proper initialization order
+// This prevents "Cannot access 'React' before initialization" errors
+import React from 'react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
