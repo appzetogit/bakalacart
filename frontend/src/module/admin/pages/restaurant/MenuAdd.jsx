@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Save,
   Edit2,
-  Trash2
+  Trash2,
+  Minus
 } from "lucide-react"
 import { adminAPI, restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -57,6 +58,8 @@ export default function MenuAdd() {
     isAvailable: true,
     isRecommended: false,
     stock: true, // Stock toggle - true means in stock
+    hasVariants: false, // Checkbox to enable variants
+    variants: [], // Array of variants: [{ id, name, price, stock }]
   })
 
   // Fetch restaurants
@@ -140,15 +143,48 @@ export default function MenuAdd() {
       isAvailable: true,
       isRecommended: false,
       stock: true,
+      hasVariants: false,
+      variants: [],
     })
     setShowNewCategoryInput(false)
     setNewCategoryName("")
     setShowAddDishModal(true)
   }
 
+  // Variant management functions
+  const handleAddVariant = () => {
+    const newVariant = {
+      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: "",
+      price: 0,
+      stock: "Unlimited",
+    }
+    setFormData({
+      ...formData,
+      variants: [...formData.variants, newVariant],
+    })
+  }
+
+  const handleRemoveVariant = (variantId) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.filter((v) => v.id !== variantId),
+    })
+  }
+
+  const handleUpdateVariant = (variantId, field, value) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.map((v) =>
+        v.id === variantId ? { ...v, [field]: value } : v
+      ),
+    })
+  }
+
   const handleEditDish = (dish, section) => {
     setSelectedSection(section)
     setEditingDish({ dish, section })
+    const hasVariants = Array.isArray(dish.variations) && dish.variations.length > 0
     setFormData({
       name: dish.name || "",
       image: dish.image || "",
@@ -161,6 +197,13 @@ export default function MenuAdd() {
       isAvailable: dish.isAvailable !== false,
       isRecommended: dish.isRecommended || false,
       stock: dish.stock === "Unlimited" || dish.stock === 0 || dish.stock === "0" ? true : (typeof dish.stock === 'number' && dish.stock > 0),
+      hasVariants: hasVariants,
+      variants: hasVariants ? dish.variations.map((v) => ({
+        id: v.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: v.name || "",
+        price: v.price || 0,
+        stock: v.stock || "Unlimited",
+      })) : [],
     })
     setShowNewCategoryInput(false)
     setNewCategoryName("")
@@ -283,9 +326,33 @@ export default function MenuAdd() {
 
 
   const handleSaveDish = async () => {
-    if (!formData.name || !formData.price || formData.price <= 0) {
-      toast.error("Please fill in dish name and price")
+    if (!formData.name) {
+      toast.error("Please fill in dish name")
       return
+    }
+
+    if (!formData.hasVariants && (!formData.price || formData.price <= 0)) {
+      toast.error("Please fill in dish price")
+      return
+    }
+
+    if (formData.hasVariants && formData.variants.length === 0) {
+      toast.error("Please add at least one variant")
+      return
+    }
+
+    if (formData.hasVariants) {
+      // Validate variants
+      for (const variant of formData.variants) {
+        if (!variant.name || !variant.name.trim()) {
+          toast.error("Please fill in variant name for all variants")
+          return
+        }
+        if (!variant.price || variant.price <= 0) {
+          toast.error("Please fill in valid price for all variants")
+          return
+        }
+      }
     }
 
     if (!formData.category) {
@@ -303,13 +370,26 @@ export default function MenuAdd() {
       
       // Prepare dish data
       const existingDish = editingDish ? editingDish.dish : null
+      
+      // Prepare variations array
+      const variations = formData.hasVariants && formData.variants.length > 0
+        ? formData.variants.map((v) => ({
+            id: String(v.id),
+            name: v.name.trim(),
+            price: parseFloat(v.price) || 0,
+            stock: v.stock || "Unlimited",
+          }))
+        : []
+
       const dishData = {
         id: editingDish ? editingDish.dish.id : Date.now().toString(),
         name: formData.name.trim(),
         nameArabic: existingDish?.nameArabic || "",
         image: formData.image || (formData.images?.[0] || ""),
         images: formData.images.length > 0 ? formData.images : (formData.image ? [formData.image] : []),
-        price: parseFloat(formData.price),
+        price: formData.hasVariants && variations.length > 0 
+          ? Math.min(...variations.map(v => v.price)) // Base price as minimum variant price
+          : parseFloat(formData.price),
         stock: formData.stock ? "Unlimited" : 0,
         discount: existingDish?.discount || null,
         originalPrice: existingDish?.originalPrice || null,
@@ -322,7 +402,7 @@ export default function MenuAdd() {
         availabilityTimeEnd: existingDish?.availabilityTimeEnd || "11:57 PM",
         isAvailable: formData.isAvailable !== false,
         isRecommended: formData.isRecommended || false,
-        variations: existingDish?.variations || [],
+        variations: variations,
         tags: existingDish?.tags || [],
         nutrition: existingDish?.nutrition || [],
         allergies: existingDish?.allergies || [],
@@ -416,6 +496,8 @@ export default function MenuAdd() {
             isAvailable: true,
             isRecommended: false,
             stock: true,
+            hasVariants: false,
+            variants: [],
           })
           setShowNewCategoryInput(false)
           setNewCategoryName("")
@@ -632,6 +714,8 @@ export default function MenuAdd() {
                           isAvailable: true,
                           isRecommended: false,
                           stock: true,
+                          hasVariants: false,
+                          variants: [],
                         })
                         setShowNewCategoryInput(false)
                         setNewCategoryName("")
@@ -674,6 +758,24 @@ export default function MenuAdd() {
                 onClick={() => {
                   setShowAddDishModal(false)
                   setEditingDish(null)
+                  // Reset form when closing
+                  setFormData({
+                    name: "",
+                    image: "",
+                    images: [],
+                    price: 0,
+                    foodType: "Non-Veg",
+                    category: "",
+                    description: "",
+                    preparationTime: "",
+                    isAvailable: true,
+                    isRecommended: false,
+                    stock: true,
+                    hasVariants: false,
+                    variants: [],
+                  })
+                  setShowNewCategoryInput(false)
+                  setNewCategoryName("")
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -805,13 +907,126 @@ export default function MenuAdd() {
                 </div>
               </div>
 
+              {/* Variants Toggle */}
+              <div>
+                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Enable Variants</span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add multiple sizes/prices (e.g., Small, Medium, Large)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.hasVariants) {
+                        // Disabling variants - clear variants array
+                        setFormData({ ...formData, hasVariants: false, variants: [] })
+                      } else {
+                        // Enabling variants - add first variant
+                        setFormData({
+                          ...formData,
+                          hasVariants: true,
+                          variants: [{
+                            id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            name: "",
+                            price: 0,
+                            stock: "Unlimited",
+                          }],
+                        })
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      formData.hasVariants ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        formData.hasVariants ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Variants Section */}
+              {formData.hasVariants && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Variants</h3>
+                  <div className="space-y-4">
+                    {formData.variants.map((variant, index) => (
+                      <div
+                        key={variant.id}
+                        className="p-4 border border-gray-200 rounded-lg bg-gray-50"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-gray-700">
+                            Variant {index + 1}
+                          </span>
+                          {formData.variants.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVariant(variant.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Remove variant"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Size/Name * (e.g., Small, Medium, Large)
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.name}
+                              onChange={(e) =>
+                                handleUpdateVariant(variant.id, "name", e.target.value)
+                              }
+                              placeholder="e.g., Small, Medium, Large"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Price (₹) *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={variant.price}
+                              onChange={(e) =>
+                                handleUpdateVariant(variant.id, "price", e.target.value)
+                              }
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddVariant}
+                      className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-gray-600 hover:text-blue-600"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Variant
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Price & Food Type */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Price & Food Type</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price (₹) *
+                      {formData.hasVariants ? "Base Price (₹)" : "Price (₹) *"}
                     </label>
                     <input
                       type="number"
@@ -819,8 +1034,14 @@ export default function MenuAdd() {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
+                      disabled={formData.hasVariants}
+                      required={!formData.hasVariants}
                     />
+                    {formData.hasVariants && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Base price will be set to minimum variant price
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -934,7 +1155,28 @@ export default function MenuAdd() {
             {/* Modal Footer */}
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
               <button
-                onClick={() => setShowAddDishModal(false)}
+                onClick={() => {
+                  setShowAddDishModal(false)
+                  setEditingDish(null)
+                  // Reset form when canceling
+                  setFormData({
+                    name: "",
+                    image: "",
+                    images: [],
+                    price: 0,
+                    foodType: "Non-Veg",
+                    category: "",
+                    description: "",
+                    preparationTime: "",
+                    isAvailable: true,
+                    isRecommended: false,
+                    stock: true,
+                    hasVariants: false,
+                    variants: [],
+                  })
+                  setShowNewCategoryInput(false)
+                  setNewCategoryName("")
+                }}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel

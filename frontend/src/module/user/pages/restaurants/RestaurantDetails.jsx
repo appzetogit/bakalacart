@@ -42,6 +42,7 @@ import AnimatedPage from "../../components/AnimatedPage"
 import { useCart } from "../../context/CartContext"
 import { useProfile } from "../../context/ProfileContext"
 import AddToCartAnimation from "../../components/AddToCartAnimation"
+import FoodCustomizationModal from "../../components/FoodCustomizationModal"
 
 
 
@@ -74,6 +75,8 @@ export default function RestaurantDetails() {
   const [showMenuOptionsSheet, setShowMenuOptionsSheet] = useState(false)
   const [expandedAddButtons, setExpandedAddButtons] = useState(new Set())
   const [expandedSections, setExpandedSections] = useState(new Set([0])) // Default: Recommended section is expanded
+  const [showCustomizationModal, setShowCustomizationModal] = useState(false)
+  const [itemForCustomization, setItemForCustomization] = useState(null)
   const [filters, setFilters] = useState({
     sortBy: null, // "low-to-high" | "high-to-low"
     vegNonVeg: null, // "veg" | "non-veg"
@@ -702,6 +705,17 @@ export default function RestaurantDetails() {
     if (isOutOfService) {
       toast.error('You are outside the service zone. Please select a location within the service area.');
       return;
+    }
+
+    // Check if item has variants and user is adding (not removing)
+    const hasVariants = Array.isArray(item?.variations) && item.variations.length > 0
+    const isAdding = newQuantity > (quantities[item.id] || 0)
+    
+    // If adding a new item with variants, show customization modal
+    if (hasVariants && isAdding && (quantities[item.id] || 0) === 0) {
+      setItemForCustomization(item)
+      setShowCustomizationModal(true)
+      return // Don't proceed with direct add
     }
 
     // Note: We don't block cart operations based on restaurant availability
@@ -3028,6 +3042,51 @@ export default function RestaurantDetails() {
         linkTo="/cart"
         hideOnPages={true}
       />
+
+      {/* Food Customization Modal */}
+      {itemForCustomization && (
+        <FoodCustomizationModal
+          item={itemForCustomization}
+          restaurant={restaurant}
+          isOpen={showCustomizationModal}
+          onClose={() => {
+            setShowCustomizationModal(false)
+            setItemForCustomization(null)
+          }}
+          onAddToCart={(cartItem, quantity) => {
+            // Add item with selected variant to cart
+            try {
+              // Get source position for animation
+              let sourcePosition = null
+              
+              // Prepare cart item with restaurant info
+              const finalCartItem = {
+                ...cartItem,
+                restaurant: restaurant?.name || cartItem.restaurant,
+                restaurantId: restaurant?.restaurantId || restaurant?._id || restaurant?.id || cartItem.restaurantId,
+              }
+
+              // Add multiple times if quantity > 1
+              for (let i = 0; i < quantity; i++) {
+                addToCart(finalCartItem, sourcePosition)
+              }
+
+              // Update local quantities state
+              setQuantities((prev) => ({
+                ...prev,
+                [cartItem.id]: (prev[cartItem.id] || 0) + quantity,
+              }))
+
+              toast.success(`${quantity} ${cartItem.name} added to cart`)
+              setShowCustomizationModal(false)
+              setItemForCustomization(null)
+            } catch (error) {
+              console.error('❌ Error adding item to cart:', error)
+              toast.error(error.message || 'Failed to add item to cart')
+            }
+          }}
+        />
+      )}
     </AnimatedPage>
   )
 }
