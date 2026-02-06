@@ -123,32 +123,33 @@ const DeliveryTrackingMap = ({
           }
         }
         
-        if (cached.result.routes && cached.result.routes[0] && cached.result.routes[0].overview_path) {
-          if (routePolylineRef.current) {
-            routePolylineRef.current.setMap(null);
-          }
-          
-          routePolylineRef.current = new window.google.maps.Polyline({
-            path: cached.result.routes[0].overview_path,
-            geodesic: true,
-            strokeColor: '#10b981',
-            strokeOpacity: 0.8,
-            strokeWeight: 4,
-            icons: [{
-              icon: {
-                path: 'M 0,-1 0,1',
-                strokeOpacity: 1,
-                strokeWeight: 2,
-                strokeColor: '#10b981',
-                scale: 4
-              },
-              offset: '0%',
-              repeat: '15px'
-            }],
-            map: mapInstance.current,
-            zIndex: 1
-          });
-        }
+        // TEMPORARILY DISABLED: Polyline removed as requested
+        // if (cached.result.routes && cached.result.routes[0] && cached.result.routes[0].overview_path) {
+        //   if (routePolylineRef.current) {
+        //     routePolylineRef.current.setMap(null);
+        //   }
+        //   
+        //   routePolylineRef.current = new window.google.maps.Polyline({
+        //     path: cached.result.routes[0].overview_path,
+        //     geodesic: true,
+        //     strokeColor: '#10b981',
+        //     strokeOpacity: 0.8,
+        //     strokeWeight: 4,
+        //     icons: [{
+        //       icon: {
+        //         path: 'M 0,-1 0,1',
+        //         strokeOpacity: 1,
+        //         strokeWeight: 2,
+        //         strokeColor: '#10b981',
+        //         scale: 4
+        //       },
+        //       offset: '0%',
+        //       repeat: '15px'
+        //     }],
+        //     map: mapInstance.current,
+        //     zIndex: 1
+        //   });
+        // }
       }
       return;
     }
@@ -212,35 +213,36 @@ const DeliveryTrackingMap = ({
             }
           }
           
+          // TEMPORARILY DISABLED: Polyline removed as requested
           // Create dashed polyline overlay for better visibility
-          if (result.routes && result.routes[0] && result.routes[0].overview_path) {
-            // Remove existing custom polyline if any
-            if (routePolylineRef.current) {
-              routePolylineRef.current.setMap(null);
-            }
-            
-            // Create dashed polyline
-            routePolylineRef.current = new window.google.maps.Polyline({
-              path: result.routes[0].overview_path,
-              geodesic: true,
-              strokeColor: '#10b981',
-              strokeOpacity: 0.8,
-              strokeWeight: 4,
-              icons: [{
-                icon: {
-                  path: 'M 0,-1 0,1',
-                  strokeOpacity: 1,
-                  strokeWeight: 2,
-                  strokeColor: '#10b981',
-                  scale: 4
-                },
-                offset: '0%',
-                repeat: '15px'
-              }],
-              map: mapInstance.current,
-              zIndex: 1
-            });
-          }
+          // if (result.routes && result.routes[0] && result.routes[0].overview_path) {
+          //   // Remove existing custom polyline if any
+          //   if (routePolylineRef.current) {
+          //     routePolylineRef.current.setMap(null);
+          //   }
+          //   
+          //   // Create dashed polyline
+          //   routePolylineRef.current = new window.google.maps.Polyline({
+          //     path: result.routes[0].overview_path,
+          //     geodesic: true,
+          //     strokeColor: '#10b981',
+          //     strokeOpacity: 0.8,
+          //     strokeWeight: 4,
+          //     icons: [{
+          //       icon: {
+          //         path: 'M 0,-1 0,1',
+          //         strokeOpacity: 1,
+          //         strokeWeight: 2,
+          //         strokeColor: '#10b981',
+          //         scale: 4
+          //       },
+          //       offset: '0%',
+          //       repeat: '15px'
+          //     }],
+          //     map: mapInstance.current,
+          //     zIndex: 1
+          //   });
+          // }
           
         } else {
           // Silently handle errors - don't log UNKNOWN_ERROR as it's often a temporary API issue

@@ -1580,7 +1580,7 @@ export default function DeliveryHome() {
           } else if (window.deliveryMapInstance) {
             // Map already initialized - recenter and update marker
             window.deliveryMapInstance.setCenter({ lat: smoothedLocation[0], lng: smoothedLocation[1] })
-            window.deliveryMapInstance.setZoom(18)
+            window.deliveryMapInstance.setZoom(14) // Reduced from 18 to prevent excessive zoom
             createOrUpdateBikeMarker(smoothedLocation[0], smoothedLocation[1], heading, !isUserPanningRef.current)
             updateRoutePolyline()
             console.log('📍 Map recentered to GPS location')
@@ -1624,7 +1624,7 @@ export default function DeliveryHome() {
                       // Recenter map if already initialized, otherwise it will initialize when location is set
                       if (window.deliveryMapInstance) {
                         window.deliveryMapInstance.setCenter({ lat, lng })
-                        window.deliveryMapInstance.setZoom(18)
+                        window.deliveryMapInstance.setZoom(14) // Reduced from 18 to prevent excessive zoom
                         console.log('📍 Recentered map to GPS location')
 
                         // Update bike marker
@@ -1858,9 +1858,32 @@ export default function DeliveryHome() {
         localStorage.setItem('deliveryBoyLastLocation', JSON.stringify(smoothedLocation))
 
         // Update live tracking polyline for any active route (pickup or delivery)
-        const currentDirectionsResponse = directionsResponseRef.current;
-        if (currentDirectionsResponse && currentDirectionsResponse.routes && currentDirectionsResponse.routes.length > 0) {
-          updateLiveTrackingPolyline(currentDirectionsResponse, smoothedLocation);
+        // CRITICAL: Don't update polyline if order is delivered
+        const currentOrderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+        const currentDeliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+        const currentDeliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+        
+        const isOrderDelivered = currentOrderStatus === 'delivered' ||
+          currentOrderStatus === 'completed' ||
+          currentDeliveryPhase === 'delivered' ||
+          currentDeliveryPhase === 'completed' ||
+          currentDeliveryStateStatus === 'delivered';
+        
+        if (!isOrderDelivered) {
+          const currentDirectionsResponse = directionsResponseRef.current;
+          if (currentDirectionsResponse && currentDirectionsResponse.routes && currentDirectionsResponse.routes.length > 0) {
+            updateLiveTrackingPolyline(currentDirectionsResponse, smoothedLocation);
+          }
+        } else {
+          // Clear polylines if order is delivered
+          if (liveTrackingPolylineRef.current) {
+            liveTrackingPolylineRef.current.setMap(null);
+            liveTrackingPolylineRef.current = null;
+          }
+          if (liveTrackingPolylineShadowRef.current) {
+            liveTrackingPolylineShadowRef.current.setMap(null);
+            liveTrackingPolylineShadowRef.current = null;
+          }
         }
 
         // ============================================
@@ -2513,27 +2536,38 @@ export default function DeliveryHome() {
                   directionsResponseRef.current = directionsResult; // Store in ref for callbacks
                   directionsResultForMap = directionsResult; // Store for use in setTimeout
 
-                  // Enable route path display
-                  setShowRoutePath(true);
+                  // CRITICAL: Only show polyline if location icon was clicked (shouldShowPolyline flag)
+                  // Check if polyline should be shown (only when location icon is clicked after accept)
+                  const activeOrderData = localStorage.getItem('deliveryActiveOrder');
+                  const shouldShowPolyline = activeOrderData ? JSON.parse(activeOrderData).shouldShowPolyline : false;
+                  
+                  // Enable route path display only if location icon was clicked
+                  if (shouldShowPolyline) {
+                    setShowRoutePath(true);
 
-                  // Initialize live tracking polyline with full route (Delivery Boy → Restaurant)
-                  if (currentLocation) {
-                    // Ensure map is ready before updating polyline
-                    if (window.deliveryMapInstance) {
-                      updateLiveTrackingPolyline(directionsResult, currentLocation);
-                      console.log('✅ Live tracking polyline initialized for pickup route');
-                    } else {
-                      // Wait for map to be ready
-                      setTimeout(() => {
-                        if (window.deliveryMapInstance && currentLocation) {
-                          updateLiveTrackingPolyline(directionsResult, currentLocation);
-                          console.log('✅ Live tracking polyline initialized for pickup route (delayed)');
-                        }
-                      }, 500);
+                    // Initialize live tracking polyline with full route (Delivery Boy → Restaurant)
+                    if (currentLocation) {
+                      // Ensure map is ready before updating polyline
+                      if (window.deliveryMapInstance) {
+                        updateLiveTrackingPolyline(directionsResult, currentLocation);
+                        console.log('✅ Live tracking polyline initialized for pickup route (location icon clicked)');
+                      } else {
+                        // Wait for map to be ready
+                        setTimeout(() => {
+                          if (window.deliveryMapInstance && currentLocation) {
+                            updateLiveTrackingPolyline(directionsResult, currentLocation);
+                            console.log('✅ Live tracking polyline initialized for pickup route (delayed)');
+                          }
+                        }, 500);
+                      }
                     }
-                  }
 
-                  console.log('✅ Route to restaurant initialized - polyline will update as delivery boy moves');
+                    console.log('✅ Route to restaurant initialized - polyline will update as delivery boy moves');
+                  } else {
+                    console.log('🚫 Polyline not shown - location icon not clicked yet. Route data stored for later use.');
+                    // Don't show polyline yet - wait for location icon click
+                    setShowRoutePath(false);
+                  }
                 } else {
                   // Fallback: Use backend route or OSRM
                   console.log('⚠️ Directions API failed, using fallback...');
@@ -2614,8 +2648,11 @@ export default function DeliveryHome() {
             }
             clearNewOrder();
 
-            // Ensure route path is visible
-            setShowRoutePath(true);
+            // CRITICAL: Don't show polyline automatically after accept
+            // Polyline will only show when location icon is clicked (shouldShowPolyline flag)
+            // Route data is stored but polyline is not displayed until location icon click
+            setShowRoutePath(false);
+            console.log('🚫 Polyline not shown automatically - will show when location icon is clicked');
 
             // Show Reached Pickup popup immediately after order acceptance (no distance check)
             // But only if order is not already past pickup phase
@@ -2751,19 +2788,23 @@ export default function DeliveryHome() {
                       console.warn('⚠️ Error cleaning up polyline:', e);
                     }
 
-                    // Fit bounds to show entire route - but preserve zoom if user has zoomed in
+                    // Fit bounds to show entire route - but limit zoom to prevent excessive zoom
                     const bounds = directionsResult.routes[0].bounds;
                     if (bounds) {
                       const currentZoom = window.deliveryMapInstance.getZoom();
                       window.deliveryMapInstance.fitBounds(bounds, { padding: 100 });
-                      // Restore zoom if user had zoomed in more than fitBounds would set
+                      // Limit zoom to prevent excessive zoom in
                       setTimeout(() => {
                         const newZoom = window.deliveryMapInstance.getZoom();
-                        if (currentZoom > newZoom && currentZoom >= 18) {
+                        // Don't zoom in more than 16, and preserve user's zoom if they zoomed out
+                        if (newZoom > 16) {
+                          window.deliveryMapInstance.setZoom(16);
+                        } else if (currentZoom < newZoom && currentZoom < 16) {
+                          // If user had zoomed out, preserve their zoom level
                           window.deliveryMapInstance.setZoom(currentZoom);
                         }
                       }, 100);
-                      console.log('✅ Map bounds fitted to route');
+                      console.log('✅ Map bounds fitted to route (zoom limited)');
                     }
 
                     console.log('✅ Route displayed on main map using custom polyline');
@@ -3305,6 +3346,37 @@ export default function DeliveryHome() {
 
               if (response.data?.success) {
                 console.log('✅ Reached drop confirmed')
+                
+                // CRITICAL: Clear all polylines immediately after reached drop is confirmed
+                console.log('🚫 Reached drop confirmed, clearing all route polylines')
+                if (routePolylineRef.current) {
+                  routePolylineRef.current.setMap(null);
+                  routePolylineRef.current = null;
+                }
+                if (directionsRendererRef.current) {
+                  directionsRendererRef.current.setMap(null);
+                }
+                if (liveTrackingPolylineRef.current) {
+                  liveTrackingPolylineRef.current.setMap(null);
+                  liveTrackingPolylineRef.current = null;
+                }
+                if (liveTrackingPolylineShadowRef.current) {
+                  liveTrackingPolylineShadowRef.current.setMap(null);
+                  liveTrackingPolylineShadowRef.current = null;
+                }
+                
+                // Update selectedRestaurant state to reflect arrived_drop status
+                if (selectedRestaurant) {
+                  setSelectedRestaurant(prev => ({
+                    ...prev,
+                    deliveryState: {
+                      ...prev.deliveryState,
+                      status: 'arrived_drop',
+                      currentPhase: 'at_delivery'
+                    },
+                    deliveryPhase: 'at_delivery'
+                  }))
+                }
               } else {
                 console.error('❌ Failed to confirm reached drop:', response.data)
                 toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.')
@@ -3751,9 +3823,52 @@ export default function DeliveryHome() {
                     setDirectionsResponse(directionsResult)
                     directionsResponseRef.current = directionsResult
 
+                    // CRITICAL: Clear old pickup route polyline before showing delivery route
+                    console.log('🔄 Clearing old pickup route polyline and switching to delivery route')
+                    try {
+                      // Clear old route polyline (pickup route)
+                      if (routePolylineRef.current) {
+                        routePolylineRef.current.setMap(null);
+                        routePolylineRef.current = null;
+                        console.log('✅ Old pickup route polyline cleared')
+                      }
+                      
+                      // Clear old live tracking polylines
+                      if (liveTrackingPolylineRef.current) {
+                        liveTrackingPolylineRef.current.setMap(null);
+                        liveTrackingPolylineRef.current = null;
+                      }
+                      if (liveTrackingPolylineShadowRef.current) {
+                        liveTrackingPolylineShadowRef.current.setMap(null);
+                        liveTrackingPolylineShadowRef.current = null;
+                      }
+                      
+                      // Clear old DirectionsRenderer if it exists
+                      if (directionsRendererRef.current) {
+                        directionsRendererRef.current.setMap(null);
+                      }
+                    } catch (e) {
+                      console.warn('⚠️ Error clearing old polylines:', e);
+                    }
+
+                    // CRITICAL: Update localStorage to mark that polyline should be shown (order picked up)
+                    try {
+                      const activeOrderData = localStorage.getItem('deliveryActiveOrder');
+                      if (activeOrderData) {
+                        const parsed = JSON.parse(activeOrderData);
+                        parsed.shouldShowPolyline = true; // Enable polyline for Delivery Boy → User route
+                        parsed.navigationMode = 'customer'; // Route to customer
+                        localStorage.setItem('deliveryActiveOrder', JSON.stringify(parsed));
+                        console.log('✅ Updated localStorage - polyline enabled for customer route');
+                      }
+                    } catch (e) {
+                      console.warn('⚠️ Error updating localStorage:', e);
+                    }
+
                     // Initialize / update live tracking polyline for customer delivery route
+                    setShowRoutePath(true); // Enable route path display
                     updateLiveTrackingPolyline(directionsResult, currentLocation)
-                    console.log('✅ Live tracking polyline initialized for customer delivery route')
+                    console.log('✅ Live tracking polyline initialized for customer delivery route (Delivery Boy → User)')
 
                     // Show route polyline on main Feed map
                     if (window.deliveryMapInstance && window.google?.maps) {
@@ -3788,46 +3903,34 @@ export default function DeliveryHome() {
                         deliveryPhase === 'at_pickup' ||
                         deliveryPhase === 'en_route_to_delivery' ||
                         deliveryPhase === 'at_delivery' ||
-                        deliveryPhase === 'picked_up'
+                        deliveryPhase === 'picked_up' ||
+                        deliveryStateStatus === 'picked_up'
 
                       if (!isDelivered && isOrderAccepted) {
                         // Set map for directions renderer to ensure it shows
                         directionsRendererRef.current.setMap(window.deliveryMapInstance);
                         directionsRendererRef.current.setDirections(directionsResult);
+                        console.log('✅ Delivery route polyline displayed (Restaurant → Customer)')
+
+                        // Fit map bounds to show entire route - limit zoom to prevent excessive zoom
+                        const bounds = directionsResult.routes?.[0]?.bounds
+                        if (bounds) {
+                          const currentZoomBeforeFit = window.deliveryMapInstance.getZoom();
+                          window.deliveryMapInstance.fitBounds(bounds, { padding: 100 });
+                          // Limit zoom to prevent excessive zoom in
+                          setTimeout(() => {
+                            const newZoom = window.deliveryMapInstance.getZoom();
+                            // Don't zoom in more than 16, and preserve user's zoom if they zoomed out
+                            if (newZoom > 16) {
+                              window.deliveryMapInstance.setZoom(16);
+                            } else if (currentZoomBeforeFit < newZoom && currentZoomBeforeFit < 16) {
+                              // If user had zoomed out, preserve their zoom level
+                              window.deliveryMapInstance.setZoom(currentZoomBeforeFit);
+                            }
+                          }, 100);
+                        }
                       } else {
                         directionsRendererRef.current.setMap(null);
-                      }
-                      
-                      // Don't create main route polyline - only live tracking polyline will be shown
-                      // Remove old custom polyline if exists (cleanup)
-                      try {
-                        if (routePolylineRef.current) {
-                          routePolylineRef.current.setMap(null);
-                          routePolylineRef.current = null;
-                        }
-
-                        // Keep DirectionsRenderer on map - it's now styled without dots
-                        // CRITICAL: Don't set map if order is delivered
-                        if (directionsRendererRef.current && !isDelivered) {
-                          directionsRendererRef.current.setMap(window.deliveryMapInstance);
-                        } else if (directionsRendererRef.current) {
-                          directionsRendererRef.current.setMap(null);
-                        }
-                      } catch (e) {
-                        console.warn('⚠️ Error cleaning up polyline:', e);
-                      }
-
-                      const bounds = directionsResult.routes?.[0]?.bounds
-                      if (bounds) {
-                        const currentZoomBeforeFit = window.deliveryMapInstance.getZoom();
-                        window.deliveryMapInstance.fitBounds(bounds, { padding: 100 });
-                        // Preserve zoom if user had zoomed in
-                        setTimeout(() => {
-                          const newZoom = window.deliveryMapInstance.getZoom();
-                          if (currentZoomBeforeFit > newZoom && currentZoomBeforeFit >= 18) {
-                            window.deliveryMapInstance.setZoom(currentZoomBeforeFit);
-                          }
-                        }, 100);
                       }
                     }
                     setShowRoutePath(true)
@@ -5208,7 +5311,7 @@ export default function DeliveryHome() {
         try {
           map = new window.google.maps.Map(mapContainerRef.current, {
             center: initialCenter,
-            zoom: 18,
+            zoom: 14, // Reduced from 18 to prevent excessive zoom
             minZoom: 10, // Minimum zoom level (city/area view)
             maxZoom: 21, // Maximum zoom level - allow full zoom
             mapTypeId: mapTypeId,
@@ -5488,7 +5591,7 @@ export default function DeliveryHome() {
 
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: initialCenter,
-          zoom: 18,
+          zoom: 14, // Reduced from 18 to prevent excessive zoom
           minZoom: 10,
           maxZoom: 21,
           mapTypeId: window.google.maps.MapTypeId?.ROADMAP || 'roadmap',
@@ -5963,58 +6066,60 @@ export default function DeliveryHome() {
           return;
         }
 
+        // TEMPORARILY DISABLED: Polyline removed as requested
         // Create main polyline with vibrant blue color (Zomato style)
-        liveTrackingPolylineRef.current = new window.google.maps.Polyline({
-          path: path,
-          geodesic: true,
-          strokeColor: '#1E88E5', // Vibrant blue like Zomato (more visible than #4285F4)
-          strokeOpacity: 1.0,
-          strokeWeight: 6, // Optimal thickness for visibility
-          zIndex: 1000, // High z-index to be above other map elements
-          icons: [], // No icons/dots - clean solid line
-          map: null, // Don't set map immediately - check delivered status first
-          visible: true // Ensure polyline is visible
-        });
-        
-        // Only set map if order is not delivered
-        if (!selectedRestaurant || !isOrderDelivered(selectedRestaurant)) {
-          liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
-        }
+        // liveTrackingPolylineRef.current = new window.google.maps.Polyline({
+        //   path: path,
+        //   geodesic: true,
+        //   strokeColor: '#1E88E5', // Vibrant blue like Zomato (more visible than #4285F4)
+        //   strokeOpacity: 1.0,
+        //   strokeWeight: 6, // Optimal thickness for visibility
+        //   zIndex: 1000, // High z-index to be above other map elements
+        //   icons: [], // No icons/dots - clean solid line
+        //   map: null, // Don't set map immediately - check delivered status first
+        //   visible: true // Ensure polyline is visible
+        // });
+        // 
+        // // Only set map if order is not delivered
+        // if (!selectedRestaurant || !isOrderDelivered(selectedRestaurant)) {
+        //   liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
+        // }
 
+        // TEMPORARILY DISABLED: Shadow polyline removed as requested
         // Create shadow/outline polyline for better visibility (like Zomato/Rapido)
         // This creates a subtle outline effect for better contrast
-        if (!liveTrackingPolylineShadowRef.current) {
-          // CRITICAL: Don't create shadow polyline if order is delivered
-          if (selectedRestaurant && isOrderDelivered(selectedRestaurant)) {
-            console.log('🚫 Order is delivered, skipping shadow polyline creation')
-            return;
-          }
-          
-          liveTrackingPolylineShadowRef.current = new window.google.maps.Polyline({
-            path: path,
-            geodesic: true,
-            strokeColor: '#FFFFFF', // White shadow/outline
-            strokeOpacity: 0.6,
-            strokeWeight: 10, // Slightly thicker for shadow effect
-            zIndex: 999, // Behind main polyline
-            icons: [],
-            map: null, // Don't set map immediately - check delivered status first
-            visible: true // Ensure shadow polyline is visible
-          });
-          
-          // Only set map if order is not delivered
-          if (!selectedRestaurant || !isOrderDelivered(selectedRestaurant)) {
-            liveTrackingPolylineShadowRef.current.setMap(window.deliveryMapInstance);
-          }
-        } else {
-          liveTrackingPolylineShadowRef.current.setPath(path);
-          // CRITICAL: Don't set visible/map if order is delivered
-          if (selectedRestaurant && isOrderDelivered(selectedRestaurant)) {
-            liveTrackingPolylineShadowRef.current.setMap(null);
-          } else {
-            liveTrackingPolylineShadowRef.current.setVisible(true); // Ensure visibility
-          }
-        }
+        // if (!liveTrackingPolylineShadowRef.current) {
+        //   // CRITICAL: Don't create shadow polyline if order is delivered
+        //   if (selectedRestaurant && isOrderDelivered(selectedRestaurant)) {
+        //     console.log('🚫 Order is delivered, skipping shadow polyline creation')
+        //     return;
+        //   }
+        //   
+        //   liveTrackingPolylineShadowRef.current = new window.google.maps.Polyline({
+        //     path: path,
+        //     geodesic: true,
+        //     strokeColor: '#FFFFFF', // White shadow/outline
+        //     strokeOpacity: 0.6,
+        //     strokeWeight: 10, // Slightly thicker for shadow effect
+        //     zIndex: 999, // Behind main polyline
+        //     icons: [],
+        //     map: null, // Don't set map immediately - check delivered status first
+        //     visible: true // Ensure shadow polyline is visible
+        //   });
+        //   
+        //   // Only set map if order is not delivered
+        //   if (!selectedRestaurant || !isOrderDelivered(selectedRestaurant)) {
+        //     liveTrackingPolylineShadowRef.current.setMap(window.deliveryMapInstance);
+        //   }
+        // } else {
+        //   liveTrackingPolylineShadowRef.current.setPath(path);
+        //   // CRITICAL: Don't set visible/map if order is delivered
+        //   if (selectedRestaurant && isOrderDelivered(selectedRestaurant)) {
+        //     liveTrackingPolylineShadowRef.current.setMap(null);
+        //   } else {
+        //     liveTrackingPolylineShadowRef.current.setVisible(true); // Ensure visibility
+        //   }
+        // }
 
         console.log('✅ Created new live tracking polyline on map with Zomato/Rapido styling');
       }
@@ -6165,7 +6270,7 @@ export default function DeliveryHome() {
         // Create map instance
         const map = new window.google.maps.Map(directionsMapContainerRef.current, {
           center: { lat: currentLocation[0], lng: currentLocation[1] },
-          zoom: 18,
+          zoom: 14, // Reduced from 18 to prevent excessive zoom
           minZoom: 10, // Minimum zoom level (city/area view)
           maxZoom: 21, // Maximum zoom level - allow full zoom
           mapTypeId: window.google.maps.MapTypeId.ROADMAP || 'roadmap',
@@ -6468,11 +6573,15 @@ export default function DeliveryHome() {
   // Handle route polyline visibility and updates
   // Always use custom polyline (DirectionsRenderer is never active - it adds dots)
   useEffect(() => {
-    // CRITICAL: Don't show polyline if order is delivered
+    // CRITICAL: Don't show polyline if order is delivered OR reached drop is confirmed
     if (selectedRestaurant) {
       const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || ''
       const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
       const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
+      
+      // Check if reached drop is confirmed (arrived_drop status)
+      const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+        deliveryPhase === 'at_delivery'
       
       const isDelivered = orderStatus === 'delivered' ||
         orderStatus === 'completed' ||
@@ -6480,8 +6589,9 @@ export default function DeliveryHome() {
         deliveryPhase === 'completed' ||
         deliveryStateStatus === 'delivered'
 
-      if (isDelivered) {
-        // Clear all polylines if order is delivered
+      // Clear polylines if reached drop OR delivered
+      if (isReachedDrop || isDelivered) {
+        // Clear all polylines if reached drop or delivered
         if (routePolylineRef.current) {
           routePolylineRef.current.setMap(null);
         }
@@ -6490,6 +6600,12 @@ export default function DeliveryHome() {
         }
         if (liveTrackingPolylineShadowRef.current) {
           liveTrackingPolylineShadowRef.current.setMap(null);
+        }
+        if (directionsRendererRef.current) {
+          directionsRendererRef.current.setMap(null);
+        }
+        if (isReachedDrop) {
+          console.log('🚫 Reached drop confirmed, polyline hidden')
         }
         return;
       }
@@ -6516,10 +6632,14 @@ export default function DeliveryHome() {
       return;
     }
 
-    // CRITICAL: Don't show route if order is already delivered/completed
+    // CRITICAL: Don't show route if order is already delivered/completed OR reached drop is confirmed
     const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || ''
     const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
     const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
+    
+    // Check if reached drop is confirmed (arrived_drop status)
+    const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+      deliveryPhase === 'at_delivery'
     
     const isDelivered = orderStatus === 'delivered' ||
       orderStatus === 'completed' ||
@@ -6527,8 +6647,9 @@ export default function DeliveryHome() {
       deliveryPhase === 'completed' ||
       deliveryStateStatus === 'delivered'
 
-    if (isDelivered) {
-      console.log('🚫 Order is delivered, clearing route polylines')
+    // Clear polylines if reached drop OR delivered
+    if (isReachedDrop || isDelivered) {
+      console.log(isReachedDrop ? '🚫 Reached drop confirmed, clearing route polylines' : '🚫 Order is delivered, clearing route polylines')
       // Clear all route polylines
       if (routePolylineRef.current) {
         routePolylineRef.current.setMap(null);
@@ -6671,10 +6792,14 @@ export default function DeliveryHome() {
       if (bounds) {
         const currentZoomBeforeFit = window.deliveryMapInstance.getZoom();
         window.deliveryMapInstance.fitBounds(bounds, { padding: 100 });
-        // Preserve zoom if user had zoomed in more than fitBounds would set
+        // Limit zoom to prevent excessive zoom in
         setTimeout(() => {
           const newZoom = window.deliveryMapInstance.getZoom();
-          if (currentZoomBeforeFit > newZoom && currentZoomBeforeFit >= 18) {
+          // Don't zoom in more than 16, and preserve user's zoom if they zoomed out
+          if (newZoom > 16) {
+            window.deliveryMapInstance.setZoom(16);
+          } else if (currentZoomBeforeFit < newZoom && currentZoomBeforeFit < 16) {
+            // If user had zoomed out, preserve their zoom level
             window.deliveryMapInstance.setZoom(currentZoomBeforeFit);
           }
         }, 100);
@@ -6700,15 +6825,39 @@ export default function DeliveryHome() {
         // CRITICAL: Initialize / Update the custom live tracking polyline
         // This is the main road-based route polyline (vibrant blue Zomato style)
         // We explicitly call this here to ensure it displays immediately when directions are received
-        const currentLocation = riderLocation || lastLocationRef.current;
-        if (directionsResponse && currentLocation && currentLocation.length === 2) {
-          updateLiveTrackingPolyline(directionsResponse, currentLocation);
-          console.log('✅ Custom road-based polyline initialized from directionsResponse update');
-        } else if (directionsResponse) {
-          // Use last known location if riderLocation is not available yet
-          const lastLoc = lastLocationRef.current || [23.2599, 77.4126];
-          updateLiveTrackingPolyline(directionsResponse, lastLoc);
-          console.log('✅ Custom road-based polyline initialized from last known location');
+        // BUT: Don't show if order is delivered
+        const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+        const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+        const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+        
+        const isDelivered = orderStatus === 'delivered' ||
+          orderStatus === 'completed' ||
+          deliveryPhase === 'delivered' ||
+          deliveryPhase === 'completed' ||
+          deliveryStateStatus === 'delivered';
+        
+        if (!isDelivered) {
+          const currentLocation = riderLocation || lastLocationRef.current;
+          if (directionsResponse && currentLocation && currentLocation.length === 2) {
+            updateLiveTrackingPolyline(directionsResponse, currentLocation);
+            console.log('✅ Custom road-based polyline initialized from directionsResponse update');
+          } else if (directionsResponse) {
+            // Use last known location if riderLocation is not available yet
+            const lastLoc = lastLocationRef.current || [23.2599, 77.4126];
+            updateLiveTrackingPolyline(directionsResponse, lastLoc);
+            console.log('✅ Custom road-based polyline initialized from last known location');
+          }
+        } else {
+          // Clear polylines if order is delivered
+          console.log('🚫 Order is delivered, not updating live tracking polyline');
+          if (liveTrackingPolylineRef.current) {
+            liveTrackingPolylineRef.current.setMap(null);
+            liveTrackingPolylineRef.current = null;
+          }
+          if (liveTrackingPolylineShadowRef.current) {
+            liveTrackingPolylineShadowRef.current.setMap(null);
+            liveTrackingPolylineShadowRef.current = null;
+          }
         }
       } else {
         // Clear DirectionsRenderer if order is delivered
@@ -6865,9 +7014,12 @@ export default function DeliveryHome() {
             activeOrderData.acceptedAt
           );
 
+          // CRITICAL: Only show polyline if shouldShowPolyline flag is true (location icon was clicked)
+          const shouldShowPolyline = activeOrderData.shouldShowPolyline === true;
+          
           if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && currentRiderLocation && currentRiderLocation.length === 2 && isOrderAccepted) {
             // Try to recalculate with Directions API first (if flag indicates we had Directions API before)
-            if (activeOrderData.hasDirectionsAPI || activeOrderData.shouldShowPolyline) {
+            if (activeOrderData.hasDirectionsAPI || shouldShowPolyline) {
               console.log('🔄 Recalculating route with Directions API for restored order...');
               console.log('📍 From (Delivery Boy):', currentRiderLocation);
               console.log('📍 To (Restaurant):', { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng });
@@ -6883,44 +7035,57 @@ export default function DeliveryHome() {
                   console.log('📍 Route distance:', result.routes[0]?.legs[0]?.distance?.text);
                   console.log('📍 Route duration:', result.routes[0]?.legs[0]?.duration?.text);
 
-                  // Initialize live tracking polyline for restored route
-                  if (currentRiderLocation && currentRiderLocation.length === 2) {
-                    // Wait a bit to ensure map is fully ready
-                    setTimeout(() => {
-                      if (window.deliveryMapInstance) {
-                        updateLiveTrackingPolyline(result, currentRiderLocation);
-                        console.log('✅ Live tracking polyline initialized for restored route');
-                      } else {
-                        console.warn('⚠️ Map not ready for polyline, will retry...');
-                        setTimeout(() => {
-                          if (window.deliveryMapInstance) {
-                            updateLiveTrackingPolyline(result, currentRiderLocation);
-                            console.log('✅ Live tracking polyline initialized (retry)');
-                          }
-                        }, 500);
-                      }
-                    }, 300);
+                  // CRITICAL: Only initialize polyline if shouldShowPolyline flag is true
+                  if (shouldShowPolyline) {
+                    setShowRoutePath(true);
+                    // Initialize live tracking polyline for restored route
+                    if (currentRiderLocation && currentRiderLocation.length === 2) {
+                      // Wait a bit to ensure map is fully ready
+                      setTimeout(() => {
+                        if (window.deliveryMapInstance) {
+                          updateLiveTrackingPolyline(result, currentRiderLocation);
+                          console.log('✅ Live tracking polyline initialized for restored route (location icon was clicked)');
+                        } else {
+                          console.warn('⚠️ Map not ready for polyline, will retry...');
+                          setTimeout(() => {
+                            if (window.deliveryMapInstance) {
+                              updateLiveTrackingPolyline(result, currentRiderLocation);
+                              console.log('✅ Live tracking polyline initialized (retry)');
+                            }
+                          }, 500);
+                        }
+                      }, 300);
+                    }
+                  } else {
+                    console.log('🚫 Polyline not shown - location icon not clicked yet');
+                    setShowRoutePath(false);
                   }
                 } else {
                   console.warn('⚠️ Directions API returned no routes');
                   // Fallback to coordinates if Directions API fails
-                  if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0) {
+                  if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0 && shouldShowPolyline) {
                     setRoutePolyline(activeOrderData.routeCoordinates);
+                    setShowRoutePath(true);
                     console.log('✅ Using fallback route coordinates from localStorage');
                   }
                 }
               }).catch(err => {
                 console.error('❌ Error recalculating route with Directions API:', err);
                 // Fallback to coordinates
-                if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0) {
+                if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0 && shouldShowPolyline) {
                   setRoutePolyline(activeOrderData.routeCoordinates);
+                  setShowRoutePath(true);
                   console.log('✅ Using fallback route coordinates from localStorage');
                 }
               });
-            } else if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0) {
-              // Use saved coordinates if we don't have Directions API flag
+            } else if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0 && shouldShowPolyline) {
+              // Use saved coordinates if we don't have Directions API flag AND location icon was clicked
               setRoutePolyline(activeOrderData.routeCoordinates);
+              setShowRoutePath(true);
               console.log('✅ Restored route polyline from localStorage');
+            } else {
+              console.log('🚫 Polyline not restored - location icon not clicked');
+              setShowRoutePath(false);
             }
           } else {
             console.warn('⚠️ Cannot calculate route - missing data:', {
@@ -6956,8 +7121,57 @@ export default function DeliveryHome() {
   }, []) // Run only on mount - calculateRouteWithDirectionsAPI is stable
 
   // Ensure polyline is displayed and updated when rider location changes (LIVE TRACKING)
+  // CRITICAL: Only show polyline in two conditions:
+  // 1. Location icon clicked after accept (shouldShowPolyline = true) → Delivery Boy → Restaurant
+  // 2. Order picked up (bill upload + accept) → Delivery Boy → User
   useEffect(() => {
     if (!selectedRestaurant || !window.deliveryMapInstance || !window.google || !window.google.maps) {
+      return;
+    }
+
+    // Check if polyline should be shown
+    const activeOrderData = localStorage.getItem('deliveryActiveOrder');
+    const shouldShowPolyline = activeOrderData ? JSON.parse(activeOrderData).shouldShowPolyline : false;
+    
+    // Check delivery phase - if order is picked up, show polyline to customer
+    const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = selectedRestaurant.deliveryState?.status || '';
+    const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || '';
+    
+    const isPickedUp = deliveryPhase === 'en_route_to_delivery' || 
+      deliveryStateStatus === 'picked_up' ||
+      orderStatus === 'out_for_delivery';
+    
+    // Check if reached drop - don't show polyline
+    const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+      deliveryPhase === 'at_delivery';
+    
+    // Check if order is delivered - CRITICAL: Don't show polyline if delivered
+    const isDelivered = orderStatus === 'delivered' ||
+      orderStatus === 'completed' ||
+      deliveryPhase === 'delivered' ||
+      deliveryPhase === 'completed' ||
+      deliveryStateStatus === 'delivered';
+    
+    // Show polyline only if: (location icon clicked) OR (order is picked up) AND not reached drop AND not delivered
+    const shouldShow = (shouldShowPolyline || isPickedUp) && !isReachedDrop && !isDelivered;
+
+    if (!shouldShow) {
+      // Clear polylines if conditions not met (reached drop OR delivered)
+      console.log(isDelivered ? '🚫 Order is delivered, clearing live tracking polylines' : '🚫 Reached drop confirmed, clearing live tracking polylines');
+      if (liveTrackingPolylineRef.current) {
+        liveTrackingPolylineRef.current.setMap(null);
+        liveTrackingPolylineRef.current = null;
+      }
+      if (liveTrackingPolylineShadowRef.current) {
+        liveTrackingPolylineShadowRef.current.setMap(null);
+        liveTrackingPolylineShadowRef.current = null;
+      }
+      // Also clear directions response to prevent re-creation
+      if (isDelivered) {
+        directionsResponseRef.current = null;
+        setDirectionsResponse(null);
+      }
       return;
     }
 
@@ -6979,10 +7193,33 @@ export default function DeliveryHome() {
         liveTrackingPolylineShadowRef.current.setMap(window.deliveryMapInstance);
       }
 
-      // Ensure main polyline is visible on map
-      if (liveTrackingPolylineRef.current && liveTrackingPolylineRef.current.getMap() === null) {
-        liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
-        console.log('✅ Live tracking polyline added to map');
+      // CRITICAL: Don't add polyline to map if order is delivered
+      const orderStatusCheck = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+      const deliveryPhaseCheck = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+      const deliveryStateStatusCheck = selectedRestaurant?.deliveryState?.status || '';
+      
+      const isDeliveredCheck = orderStatusCheck === 'delivered' ||
+        orderStatusCheck === 'completed' ||
+        deliveryPhaseCheck === 'delivered' ||
+        deliveryPhaseCheck === 'completed' ||
+        deliveryStateStatusCheck === 'delivered';
+      
+      if (!isDeliveredCheck) {
+        // Ensure main polyline is visible on map
+        if (liveTrackingPolylineRef.current && liveTrackingPolylineRef.current.getMap() === null) {
+          liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
+          console.log('✅ Live tracking polyline added to map');
+        }
+      } else {
+        // Clear polylines if delivered
+        if (liveTrackingPolylineRef.current) {
+          liveTrackingPolylineRef.current.setMap(null);
+          liveTrackingPolylineRef.current = null;
+        }
+        if (liveTrackingPolylineShadowRef.current) {
+          liveTrackingPolylineShadowRef.current.setMap(null);
+          liveTrackingPolylineShadowRef.current = null;
+        }
       }
     } else if (selectedRestaurant && selectedRestaurant.lat && selectedRestaurant.lng && currentRiderLocation && currentRiderLocation.length === 2 && !currentDirectionsResponse) {
       // If we have restaurant and rider location but no route yet, calculate it
@@ -6997,25 +7234,46 @@ export default function DeliveryHome() {
           { lat: selectedRestaurant.lat, lng: selectedRestaurant.lng }
         ).then(result => {
           if (result && result.routes && result.routes.length > 0) {
+            // CRITICAL: Check delivered status before setting directions response
+            const orderStatusCheck = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+            const deliveryPhaseCheck = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+            const deliveryStateStatusCheck = selectedRestaurant?.deliveryState?.status || '';
+            
+            const isDeliveredCheck = orderStatusCheck === 'delivered' ||
+              orderStatusCheck === 'completed' ||
+              deliveryPhaseCheck === 'delivered' ||
+              deliveryPhaseCheck === 'completed' ||
+              deliveryStateStatusCheck === 'delivered';
+            
+            if (isDeliveredCheck) {
+              console.log('🚫 Order is delivered, not setting directions response');
+              return;
+            }
+            
             setDirectionsResponse(result);
             directionsResponseRef.current = result;
             console.log('✅ Route calculated and polyline will be created');
             console.log('📍 Route distance:', result.routes[0]?.legs[0]?.distance?.text);
             console.log('📍 Route duration:', result.routes[0]?.legs[0]?.duration?.text);
             
-            // Initialize polyline
+            // Initialize polyline only if order is not delivered
             setTimeout(() => {
-              if (window.deliveryMapInstance) {
+              // Double check delivered status before creating polyline
+              const orderStatusCheck2 = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+              const deliveryPhaseCheck2 = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+              const deliveryStateStatusCheck2 = selectedRestaurant?.deliveryState?.status || '';
+              
+              const isDeliveredCheck2 = orderStatusCheck2 === 'delivered' ||
+                orderStatusCheck2 === 'completed' ||
+                deliveryPhaseCheck2 === 'delivered' ||
+                deliveryPhaseCheck2 === 'completed' ||
+                deliveryStateStatusCheck2 === 'delivered';
+              
+              if (!isDeliveredCheck2 && window.deliveryMapInstance) {
                 updateLiveTrackingPolyline(result, currentRiderLocation);
                 console.log('✅ Live tracking polyline initialized');
               } else {
-                console.warn('⚠️ Map not ready, will retry polyline initialization');
-                setTimeout(() => {
-                  if (window.deliveryMapInstance) {
-                    updateLiveTrackingPolyline(result, currentRiderLocation);
-                    console.log('✅ Live tracking polyline initialized (retry)');
-                  }
-                }, 500);
+                console.log('🚫 Order is delivered, skipping polyline initialization');
               }
             }, 300);
           } else {
@@ -7648,6 +7906,16 @@ export default function DeliveryHome() {
       setTimeout(clearAllPolylines, 0);
       setTimeout(clearAllPolylines, 100);
       setTimeout(clearAllPolylines, 500);
+      setTimeout(clearAllPolylines, 1000);
+      // Set up interval to continuously clear polylines if they get recreated (for 10 seconds)
+      const clearIntervalId = setInterval(() => {
+        if (liveTrackingPolylineRef.current && liveTrackingPolylineRef.current.getMap()) {
+          console.log('🚫 [CONTINUOUS CLEAR] Clearing polyline that was recreated');
+          clearAllPolylines();
+        }
+      }, 500);
+      // Clear interval after 10 seconds
+      setTimeout(() => clearInterval(clearIntervalId), 10000);
     }
   }, [selectedRestaurant?.orderStatus, selectedRestaurant?.status, selectedRestaurant?.deliveryPhase, selectedRestaurant?.deliveryState?.currentPhase, selectedRestaurant?.deliveryState?.status, showOrderDeliveredAnimation])
 
@@ -7790,11 +8058,36 @@ export default function DeliveryHome() {
   ])
 
   // CRITICAL: Monitor order status and close all pickup/delivery popups when order is delivered
+  // Also clear polylines when reached drop is confirmed (arrived_drop status)
   // Also clear selectedRestaurant if order is completed and payment page is closed
   useEffect(() => {
     const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || ''
     const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || ''
     const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || ''
+
+    // Check if reached drop is confirmed (arrived_drop status)
+    const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+      deliveryPhase === 'at_delivery'
+
+    // CRITICAL: Clear polylines when reached drop is confirmed
+    if (isReachedDrop) {
+      console.log('🚫 Reached drop confirmed, clearing all route polylines')
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+        routePolylineRef.current = null;
+      }
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+      }
+      if (liveTrackingPolylineRef.current) {
+        liveTrackingPolylineRef.current.setMap(null);
+        liveTrackingPolylineRef.current = null;
+      }
+      if (liveTrackingPolylineShadowRef.current) {
+        liveTrackingPolylineShadowRef.current.setMap(null);
+        liveTrackingPolylineShadowRef.current = null;
+      }
+    }
 
     const isDelivered = orderStatus === 'delivered' ||
       orderStatus === 'completed' ||
@@ -7941,15 +8234,19 @@ export default function DeliveryHome() {
                 console.warn('⚠️ Error cleaning up old polyline:', e);
               }
 
-              // Fit map bounds to show entire route
+              // Fit map bounds to show entire route - limit zoom to prevent excessive zoom
               const bounds = directionsResult.routes[0].bounds;
               if (bounds) {
                 const currentZoomBeforeFit = window.deliveryMapInstance.getZoom();
                 window.deliveryMapInstance.fitBounds(bounds, { padding: 100 });
-                // Preserve zoom if user had zoomed in
+                // Limit zoom to prevent excessive zoom in
                 setTimeout(() => {
                   const newZoom = window.deliveryMapInstance.getZoom();
-                  if (currentZoomBeforeFit > newZoom && currentZoomBeforeFit >= 18) {
+                  // Don't zoom in more than 16, and preserve user's zoom if they zoomed out
+                  if (newZoom > 16) {
+                    window.deliveryMapInstance.setZoom(16);
+                  } else if (currentZoomBeforeFit < newZoom && currentZoomBeforeFit < 16) {
+                    // If user had zoomed out, preserve their zoom level
                     window.deliveryMapInstance.setZoom(currentZoomBeforeFit);
                   }
                 }, 100);
@@ -8267,9 +8564,12 @@ export default function DeliveryHome() {
       if (shouldCenterMap) {
         const currentZoom = map.getZoom();
         map.setCenter(position);
-        // Only set zoom to 18 if current zoom is less than 18 (don't reduce user's zoom)
-        if (currentZoom < 18) {
-          map.setZoom(18); // Full zoom in for better visibility
+        // Only set zoom to 14 if current zoom is less than 14 (don't reduce user's zoom, limit max zoom)
+        if (currentZoom < 14) {
+          map.setZoom(14); // Reduced from 18 to prevent excessive zoom
+        } else if (currentZoom > 16) {
+          // If zoom is too high, limit it to 16
+          map.setZoom(16);
         }
       }
 
@@ -8357,13 +8657,37 @@ export default function DeliveryHome() {
     const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
     const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
     
+    // Check if reached drop is confirmed (arrived_drop status) - CRITICAL: Clear polyline immediately
+    const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+      deliveryPhase === 'at_delivery'
+    
+    if (isReachedDrop) {
+      console.log('🚫 Reached drop confirmed, clearing route polyline')
+      // Clear all route polylines
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+        routePolylineRef.current = null;
+      }
+      if (liveTrackingPolylineRef.current) {
+        liveTrackingPolylineRef.current.setMap(null);
+        liveTrackingPolylineRef.current = null;
+      }
+      if (liveTrackingPolylineShadowRef.current) {
+        liveTrackingPolylineShadowRef.current.setMap(null);
+        liveTrackingPolylineShadowRef.current = null;
+      }
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+      }
+      return;
+    }
+    
     // Check if order is accepted
     const isOrderAccepted = orderStatus === 'accepted' ||
       deliveryStateStatus === 'accepted' ||
       deliveryPhase === 'en_route_to_pickup' ||
       deliveryPhase === 'at_pickup' ||
       deliveryPhase === 'en_route_to_delivery' ||
-      deliveryPhase === 'at_delivery' ||
       deliveryPhase === 'picked_up' ||
       selectedRestaurant.acceptedAt // If acceptedAt timestamp exists
 
@@ -8383,14 +8707,16 @@ export default function DeliveryHome() {
     }
 
     // CRITICAL: Don't show route if order is already delivered/completed
+    // Note: isReachedDrop is already checked above, so we only check isDelivered here
     const isDelivered = orderStatus === 'delivered' ||
       orderStatus === 'completed' ||
       deliveryPhase === 'delivered' ||
       deliveryPhase === 'completed' ||
       deliveryStateStatus === 'delivered'
 
-    if (isDelivered) {
-      console.log('🚫 Order is delivered, clearing route polyline')
+    // Clear polylines if reached drop OR delivered
+    if (isReachedDrop || isDelivered) {
+      console.log(isReachedDrop ? '🚫 Reached drop confirmed, clearing route polyline' : '🚫 Order is delivered, clearing route polyline')
       // Clear all route polylines
       if (routePolylineRef.current) {
         routePolylineRef.current.setMap(null);
@@ -8400,6 +8726,9 @@ export default function DeliveryHome() {
       }
       if (liveTrackingPolylineShadowRef.current) {
         liveTrackingPolylineShadowRef.current.setMap(null);
+      }
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
       }
       return;
     }
@@ -8433,10 +8762,14 @@ export default function DeliveryHome() {
       }).filter(coord => coord !== null);
 
       if (path.length > 0) {
-        // CRITICAL: Check if order is delivered before creating/setting polyline
+        // CRITICAL: Check if order is delivered OR reached drop is confirmed before creating/setting polyline
         const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || ''
         const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || ''
         const deliveryStateStatus = selectedRestaurant.deliveryState?.status || ''
+        
+        // Check if reached drop is confirmed (arrived_drop status)
+        const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
+          deliveryPhase === 'at_delivery'
         
         const isDelivered = orderStatus === 'delivered' ||
           orderStatus === 'completed' ||
@@ -8444,29 +8777,31 @@ export default function DeliveryHome() {
           deliveryPhase === 'completed' ||
           deliveryStateStatus === 'delivered'
 
-        if (isDelivered) {
-          console.log('🚫 Order is delivered, not creating route polyline')
+        // Don't show polyline if reached drop OR delivered
+        if (isReachedDrop || isDelivered) {
+          console.log(isReachedDrop ? '🚫 Reached drop confirmed, not creating route polyline' : '🚫 Order is delivered, not creating route polyline')
           if (routePolylineRef.current) {
             routePolylineRef.current.setMap(null);
           }
           return;
         }
         
+        // TEMPORARILY DISABLED: Polyline removed as requested
         // Create main route polyline with vibrant blue color
-        if (!routePolylineRef.current) {
-          routePolylineRef.current = new window.google.maps.Polyline({
-            path: path,
-            geodesic: true,
-            strokeColor: '#1E88E5',
-            strokeOpacity: 0.8,
-            strokeWeight: 6,
-            zIndex: 1000,
-            map: map
-          });
-        } else {
-          routePolylineRef.current.setPath(path);
-          routePolylineRef.current.setMap(map);
-        }
+        // if (!routePolylineRef.current) {
+        //   routePolylineRef.current = new window.google.maps.Polyline({
+        //     path: path,
+        //     geodesic: true,
+        //     strokeColor: '#1E88E5',
+        //     strokeOpacity: 0.8,
+        //     strokeWeight: 6,
+        //     zIndex: 1000,
+        //     map: map
+        //   });
+        // } else {
+        //   routePolylineRef.current.setPath(path);
+        //   routePolylineRef.current.setMap(map);
+        // }
 
         // Fit map bounds to show entire route - but preserve zoom if user has zoomed in
         if (path.length > 1) {
@@ -8498,17 +8833,10 @@ export default function DeliveryHome() {
 
   // Bike marker update removed (Ola Maps removed)
 
-  // Carousel slides data - filter based on bank details status
+  // Carousel slides data - bank details banner removed
   const carouselSlides = useMemo(() => [
-    ...(bankDetailsFilled ? [] : [{
-      id: 2,
-      title: "Submit bank details",
-      subtitle: "PAN & bank details required for payouts",
-      icon: "bank",
-      buttonText: "Submit",
-      bgColor: "bg-yellow-400"
-    }])
-  ], [bankDetailsFilled])
+    // Bank details banner removed as per user request
+  ], [])
 
   // Auto-rotate carousel
   useEffect(() => {

@@ -283,7 +283,7 @@ const orderSchema = new mongoose.Schema({
   deliveryState: {
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'reached_pickup', 'order_confirmed', 'en_route_to_delivery', 'delivered'],
+      enum: ['pending', 'accepted', 'reached_pickup', 'order_confirmed', 'picked_up', 'arrived_drop', 'en_route_to_delivery', 'delivered'],
       default: 'pending'
     },
     currentPhase: {

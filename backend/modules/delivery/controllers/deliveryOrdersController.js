@@ -1359,7 +1359,7 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
       return errorResponse(res, 500, 'Order ID not found in order object');
     }
     const updateData = {
-      'deliveryState.status': 'order_confirmed',
+      'deliveryState.status': 'picked_up',
       'deliveryState.currentPhase': 'en_route_to_delivery',
       'deliveryState.orderIdConfirmedAt': new Date(),
       'deliveryState.routeToDelivery': {
@@ -1567,7 +1567,8 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
     if (order.deliveryState.currentPhase !== 'at_delivery') {
       try {
         // Update the order document directly since we have it
-        order.deliveryState.status = 'en_route_to_delivery';
+        // Set status to arrived_drop (new status for reached drop location)
+        order.deliveryState.status = 'arrived_drop';
         order.deliveryState.currentPhase = 'at_delivery';
         order.deliveryState.reachedDropAt = new Date();
 
@@ -1957,32 +1958,45 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       deliveryDistance = R * c;
     }
 
-    console.log(`📏 Delivery distance: ${deliveryDistance.toFixed(2)} km for order ${orderIdForLog}`);
+    console.log(`📏 Delivery distance (Restaurant → Customer): ${deliveryDistance.toFixed(2)} km for order ${orderIdForLog}`);
 
-    // Calculate earnings using admin's commission rules
+    // Calculate earnings using admin's commission rules from DeliveryBoyCommission
     let totalEarning = 0;
     let commissionBreakdown = null;
 
     try {
-      // Use DeliveryBoyCommission model to calculate commission based on distance
+      // CRITICAL: Use DeliveryBoyCommission model to calculate commission based on restaurant-to-customer distance
+      // This ensures earnings follow admin's commission rules configured in DeliveryBoyCommission page
       const commissionResult = await DeliveryBoyCommission.calculateCommission(deliveryDistance);
       totalEarning = commissionResult.commission;
       commissionBreakdown = commissionResult.breakdown;
 
-      console.log(`💰 Delivery earnings calculated using commission rules: ₹${totalEarning.toFixed(2)} for order ${orderIdForLog}`);
-      console.log(`📊 Commission breakdown:`, {
-        rule: commissionResult.rule.name,
-        basePayout: commissionResult.breakdown.basePayout,
-        distance: commissionResult.breakdown.distance,
-        commissionPerKm: commissionResult.breakdown.commissionPerKm,
-        distanceCommission: commissionResult.breakdown.distanceCommission,
-        total: totalEarning
+      console.log(`💰 Delivery earnings calculated using admin commission rules: ₹${totalEarning.toFixed(2)} for order ${orderIdForLog}`);
+      console.log(`📊 Commission breakdown (from DeliveryBoyCommission):`, {
+        ruleName: commissionResult.rule.name,
+        ruleId: commissionResult.rule._id,
+        basePayout: `₹${commissionResult.breakdown.basePayout.toFixed(2)}`,
+        distance: `${commissionResult.breakdown.distance.toFixed(2)} km`,
+        minDistance: `${commissionResult.breakdown.minDistance} km`,
+        commissionPerKm: `₹${commissionResult.breakdown.commissionPerKm}/km`,
+        distanceCommission: `₹${commissionResult.breakdown.distanceCommission.toFixed(2)}`,
+        perKmApplied: commissionResult.breakdown.perKmApplied,
+        totalEarning: `₹${totalEarning.toFixed(2)}`,
+        calculation: `${commissionResult.breakdown.basePayout} + ${commissionResult.breakdown.distanceCommission.toFixed(2)} = ${totalEarning.toFixed(2)}`
       });
+      
+      // Validate that earnings are calculated correctly
+      if (totalEarning <= 0) {
+        console.warn(`⚠️ Calculated earnings is ₹${totalEarning}, which seems incorrect. Using fallback.`);
+        throw new Error('Calculated earnings is zero or negative');
+      }
     } catch (commissionError) {
-      console.error('⚠️ Error calculating commission using rules:', commissionError.message);
+      console.error('⚠️ Error calculating commission using admin rules:', commissionError.message);
+      console.error('⚠️ Commission error stack:', commissionError.stack);
       // Fallback: Use delivery fee as earnings if commission calculation fails
       totalEarning = order.pricing?.deliveryFee || 0;
       console.warn(`⚠️ Using fallback earnings (delivery fee): ₹${totalEarning.toFixed(2)}`);
+      console.warn(`⚠️ NOTE: This fallback should not happen if DeliveryBoyCommission rules are configured correctly`);
     }
 
     // Add earning to delivery boy's wallet
