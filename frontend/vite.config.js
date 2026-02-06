@@ -1,22 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(), 
+    react({
+      // Ensure React is properly transformed
+      jsxRuntime: 'automatic',
+    }), 
     tailwindcss(),
-    nodePolyfills({
-      // Whether to polyfill `node:` protocol imports.
-      protocolImports: true,
-    }),
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Provide empty implementations for Node.js modules used by axios
+      'stream': 'stream-browserify',
+      'util': 'util',
+      'buffer': 'buffer',
+      'process': 'process/browser',
     },
     dedupe: ['react', 'react-dom'],
     // Better module resolution to prevent initialization issues
@@ -24,9 +27,11 @@ export default defineConfig({
     // Ensure consistent module resolution
     mainFields: ['module', 'jsnext:main', 'jsnext', 'main'],
   },
-  // Define empty objects for Node.js modules that axios might reference
+  // Define Node.js globals for browser compatibility
   define: {
     'process.env': {},
+    'process': '{}',
+    'global': 'globalThis',
   },
   optimizeDeps: {
     include: [
@@ -71,21 +76,30 @@ export default defineConfig({
     // Code splitting configuration - simplified to avoid circular dependencies
     rollupOptions: {
       output: {
-        // Simplified manual chunk splitting to avoid initialization order issues
+        // CRITICAL FIX: Simplified chunking to prevent React initialization errors
         manualChunks: (id) => {
-          // CRITICAL: Don't split React core - let it be bundled with vendor
-          // Splitting React causes initialization order issues
+          // CRITICAL: Keep React in a single chunk that loads first
+          // This prevents "can't access lexical declaration before initialization" errors
           if (id.includes('node_modules')) {
-            // DO NOT split React core packages - they must load together
-            // This prevents "can't access lexical declaration before initialization" errors
-            const isReactCore = (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router/') || id === 'react' || id === 'react-dom' || id === 'react-router-dom' || id.includes('react-is'))
+            // Check if it's React core - MUST be in same chunk
+            const isReactCore = (
+              id.includes('node_modules/react/') || 
+              id.includes('node_modules/react-dom/') || 
+              id.includes('node_modules/react-router/') ||
+              id.includes('node_modules/react-is/') ||
+              id.includes('node_modules/scheduler/') ||
+              id === 'react' || 
+              id === 'react-dom' || 
+              id === 'react-router-dom'
+            )
             
-            // If it's React core, put it in vendor (no splitting)
+            // CRITICAL: Put all React core in same chunk - this ensures proper initialization order
+            // This MUST be the first chunk to load to prevent initialization errors
             if (isReactCore) {
-              return 'vendor'
+              return 'react-vendor' // All React together in one chunk that loads first
             }
             
-            // Only split non-React-core dependencies
+            // Only split non-React dependencies
             // Radix UI (large, used in many places)
             if (id.includes('@radix-ui')) {
               return 'radix-ui-vendor'
@@ -94,7 +108,7 @@ export default defineConfig({
             if (id.includes('@mui')) {
               return 'mui-vendor'
             }
-            // Icon libraries (can be large) - these use React but aren't React core
+            // Icon libraries (can be large)
             if (id.includes('lucide-react') || id.includes('@heroicons') || id.includes('@tabler/icons') || id.includes('react-icons')) {
               return 'icons-vendor'
             }
@@ -102,7 +116,7 @@ export default defineConfig({
             if (id.includes('mapbox') || id.includes('google-maps') || id.includes('leaflet') || id.includes('@turf') || id.includes('react-map-gl')) {
               return 'maps-vendor'
             }
-            // Animation libraries (can be large) - split further
+            // Animation libraries (can be large)
             if (id.includes('framer-motion') || id.includes('motion')) {
               return 'framer-motion-vendor'
             }
@@ -136,7 +150,7 @@ export default defineConfig({
             if (id.includes('axios')) {
               return 'axios-vendor'
             }
-            // Everything else (including React-related packages that aren't core) goes to vendor
+            // Everything else goes to vendor
             return 'vendor'
           }
           // Split large app modules for better code splitting
@@ -149,6 +163,8 @@ export default defineConfig({
           if (id.includes('/module/delivery/')) {
             return 'delivery-module'
           }
+          // Return undefined for everything else to use Vite's default chunking
+          return undefined
         },
         // Optimize chunk file names
         chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -200,6 +216,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     // Enable source maps for production debugging (optional - can disable for smaller builds)
     sourcemap: false,
+    // Disable sourcemaps to avoid node polyfills issues
+    minify: 'esbuild', // Already set, but ensure it's esbuild not terser
     // CSS code splitting
     cssCodeSplit: true,
     // Target modern browsers for smaller output
@@ -209,6 +227,10 @@ export default defineConfig({
       moduleSideEffects: (id) => {
         // Preserve side effects for certain modules
         if (id.includes('node_modules')) {
+          // React and React-DOM need side effects preserved to prevent initialization issues
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            return true
+          }
           // Some libraries need side effects preserved
           if (id.includes('@radix-ui') || id.includes('@mui') || id.includes('firebase')) {
             return true
@@ -223,6 +245,12 @@ export default defineConfig({
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
+      // Ensure React is properly transformed
+      requireReturnsDefault: 'auto',
+    },
+    // Ensure proper module format
+    modulePreload: {
+      polyfill: true,
     },
   },
   server: {
