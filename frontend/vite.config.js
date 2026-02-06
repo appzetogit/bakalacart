@@ -15,11 +15,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Provide empty implementations for Node.js modules used by axios
+      // Provide browser-compatible implementations for Node.js modules used by axios
       'stream': 'stream-browserify',
       'util': 'util',
       'buffer': 'buffer',
       'process': 'process/browser',
+      'events': 'events', // Required for axios EventEmitter
     },
     dedupe: ['react', 'react-dom'],
     // Better module resolution to prevent initialization issues
@@ -41,14 +42,22 @@ export default defineConfig({
       '@mui/x-date-pickers', 
       'mapbox-gl', 
       'react-map-gl',
+      // CRITICAL: Pre-bundle React to ensure proper initialization order
       'react',
       'react-dom',
+      'react-dom/client',
       'react-router-dom',
+      'react-is',
+      'scheduler',
     ],
     // Exclude problematic dependencies from pre-bundling if needed
     exclude: [],
     // Force re-optimization when dependencies change
     force: false,
+    // Ensure React is properly optimized
+    esbuildOptions: {
+      target: 'es2020',
+    },
   },
   build: {
     // Use esbuild for faster builds, with aggressive minification
@@ -76,27 +85,28 @@ export default defineConfig({
     // Code splitting configuration - simplified to avoid circular dependencies
     rollupOptions: {
       output: {
-        // CRITICAL FIX: Simplified chunking to prevent React initialization errors
+        // CRITICAL FIX: Prevent React initialization errors by NOT splitting React
         manualChunks: (id) => {
-          // CRITICAL: Keep React in a single chunk that loads first
-          // This prevents "can't access lexical declaration before initialization" errors
+          // CRITICAL: Return undefined for React - let it be bundled with entry or vendor automatically
+          // This prevents "Cannot access 'React' before initialization" errors
           if (id.includes('node_modules')) {
-            // Check if it's React core - MUST be in same chunk
+            // Check if it's React core - DO NOT manually chunk it
             const isReactCore = (
               id.includes('node_modules/react/') || 
               id.includes('node_modules/react-dom/') || 
               id.includes('node_modules/react-router/') ||
               id.includes('node_modules/react-is/') ||
               id.includes('node_modules/scheduler/') ||
+              id.includes('node_modules/object-assign/') ||
               id === 'react' || 
               id === 'react-dom' || 
               id === 'react-router-dom'
             )
             
-            // CRITICAL: Put all React core in same chunk - this ensures proper initialization order
-            // This MUST be the first chunk to load to prevent initialization errors
+            // CRITICAL: Return undefined for React - Vite will handle it automatically
+            // This ensures proper initialization order without circular dependencies
             if (isReactCore) {
-              return 'react-vendor' // All React together in one chunk that loads first
+              return undefined // Let Vite bundle React automatically with proper order
             }
             
             // Only split non-React dependencies
@@ -189,9 +199,11 @@ export default defineConfig({
         // Ensure proper chunk ordering - React must load first
         // This ensures dependencies are loaded in the correct order
         generatedCode: {
-          constBindings: true,
+          constBindings: false, // Use let/var instead of const to avoid TDZ issues
           objectShorthand: true,
         },
+        // Ensure proper hoisting to prevent initialization errors
+        hoistTransitiveImports: false, // Don't hoist to prevent circular deps
       },
       // External dependencies that should not be bundled (if any)
       external: [],
@@ -208,16 +220,34 @@ export default defineConfig({
         if (warning.code === 'UNRESOLVED_IMPORT' && warning.source && warning.source.includes('react')) {
           return
         }
+        // Suppress warnings about Node.js modules being externalized (expected for browser build)
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.source && 
+            ['http', 'https', 'stream', 'events', 'util', 'fs', 'path', 'crypto', 'zlib', 'url', 'assert', 'os', 'tty', 'child_process'].some(m => warning.source.includes(m))) {
+          return
+        }
         // Use default warning handler for other warnings
         warn(warning)
       },
+      // Plugin to ensure axios uses browser adapter only
+      plugins: [
+        {
+          name: 'axios-browser-only',
+          resolveId(id) {
+            // Prevent axios from loading Node.js http adapter
+            // This forces axios to use the xhr adapter (browser adapter)
+            if (id.includes('axios/lib/adapters/http.js')) {
+              // Return null to prevent loading, axios will use default xhr adapter
+              return false
+            }
+            return null
+          },
+        },
+      ],
     },
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
     // Enable source maps for production debugging (optional - can disable for smaller builds)
     sourcemap: false,
-    // Disable sourcemaps to avoid node polyfills issues
-    minify: 'esbuild', // Already set, but ensure it's esbuild not terser
     // CSS code splitting
     cssCodeSplit: true,
     // Target modern browsers for smaller output
@@ -227,8 +257,9 @@ export default defineConfig({
       moduleSideEffects: (id) => {
         // Preserve side effects for certain modules
         if (id.includes('node_modules')) {
-          // React and React-DOM need side effects preserved to prevent initialization issues
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+          // CRITICAL: React and React-DOM MUST have side effects preserved
+          // This prevents initialization order issues
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('react-is') || id.includes('scheduler')) {
             return true
           }
           // Some libraries need side effects preserved
