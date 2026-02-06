@@ -615,7 +615,33 @@ export default function MenuAdd() {
                 ) : (
                   <>
                     <p className="mb-4">No menu sections found</p>
-                    <p className="text-sm">Menu will be created when you add the first dish</p>
+                    <p className="text-sm mb-6">Menu will be created when you add the first dish</p>
+                    <button
+                      onClick={() => {
+                        setSelectedSection(null)
+                        setEditingDish(null)
+                        setFormData({
+                          name: "",
+                          image: "",
+                          images: [],
+                          price: 0,
+                          foodType: "Non-Veg",
+                          category: "",
+                          description: "",
+                          preparationTime: "",
+                          isAvailable: true,
+                          isRecommended: false,
+                          stock: true,
+                        })
+                        setShowNewCategoryInput(false)
+                        setNewCategoryName("")
+                        setShowAddDishModal(true)
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 mx-auto"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add First Dish
+                    </button>
                   </>
                 )}
               </div>
