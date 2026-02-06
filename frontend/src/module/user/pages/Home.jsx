@@ -2,7 +2,7 @@ import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 // Lenis will be lazy loaded
-import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react"
+import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Footer from "../components/Footer"
 import AddToCartButton from "../components/AddToCartButton"
@@ -21,8 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useSearchOverlay, useLocationSelector } from "../components/UserLayout"
 import PageNavbar from "../components/PageNavbar"
 
-// Import shared food images - prevents duplication
-import { foodImages } from "@/constants/images"
+// Mock images removed - use backend data instead
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -387,26 +386,97 @@ export default function Home() {
 
   // Fetch hero banners from API
   useEffect(() => {
+    console.log('🖼️ [Hero Banners] useEffect triggered - Component mounted or updated')
+    
     const fetchHeroBanners = async () => {
       try {
+        console.log('🖼️ [Hero Banners] Starting to fetch banners...')
+        console.log('🖼️ [Hero Banners] API Base URL:', API_BASE_URL)
+        console.log('🖼️ [Hero Banners] Full API URL:', `${API_BASE_URL}/hero-banners/public`)
         setLoadingBanners(true)
+        
         const response = await api.get('/hero-banners/public')
-        if (response.data.success && response.data.data.banners) {
-          const banners = response.data.data.banners
-          setHeroBannersData(banners)
-          // Extract image URLs for display
-          setHeroBannerImages(banners.map(b => b.imageUrl || b))
+        console.log('🖼️ [Hero Banners] API response received:', {
+          success: response.data?.success,
+          hasData: !!response.data?.data,
+          bannersCount: response.data?.data?.banners?.length || 0,
+          fullResponse: response.data
+        })
+        
+        if (response.data && response.data.success && response.data.data) {
+          const banners = response.data.data.banners || []
+          console.log('🖼️ [Hero Banners] Raw banners array:', banners)
+          
+          if (banners.length > 0) {
+            // Filter out banners without imageUrl
+            const validBanners = banners.filter(b => {
+              const isValid = b && b.imageUrl && typeof b.imageUrl === 'string' && b.imageUrl.trim() !== ''
+              if (!isValid) {
+                console.warn('🖼️ [Hero Banners] Invalid banner found:', b)
+              }
+              return isValid
+            })
+            console.log('🖼️ [Hero Banners] Valid banners after filtering:', validBanners.length, validBanners)
+            
+            if (validBanners.length > 0) {
+              setHeroBannersData(validBanners)
+              // Extract image URLs for display
+              const imageUrls = validBanners.map(b => b.imageUrl)
+              console.log('🖼️ [Hero Banners] Setting banner images:', imageUrls)
+              setHeroBannerImages(imageUrls)
+            } else {
+              console.warn('🖼️ [Hero Banners] No valid banners found after filtering')
+              setHeroBannerImages([])
+              setHeroBannersData([])
+            }
+          } else {
+            console.warn('🖼️ [Hero Banners] No banners found in API response. Banners array is empty.')
+            setHeroBannerImages([])
+            setHeroBannersData([])
+          }
+        } else {
+          console.warn('🖼️ [Hero Banners] Invalid API response structure:', {
+            hasResponse: !!response.data,
+            hasSuccess: !!response.data?.success,
+            hasData: !!response.data?.data,
+            response: response.data
+          })
+          setHeroBannerImages([])
+          setHeroBannersData([])
         }
       } catch (error) {
-        console.error('Error fetching hero banners:', error)
+        console.error('🖼️ [Hero Banners] ❌ Error fetching hero banners:', error)
+        console.error('🖼️ [Hero Banners] Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          fullError: error
+        })
+        
+        // Check if it's a network error
+        if (!error.response) {
+          console.error('🖼️ [Hero Banners] Network error - Backend might be down or CORS issue')
+        }
+        
         // Fallback to empty array if API fails
         setHeroBannerImages([])
         setHeroBannersData([])
       } finally {
         setLoadingBanners(false)
+        console.log('🖼️ [Hero Banners] Fetch completed. Loading state set to false.')
+        console.log('🖼️ [Hero Banners] Final state:', {
+          bannerImagesCount: heroBannerImages.length,
+          bannersDataCount: heroBannersData.length,
+          loadingBanners
+        })
       }
     }
 
+    // Immediate log to verify useEffect is running
+    console.log('🖼️ [Hero Banners] useEffect callback executing...')
     fetchHeroBanners()
   }, [])
 
@@ -427,7 +497,7 @@ export default function Home() {
             return {
               id: cat.id,
               name: cat.name,
-              image: isValidImage ? cat.image : foodImages[0], // Fallback to default image if not provided or empty
+              image: isValidImage ? cat.image : '', // Use empty string - images should come from backend
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               label: cat.name // For compatibility with existing code
             }
@@ -1484,6 +1554,7 @@ export default function Home() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            style={{ minHeight: '39vh' }}
           >
             <motion.div
               className="flex h-full"
@@ -1495,7 +1566,8 @@ export default function Home() {
                 ease: "easeInOut"
               }}
               style={{
-                width: `${heroBannerImages.length * 100}vw`
+                width: `${heroBannerImages.length * 100}vw`,
+                height: '100%'
               }}
             >
               {heroBannerImages.map((image, index) => {
@@ -1503,11 +1575,21 @@ export default function Home() {
                 const linkedRestaurants = bannerData?.linkedRestaurants || []
                 const hasLinkedRestaurants = linkedRestaurants.length > 0
                 
+                console.log(`🖼️ [Hero Banners] Rendering banner ${index + 1}:`, {
+                  imageUrl: image,
+                  hasImage: !!image,
+                  imageType: typeof image
+                })
+                
                 return (
                   <div
                     key={index}
-                    className="h-full flex-shrink-0"
-                    style={{ width: '100vw', cursor: hasLinkedRestaurants ? 'pointer' : 'default' }}
+                    className="h-full flex-shrink-0 relative"
+                    style={{ 
+                      width: '100vw', 
+                      cursor: hasLinkedRestaurants ? 'pointer' : 'default',
+                      minHeight: '39vh'
+                    }}
                     onClick={() => {
                       if (hasLinkedRestaurants) {
                         // Redirect to first linked restaurant
@@ -1527,15 +1609,31 @@ export default function Home() {
                       }
                     }}
                   >
-                    <OptimizedImage
-                      src={image}
-                      alt={`Hero Banner ${index + 1}`}
-                      className="w-full h-full"
-                      priority={index === 0}
-                      sizes="100vw"
-                      objectFit="cover"
-                      placeholder="blur"
-                    />
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={`Hero Banner ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        style={{ 
+                          objectFit: 'cover',
+                          display: 'block',
+                          minHeight: '100%',
+                          width: '100%'
+                        }}
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        onError={(e) => {
+                          console.error(`🖼️ [Hero Banners] Image ${index + 1} failed to load:`, image, e)
+                          e.target.style.display = 'none'
+                        }}
+                        onLoad={() => {
+                          console.log(`🖼️ [Hero Banners] Image ${index + 1} loaded successfully:`, image)
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                        <p className="text-white">Banner image not available</p>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1610,13 +1708,6 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleSearchFocus}
-                      className="flex-shrink-0 mr-2 sm:mr-3 lg:mr-4 p-1 lg:p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                      >
-                      <Mic className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-gray-500 dark:text-gray-400" strokeWidth={2.5} />
-                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -1732,29 +1823,7 @@ export default function Home() {
                               onError={(e) => {
                                 console.error(`❌ Image failed to load for category "${category.name}":`, category.image)
                                 console.error('Error details:', e)
-                                // Try fallback image
-                                if (e.target.src !== foodImages[0]) {
-                                  console.log('🔄 Trying fallback image...')
-                                  e.target.src = foodImages[0]
-                                } else {
-                                  // If fallback also fails, show emoji
-                                  console.log('⚠️ Fallback also failed, showing emoji')
-                                  e.target.style.display = 'none'
-                                  if (!e.target.parentElement.querySelector('.fallback-emoji')) {
-                                    const fallback = document.createElement('div')
-                                    fallback.className = 'fallback-emoji w-full h-full flex items-center justify-center text-4xl'
-                                    fallback.textContent = '🍽️'
-                                    e.target.parentElement.appendChild(fallback)
-                                  }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <img
-                              src={foodImages[0]}
-                              alt={category.name}
-                              className="w-full h-full object-cover rounded-full"
-                              onError={(e) => {
+                                // If image fails, show emoji
                                 e.target.style.display = 'none'
                                 if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                   const fallback = document.createElement('div')
@@ -1764,6 +1833,10 @@ export default function Home() {
                                 }
                               }}
                             />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-4xl">
+                              🍽️
+                            </div>
                           )}
                         </div>
                         <span className="text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center">
@@ -1830,26 +1903,7 @@ export default function Home() {
                               onError={(e) => {
                                 console.error(`❌ Image failed to load for category "${category.label}":`, category.imageUrl)
                                 // Try fallback image
-                                if (e.target.src !== foodImages[0]) {
-                                  e.target.src = foodImages[0]
-                                } else {
-                                  // If fallback also fails, show emoji
-                                  e.target.style.display = 'none'
-                                  if (!e.target.parentElement.querySelector('.fallback-emoji')) {
-                                    const fallback = document.createElement('div')
-                                    fallback.className = 'fallback-emoji w-full h-full flex items-center justify-center text-4xl'
-                                    fallback.textContent = '🍽️'
-                                    e.target.parentElement.appendChild(fallback)
-                                  }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <img
-                              src={foodImages[0]}
-                              alt={category.label}
-                              className="w-full h-full object-cover rounded-full"
-                              onError={(e) => {
+                                // If image fails, show emoji
                                 e.target.style.display = 'none'
                                 if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                   const fallback = document.createElement('div')
@@ -1859,6 +1913,10 @@ export default function Home() {
                                 }
                               }}
                             />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-4xl">
+                              🍽️
+                            </div>
                           )}
                         </div>
                         <span className="text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center">
@@ -3073,8 +3131,8 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-4 sm:gap-5 md:gap-6">
                   {(realCategories.length > 0 ? realCategories : landingCategories).map((category, index) => {
                     const categoryData = realCategories.length > 0 
-                      ? { name: category.name, image: category.image || foodImages[0], slug: category.slug }
-                      : { name: category.label, image: category.imageUrl || foodImages[0], slug: category.slug }
+                      ? { name: category.name, image: category.image || '', slug: category.slug }
+                      : { name: category.label, image: category.imageUrl || '', slug: category.slug }
                     
                     return (
                       <motion.div
@@ -3106,27 +3164,7 @@ export default function Home() {
                                   crossOrigin="anonymous"
                                   onError={(e) => {
                                     console.error(`❌ Image failed to load for category "${categoryData.name}":`, categoryData.image)
-                                    // Try fallback image
-                                    if (e.target.src !== foodImages[0]) {
-                                      e.target.src = foodImages[0]
-                                    } else {
-                                      // If fallback also fails, show emoji
-                                      e.target.style.display = 'none'
-                                      if (!e.target.parentElement.querySelector('.fallback-emoji')) {
-                                        const fallback = document.createElement('div')
-                                        fallback.className = 'fallback-emoji w-full h-full flex items-center justify-center text-4xl'
-                                        fallback.textContent = '🍽️'
-                                        e.target.parentElement.appendChild(fallback)
-                                      }
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <img
-                                  src={foodImages[0]}
-                                  alt={categoryData.name}
-                                  className="w-full h-full object-cover rounded-full"
-                                  onError={(e) => {
+                                    // If image fails, show emoji
                                     e.target.style.display = 'none'
                                     if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                       const fallback = document.createElement('div')
@@ -3136,6 +3174,10 @@ export default function Home() {
                                     }
                                   }}
                                 />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-4xl">
+                                  🍽️
+                                </div>
                               )}
                             </div>
                             <span className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 text-center leading-tight px-1 break-words w-full min-w-0">

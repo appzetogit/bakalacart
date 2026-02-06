@@ -8,7 +8,6 @@ import {
   MapPin, 
   Bell, 
   Search, 
-  Mic, 
   ArrowRight,
   Home,
   Heart,
@@ -514,9 +513,6 @@ export default function HomePage() {
             placeholder={placeholderTexts[currentPlaceholderIndex]}
             className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 transition-all duration-300"
           />
-          <button className="p-1">
-            <Mic className="w-5 h-5 text-gray-400" />
-          </button>
         </div>
       </div>
 

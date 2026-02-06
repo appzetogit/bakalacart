@@ -31,27 +31,73 @@ try {
 // Function to send notification
 export const sendPushNotification = async (tokens, payload) => {
     if (!isInitialized) {
-        console.warn('Firebase Admin not initialized. Skipping notification.');
-        return;
+        console.error('❌ [FCM] Firebase Admin not initialized. Cannot send notifications.');
+        console.error('❌ [FCM] Please check if firebase-service-account.json exists in config folder.');
+        return {
+            successCount: 0,
+            failureCount: tokens?.length || 0,
+            failedTokens: tokens || [],
+            error: 'Firebase Admin not initialized'
+        };
     }
 
     if (!tokens || tokens.length === 0) {
-        return;
+        console.warn('⚠️ [FCM] No tokens provided. Skipping notification.');
+        return {
+            successCount: 0,
+            failureCount: 0,
+            failedTokens: [],
+            error: 'No tokens provided'
+        };
+    }
+
+    // Validate payload
+    if (!payload || !payload.title || !payload.body) {
+        console.error('❌ [FCM] Invalid payload: title and body are required');
+        return {
+            successCount: 0,
+            failureCount: tokens.length,
+            failedTokens: tokens,
+            error: 'Invalid payload'
+        };
     }
 
     try {
+        // Build notification object with optional image
+        const notificationObj = {
+            title: payload.title,
+            body: payload.body,
+        };
+        
+        // Add image URL if provided (for web push notifications)
+        if (payload.image) {
+            notificationObj.imageUrl = payload.image;
+        }
+
         const message = {
-            notification: {
-                title: payload.title,
-                body: payload.body,
-            },
+            notification: notificationObj,
             data: payload.data || {},
             tokens: tokens, // Array of FCM tokens
+            webpush: {
+                notification: {
+                    ...notificationObj,
+                    icon: payload.data?.icon || '/bakalalogo.png',
+                    badge: payload.data?.icon || '/bakalalogo.png',
+                },
+                fcmOptions: {
+                    link: payload.data?.click_action || '/'
+                }
+            }
         };
 
         const response = await admin.messaging().sendEachForMulticast(message);
         console.log(`📡 [FCM] Successfully sent: ${response.successCount} messages, Failed: ${response.failureCount} messages`);
         console.log(`📡 [FCM] Title: "${payload.title}" | Recipient count: ${tokens.length}`);
+        
+        // Log detailed error information
+        if (response.failureCount > 0) {
+            console.error(`❌ [FCM] ${response.failureCount} notifications failed out of ${tokens.length} total`);
+        }
 
         // Optional: cleanup invalid tokens
         const failedTokens = [];
@@ -72,9 +118,19 @@ export const sendPushNotification = async (tokens, payload) => {
             responses: response.responses
         };
     } catch (error) {
-        console.error('Error sending message:', error);
-        // Don't throw error to prevent blocking main flow
-        return null;
+        console.error('❌ [FCM] Error sending message:', error);
+        console.error('❌ [FCM] Error details:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        // Return error details instead of null
+        return {
+            successCount: 0,
+            failureCount: tokens.length,
+            failedTokens: tokens,
+            error: error.message || 'Unknown error'
+        };
     }
 };
 

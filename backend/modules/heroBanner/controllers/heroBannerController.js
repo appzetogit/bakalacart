@@ -22,11 +22,20 @@ export const getHeroBanners = async (req, res) => {
       .select('imageUrl order linkedRestaurants')
       .lean();
 
+    console.log(`[getHeroBanners] Found ${banners.length} active banners`);
+    
+    const formattedBanners = banners.map(b => ({
+      imageUrl: b.imageUrl,
+      linkedRestaurants: b.linkedRestaurants || []
+    }));
+
+    console.log('[getHeroBanners] Formatted banners:', formattedBanners.map(b => ({ 
+      imageUrl: b.imageUrl?.substring(0, 50) + '...', 
+      linkedRestaurantsCount: b.linkedRestaurants?.length || 0 
+    })));
+
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
-      banners: banners.map(b => ({
-        imageUrl: b.imageUrl,
-        linkedRestaurants: b.linkedRestaurants || []
-      }))
+      banners: formattedBanners
     });
   } catch (error) {
     console.error('Error fetching hero banners:', error);

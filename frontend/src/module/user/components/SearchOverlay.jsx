@@ -4,27 +4,25 @@ import { X, Search, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-// Import shared food images - prevents duplication
-import { foodImages } from "@/constants/images"
-
 // Recent search suggestions
 const recentSuggestions = [
   "Biryani", "Cake", "Chhole Bhature", "Chicken Tanduri", "Donuts", "Dosa", "French Fries", "Idli"
 ]
 
 // Categories matching the home page browse section - only unique categories
+// Mock images removed - use backend data instead
 const categories = [
-  { id: 1, name: "Biryani", image: foodImages[0] },
-  { id: 2, name: "Cake", image: foodImages[1] },
-  { id: 3, name: "Chhole Bhature", image: foodImages[2] },
-  { id: 4, name: "Chicken Tanduri", image: foodImages[3] },
-  { id: 5, name: "Donuts", image: foodImages[4] },
-  { id: 6, name: "Dosa", image: foodImages[5] },
-  { id: 7, name: "French Fries", image: foodImages[6] },
-  { id: 8, name: "Idli", image: foodImages[7] },
-  { id: 9, name: "Momos", image: foodImages[8] },
-  { id: 10, name: "Samosa", image: foodImages[9] },
-  { id: 11, name: "Starters", image: foodImages[10] },
+  { id: 1, name: "Biryani", image: '' },
+  { id: 2, name: "Cake", image: '' },
+  { id: 3, name: "Chhole Bhature", image: '' },
+  { id: 4, name: "Chicken Tanduri", image: '' },
+  { id: 5, name: "Donuts", image: '' },
+  { id: 6, name: "Dosa", image: '' },
+  { id: 7, name: "French Fries", image: '' },
+  { id: 8, name: "Idli", image: '' },
+  { id: 9, name: "Momos", image: '' },
+  { id: 10, name: "Samosa", image: '' },
+  { id: 11, name: "Starters", image: '' },
 ]
 
 // Use only unique categories (no duplicates)
@@ -184,7 +182,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                         className="w-full h-full object-cover rounded-full"
                           loading="lazy"
                           onError={(e) => {
-                            e.target.src = foodImages[0]
+                            e.target.src = 'https://via.placeholder.com/100'
                           }}
                         />
                     </div>

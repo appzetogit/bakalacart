@@ -11,7 +11,6 @@ import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { useCart } from "../context/CartContext"
 import PageNavbar from "../components/PageNavbar"
-import { foodImages } from "@/constants/images"
 import offerImage from "@/assets/offerimage.png"
 import AddToCartAnimation from "../components/AddToCartAnimation"
 import OptimizedImage from "@/components/OptimizedImage"
@@ -135,19 +134,35 @@ export default function Under250() {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
+        console.log('🖼️ [Under 250] Starting to fetch banners...')
         setLoadingBanner(true)
         const response = await api.get('/hero-banners/under-250/public')
+        console.log('🖼️ [Under 250] API response:', {
+          success: response.data?.success,
+          bannersCount: response.data?.data?.banners?.length || 0,
+          banners: response.data?.data?.banners
+        })
+        
         if (response.data.success && response.data.data.banners && response.data.data.banners.length > 0) {
-          // Use the first banner
-          setBannerImage(response.data.data.banners[0])
+          // Use the first banner - ensure it's a string URL
+          const bannerUrl = response.data.data.banners[0]
+          console.log('🖼️ [Under 250] Setting banner image:', bannerUrl)
+          setBannerImage(bannerUrl)
         } else {
+          console.warn('🖼️ [Under 250] No banners found in response')
           setBannerImage(null)
         }
       } catch (error) {
-        console.error('Error fetching under 250 banners:', error)
+        console.error('🖼️ [Under 250] ❌ Error fetching under 250 banners:', error)
+        console.error('🖼️ [Under 250] Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        })
         setBannerImage(null)
       } finally {
         setLoadingBanner(false)
+        console.log('🖼️ [Under 250] Fetch completed. Banner image:', bannerImage)
       }
     }
 
@@ -184,40 +199,32 @@ export default function Under250() {
         setLoadingCategories(true)
         const response = await api.get('/categories/public')
         if (response.data.success && response.data.data.categories) {
-          const adminCategories = response.data.data.categories.map(cat => {
-            // Check if image is valid (not empty, not placeholder, and is a valid URL)
-            const isValidImage = cat.image && 
-                                 cat.image.trim() !== '' && 
-                                 cat.image !== 'https://via.placeholder.com/40' &&
-                                 (cat.image.startsWith('http://') || cat.image.startsWith('https://'))
-            
-            return {
-              id: cat.id,
-              name: cat.name,
-              image: isValidImage ? cat.image : foodImages[0], // Fallback to default image if not provided or empty
-              slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-')
-            }
-          })
+          const adminCategories = response.data.data.categories
+            .filter(cat => {
+              // Only include categories with valid images
+              const isValidImage = cat.image && 
+                                   cat.image.trim() !== '' && 
+                                   cat.image !== 'https://via.placeholder.com/40' &&
+                                   (cat.image.startsWith('http://') || cat.image.startsWith('https://'))
+              return isValidImage
+            })
+            .map(cat => {
+              return {
+                id: cat.id,
+                name: cat.name,
+                image: cat.image,
+                slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-')
+              }
+            })
           setCategories(adminCategories)
         } else {
-          // Fallback to default categories if API fails
-          const defaultCategories = [
-            { id: 1, name: "Biryani", image: foodImages[0] },
-            { id: 2, name: "Cake", image: foodImages[1] },
-            { id: 3, name: "Chhole Bhature", image: foodImages[2] },
-            { id: 4, name: "Chicken Tanduri", image: foodImages[3] },
-          ]
-          setCategories(defaultCategories)
+          // No categories available from API
+          setCategories([])
         }
       } catch (error) {
         console.error('Error fetching categories:', error)
-        // Fallback to default categories on error
-        const defaultCategories = [
-          { id: 1, name: "Biryani", image: foodImages[0] },
-          { id: 2, name: "Cake", image: foodImages[1] },
-          { id: 3, name: "Chhole Bhature", image: foodImages[2] },
-        ]
-        setCategories(defaultCategories)
+        // No fallback data - show empty state
+        setCategories([])
       } finally {
         setLoadingCategories(false)
       }
@@ -385,13 +392,24 @@ export default function Under250() {
         {/* Banner Image */}
         {bannerImage && (
           <div className="absolute top-0 left-0 right-0 bottom-0 z-0">
-            <OptimizedImage
+            <img
               src={bannerImage}
               alt="Under 250 Banner"
-              className="w-full h-full"
-              objectFit="cover"
-              priority={true}
-              sizes="100vw"
+              className="w-full h-full object-cover"
+              style={{ 
+                objectFit: 'cover',
+                display: 'block',
+                minHeight: '100%',
+                width: '100%'
+              }}
+              loading="eager"
+              onError={(e) => {
+                console.error('🖼️ [Under 250] Banner image failed to load:', bannerImage, e)
+                e.target.style.display = 'none'
+              }}
+              onLoad={() => {
+                console.log('🖼️ [Under 250] Banner image loaded successfully:', bannerImage)
+              }}
             />
           </div>
         )}
@@ -418,29 +436,39 @@ export default function Under250() {
               overflowY: "hidden",
             }}
           >
-            {/* All Button */}
-            <div className="flex-shrink-0">
-              <motion.div 
-                className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28"
-                whileHover={{ scale: 1.1, y: -4 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              >
-                <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all">
-                  <OptimizedImage
-                    src={offerImage}
-                    alt="All"
-                    className="w-full h-full bg-white rounded-full"
-                    objectFit="cover"
-                    sizes="(max-width: 640px) 62px, (max-width: 768px) 96px, 112px"
-                    placeholder="blur"
-                  />
-                </div>
-                <span className="text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center pb-1">
-                  All
-                </span>
-              </motion.div>
-            </div>
+             {/* All Button */}
+             <div className="flex-shrink-0">
+               <motion.div 
+                 className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28"
+                 whileHover={{ scale: 1.1, y: -4 }}
+                 whileTap={{ scale: 0.95 }}
+                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
+               >
+                 <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-white">
+                   <img
+                     src={offerImage}
+                     alt="All"
+                     className="w-full h-full object-cover rounded-full"
+                     style={{ 
+                       objectFit: 'cover',
+                       display: 'block',
+                       width: '100%',
+                       height: '100%'
+                     }}
+                     loading="eager"
+                     onError={(e) => {
+                       console.error('🖼️ [Under 250] All button image failed to load:', offerImage, e)
+                     }}
+                     onLoad={() => {
+                       console.log('🖼️ [Under 250] All button image loaded successfully:', offerImage)
+                     }}
+                   />
+                 </div>
+                 <span className="text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center pb-1">
+                   All
+                 </span>
+               </motion.div>
+             </div>
             {categories.map((category, index) => {
               const isActive = activeCategory === category.id
               const categorySlug = category.slug || category.name.toLowerCase().replace(/\s+/g, '-')
@@ -455,7 +483,7 @@ export default function Under250() {
                       transition={{ type: "spring", stiffness: 300, damping: 20 }}
                     >
                       <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-gray-100 dark:bg-gray-800">
-                        {category.image && category.image.trim() !== '' && category.image !== 'https://via.placeholder.com/40' ? (
+                        {category.image ? (
                           <img
                             src={category.image}
                             alt={category.name}
@@ -466,30 +494,8 @@ export default function Under250() {
                             }}
                             onError={(e) => {
                               console.error(`❌ Image failed to load for category "${category.name}":`, category.image)
-                              // Try fallback image
-                              if (e.target.src !== foodImages[0]) {
-                                console.log('🔄 Trying fallback image...')
-                                e.target.src = foodImages[0]
-                              } else {
-                                // If fallback also fails, show emoji
-                                console.log('⚠️ Fallback also failed, showing emoji')
-                                e.target.style.display = 'none'
-                                if (!e.target.parentElement.querySelector('.fallback-emoji')) {
-                                  const fallback = document.createElement('div')
-                                  fallback.className = 'fallback-emoji w-full h-full flex items-center justify-center text-4xl'
-                                  fallback.textContent = '🍽️'
-                                  e.target.parentElement.appendChild(fallback)
-                                }
-                              }
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src={foodImages[0]}
-                            alt={category.name}
-                            className="w-full h-full object-cover rounded-full"
-                            onError={(e) => {
                               e.target.style.display = 'none'
+                              // Show placeholder emoji if image fails
                               if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                 const fallback = document.createElement('div')
                                 fallback.className = 'fallback-emoji w-full h-full flex items-center justify-center text-4xl'
@@ -498,6 +504,10 @@ export default function Under250() {
                               }
                             }}
                           />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                            <div className="text-gray-400 text-4xl">🍽️</div>
+                          </div>
                         )}
                       </div>
                       <span className={`text-xs sm:text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200 text-center pb-1 ${isActive ? 'border-b-2 border-green-600' : ''}`}>
@@ -609,21 +619,44 @@ export default function Under250() {
                         style={{ boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)" }}
                       >
                         {/* Item Image */}
-                        <div className="relative w-full h-32 sm:h-36 md:h-40 lg:h-48 xl:h-52 overflow-hidden">
+                        <div className="relative w-full h-32 sm:h-36 md:h-40 lg:h-48 xl:h-52 overflow-hidden bg-gray-100">
                           <motion.div
                             className="absolute inset-0"
                             whileHover={{ scale: 1.1 }}
                             transition={{ duration: 0.5, ease: "easeOut" }}
                           >
-                            <OptimizedImage
-                              src={item.image}
-                              alt={item.name}
-                              className="w-full h-full"
-                              objectFit="cover"
-                              sizes="(max-width: 640px) 200px, (max-width: 768px) 220px, 100vw"
-                              placeholder="blur"
-                              priority={itemIndex < 4}
-                            />
+                            {item.image ? (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                                style={{ 
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                  minHeight: '100%',
+                                  width: '100%'
+                                }}
+                                loading={itemIndex < 4 ? 'eager' : 'lazy'}
+                                onError={(e) => {
+                                  console.error(`🖼️ [Under 250] Dish image failed to load for "${item.name}":`, item.image, e)
+                                  e.target.style.display = 'none'
+                                  // Show placeholder if image fails
+                                  if (!e.target.parentElement.querySelector('.image-placeholder')) {
+                                    const placeholder = document.createElement('div')
+                                    placeholder.className = 'image-placeholder w-full h-full flex items-center justify-center bg-gray-200'
+                                    placeholder.innerHTML = '<div class="text-gray-400 text-4xl">🍽️</div>'
+                                    e.target.parentElement.appendChild(placeholder)
+                                  }
+                                }}
+                                onLoad={() => {
+                                  console.log(`🖼️ [Under 250] Dish image loaded successfully for "${item.name}":`, item.image)
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                <div className="text-gray-400 text-4xl">🍽️</div>
+                              </div>
+                            )}
                           </motion.div>
                           {/* Gradient Overlay on Hover */}
                           <motion.div
@@ -841,16 +874,39 @@ export default function Under250() {
               </div>
 
               {/* Image Section */}
-              <div className="relative w-full h-64 md:h-80 lg:h-96 xl:h-[500px] overflow-hidden rounded-t-3xl">
-                <OptimizedImage
-                  src={selectedItem.image}
-                  alt={selectedItem.name}
-                  className="w-full h-full"
-                  objectFit="cover"
-                  sizes="100vw"
-                  priority={true}
-                  placeholder="blur"
-                />
+              <div className="relative w-full h-64 md:h-80 lg:h-96 xl:h-[500px] overflow-hidden rounded-t-3xl bg-gray-100">
+                {selectedItem.image ? (
+                  <img
+                    src={selectedItem.image}
+                    alt={selectedItem.name}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      objectFit: 'cover',
+                      display: 'block',
+                      minHeight: '100%',
+                      width: '100%'
+                    }}
+                    loading="eager"
+                    onError={(e) => {
+                      console.error(`🖼️ [Under 250] Selected item image failed to load:`, selectedItem.image, e)
+                      e.target.style.display = 'none'
+                      // Show placeholder if image fails
+                      if (!e.target.parentElement.querySelector('.image-placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'image-placeholder w-full h-full flex items-center justify-center bg-gray-200'
+                        placeholder.innerHTML = '<div class="text-gray-400 text-6xl">🍽️</div>'
+                        e.target.parentElement.appendChild(placeholder)
+                      }
+                    }}
+                    onLoad={() => {
+                      console.log(`🖼️ [Under 250] Selected item image loaded successfully:`, selectedItem.image)
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                    <div className="text-gray-400 text-6xl">🍽️</div>
+                  </div>
+                )}
                 {/* Bookmark and Share Icons Overlay */}
                 <div className="absolute bottom-4 right-4 flex items-center gap-3">
                   <button

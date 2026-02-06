@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
-import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Mic, Loader2 } from "lucide-react"
+import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,8 +10,8 @@ import { useLocation } from "../hooks/useLocation"
 import { useZone } from "../hooks/useZone"
 import { restaurantAPI, adminAPI } from "@/lib/api"
 
-// Import shared food images - prevents duplication
-import { foodImages } from "@/constants/images"
+// Mock images removed - use backend data instead
+import offerImage from "@/assets/offerimage.png"
 
 // Filter options
 const filterOptions = [
@@ -38,7 +38,7 @@ export default function SearchResults() {
   const [restaurantsData, setRestaurantsData] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
   const [categories, setCategories] = useState([
-    { id: 'all', name: "All", image: foodImages[7] }
+    { id: 'all', name: "All", image: offerImage }
   ])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [categoryKeywords, setCategoryKeywords] = useState({})
@@ -55,11 +55,11 @@ export default function SearchResults() {
           
           // Transform API categories to match expected format
           const transformedCategories = [
-            { id: 'all', name: "All", image: foodImages[7] },
+            { id: 'all', name: "All", image: offerImage },
             ...categoriesArray.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
-              image: (cat.image && cat.image.trim() !== '') ? cat.image : foodImages[0],
+              image: (cat.image && cat.image.trim() !== '') ? cat.image : '',
               type: cat.type,
             }))
           ]
@@ -669,11 +669,8 @@ export default function SearchResults() {
               placeholder="Restaurant name or a dish..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
+              className="pl-10 pr-4 h-11 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
               />
-            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Mic className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            </button>
           </form>
             </div>
 

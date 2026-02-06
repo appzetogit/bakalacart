@@ -2,13 +2,13 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Mic, MapPin, ArrowDownUp, Timer, IndianRupee, UtensilsCrossed, ShieldCheck, X, Loader2 } from "lucide-react"
+import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, MapPin, ArrowDownUp, Timer, IndianRupee, UtensilsCrossed, ShieldCheck, X, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-// Import shared food images - prevents duplication
-import { foodImages } from "@/constants/images"
+// Mock images removed - use backend data instead
+import offerImage from "@/assets/offerimage.png"
 import api from "@/lib/api"
 import { restaurantAPI, adminAPI } from "@/lib/api"
 import { useProfile } from "../context/ProfileContext"
@@ -67,11 +67,11 @@ export default function CategoryPage() {
           
           // Transform API categories to match expected format
           const transformedCategories = [
-            { id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' },
+            { id: 'all', name: "All", image: offerImage, slug: 'all' },
             ...categoriesArray.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
-              image: (cat.image && cat.image.trim() !== '') ? cat.image : foodImages[0],
+              image: (cat.image && cat.image.trim() !== '') ? cat.image : '',
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               type: cat.type,
             }))
@@ -93,12 +93,12 @@ export default function CategoryPage() {
           setCategoryKeywords(keywordsMap)
         } else {
           // Keep default "All" category on error
-          setCategories([{ id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' }])
+          setCategories([{ id: 'all', name: "All", image: offerImage, slug: 'all' }])
         }
       } catch (error) {
         console.error('Error fetching categories:', error)
         // Keep default "All" category on error
-        setCategories([{ id: 'all', name: "All", image: foodImages[7] || foodImages[0], slug: 'all' }])
+        setCategories([{ id: 'all', name: "All", image: offerImage, slug: 'all' }])
       } finally {
         setLoadingCategories(false)
       }
@@ -667,11 +667,8 @@ export default function CategoryPage() {
                 placeholder="Restaurant name or a dish..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10 h-11 md:h-12 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm md:text-base dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
+                className="pl-10 pr-4 h-11 md:h-12 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-sm md:text-base dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Mic className="h-4 w-4 text-gray-500" />
-              </button>
             </div>
           </div>
 
@@ -710,8 +707,8 @@ export default function CategoryPage() {
                           alt={cat.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            // Fallback to default image if category image fails to load
-                            e.target.src = foodImages[0] || 'https://via.placeholder.com/100'
+                            // Fallback to placeholder if category image fails to load
+                            e.target.src = 'https://via.placeholder.com/100'
                           }}
                         />
                       </div>

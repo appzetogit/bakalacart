@@ -121,12 +121,15 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
 
         if (targetTokens.length === 0) {
             console.log(`⚠️ [Admin Notification] No FCM tokens found for target: ${sendTo}, zone: ${zone}`);
+            console.log(`⚠️ [Admin Notification] Debug info - Users/Restaurants/Delivery found but no tokens available`);
         } else {
             console.log(`🚀 [Admin Notification] Sending to ${targetTokens.length} tokens. Title: ${title}`);
+            console.log(`🔍 [Admin Notification] Sample tokens (first 3):`, targetTokens.slice(0, 3).map(t => t.substring(0, 20) + '...'));
 
             const payload = {
                 title: title,
                 body: description,
+                image: image || null, // For web push imageUrl
                 data: {
                     type: 'admin_broadcast',
                     image: image || '',
@@ -136,13 +139,22 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
                 }
             };
 
-            if (image) {
-                payload.image = image; // For system tray preview
-                payload.data.image = image;
-            }
-
             // Send via Firebase
-            await sendPushNotification(targetTokens, payload);
+            const result = await sendPushNotification(targetTokens, payload);
+            
+            // Check result and log details
+            if (result) {
+                if (result.error) {
+                    console.error(`❌ [Admin Notification] Failed to send: ${result.error}`);
+                } else {
+                    console.log(`✅ [Admin Notification] Result: ${result.successCount} sent, ${result.failureCount} failed`);
+                    if (result.failedTokens && result.failedTokens.length > 0) {
+                        console.log(`⚠️ [Admin Notification] ${result.failedTokens.length} tokens failed. Consider cleaning them up.`);
+                    }
+                }
+            } else {
+                console.error(`❌ [Admin Notification] sendPushNotification returned null/undefined`);
+            }
         }
 
         return successResponse(res, 201, 'Notification sent and saved successfully', {
