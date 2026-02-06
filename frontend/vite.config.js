@@ -7,8 +7,12 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      // Ensure React is properly transformed
+      // CRITICAL FIX: Ensure React is properly transformed and initialized
       jsxRuntime: 'automatic',
+      // Ensure React is imported correctly to prevent initialization errors
+      jsxImportSource: 'react',
+      // Fast refresh for development
+      fastRefresh: true,
     }), 
     tailwindcss(),
   ],
@@ -82,19 +86,20 @@ export default defineConfig({
     reportCompressedSize: false, // Faster builds
     // CSS minification
     cssMinify: 'lightningcss',
-    // Code splitting configuration - simplified to avoid circular dependencies
+    // Code splitting configuration - CRITICAL FIX for React initialization errors
     rollupOptions: {
       output: {
-        // CRITICAL FIX: Prevent React initialization errors by NOT splitting React
+        // CRITICAL FIX: Explicitly bundle React in a single chunk that loads first
+        // This prevents "Cannot access 'React' before initialization" errors
         manualChunks: (id) => {
-          // CRITICAL: Return undefined for React - let it be bundled with entry or vendor automatically
-          // This prevents "Cannot access 'React' before initialization" errors
           if (id.includes('node_modules')) {
-            // Check if it's React core - DO NOT manually chunk it
+            // CRITICAL: Bundle ALL React-related packages together in a single chunk
+            // This ensures proper initialization order and prevents TDZ errors
             const isReactCore = (
               id.includes('node_modules/react/') || 
               id.includes('node_modules/react-dom/') || 
               id.includes('node_modules/react-router/') ||
+              id.includes('node_modules/react-router-dom/') ||
               id.includes('node_modules/react-is/') ||
               id.includes('node_modules/scheduler/') ||
               id.includes('node_modules/object-assign/') ||
@@ -103,10 +108,10 @@ export default defineConfig({
               id === 'react-router-dom'
             )
             
-            // CRITICAL: Return undefined for React - Vite will handle it automatically
-            // This ensures proper initialization order without circular dependencies
+            // CRITICAL: Put React in a dedicated chunk that loads FIRST
+            // This ensures React is fully initialized before any other code uses it
             if (isReactCore) {
-              return undefined // Let Vite bundle React automatically with proper order
+              return 'react-vendor' // Single chunk for all React dependencies
             }
             
             // Only split non-React dependencies
@@ -196,14 +201,14 @@ export default defineConfig({
         preserveModules: false,
         // Better handling of circular dependencies
         interop: 'compat',
-        // Ensure proper chunk ordering - React must load first
+        // CRITICAL FIX: Ensure proper chunk ordering - React must load first
         // This ensures dependencies are loaded in the correct order
         generatedCode: {
           constBindings: false, // Use let/var instead of const to avoid TDZ issues
           objectShorthand: true,
         },
-        // Ensure proper hoisting to prevent initialization errors
-        hoistTransitiveImports: false, // Don't hoist to prevent circular deps
+        // CRITICAL FIX: Enable hoisting for React to ensure proper initialization order
+        hoistTransitiveImports: true, // Hoist React imports to prevent initialization errors
       },
       // External dependencies that should not be bundled (if any)
       external: [],
