@@ -16,32 +16,54 @@ firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
+// Handle background messages
 messaging.onBackgroundMessage((payload) => {
-    console.log('[firebase-messaging-sw.js] Received background message', payload);
+    console.log('[SW] Received background message:', payload);
 
-    const notificationTitle = payload.notification?.title || 'Bakala Order Update';
+    // If payload has notification object, the browser will show it automatically.
+    // If we call showNotification here, it will result in double notifications.
+    if (payload.notification) {
+        console.log('[SW] Payload has notification object, let browser handle automatically');
+        return;
+    }
+
+    const title = payload.data?.title || 'Bakala Update';
+    const body = payload.data?.body || '';
+    const tag = payload.data?.tag || payload.data?.orderId || 'admin_broadcast';
+
+    // Icon and Image needs to be absolute URLs for maximum compatibility
+    const icon = payload.data?.icon || '/bakalalogo.png';
+    const image = payload.data?.image || null;
+
     const notificationOptions = {
-        body: payload.notification?.body || '',
-        icon: payload.data?.icon || '/bakalalogo.png',
+        body: body,
+        icon: icon,
+        image: image,
         data: payload.data,
-        tag: payload.data?.tag || payload.data?.orderId // Prevent multiple notifications for same order/message
+        tag: tag, // THIS IS KEY FOR DEDUPLICATION
+        badge: '/bakalalogo.png',
+        requireInteraction: true,
+        vibrate: [200, 100, 200]
     };
 
-    console.log(`[firebase-messaging-sw.js] Showing background notification for: ${notificationTitle}`);
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    console.log(`🔔 [SW] Displaying manual notification: ${title} (Tag: ${tag})`);
+    return self.registration.showNotification(title, notificationOptions);
 });
 
+// Handle notification click
 self.addEventListener('notificationclick', (event) => {
+    console.log('[SW] Notification clicked:', event.notification.tag);
     event.notification.close();
 
     const data = event.notification.data;
-    const urlToOpen = data?.link || '/';
+    // Link can be in data.click_action or data.link
+    const urlToOpen = data?.link || data?.click_action || '/';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             // Check if there's already a window matching URL
             for (const client of clientList) {
-                if (client.url === urlToOpen && 'focus' in client) {
+                if (urlToOpen.includes(client.url) && 'focus' in client) {
                     return client.focus();
                 }
             }
@@ -49,8 +71,6 @@ self.addEventListener('notificationclick', (event) => {
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }
-        }).catch(err => {
-            console.error('[firebase-messaging-sw.js] Error handling notification click:', err);
         })
     );
 });

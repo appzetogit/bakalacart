@@ -774,6 +774,22 @@ export const verifyOrderPayment = async (req, res) => {
       });
     }
 
+    // Guard: Prevent duplicate processing and notifications if already confirmed
+    if (order.status === 'confirmed' || order.payment.status === 'completed') {
+      logger.info(`Order ${order.orderId} already confirmed, skipping duplicate processing.`);
+      return res.json({
+        success: true,
+        message: 'Order already confirmed',
+        data: {
+          order: {
+            id: order._id.toString(),
+            orderId: order.orderId,
+            status: order.status
+          }
+        }
+      });
+    }
+
     // Verify payment signature
     const isValid = await verifyPayment(razorpayOrderId, razorpayPaymentId, razorpaySignature);
 

@@ -223,7 +223,7 @@ function setupForegroundNotificationHandler(handler) {
                 body: body,
                 icon: icon,
                 data: payload.data,
-                tag: payload.data?.orderId // Prevent multiple notifications for same order
+                tag: payload.data?.tag || payload.data?.orderId // Prevent multiple notifications for same order/message
             });
         }
 

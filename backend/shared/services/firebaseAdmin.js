@@ -7,7 +7,6 @@ import fs from 'fs';
 let isInitialized = false;
 
 try {
-    // Try to load service account from config file
     const serviceAccountPath = path.resolve(process.cwd(), 'config', 'firebase-service-account.json');
 
     if (fs.existsSync(serviceAccountPath)) {
@@ -18,119 +17,139 @@ try {
         });
 
         isInitialized = true;
-        console.log('Firebase Admin initialized successfully with service account file.');
+        console.log('✅ [FCM] Firebase Admin initialized successfully.');
     } else {
-        // Fallback to environment variables if file doesn't exist (Production support)
-        // You can implement this if you have env vars like FIREBASE_PROJECT_ID etc.
-        console.warn('Firebase service account file not found at:', serviceAccountPath);
+        console.warn('⚠️ [FCM] Firebase service account file not found.');
     }
 } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
+    console.error('❌ [FCM] Error initializing Firebase Admin:', error);
 }
 
 // Function to send notification
 export const sendPushNotification = async (tokens, payload) => {
-    if (!isInitialized) {
-        console.error('❌ [FCM] Firebase Admin not initialized. Cannot send notifications.');
-        console.error('❌ [FCM] Please check if firebase-service-account.json exists in config folder.');
-        return {
-            successCount: 0,
-            failureCount: tokens?.length || 0,
-            failedTokens: tokens || [],
-            error: 'Firebase Admin not initialized'
-        };
-    }
+    if (!isInitialized) return { success: false, error: 'Firebase Admin not initialized' };
 
-    if (!tokens || tokens.length === 0) {
-        console.warn('⚠️ [FCM] No tokens provided. Skipping notification.');
-        return {
-            successCount: 0,
-            failureCount: 0,
-            failedTokens: [],
-            error: 'No tokens provided'
-        };
-    }
+    // Ensure tokens are unique and non-empty
+    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
 
-    // Validate payload
-    if (!payload || !payload.title || !payload.body) {
-        console.error('❌ [FCM] Invalid payload: title and body are required');
-        return {
-            successCount: 0,
-            failureCount: tokens.length,
-            failedTokens: tokens,
-            error: 'Invalid payload'
-        };
+    if (uniqueTokens.length === 0) {
+        console.log('⚠️ [FCM] No tokens to send to.');
+        return { successCount: 0, failureCount: 0, failedTokens: [] };
     }
 
     try {
-        // Build notification object with optional image
-        const notificationObj = {
-            title: payload.title,
-            body: payload.body,
-        };
-        
-        // Add image URL if provided (for web push notifications)
-        if (payload.image) {
-            notificationObj.imageUrl = payload.image;
-        }
+        const tag = payload.data?.tag || payload.data?.orderId || payload.data?.notificationId || Date.now().toString();
+        const iconUrl = payload.data?.icon || 'https://bakalacart.com/bakalalogo.png';
 
         const message = {
-            notification: notificationObj,
-            data: payload.data || {},
-            tokens: tokens, // Array of FCM tokens
-            webpush: {
+            // Data payload for all (Metadata for custom handlers)
+            data: {
+                ...payload.data,
+                tag: tag,
+                title: payload.title,
+                body: payload.body,
+                icon: iconUrl,
+                image: payload.image || ''
+            },
+            tokens: uniqueTokens,
+            android: {
+                collapseKey: tag, // Deduplication for Android
+                priority: 'high',
+                // For Native Apps: If 'notification' is included here, Android OS shows it automatically.
+                // If the app also has an 'onMessage' listener that shows a notification, you get two.
+                // WE REMOVE THE ANDROID NOTIFICATION BLOCK to let the App handle it via 'data' only.
+                // OR we keep it but ensure 'data' doesn't contain the same info if the app is naive.
+                // BEST BET: Keep notification for background but use 'tag' correctly.
                 notification: {
-                    ...notificationObj,
-                    icon: payload.data?.icon || '/bakalalogo.png',
-                    badge: payload.data?.icon || '/bakalalogo.png',
+                    title: payload.title,
+                    body: payload.body,
+                    tag: tag,
+                    icon: 'notification_icon',
+                    color: '#008037',
+                    image: payload.image || null,
+                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                    sound: 'default'
+                }
+            },
+            apns: {
+                headers: {
+                    'apns-collapse-id': tag, // Deduplication for iOS
+                    'apns-priority': '10'
+                },
+                payload: {
+                    aps: {
+                        alert: {
+                            title: payload.title,
+                            body: payload.body
+                        },
+                        'thread-id': tag,
+                        badge: 1,
+                        sound: 'default',
+                        'mutable-content': 1
+                    }
+                }
+            },
+            webpush: {
+                headers: {
+                    Urgency: 'high',
+                    Topic: tag.substring(0, 32)
+                },
+                notification: {
+                    title: payload.title,
+                    body: payload.body,
+                    tag: tag, // Deduplication for Web
+                    icon: iconUrl,
+                    badge: iconUrl,
+                    image: payload.image || null,
+                    requireInteraction: true
                 },
                 fcmOptions: {
-                    link: payload.data?.click_action || '/'
+                    link: (payload.data?.click_action && !payload.data.click_action.includes('_CLICK'))
+                        ? payload.data.click_action
+                        : (payload.data?.link || '/')
                 }
             }
         };
 
-        const response = await admin.messaging().sendEachForMulticast(message);
-        console.log(`📡 [FCM] Successfully sent: ${response.successCount} messages, Failed: ${response.failureCount} messages`);
-        console.log(`📡 [FCM] Title: "${payload.title}" | Recipient count: ${tokens.length}`);
-        
-        // Log detailed error information
-        if (response.failureCount > 0) {
-            console.error(`❌ [FCM] ${response.failureCount} notifications failed out of ${tokens.length} total`);
-        }
+        // CRITICAL: We DO NOT send the top-level 'notification' object 
+        // if we are providing platform-specific notification blocks.
+        // This is a common cause of double notifications.
+        // However, for generic clients, we keep it. but here we have all 3 major platforms covered.
+        // For security, if it's a mobile app, it relies on 'android' and 'apns'.
+        // If it's a web app, it relies on 'webpush'.
+        // So we can SAFELY remove the top-level 'notification' object.
 
-        // Optional: cleanup invalid tokens
-        const failedTokens = [];
-        if (response.failureCount > 0) {
-            response.responses.forEach((resp, idx) => {
-                if (!resp.success) {
-                    failedTokens.push(tokens[idx]);
-                    console.error(`❌ [FCM Error] Token: ${tokens[idx].substring(0, 10)}... Error:`, resp.error);
+        console.log(`🚀 [FCM] Preparing to send to ${uniqueTokens.length} tokens. Tag: ${tag}`);
+        const response = await admin.messaging().sendEachForMulticast(message);
+
+        console.log(`✅ [FCM] Sent successfully: ${response.successCount}, Failed: ${response.failureCount}`);
+
+        const failedTokensList = [];
+        const cleanupTokens = [];
+
+        response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+                const token = uniqueTokens[idx];
+                failedTokensList.push({ token, error: resp.error?.code });
+
+                if (['messaging/registration-token-not-registered',
+                    'messaging/invalid-registration-token',
+                    'messaging/invalid-argument'].includes(resp.error?.code)) {
+                    cleanupTokens.push(token);
                 }
-            });
-            console.log('Failed tokens:', failedTokens);
-        }
+            }
+        });
 
         return {
             successCount: response.successCount,
             failureCount: response.failureCount,
-            failedTokens: failedTokens,
+            failedTokens: failedTokensList,
+            cleanupTokens: cleanupTokens,
             responses: response.responses
         };
     } catch (error) {
-        console.error('❌ [FCM] Error sending message:', error);
-        console.error('❌ [FCM] Error details:', {
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-        });
-        // Return error details instead of null
-        return {
-            successCount: 0,
-            failureCount: tokens.length,
-            failedTokens: tokens,
-            error: error.message || 'Unknown error'
-        };
+        console.error('❌ [FCM] Multicast Error:', error);
+        return { successCount: 0, failureCount: uniqueTokens.length, error: error.message };
     }
 };
 

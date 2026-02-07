@@ -1,50 +1,47 @@
-
 import Notification from '../models/Notification.js';
 import User from '../../auth/models/User.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Delivery from '../../delivery/models/Delivery.js';
 import Zone from '../../admin/models/Zone.js';
-import { sendPushNotification } from '../../../shared/services/firebaseAdmin.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
-import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
-import mongoose from 'mongoose';
+import { sendPushNotification } from '../../../shared/services/firebaseAdmin.js';
+import { cloudinary } from '../../../config/cloudinary.js';
 
 /**
- * Send push notification from Admin to target group
+ * Send notification from admin dashboard
  * POST /api/notification/send
  */
 export const sendAdminNotification = asyncHandler(async (req, res) => {
-    const { title, zone, sendTo, description } = req.body;
-    let { image } = req.body;
-
-    if (!title || !description || !sendTo) {
-        return errorResponse(res, 400, 'Title, description, and target group are required');
-    }
-
     try {
-        // Handle Cloudinary Image Upload
-        if (req.file) {
-            console.log('📤 Uploading notification banner to Cloudinary...');
-            const uploadResult = await uploadToCloudinary(req.file.buffer, {
-                folder: 'notifications'
-            });
-            image = uploadResult.secure_url;
-            console.log('✅ Image uploaded successfully:', image);
+        const { title, description, sendTo, zone, image } = req.body;
+
+        if (!title || !description || !sendTo) {
+            return errorResponse(res, 400, 'Title, description and target (sendTo) are required');
         }
 
         let targetTokens = [];
-
-        // 1. Identify Zone if specified
         let zoneModel = null;
+
         if (zone && zone !== 'All') {
             zoneModel = await Zone.findOne({ name: zone });
+            if (!zoneModel) {
+                console.log(`⚠️ [Admin Notification] Zone not found: ${zone}. Falling back to all users in category.`);
+            }
         }
 
-        let users = [];
-        if (sendTo === 'Customer') {
+        // Logic to collect tokens based on target
+        if (sendTo === 'All') {
+            const allUsers = await User.find({}).select('fcmTokens fcmTokenMobile');
+            const allRestaurants = await Restaurant.find({}).select('fcmTokens fcmTokenMobile');
+            const allDelivery = await Delivery.find({}).select('fcmTokens fcmTokenMobile');
+
+            [...allUsers, ...allRestaurants, ...allDelivery].forEach(record => {
+                targetTokens.push(...(record.fcmTokens || []), ...(record.fcmTokenMobile || []));
+            });
+        } else if (sendTo === 'Customer') {
+            let users = [];
             if (zoneModel) {
-                // Find users whose current location is in the zone
                 users = await User.find({
                     role: 'user',
                     'currentLocation.location': {
@@ -56,35 +53,45 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
             } else {
                 users = await User.find({ role: 'user' }).select('fcmTokens fcmTokenMobile');
             }
-
             users.forEach(user => {
                 targetTokens.push(...(user.fcmTokens || []), ...(user.fcmTokenMobile || []));
             });
         } else if (sendTo === 'Restaurant') {
             let restaurants = [];
+            let restaurantUsers = [];
+
             if (zoneModel) {
-                // Find restaurants in the specified zone using GeoJSON coordinates
                 restaurants = await Restaurant.find({
                     'location.coordinates': {
                         $geoWithin: {
                             $geometry: zoneModel.boundary
                         }
                     }
-                }).select('fcmTokens fcmTokenMobile');
+                }).select('name fcmTokens fcmTokenMobile');
+
+                restaurantUsers = await User.find({
+                    role: 'restaurant',
+                    'currentLocation.location': {
+                        $geoWithin: {
+                            $geometry: zoneModel.boundary
+                        }
+                    }
+                }).select('name fcmTokens fcmTokenMobile');
             } else {
-                // Find all restaurants if no zone specified
-                restaurants = await Restaurant.find({}).select('fcmTokens fcmTokenMobile');
+                restaurants = await Restaurant.find({}).select('name fcmTokens fcmTokenMobile');
+                restaurantUsers = await User.find({ role: 'restaurant' }).select('name fcmTokens fcmTokenMobile');
             }
 
-            console.log('Restaurants found:', restaurants.length);
-            restaurants.forEach(r => {
-                console.log('Restaurant tokens:', r.fcmTokens, r.fcmTokenMobile);
+            console.log(`📡 [Admin Notification] Restaurants: ${restaurants.length}, Restaurant Users: ${restaurantUsers.length}`);
+
+            [...restaurants, ...restaurantUsers].forEach(r => {
                 targetTokens.push(...(r.fcmTokens || []), ...(r.fcmTokenMobile || []));
             });
         } else if (sendTo === 'Delivery Man') {
             let deliveryPartners = [];
+            let deliveryUsers = [];
+
             if (zoneModel) {
-                // Find delivery partners by zone assignment OR geographic location
                 deliveryPartners = await Delivery.find({
                     $or: [
                         { 'availability.zones': zoneModel._id },
@@ -96,20 +103,29 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
                             }
                         }
                     ]
-                }).select('fcmTokens fcmTokenMobile');
+                }).select('name fcmTokens fcmTokenMobile');
+
+                deliveryUsers = await User.find({
+                    role: 'delivery',
+                    'currentLocation.location': {
+                        $geoWithin: {
+                            $geometry: zoneModel.boundary
+                        }
+                    }
+                }).select('name fcmTokens fcmTokenMobile');
             } else {
-                deliveryPartners = await Delivery.find({}).select('fcmTokens fcmTokenMobile');
+                deliveryPartners = await Delivery.find({}).select('name fcmTokens fcmTokenMobile');
+                deliveryUsers = await User.find({ role: 'delivery' }).select('name fcmTokens fcmTokenMobile');
             }
 
-            deliveryPartners.forEach(delivery => {
-                targetTokens.push(...(delivery.fcmTokens || []), ...(delivery.fcmTokenMobile || []));
+            console.log(`📡 [Admin Notification] Delivery partners: ${deliveryPartners.length}, Delivery Users: ${deliveryUsers.length}`);
+
+            [...deliveryPartners, ...deliveryUsers].forEach(d => {
+                targetTokens.push(...(d.fcmTokens || []), ...(d.fcmTokenMobile || []));
             });
         }
 
-        // Remove duplicates and empties
-        targetTokens = [...new Set(targetTokens)].filter(Boolean);
-
-        // 3. Save to History (we need ID for tag)
+        // Save notification to history
         const newNotification = await Notification.create({
             title,
             description,
@@ -120,46 +136,37 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
         });
 
         if (targetTokens.length === 0) {
-            console.log(`⚠️ [Admin Notification] No FCM tokens found for target: ${sendTo}, zone: ${zone}`);
-            console.log(`⚠️ [Admin Notification] Debug info - Users/Restaurants/Delivery found but no tokens available`);
+            console.log(`⚠️ [Admin Notification] No FCM tokens found.`);
         } else {
-            console.log(`🚀 [Admin Notification] Sending to ${targetTokens.length} tokens. Title: ${title}`);
-            console.log(`🔍 [Admin Notification] Sample tokens (first 3):`, targetTokens.slice(0, 3).map(t => t.substring(0, 20) + '...'));
+            const baseUrl = process.env.CORS_ORIGIN || 'https://bakalacart.com';
+            const logoUrl = `${baseUrl}/bakalalogo.png`;
 
             const payload = {
                 title: title,
                 body: description,
-                image: image || null, // For web push imageUrl
+                image: image || null,
                 data: {
                     type: 'admin_broadcast',
                     image: image || '',
-                    icon: '/bakalalogo.png', // Bakala logo requirement
-                    tag: newNotification._id.toString(), // Prevent duplicates
-                    click_action: 'FLUTTER_NOTIFICATION_CLICK'
+                    icon: logoUrl,
+                    tag: newNotification._id.toString(),
+                    notificationId: newNotification._id.toString(),
+                    click_action: '/notifications',
+                    link: '/notifications'
                 }
             };
 
             // Send via Firebase
             const result = await sendPushNotification(targetTokens, payload);
-            
-            // Check result and log details
-            if (result) {
-                if (result.error) {
-                    console.error(`❌ [Admin Notification] Failed to send: ${result.error}`);
-                } else {
-                    console.log(`✅ [Admin Notification] Result: ${result.successCount} sent, ${result.failureCount} failed`);
-                    if (result.failedTokens && result.failedTokens.length > 0) {
-                        console.log(`⚠️ [Admin Notification] ${result.failedTokens.length} tokens failed. Consider cleaning them up.`);
-                    }
-                }
-            } else {
-                console.error(`❌ [Admin Notification] sendPushNotification returned null/undefined`);
+
+            if (result && result.cleanupTokens && result.cleanupTokens.length > 0) {
+                await cleanupInvalidTokens(result.cleanupTokens);
             }
         }
 
-        return successResponse(res, 201, 'Notification sent and saved successfully', {
+        return successResponse(res, 201, 'Notification sent successfully', {
             notification: newNotification,
-            tokenCount: targetTokens.length
+            tokenCount: [...new Set(targetTokens.filter(Boolean))].length
         });
 
     } catch (error) {
@@ -169,47 +176,45 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Cleanup invalid tokens from all models
+ */
+const cleanupInvalidTokens = async (tokens) => {
+    if (!tokens || tokens.length === 0) return;
+    try {
+        await Promise.all([
+            User.updateMany({}, { $pull: { fcmTokens: { $in: tokens }, fcmTokenMobile: { $in: tokens } } }),
+            Restaurant.updateMany({}, { $pull: { fcmTokens: { $in: tokens }, fcmTokenMobile: { $in: tokens } } }),
+            Delivery.updateMany({}, { $pull: { fcmTokens: { $in: tokens }, fcmTokenMobile: { $in: tokens } } })
+        ]);
+        console.log(`✨ [FCM Cleanup] Removed ${tokens.length} invalid tokens.`);
+    } catch (error) {
+        console.error('❌ [FCM Cleanup] Error:', error);
+    }
+};
+
+/**
  * Get notification history
- * GET /api/notification
  */
 export const getNotifications = asyncHandler(async (req, res) => {
-    try {
-        const notifications = await Notification.find().sort({ createdAt: -1 });
-        return successResponse(res, 200, 'Notification history retrieved', { notifications });
-    } catch (error) {
-        return errorResponse(res, 500, 'Failed to fetch notification history');
-    }
+    const notifications = await Notification.find().sort({ createdAt: -1 });
+    return successResponse(res, 200, 'Notification history retrieved', { notifications });
 });
 
 /**
  * Delete a notification from history
- * DELETE /api/notification/:id
  */
 export const deleteNotification = asyncHandler(async (req, res) => {
-    try {
-        const { id } = req.params;
-        await Notification.findByIdAndDelete(id);
-        return successResponse(res, 200, 'Notification deleted');
-    } catch (error) {
-        return errorResponse(res, 500, 'Failed to delete notification');
-    }
+    await Notification.findByIdAndDelete(req.params.id);
+    return successResponse(res, 200, 'Notification deleted');
 });
 
 /**
- * Toggle notification status (just for UI)
- * PATCH /api/notification/:id/status
+ * Toggle notification status
  */
 export const toggleNotificationStatus = asyncHandler(async (req, res) => {
-    try {
-        const { id } = req.params;
-        const notification = await Notification.findById(id);
-        if (!notification) return errorResponse(res, 404, 'Notification not found');
-
-        notification.status = !notification.status;
-        await notification.save();
-
-        return successResponse(res, 200, 'Notification status updated', { notification });
-    } catch (error) {
-        return errorResponse(res, 500, 'Failed to update status');
-    }
+    const notification = await Notification.findById(req.params.id);
+    if (!notification) return errorResponse(res, 404, 'Notification not found');
+    notification.status = !notification.status;
+    await notification.save();
+    return successResponse(res, 200, 'Notification status updated', { notification });
 });
