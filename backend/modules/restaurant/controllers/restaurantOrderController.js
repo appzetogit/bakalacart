@@ -194,8 +194,18 @@ export const getRestaurantOrderById = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Order not found');
     }
 
+    // Fetch settlement data if available
+    let settlement = null;
+    try {
+      const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
+      settlement = await OrderSettlement.findOne({ orderId: order._id }).lean();
+    } catch (settlementError) {
+      console.warn('⚠️ Could not fetch settlement for order:', settlementError.message);
+    }
+
     return successResponse(res, 200, 'Order retrieved successfully', {
-      order
+      order,
+      settlement
     });
   } catch (error) {
     console.error('Error fetching order:', error);

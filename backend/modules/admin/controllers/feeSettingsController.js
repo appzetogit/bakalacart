@@ -54,7 +54,17 @@ export const getFeeSettings = asyncHandler(async (req, res) => {
  */
 export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
   try {
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, isActive } = req.body;
+    const {
+      deliveryFee,
+      deliveryFeeRanges,
+      freeDeliveryThreshold,
+      platformFee,
+      gstRate,
+      isActive,
+      deliveryFeePerKm,
+      minDeliveryDistance,
+      minDeliveryFee
+    } = req.body;
 
     // Validate platform fee
     if (platformFee === undefined || platformFee < 0) {
@@ -94,6 +104,9 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
     // Create new fee settings
     const feeSettingsData = {
       deliveryFee: deliveryFee !== undefined ? Number(deliveryFee) : 25,
+      deliveryFeePerKm: deliveryFeePerKm !== undefined ? Number(deliveryFeePerKm) : 5,
+      minDeliveryDistance: minDeliveryDistance !== undefined ? Number(minDeliveryDistance) : 4,
+      minDeliveryFee: minDeliveryFee !== undefined ? Number(minDeliveryFee) : 25,
       freeDeliveryThreshold: freeDeliveryThreshold ? Number(freeDeliveryThreshold) : 149,
       platformFee: Number(platformFee),
       gstRate: Number(gstRate),
@@ -131,7 +144,17 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
 export const updateFeeSettings = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { deliveryFee, deliveryFeeRanges, freeDeliveryThreshold, platformFee, gstRate, isActive } = req.body;
+    const {
+      deliveryFee,
+      deliveryFeeRanges,
+      freeDeliveryThreshold,
+      platformFee,
+      gstRate,
+      isActive,
+      deliveryFeePerKm,
+      minDeliveryDistance,
+      minDeliveryFee
+    } = req.body;
 
     const feeSettings = await FeeSettings.findById(id);
 
@@ -194,6 +217,18 @@ export const updateFeeSettings = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'GST rate must be between 0 and 100');
       }
       feeSettings.gstRate = Number(gstRate);
+    }
+
+    if (deliveryFeePerKm !== undefined) {
+      feeSettings.deliveryFeePerKm = Number(deliveryFeePerKm);
+    }
+
+    if (minDeliveryDistance !== undefined) {
+      feeSettings.minDeliveryDistance = Number(minDeliveryDistance);
+    }
+
+    if (minDeliveryFee !== undefined) {
+      feeSettings.minDeliveryFee = Number(minDeliveryFee);
     }
 
     if (isActive !== undefined) {

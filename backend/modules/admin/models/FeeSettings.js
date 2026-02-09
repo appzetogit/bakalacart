@@ -26,6 +26,24 @@ const feeSettingsSchema = new mongoose.Schema(
       min: 0,
       comment: 'Default delivery fee (used if no range matches)'
     },
+    deliveryFeePerKm: {
+      type: Number,
+      default: 5,
+      min: 0,
+      comment: 'Delivery fee per kilometer'
+    },
+    minDeliveryDistance: {
+      type: Number,
+      default: 4,
+      min: 0,
+      comment: 'Distance (in km) up to which minDeliveryFee is applied'
+    },
+    minDeliveryFee: {
+      type: Number,
+      default: 25,
+      min: 0,
+      comment: 'Minimum delivery fee for distance up to minDeliveryDistance'
+    },
     deliveryFeeRanges: {
       type: [deliveryFeeRangeSchema],
       default: [],
