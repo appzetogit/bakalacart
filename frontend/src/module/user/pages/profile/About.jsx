@@ -28,10 +28,23 @@ export default function About() {
     features: [],
     stats: []
   })
+  const [businessSettings, setBusinessSettings] = useState(null)
 
   useEffect(() => {
     fetchAboutData()
+    fetchBusinessSettings()
   }, [])
+
+  const fetchBusinessSettings = async () => {
+    try {
+      const response = await api.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC)
+      if (response.data.success) {
+        setBusinessSettings(response.data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching business settings:', error)
+    }
+  }
 
   const fetchAboutData = async () => {
     try {
@@ -90,25 +103,19 @@ export default function About() {
               >
                 <div className="relative">
                   <div className="absolute inset-0 bg-green-400 rounded-full blur-2xl opacity-30 animate-pulse" />
-                  <div className="relative bg-white dark:bg-gray-800 rounded-full p-4 md:p-6 shadow-xl">
-                    {aboutData.logo && aboutData.logo.trim() ? (
-                      <img
-                        src={aboutData.logo}
-                        alt={`${aboutData.appName} Logo`}
-                        className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-full"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <div className="h-16 w-16 md:h-20 md:w-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                        {aboutData.appName.charAt(0)}
-                      </div>
-                    )}
+                  <div className="relative bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-xl overflow-hidden flex items-center justify-center">
+                    <img
+                      src={businessSettings?.logo?.url || aboutData.logo || '/bakalalogo.png'}
+                      alt={`${aboutData.appName} Logo`}
+                      className="max-h-32 md:max-h-40 object-contain w-auto"
+                      onError={(e) => {
+                        e.target.src = '/bakalalogo.png'
+                      }}
+                    />
                   </div>
                 </div>
               </motion.div>
-              
+
               <motion.h2
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -117,7 +124,7 @@ export default function About() {
               >
                 {aboutData.appName}
               </motion.h2>
-              
+
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -126,7 +133,7 @@ export default function About() {
               >
                 Version {aboutData.version}
               </motion.p>
-              
+
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -211,7 +218,7 @@ export default function About() {
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                 </Link>
-                
+
                 <Link
                   to="/profile/privacy"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
@@ -229,7 +236,7 @@ export default function About() {
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                 </Link>
-                
+
                 <Link
                   to="/profile/refund"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
@@ -247,7 +254,7 @@ export default function About() {
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                 </Link>
-                
+
                 <Link
                   to="/profile/shipping"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
@@ -265,7 +272,7 @@ export default function About() {
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                 </Link>
-                
+
                 <Link
                   to="/profile/cancellation"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"

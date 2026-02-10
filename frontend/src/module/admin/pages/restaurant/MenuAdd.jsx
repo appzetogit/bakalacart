@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
-  ArrowLeft, 
-  Search, 
-  Plus, 
-  X, 
-  Upload, 
+import {
+  ArrowLeft,
+  Search,
+  Plus,
+  X,
+  Upload,
   Loader2,
   Utensils,
   ChevronDown,
@@ -92,7 +92,7 @@ export default function MenuAdd() {
 
   const fetchMenu = async () => {
     if (!selectedRestaurant?._id) return
-    
+
     try {
       setLoading(true)
       // Get menu by restaurant ID using admin endpoint
@@ -117,6 +117,7 @@ export default function MenuAdd() {
   }
 
   const handleRestaurantSelect = (restaurant) => {
+    if (selectedRestaurant?._id === restaurant._id) return
     setSelectedRestaurant(restaurant)
     setMenu(null)
   }
@@ -128,7 +129,7 @@ export default function MenuAdd() {
     }))
   }
 
-  const handleAddDish = (section) => {
+  const handleAddDish = (section = { name: "" }) => {
     setSelectedSection(section)
     setEditingDish(null)
     setFormData({
@@ -222,10 +223,10 @@ export default function MenuAdd() {
 
     try {
       setDeletingDish(true)
-      
+
       // Get current menu
       const currentMenu = menu || { sections: [] }
-      
+
       // Remove item from section
       const updatedSections = currentMenu.sections.map(sec => {
         if (sec.id === section.id || sec.name === section.name) {
@@ -281,7 +282,7 @@ export default function MenuAdd() {
       }
 
       const updatedSections = [...(currentMenu.sections || []), newSection]
-      
+
       // Update menu with new section using admin API
       const updateResponse = await adminAPI.updateRestaurantMenu(selectedRestaurant._id, {
         sections: updatedSections
@@ -306,7 +307,7 @@ export default function MenuAdd() {
 
   const handleImageUpload = async (file) => {
     if (!file) return
-    
+
     try {
       const response = await uploadAPI.uploadMedia(file, { folder: 'menu-items' })
       if (response.data?.success && response.data.data?.url) {
@@ -367,18 +368,18 @@ export default function MenuAdd() {
 
     try {
       setSaving(true)
-      
+
       // Prepare dish data
       const existingDish = editingDish ? editingDish.dish : null
-      
+
       // Prepare variations array
       const variations = formData.hasVariants && formData.variants.length > 0
         ? formData.variants.map((v) => ({
-            id: String(v.id),
-            name: v.name.trim(),
-            price: parseFloat(v.price) || 0,
-            stock: v.stock || "Unlimited",
-          }))
+          id: String(v.id),
+          name: v.name.trim(),
+          price: parseFloat(v.price) || 0,
+          stock: v.stock || "Unlimited",
+        }))
         : []
 
       const dishData = {
@@ -387,7 +388,7 @@ export default function MenuAdd() {
         nameArabic: existingDish?.nameArabic || "",
         image: formData.image || (formData.images?.[0] || ""),
         images: formData.images.length > 0 ? formData.images : (formData.image ? [formData.image] : []),
-        price: formData.hasVariants && variations.length > 0 
+        price: formData.hasVariants && variations.length > 0
           ? Math.min(...variations.map(v => v.price)) // Base price as minimum variant price
           : parseFloat(formData.price),
         stock: formData.stock ? "Unlimited" : 0,
@@ -426,16 +427,16 @@ export default function MenuAdd() {
 
       // Get current menu
       const currentMenu = menu || { sections: [] }
-      
+
       let updatedSections = []
-      
+
       if (editingDish) {
         // Editing existing dish - replace it
         updatedSections = currentMenu.sections.map(section => {
           if (section.id === editingDish.section.id || section.name === editingDish.section.name) {
             return {
               ...section,
-              items: (section.items || []).map(item => 
+              items: (section.items || []).map(item =>
                 String(item.id) === String(editingDish.dish.id) ? dishData : item
               )
             }
@@ -542,7 +543,7 @@ export default function MenuAdd() {
         {/* Restaurant Selection */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Restaurant</h2>
-          
+
           {/* Search */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -566,11 +567,10 @@ export default function MenuAdd() {
                 <button
                   key={restaurant._id || restaurant.id}
                   onClick={() => handleRestaurantSelect(restaurant)}
-                  className={`p-3 rounded-lg border-2 text-left transition-all ${
-                    selectedRestaurant?._id === restaurant._id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${selectedRestaurant?._id === restaurant._id
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
                 >
                   <div className="font-semibold text-gray-900">{restaurant.name}</div>
                   <div className="text-sm text-gray-600 mt-1">
@@ -590,13 +590,22 @@ export default function MenuAdd() {
         {/* Menu Sections */}
         {selectedRestaurant && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
                 Menu for {selectedRestaurant.name}
               </h2>
-              {loading && (
-                <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
-              )}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => handleAddDish({ name: "" })}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center gap-2 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Food
+                </button>
+                {loading && (
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+                )}
+              </div>
             </div>
 
             {menu && menu.sections && menu.sections.length > 0 ? (
@@ -752,7 +761,7 @@ export default function MenuAdd() {
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">
-                {editingDish ? "Edit Dish" : "Add Dish"}
+                {editingDish ? "Edit Dish" : (selectedSection?.name ? "Add Dish" : "Add Food")}
               </h2>
               <button
                 onClick={() => {
@@ -936,14 +945,12 @@ export default function MenuAdd() {
                         })
                       }
                     }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      formData.hasVariants ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.hasVariants ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        formData.hasVariants ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.hasVariants ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>
@@ -1091,14 +1098,12 @@ export default function MenuAdd() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, stock: !formData.stock })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        formData.stock ? 'bg-green-600' : 'bg-gray-300'
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.stock ? 'bg-green-600' : 'bg-gray-300'
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          formData.stock ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.stock ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
@@ -1114,14 +1119,12 @@ export default function MenuAdd() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isRecommended: !formData.isRecommended })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        formData.isRecommended ? 'bg-blue-600' : 'bg-gray-300'
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isRecommended ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          formData.isRecommended ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isRecommended ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
@@ -1137,14 +1140,12 @@ export default function MenuAdd() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isAvailable: !formData.isAvailable })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        formData.isAvailable ? 'bg-blue-600' : 'bg-gray-300'
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isAvailable ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          formData.isAvailable ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isAvailable ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
@@ -1194,7 +1195,7 @@ export default function MenuAdd() {
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    {editingDish ? "Update Dish" : "Save Dish"}
+                    {editingDish ? "Update Dish" : (selectedSection?.name ? "Save Dish" : "Save Food")}
                   </>
                 )}
               </button>

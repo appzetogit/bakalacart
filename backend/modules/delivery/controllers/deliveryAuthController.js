@@ -34,7 +34,7 @@ export const sendOTP = asyncHandler(async (req, res) => {
   }
 
   try {
-    const result = await otpService.generateAndSendOTP(phone, purpose, null);
+    const result = await otpService.generateAndSendOTP(phone, purpose, null, 'delivery');
     return successResponse(res, 200, result.message, {
       expiresIn: result.expiresIn,
       identifierType: result.identifierType

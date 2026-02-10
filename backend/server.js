@@ -277,8 +277,38 @@ deliveryNamespace.on('connection', (socket) => {
         room: room,
         socketId: socket.id
       });
-    } else {
-      console.warn('⚠️ Delivery partner tried to join without deliveryId');
+      } else {
+        console.warn('⚠️ Delivery partner tried to join without deliveryId');
+      }
+  });
+
+  // Handle chat messages from Delivery Partner
+  socket.on('send-chat-message', async (data) => {
+    // data: { orderId, message }
+    try {
+      const { orderId, message } = data;
+      if (!orderId || !message) return;
+
+      console.log(`💬 Delivery partner sent message for order ${orderId}:`, message);
+
+      // 1. Emit to the User (Main Namespace Order Room)
+      io.to(`order:${orderId}`).emit('receive-chat-message', {
+        ...data,
+        sender: 'delivery', // Mark sender as delivery
+        timestamp: Date.now()
+      });
+
+      // 2. Emit back to Delivery Partner (in case they have multiple devices or just for confirmation)
+      if (data.deliveryPartnerId) {
+        deliveryNamespace.to(`delivery:${data.deliveryPartnerId}`).emit('chat-message', {
+          ...data,
+          sender: 'delivery',
+          timestamp: Date.now()
+        });
+      }
+
+    } catch (error) {
+      console.error('Error handling delivery chat message:', error);
     }
   });
 
@@ -570,6 +600,42 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle chat messages from User
+  socket.on('send-chat-message', async (data) => {
+    // data: { orderId, message, sender, timestamp }
+    try {
+      const { orderId, message } = data;
+      if (!orderId || !message) return;
+
+      console.log(`💬 User sent message for order ${orderId}:`, message);
+
+      // 1. Emit back to the User (Order Room) so they see their own message (and other users tracking)
+      io.to(`order:${orderId}`).emit('receive-chat-message', {
+        ...data,
+        sender: 'user', // Ensure sender is marked as user
+        timestamp: Date.now()
+      });
+
+      // 2. Emit to the Delivery Partner
+      // We need to find the delivery partner for this order to target them
+      const { default: Order } = await import('./modules/order/models/Order.js');
+      const order = await Order.findById(orderId).select('deliveryPartnerId').lean();
+
+      if (order?.deliveryPartnerId) {
+        const deliveryPartnerId = order.deliveryPartnerId.toString();
+        // Emit to the delivery namespace room for this delivery partner
+        deliveryNamespace.to(`delivery:${deliveryPartnerId}`).emit('chat-message', {
+          ...data,
+          sender: 'user',
+          timestamp: Date.now()
+        });
+        console.log(`💬 Forwarded user message to delivery partner ${deliveryPartnerId}`);
+      }
+    } catch (error) {
+      console.error('Error handling user chat message:', error);
+    }
+  });
+
   // Delivery boy joins delivery room
   socket.on('join-delivery', (deliveryId) => {
     if (deliveryId) {
@@ -582,6 +648,8 @@ io.on('connection', (socket) => {
     console.log('Client disconnected:', socket.id);
   });
 });
+
+
 
 // Start server
 const PORT = process.env.PORT || 5000;

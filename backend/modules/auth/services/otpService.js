@@ -1,5 +1,5 @@
 import Otp from '../models/Otp.js';
-import smsIndiaHubService from './smsIndiaHubService.js';
+import msg91Service from './msg91Service.js';
 import emailService from './emailService.js';
 import winston from 'winston';
 
@@ -83,11 +83,12 @@ class OTPService {
   /**
    * Generate and send OTP via phone or email
    * @param {string} phone - Phone number (optional if email provided)
+   * @param {string} role - Role of the user (user, restaurant, delivery)
    * @param {string} email - Email address (optional if phone provided)
    * @param {string} purpose - Purpose of OTP (login, register, etc.)
    * @returns {Promise<Object>}
    */
-  async generateAndSendOTP(phone = null, purpose = 'login', email = null) {
+  async generateAndSendOTP(phone = null, purpose = 'login', email = null, role = 'user') {
     try {
       // Validate that either phone or email is provided
       if (!phone && !email) {
@@ -105,7 +106,7 @@ class OTPService {
           purpose,
           createdAt: { $gte: oneHourAgo }
         };
-        
+
         const recentOtpCount = await Otp.countDocuments(rateLimitQuery);
         if (recentOtpCount >= 3) {
           throw new Error('Too many OTP requests. Please try again after some time.');
@@ -113,8 +114,8 @@ class OTPService {
       }
 
       // Generate OTP (use default for test phone numbers or test emails)
-      const otp = ((phone && isTestPhoneNumber(phone)) || (email && isTestEmail(email))) 
-        ? DEFAULT_TEST_OTP 
+      const otp = ((phone && isTestPhoneNumber(phone)) || (email && isTestEmail(email)))
+        ? DEFAULT_TEST_OTP
         : generateOTP();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -142,10 +143,11 @@ class OTPService {
 
       // Send OTP via SMS or Email
       if (phone) {
+        console.log(`🚀 [OTP_SERVICE] Sending SMS for role: ${role} to: ${phone}`);
         // Skip actual SMS sending for test phone numbers
         if (!isTestPhoneNumber(phone)) {
-          // Use SMSIndia Hub for phone OTP
-          await smsIndiaHubService.sendOTP(phone, otp, purpose);
+          // Use MSG91 for phone OTP
+          await msg91Service.sendOTP(phone, otp, purpose, role);
         } else {
           logger.info(`Skipping SMS for test phone number: ${phone}`, {
             phone,
@@ -210,7 +212,7 @@ class OTPService {
 
       // Check if this is a test phone number or test email and OTP matches default test OTP
       if ((phone && isTestPhoneNumber(phone) && otp === DEFAULT_TEST_OTP) ||
-          (email && isTestEmail(email) && otp === DEFAULT_TEST_OTP)) {
+        (email && isTestEmail(email) && otp === DEFAULT_TEST_OTP)) {
         logger.info(`Test OTP verified for ${phone || email}`, {
           phone,
           email,
@@ -225,7 +227,7 @@ class OTPService {
       // Verify OTP from database
       // For reset-password purpose, allow already-verified OTPs within 10 minutes
       let otpRecord;
-      
+
       if (purpose === 'reset-password') {
         // First try to find unverified OTP
         const unverifiedQuery = {
@@ -236,9 +238,9 @@ class OTPService {
         };
         if (phone) unverifiedQuery.phone = phone;
         if (email) unverifiedQuery.email = email;
-        
+
         otpRecord = await Otp.findOne(unverifiedQuery);
-        
+
         // If not found, check for already-verified OTP within last 10 minutes
         if (!otpRecord) {
           const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -251,9 +253,9 @@ class OTPService {
           };
           if (phone) verifiedQuery.phone = phone;
           if (email) verifiedQuery.email = email;
-          
+
           otpRecord = await Otp.findOne(verifiedQuery);
-          
+
           if (otpRecord) {
             // OTP already verified and still valid (within 10 minutes)
             return {
@@ -272,7 +274,7 @@ class OTPService {
         };
         if (phone) query.phone = phone;
         if (email) query.email = email;
-        
+
         otpRecord = await Otp.findOne(query);
       }
 
@@ -326,8 +328,8 @@ class OTPService {
    * @param {string} email - Email address (optional if phone provided)
    * @returns {Promise<Object>}
    */
-  async resendOTP(phone = null, purpose = 'login', email = null) {
-    return await this.generateAndSendOTP(phone, purpose, email);
+  async resendOTP(phone = null, purpose = 'login', email = null, role = 'user') {
+    return await this.generateAndSendOTP(phone, purpose, email, role);
   }
 }
 
