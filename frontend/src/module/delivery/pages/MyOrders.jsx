@@ -20,11 +20,15 @@ import {
   Navigation,
   Camera,
   IndianRupee,
-  Eye
+  Eye,
+  MessageSquare,
+  Send
 } from "lucide-react"
 import { deliveryAPI, uploadAPI } from "@/lib/api"
+import { API_BASE_URL } from "@/lib/api/config"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
+import io from "socket.io-client"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +36,7 @@ import {
   DialogTitle,
   DialogDescription
 } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function MyOrders() {
   const navigate = useNavigate()
@@ -52,6 +57,110 @@ export default function MyOrders() {
   const [showOrderDetailsDialog, setShowOrderDetailsDialog] = useState(false)
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState(null)
   const [showMenuForOrder, setShowMenuForOrder] = useState(null) // Track which order's menu is open
+
+  // Chat State
+  const [chatOpen, setChatOpen] = useState(false)
+  const [selectedOrderForChat, setSelectedOrderForChat] = useState(null)
+  const [chatMessages, setChatMessages] = useState([])
+  const [newMessage, setNewMessage] = useState("")
+  const [chatSocket, setChatSocket] = useState(null)
+  const chatMessagesEndRef = useRef(null)
+
+  // Socket URL for delivery namespace
+  const SOCKET_URL = API_BASE_URL.replace('/api', '')
+
+  // Initialize Socket for Chat
+  useEffect(() => {
+    if (!chatOpen || !selectedOrderForChat) return
+
+    const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
+    if (!orderId) return
+
+    // Connect to delivery socket namespace
+    const socket = io(`${SOCKET_URL}/delivery`, {
+      transports: ['websocket', 'polling']
+    })
+
+    socket.on('connect', () => {
+      console.log('✅ Connected to delivery chat socket')
+      // Join delivery room
+      const deliveryPartnerId = selectedOrderForChat.deliveryPartnerId || 
+                                 selectedOrderForChat.assignmentInfo?.deliveryPartnerId
+      if (deliveryPartnerId) {
+        socket.emit('join-delivery', deliveryPartnerId)
+      }
+    })
+
+    socket.on('chat-message', (data) => {
+      console.log('📩 New chat message received:', data)
+      setChatMessages(prev => [...prev, data])
+    })
+
+    socket.on('receive-chat-message', (data) => {
+      console.log('📩 Chat message received:', data)
+      setChatMessages(prev => [...prev, data])
+    })
+
+    setChatSocket(socket)
+
+    return () => {
+      socket.disconnect()
+      setChatSocket(null)
+    }
+  }, [chatOpen, selectedOrderForChat])
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
+
+  // Handle opening chat
+  const handleOpenChat = (order) => {
+    setSelectedOrderForChat(order)
+    setChatOpen(true)
+    setChatMessages([])
+    setNewMessage("")
+  }
+
+  // Handle closing chat
+  const handleCloseChat = () => {
+    setChatOpen(false)
+    setSelectedOrderForChat(null)
+    setChatMessages([])
+    setNewMessage("")
+    if (chatSocket) {
+      chatSocket.disconnect()
+      setChatSocket(null)
+    }
+  }
+
+  // Handle sending message
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !chatSocket || !selectedOrderForChat) return
+
+    const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
+    if (!orderId) return
+
+    // Send message to server
+    chatSocket.emit('send-chat-message', {
+      orderId,
+      message: newMessage.trim(),
+      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
+                         selectedOrderForChat.assignmentInfo?.deliveryPartnerId,
+      timestamp: Date.now()
+    })
+
+    // Add message to local state immediately for better UX
+    setChatMessages(prev => [...prev, {
+      message: newMessage.trim(),
+      sender: 'delivery',
+      timestamp: Date.now()
+    }])
+
+    setNewMessage("")
+  }
 
   // Fetch orders from API
   useEffect(() => {
@@ -1618,7 +1727,7 @@ export default function MyOrders() {
                               isUploading={uploadingBills[order.orderId || order._id]}
                               onCameraClick={handleBillImageCapture}
                             />
-                          ) : // Phase 4: Picked up but not reached drop - show Reached Drop button with Location Icon
+                          ) : // Phase 4: Picked up but not reached drop - show Reached Drop button with Location Icon and Chat Icon
                             !isReachedDrop(order) ? (
                               <div className="flex items-center gap-2">
                                 <div className="flex-1">
@@ -1627,6 +1736,16 @@ export default function MyOrders() {
                                     onReachedDrop={handleReachedDrop}
                                   />
                                 </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenChat(order)
+                                  }}
+                                  className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 shadow-sm border border-purple-100 hover:bg-purple-100 transition-colors"
+                                  title="Chat with customer"
+                                >
+                                  <MessageSquare className="w-6 h-6" />
+                                </button>
                                 <button
                                   onClick={(e) => handleCustomerLocationClick(order, e)}
                                   className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100"
@@ -2000,6 +2119,124 @@ export default function MyOrders() {
         }}
         className="hidden"
       />
+
+      {/* Chat Modal */}
+      <AnimatePresence>
+        {chatOpen && selectedOrderForChat && (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseChat}
+              className="absolute inset-0 bg-black/50"
+            />
+            
+            {/* Chat Box */}
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full sm:w-[500px] h-[600px] sm:h-[700px] bg-white dark:bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col z-10"
+            >
+              {/* Chat Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Chat with Customer</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Order: {selectedOrderForChat.orderId || selectedOrderForChat._id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseChat}
+                  className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+              </div>
+
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-[#0a0a0a] scroll-smooth">
+                {chatMessages.length === 0 ? (
+                  <div className="text-center py-10 space-y-3">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h4 className="text-gray-900 dark:text-white font-medium">Start a conversation</h4>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[200px] mx-auto">
+                      Communicate with the customer about delivery instructions or updates.
+                    </p>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, index) => {
+                    const isDelivery = msg.sender === 'delivery'
+                    return (
+                      <div
+                        key={index}
+                        className={`flex ${isDelivery ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                            isDelivery
+                              ? 'bg-purple-600 text-white rounded-br-none'
+                              : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
+                          }`}
+                        >
+                          <p>{msg.message}</p>
+                          <p
+                            className={`text-[10px] mt-1 text-right ${
+                              isDelivery ? 'text-purple-100' : 'text-gray-400 dark:text-gray-500'
+                            }`}
+                          >
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+                <div ref={chatMessagesEndRef} />
+              </div>
+
+              {/* Input Area */}
+              <div className="p-3 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-end gap-2">
+                  <Textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder="Type your message..."
+                    className="flex-1 min-h-[60px] max-h-[120px] resize-none bg-gray-50 dark:bg-[#0a0a0a] border-gray-200 dark:border-gray-800 focus:border-purple-500 dark:focus:border-purple-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    rows={2}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim()}
+                    className="w-12 h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors flex-shrink-0"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

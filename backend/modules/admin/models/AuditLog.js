@@ -114,7 +114,7 @@ auditLogSchema.index({ actionType: 1, createdAt: -1 });
 auditLogSchema.index({ 'performedBy.type': 1, 'performedBy.userId': 1 });
 auditLogSchema.index({ 'transactionDetails.orderId': 1 });
 auditLogSchema.index({ createdAt: -1 });
-auditLogSchema.index({ 'commissionChange.restaurantId': 1 });
+// Note: commissionChange.restaurantId index is automatically created by sparse: true, so we don't need explicit index
 
 // Static method to create audit log
 auditLogSchema.statics.createLog = async function (logData) {

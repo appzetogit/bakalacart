@@ -33,6 +33,31 @@ export function ProfileProvider({ children }) {
 
   const [addresses, setAddresses] = useState([])
 
+  // Helper function to deduplicate addresses by ID and label
+  const deduplicateAddresses = useCallback((addressList) => {
+    if (!Array.isArray(addressList) || addressList.length === 0) return []
+    
+    // First pass: Remove duplicates by ID (keep first occurrence)
+    const uniqueById = addressList.filter((address, index, self) => {
+      if (!address.id) return true // Keep addresses without ID
+      const firstIndex = self.findIndex(addr => addr.id === address.id)
+      return index === firstIndex
+    })
+    
+    // Second pass: Remove duplicates by label (keep first occurrence)
+    const uniqueByLabel = uniqueById.filter((address, index, self) => {
+      const firstIndex = self.findIndex(addr => addr.label === address.label)
+      return index === firstIndex
+    })
+    
+    return uniqueByLabel
+  }, [])
+
+  // Memoized deduplicated addresses - always use this instead of raw addresses
+  const deduplicatedAddresses = useMemo(() => {
+    return deduplicateAddresses(addresses)
+  }, [addresses, deduplicateAddresses])
+
   const [paymentMethods, setPaymentMethods] = useState(() => {
     const saved = localStorage.getItem("userPaymentMethods")
     return saved ? JSON.parse(saved) : [
@@ -83,8 +108,10 @@ export function ProfileProvider({ children }) {
   }, [userProfile])
 
   useEffect(() => {
-    localStorage.setItem("userAddresses", JSON.stringify(addresses))
-  }, [addresses])
+    // Always save deduplicated addresses to localStorage
+    const deduplicated = deduplicateAddresses(addresses)
+    localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+  }, [addresses, deduplicateAddresses])
 
   useEffect(() => {
     localStorage.setItem("userPaymentMethods", JSON.stringify(paymentMethods))
@@ -132,15 +159,20 @@ export function ProfileProvider({ children }) {
         try {
           const addressesResponse = await userAPI.getAddresses()
           const addressesData = addressesResponse?.data?.data?.addresses || addressesResponse?.data?.addresses || []
-          setAddresses(addressesData)
-          localStorage.setItem("userAddresses", JSON.stringify(addressesData))
+          // Deduplicate addresses before setting
+          const deduplicated = deduplicateAddresses(addressesData)
+          setAddresses(deduplicated)
+          localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
         } catch (addressError) {
           console.error("Error fetching addresses:", addressError)
           // Try to load from localStorage as fallback
           const saved = localStorage.getItem("userAddresses")
           if (saved) {
             try {
-              setAddresses(JSON.parse(saved))
+              const parsed = JSON.parse(saved)
+              // Deduplicate addresses from localStorage
+              const deduplicated = deduplicateAddresses(parsed)
+              setAddresses(deduplicated)
             } catch (e) {
               console.error("Error parsing saved addresses:", e)
             }
@@ -153,7 +185,10 @@ export function ProfileProvider({ children }) {
         const saved = localStorage.getItem("userAddresses")
         if (saved) {
           try {
-            setAddresses(JSON.parse(saved))
+            const parsed = JSON.parse(saved)
+            // Deduplicate addresses from localStorage
+            const deduplicated = deduplicateAddresses(parsed)
+            setAddresses(deduplicated)
           } catch (e) {
             console.error("Error parsing saved addresses:", e)
           }
@@ -186,8 +221,10 @@ export function ProfileProvider({ children }) {
       if (newAddress) {
         setAddresses((prev) => {
           const updated = [...prev, newAddress]
-          localStorage.setItem("userAddresses", JSON.stringify(updated))
-          return updated
+          // Deduplicate before saving
+          const deduplicated = deduplicateAddresses(updated)
+          localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+          return deduplicated
         })
         return newAddress
       }
@@ -205,8 +242,10 @@ export function ProfileProvider({ children }) {
       if (updatedAddr) {
         setAddresses((prev) => {
           const updated = prev.map((addr) => (addr.id === id ? { ...updatedAddr, id } : addr))
-          localStorage.setItem("userAddresses", JSON.stringify(updated))
-          return updated
+          // Deduplicate before saving
+          const deduplicated = deduplicateAddresses(updated)
+          localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+          return deduplicated
         })
         return updatedAddr
       }
@@ -221,8 +260,10 @@ export function ProfileProvider({ children }) {
       await userAPI.deleteAddress(id)
       setAddresses((prev) => {
         const newAddresses = prev.filter((addr) => addr.id !== id)
-        localStorage.setItem("userAddresses", JSON.stringify(newAddresses))
-        return newAddresses
+        // Deduplicate before saving (in case there are other duplicates)
+        const deduplicated = deduplicateAddresses(newAddresses)
+        localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+        return deduplicated
       })
     } catch (error) {
       console.error("Error deleting address:", error)
@@ -231,17 +272,19 @@ export function ProfileProvider({ children }) {
   }, [])
 
   const setDefaultAddress = useCallback((id) => {
-    setAddresses((prev) =>
-      prev.map((addr) => ({
+    setAddresses((prev) => {
+      const updated = prev.map((addr) => ({
         ...addr,
         isDefault: addr.id === id,
       }))
-    )
-  }, [])
+      // Deduplicate before saving
+      return deduplicateAddresses(updated)
+    })
+  }, [deduplicateAddresses])
 
   const getDefaultAddress = useCallback(() => {
-    return addresses.find((addr) => addr.isDefault) || addresses[0] || null
-  }, [addresses])
+    return deduplicatedAddresses.find((addr) => addr.isDefault) || deduplicatedAddresses[0] || null
+  }, [deduplicatedAddresses])
 
   // Payment method functions - memoized with useCallback
   const addPaymentMethod = useCallback((payment) => {
@@ -289,8 +332,8 @@ export function ProfileProvider({ children }) {
   }, [paymentMethods])
 
   const getAddressById = useCallback((id) => {
-    return addresses.find((addr) => addr.id === id)
-  }, [addresses])
+    return deduplicatedAddresses.find((addr) => addr.id === id)
+  }, [deduplicatedAddresses])
 
   const getPaymentMethodById = useCallback((id) => {
     return paymentMethods.find((pm) => pm.id === id)
@@ -353,7 +396,7 @@ export function ProfileProvider({ children }) {
       userProfile,
       loading,
       updateUserProfile,
-      addresses,
+      addresses: deduplicatedAddresses, // Always use deduplicated addresses
       paymentMethods,
       favorites,
       vegMode,
@@ -384,7 +427,7 @@ export function ProfileProvider({ children }) {
       userProfile,
       loading,
       updateUserProfile,
-      addresses,
+      deduplicatedAddresses,
       paymentMethods,
       favorites,
       dishFavorites,

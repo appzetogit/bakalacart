@@ -1531,6 +1531,14 @@ export default function Home() {
               transform: translateY(0);
             }
           }
+          @keyframes shimmer {
+            0% {
+              transform: translateX(-100%);
+            }
+            100% {
+              transform: translateX(100%);
+            }
+          }
         `}</style>
       </div>
 
@@ -1630,8 +1638,8 @@ export default function Home() {
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                        <p className="text-white">Banner image not available</p>
+                      <div className="w-full h-full bg-white flex items-center justify-center">
+                        <p className="text-gray-600">Banner image not available</p>
                       </div>
                     )}
                   </div>
@@ -1640,7 +1648,7 @@ export default function Home() {
             </motion.div>
           </div>
         ) : (
-          <div className="absolute top-0 left-0 right-0 bottom-0 z-0 bg-gradient-to-br from-green-400 to-green-600" />
+          <div className="absolute top-0 left-0 right-0 bottom-0 z-0 bg-white" />
         )}
 
         {/* Navbar */}
@@ -1650,7 +1658,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <PageNavbar textColor="white" zIndex={20} />
+          <PageNavbar textColor="black" zIndex={20} />
         </motion.div>
 
         {/* Hero Section */}
@@ -2209,6 +2217,55 @@ export default function Home() {
               )}
             </AnimatePresence>
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-3 sm:gap-4 lg:gap-5 xl:gap-6 pt-1 sm:pt-1.5 lg:pt-2 items-stretch ${isLoadingFilterResults || loadingRestaurants ? 'opacity-50' : 'opacity-100'} transition-opacity duration-300`}>
+              {/* Skeleton Loading Cards with Shimmer Animation */}
+              {(isLoadingFilterResults || loadingRestaurants) && filteredRestaurants.length === 0 && (
+                Array.from({ length: 6 }).map((_, skeletonIndex) => (
+                  <motion.div
+                    key={`skeleton-${skeletonIndex}`}
+                    className="h-full bg-white dark:bg-[#1a1a1a] rounded-md overflow-hidden border border-gray-200 dark:border-gray-800 relative"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: skeletonIndex * 0.1 }}
+                  >
+                    {/* Shimmer Overlay */}
+                    <div 
+                      className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent"
+                      style={{
+                        animation: 'shimmer 2s infinite'
+                      }}
+                    ></div>
+                    
+                    {/* Image Skeleton */}
+                    <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {/* Title Skeleton */}
+                      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                      </div>
+                      {/* Rating Skeleton */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                        </div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                        </div>
+                      </div>
+                      {/* Delivery Info Skeleton */}
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                      </div>
+                      {/* Offer Skeleton */}
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
               {filteredRestaurants.map((restaurant, index) => {
                 const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-")
                 // Direct favorite check - isFavorite is already memoized in context

@@ -653,55 +653,57 @@ export default function OrderAssign() {
 
       {/* Assign Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
             <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
               Assign Delivery Boy
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400 mt-2">
+            <DialogDescription className="text-gray-600 dark:text-gray-400 mt-1.5 text-base">
               Select a delivery boy to assign this order
             </DialogDescription>
           </DialogHeader>
           
           {/* Order Details Card */}
           {selectedOrder && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Order Details</span>
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-5 border-2 border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Order Details</span>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Order ID:</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.orderId}</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Order ID:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white font-mono">{selectedOrder.orderId}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Customer:</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.customerName}</span>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Customer:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedOrder.customerName}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Restaurant:</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.restaurant}</span>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Restaurant:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedOrder.restaurant}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                    <IndianRupee className="w-3 h-3" />
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Amount:</span>
+                  <span className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <IndianRupee className="w-4 h-4" />
                     {selectedOrder.totalAmount?.toFixed(2) || "0.00"}
                   </span>
                 </div>
                 {selectedOrder.items && selectedOrder.items.length > 0 && (
-                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">Items:</span>
-                    <div className="space-y-1">
+                  <div className="pt-3 mt-3 border-t-2 border-gray-200 dark:border-gray-700">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Items:</span>
+                    <div className="space-y-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                       {selectedOrder.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
-                          <span className="text-gray-500 dark:text-gray-400">Qty: {item.quantity || 1}</span>
+                        <div key={idx} className="flex items-center justify-between text-sm py-1">
+                          <span className="text-gray-700 dark:text-gray-300 font-medium">{item.name}</span>
+                          <span className="text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md text-xs font-semibold">Qty: {item.quantity || 1}</span>
                         </div>
                       ))}
                       {selectedOrder.items.length > 3 && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium pt-1 block border-t border-gray-200 dark:border-gray-700 mt-2">
                           +{selectedOrder.items.length - 3} more items
                         </span>
                       )}
@@ -713,20 +715,24 @@ export default function OrderAssign() {
           )}
 
           {/* Delivery Boy Selection */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-              <User className="w-4 h-4" />
+          <div className="space-y-3 mt-6">
+            <label className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2.5 uppercase tracking-wide">
+              <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
               Select Delivery Boy
             </label>
             {isLoadingDeliveryBoys ? (
-              <div className="flex items-center justify-center p-8 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                <span className="ml-2 text-sm text-gray-500">Loading delivery boys...</span>
+              <div className="flex items-center justify-center p-10 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
+                <span className="ml-3 text-sm font-medium text-gray-600 dark:text-gray-400">Loading delivery boys...</span>
               </div>
             ) : deliveryBoys.length === 0 ? (
-              <div className="text-center p-8 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <User className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No delivery boys available</p>
+              <div className="text-center p-10 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <User className="w-6 h-6 text-gray-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No delivery boys available</p>
               </div>
             ) : (
               <Select
@@ -738,8 +744,8 @@ export default function OrderAssign() {
                   })
                 }}
               >
-                <SelectTrigger className="w-full h-11">
-                  <SelectValue placeholder="Choose a delivery boy" />
+                <SelectTrigger className="w-full h-12 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
+                  <SelectValue placeholder="Choose a delivery boy" className="text-gray-600 dark:text-gray-400" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px] z-[60]">
                   {deliveryBoys.length > 0 ? (
@@ -753,26 +759,26 @@ export default function OrderAssign() {
                         <SelectItem 
                           key={dbId} 
                           value={dbId?.toString()} 
-                          className="cursor-pointer py-3"
+                          className="cursor-pointer py-3 hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           <div className="flex items-center justify-between w-full gap-3">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                <User className="w-5 h-5 text-blue-600 dark:text-blue-300" />
                               </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-medium text-gray-900 dark:text-white truncate">{dbName}</span>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <span className="font-semibold text-gray-900 dark:text-white truncate text-base">{dbName}</span>
                                 {dbPhone && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                    <Phone className="w-3 h-3 flex-shrink-0" />
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                    <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="truncate">{dbPhone}</span>
                                   </span>
                                 )}
                               </div>
                             </div>
                             {isOnline && (
-                              <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full flex items-center gap-1 flex-shrink-0">
-                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
+                              <span className="px-2.5 py-1 text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded-full flex items-center gap-1.5 flex-shrink-0 shadow-sm">
+                                <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></div>
                                 Online
                               </span>
                             )}
@@ -781,7 +787,7 @@ export default function OrderAssign() {
                       )
                     })
                   ) : (
-                    <div className="px-4 py-2 text-sm text-gray-500">No delivery boys available</div>
+                    <div className="px-4 py-3 text-sm text-gray-500 text-center">No delivery boys available</div>
                   )}
                 </SelectContent>
               </Select>
@@ -789,7 +795,7 @@ export default function OrderAssign() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-6 mt-6 border-t-2 border-gray-200 dark:border-gray-700">
             <Button
               variant="outline"
               onClick={() => {
@@ -797,14 +803,14 @@ export default function OrderAssign() {
                 setSelectedOrder(null)
                 setSelectedDeliveryBoy({})
               }}
-              className="min-w-[100px]"
+              className="min-w-[120px] h-11 font-semibold border-2 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Cancel
             </Button>
             <Button
               onClick={handleAssign}
               disabled={!selectedDeliveryBoy[selectedOrder?.id] || assigningOrderId === selectedOrder?.id}
-              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] h-11 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {assigningOrderId === selectedOrder?.id ? (
                 <>

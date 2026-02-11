@@ -70,10 +70,10 @@ export default function ReportSafetyEmergency() {
                   For immediate emergencies, please call your local emergency services.
                 </p>
                 <a
-                  href="tel:100"
+                  href="tel:8108212153"
                   className="text-red-600 dark:text-red-400 font-semibold text-base md:text-lg lg:text-xl hover:underline"
                 >
-                  Emergency: 100
+                  Emergency: 8108212153
                 </a>
               </div>
             </div>

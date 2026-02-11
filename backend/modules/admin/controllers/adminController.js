@@ -28,20 +28,89 @@ const logger = winston.createLogger({
 /**
  * Get Admin Dashboard Statistics
  * GET /api/admin/dashboard/stats
+ * Query params: period (overall, today, week, month, year, custom), startDate, endDate
  */
 export const getDashboardStats = asyncHandler(async (req, res) => {
   try {
-    // Calculate date ranges
+    const { period = 'overall', startDate, endDate } = req.query;
+    
+    // Calculate date ranges based on period
     const now = new Date();
+    let dateFilter = {};
+    let startDateObj = null;
+    let endDateObj = new Date(now);
+    
+    if (period === 'custom' && startDate && endDate) {
+      // Custom date range
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      // Set time to start of day for startDate and end of day for endDate
+      startDateObj.setHours(0, 0, 0, 0);
+      endDateObj.setHours(23, 59, 59, 999);
+      dateFilter = {
+        $gte: startDateObj,
+        $lte: endDateObj
+      };
+    } else if (period === 'today') {
+      // Today
+      startDateObj = new Date(now);
+      startDateObj.setHours(0, 0, 0, 0);
+      endDateObj = new Date(now);
+      endDateObj.setHours(23, 59, 59, 999);
+      dateFilter = {
+        $gte: startDateObj,
+        $lte: endDateObj
+      };
+    } else if (period === 'week') {
+      // This week (last 7 days)
+      startDateObj = new Date(now);
+      startDateObj.setDate(now.getDate() - 7);
+      startDateObj.setHours(0, 0, 0, 0);
+      endDateObj.setHours(23, 59, 59, 999);
+      dateFilter = {
+        $gte: startDateObj,
+        $lte: endDateObj
+      };
+    } else if (period === 'month') {
+      // This month
+      startDateObj = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDateObj.setHours(0, 0, 0, 0);
+      endDateObj = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endDateObj.setHours(23, 59, 59, 999);
+      dateFilter = {
+        $gte: startDateObj,
+        $lte: endDateObj
+      };
+    } else if (period === 'year') {
+      // This year
+      startDateObj = new Date(now.getFullYear(), 0, 1);
+      startDateObj.setHours(0, 0, 0, 0);
+      endDateObj = new Date(now.getFullYear(), 11, 31);
+      endDateObj.setHours(23, 59, 59, 999);
+      dateFilter = {
+        $gte: startDateObj,
+        $lte: endDateObj
+      };
+    }
+    // For 'overall', dateFilter remains empty (no date filtering)
+    
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // Build order match filter
+    const orderMatchFilter = {
+      status: 'delivered',
+      'pricing.total': { $exists: true }
+    };
+    
+    // Add date filter if period is not 'overall'
+    if (Object.keys(dateFilter).length > 0) {
+      orderMatchFilter.deliveredAt = dateFilter;
+    }
+    
     // Get total revenue (sum of all completed orders)
     const revenueStats = await Order.aggregate([
       {
-        $match: {
-          status: 'delivered',
-          'pricing.total': { $exists: true }
-        }
+        $match: orderMatchFilter
       },
       {
         $group: {
@@ -64,14 +133,21 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     const revenueData = revenueStats[0] || { totalRevenue: 0, last30DaysRevenue: 0 };
 
     // Get all settlements for delivered orders only (to match with revenue calculation)
-    // First get delivered order IDs
-    const deliveredOrderIds = await Order.find({ status: 'delivered' }).select('_id').lean();
+    // First get delivered order IDs with date filter
+    const deliveredOrderQuery = { status: 'delivered' };
+    if (Object.keys(dateFilter).length > 0) {
+      deliveredOrderQuery.deliveredAt = dateFilter;
+    }
+    const deliveredOrderIds = await Order.find(deliveredOrderQuery).select('_id').lean();
     const deliveredOrderIdArray = deliveredOrderIds.map(o => o._id);
     
     // Get settlements only for delivered orders
-    const allSettlements = await OrderSettlement.find({
-      orderId: { $in: deliveredOrderIdArray }
-    }).lean();
+    // Also filter settlements by date if period is not 'overall'
+    const settlementQuery = { orderId: { $in: deliveredOrderIdArray } };
+    if (Object.keys(dateFilter).length > 0) {
+      settlementQuery.createdAt = dateFilter;
+    }
+    const allSettlements = await OrderSettlement.find(settlementQuery).lean();
     
     console.log(`📊 Dashboard Stats - Total settlements found: ${allSettlements.length}`);
     
@@ -124,8 +200,13 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     const last30DaysDeliveryFee = last30DaysSettlements.reduce((sum, s) => sum + (s.adminEarning?.deliveryFee || 0), 0);
     const last30DaysGST = last30DaysSettlements.reduce((sum, s) => sum + (s.adminEarning?.gst || 0), 0);
 
-    // Get order statistics
+    // Get order statistics with date filter
+    const orderStatsMatchFilter = {};
+    if (Object.keys(dateFilter).length > 0) {
+      orderStatsMatchFilter.createdAt = dateFilter;
+    }
     const orderStats = await Order.aggregate([
+      ...(Object.keys(orderStatsMatchFilter).length > 0 ? [{ $match: orderStatsMatchFilter }] : []),
       {
         $group: {
           _id: '$status',
@@ -139,8 +220,12 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       orderStatusMap[stat._id] = stat.count;
     });
 
-    // Get total orders processed
-    const totalOrders = await Order.countDocuments({ status: 'delivered' });
+    // Get total orders processed with date filter
+    const totalOrdersQuery = { status: 'delivered' };
+    if (Object.keys(dateFilter).length > 0) {
+      totalOrdersQuery.deliveredAt = dateFilter;
+    }
+    const totalOrders = await Order.countDocuments(totalOrdersQuery);
 
     // Get active partners count
     const activeRestaurants = await Restaurant.countDocuments({ isActive: true });
@@ -286,14 +371,204 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       isActive: true
     });
 
-    // Get monthly data for last 12 months
-    // Use aggregation to match orders with settlements by orderId and use order's deliveredAt
+    // Get monthly data based on period
     const monthlyData = [];
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    for (let i = 11; i >= 0; i--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+    // Determine how many months to show based on period
+    let monthsToShow = 12; // Default for overall
+    let startMonthOffset = 11;
+    
+    if (period === 'today' || period === 'week') {
+      // For today/week, show daily data for last 7 days
+      monthsToShow = 0;
+      const daysToShow = period === 'today' ? 1 : 7;
+      for (let i = daysToShow - 1; i >= 0; i--) {
+        const dayStart = new Date(now);
+        dayStart.setDate(now.getDate() - i);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const dayOrders = await Order.find({
+          status: 'delivered',
+          deliveredAt: { $gte: dayStart, $lte: dayEnd }
+        }).select('_id pricing deliveredAt').lean();
+        
+        const dayOrderIds = dayOrders.map(o => o._id);
+        const daySettlements = await OrderSettlement.find({
+          orderId: { $in: dayOrderIds }
+        }).select('orderId adminEarning').lean();
+        
+        const settlementMap = new Map();
+        daySettlements.forEach(s => {
+          settlementMap.set(s.orderId.toString(), s);
+        });
+        
+        let dayRevenue = 0;
+        let dayCommission = 0;
+        
+        dayOrders.forEach(order => {
+          dayRevenue += order.pricing?.total || 0;
+          const settlement = settlementMap.get(order._id.toString());
+          if (settlement && settlement.adminEarning) {
+            dayCommission += settlement.adminEarning.commission || 0;
+          }
+        });
+        
+        monthlyData.push({
+          month: dayStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+          revenue: Math.round(dayRevenue * 100) / 100,
+          commission: Math.round(dayCommission * 100) / 100,
+          orders: dayOrders.length
+        });
+      }
+    } else if (period === 'month') {
+      // For this month, show daily data
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), day);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const dayOrders = await Order.find({
+          status: 'delivered',
+          deliveredAt: { $gte: dayStart, $lte: dayEnd }
+        }).select('_id pricing deliveredAt').lean();
+        
+        const dayOrderIds = dayOrders.map(o => o._id);
+        const daySettlements = await OrderSettlement.find({
+          orderId: { $in: dayOrderIds }
+        }).select('orderId adminEarning').lean();
+        
+        const settlementMap = new Map();
+        daySettlements.forEach(s => {
+          settlementMap.set(s.orderId.toString(), s);
+        });
+        
+        let dayRevenue = 0;
+        let dayCommission = 0;
+        
+        dayOrders.forEach(order => {
+          dayRevenue += order.pricing?.total || 0;
+          const settlement = settlementMap.get(order._id.toString());
+          if (settlement && settlement.adminEarning) {
+            dayCommission += settlement.adminEarning.commission || 0;
+          }
+        });
+        
+        monthlyData.push({
+          month: dayStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+          revenue: Math.round(dayRevenue * 100) / 100,
+          commission: Math.round(dayCommission * 100) / 100,
+          orders: dayOrders.length
+        });
+      }
+    } else if (period === 'year') {
+      // For this year, show monthly data
+      monthsToShow = now.getMonth() + 1; // Current month + previous months
+      startMonthOffset = now.getMonth();
+    } else if (period === 'custom' && startDateObj && endDateObj) {
+      // For custom range, calculate days and show daily or weekly based on range
+      const daysDiff = Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24));
+      if (daysDiff <= 30) {
+        // Show daily data for ranges <= 30 days
+        for (let i = 0; i <= daysDiff; i++) {
+          const dayStart = new Date(startDateObj);
+          dayStart.setDate(startDateObj.getDate() + i);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(dayStart);
+          dayEnd.setHours(23, 59, 59, 999);
+          
+          const dayOrders = await Order.find({
+            status: 'delivered',
+            deliveredAt: { $gte: dayStart, $lte: dayEnd }
+          }).select('_id pricing deliveredAt').lean();
+          
+          const dayOrderIds = dayOrders.map(o => o._id);
+          const daySettlements = await OrderSettlement.find({
+            orderId: { $in: dayOrderIds }
+          }).select('orderId adminEarning').lean();
+          
+          const settlementMap = new Map();
+          daySettlements.forEach(s => {
+            settlementMap.set(s.orderId.toString(), s);
+          });
+          
+          let dayRevenue = 0;
+          let dayCommission = 0;
+          
+          dayOrders.forEach(order => {
+            dayRevenue += order.pricing?.total || 0;
+            const settlement = settlementMap.get(order._id.toString());
+            if (settlement && settlement.adminEarning) {
+              dayCommission += settlement.adminEarning.commission || 0;
+            }
+          });
+          
+          monthlyData.push({
+            month: dayStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+            revenue: Math.round(dayRevenue * 100) / 100,
+            commission: Math.round(dayCommission * 100) / 100,
+            orders: dayOrders.length
+          });
+        }
+      } else {
+        // Show weekly data for ranges > 30 days
+        const weeks = Math.ceil(daysDiff / 7);
+        for (let week = 0; week < weeks; week++) {
+          const weekStart = new Date(startDateObj);
+          weekStart.setDate(startDateObj.getDate() + (week * 7));
+          weekStart.setHours(0, 0, 0, 0);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          if (weekEnd > endDateObj) weekEnd = endDateObj;
+          
+          const weekOrders = await Order.find({
+            status: 'delivered',
+            deliveredAt: { $gte: weekStart, $lte: weekEnd }
+          }).select('_id pricing deliveredAt').lean();
+          
+          const weekOrderIds = weekOrders.map(o => o._id);
+          const weekSettlements = await OrderSettlement.find({
+            orderId: { $in: weekOrderIds }
+          }).select('orderId adminEarning').lean();
+          
+          const settlementMap = new Map();
+          weekSettlements.forEach(s => {
+            settlementMap.set(s.orderId.toString(), s);
+          });
+          
+          let weekRevenue = 0;
+          let weekCommission = 0;
+          
+          weekOrders.forEach(order => {
+            weekRevenue += order.pricing?.total || 0;
+            const settlement = settlementMap.get(order._id.toString());
+            if (settlement && settlement.adminEarning) {
+              weekCommission += settlement.adminEarning.commission || 0;
+            }
+          });
+          
+          monthlyData.push({
+            month: `${weekStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`,
+            revenue: Math.round(weekRevenue * 100) / 100,
+            commission: Math.round(weekCommission * 100) / 100,
+            orders: weekOrders.length
+          });
+        }
+      }
+    }
+    
+    // For overall and year, show monthly data
+    if (period === 'overall' || period === 'year') {
+      for (let i = startMonthOffset; i >= 0; i--) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
       
       // Get orders delivered in this month
       const monthOrders = await Order.find({
@@ -339,6 +614,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         commission: Math.round(monthCommission * 100) / 100,
         orders: monthOrdersCount
       });
+    }
     }
 
     return successResponse(res, 200, 'Dashboard stats retrieved successfully', {

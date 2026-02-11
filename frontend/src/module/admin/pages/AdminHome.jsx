@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -22,21 +22,79 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus } from "lucide-react"
+import { Activity, ArrowUpRight, ShoppingBag, CreditCard, Truck, Receipt, DollarSign, Store, UserCheck, Package, UserCircle, Clock, CheckCircle, Plus, Calendar } from "lucide-react"
 import { adminAPI } from "@/lib/api"
+import { DateRangeCalendar } from "@/components/ui/date-range-calendar"
 
 export default function AdminHome() {
-  const [selectedZone, setSelectedZone] = useState("all")
   const [selectedPeriod, setSelectedPeriod] = useState("overall")
+  const [startDate, setStartDate] = useState(null)
+  const [endDate, setEndDate] = useState(null)
+  const [showCalendar, setShowCalendar] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
+  const calendarRef = useRef(null)
 
-  // Fetch dashboard stats on mount
+  // Format date range display
+  const dateRangeDisplay = useMemo(() => {
+    if (!startDate || !endDate) return "Date to date"
+    const formatDate = (date) => {
+      const day = date.getDate()
+      const month = date.toLocaleString('en-US', { month: 'short' })
+      return `${day} ${month}`
+    }
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`
+  }, [startDate, endDate])
+
+  // Handle date range change from calendar
+  const handleDateRangeChange = (start, end) => {
+    setStartDate(start)
+    setEndDate(end)
+    if (start && end) {
+      setSelectedPeriod("custom")
+      setShowCalendar(false)
+    }
+  }
+
+  // Close calendar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+        setShowCalendar(false)
+      }
+    }
+    
+    if (showCalendar) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showCalendar])
+
+  // Reset date range when period changes (unless custom)
+  useEffect(() => {
+    if (selectedPeriod !== "custom") {
+      setStartDate(null)
+      setEndDate(null)
+    }
+  }, [selectedPeriod])
+
+  // Fetch dashboard stats
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
         setIsLoading(true)
-        const response = await adminAPI.getDashboardStats()
+        const params = { period: selectedPeriod }
+        
+        if (selectedPeriod === "custom" && startDate && endDate) {
+          // Format dates as YYYY-MM-DD
+          params.startDate = startDate.toISOString().split('T')[0]
+          params.endDate = endDate.toISOString().split('T')[0]
+        }
+        
+        const response = await adminAPI.getDashboardStats(params)
         if (response.data?.success && response.data?.data) {
           setDashboardData(response.data.data)
           console.log('✅ Dashboard stats fetched:', response.data.data)
@@ -56,16 +114,7 @@ export default function AdminHome() {
     }
 
     fetchDashboardStats()
-  }, [])
-
-  // Update loading state when filters change
-  useEffect(() => {
-    if (dashboardData) {
-      setIsLoading(true)
-      const timer = setTimeout(() => setIsLoading(false), 350)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedZone, selectedPeriod])
+  }, [selectedPeriod, startDate, endDate])
 
   // Get order stats from real data
   const getOrderStats = () => {
@@ -157,19 +206,12 @@ export default function AdminHome() {
 
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select value={selectedZone} onValueChange={setSelectedZone}>
-              <SelectTrigger className="min-w-[160px] border-neutral-300 bg-white text-neutral-900">
-                <SelectValue placeholder="All zones" />
-              </SelectTrigger>
-              <SelectContent className="border-neutral-200 bg-white text-neutral-900">
-                <SelectItem value="all">All zones</SelectItem>
-                <SelectItem value="zone1">Zone 1</SelectItem>
-                <SelectItem value="zone2">Zone 2</SelectItem>
-                <SelectItem value="zone3">Zone 3</SelectItem>
-                <SelectItem value="zone4">Zone 4</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <Select value={selectedPeriod} onValueChange={(value) => {
+              setSelectedPeriod(value)
+              if (value === "custom") {
+                setShowCalendar(true)
+              }
+            }}>
               <SelectTrigger className="min-w-[140px] border-neutral-300 bg-white text-neutral-900">
                 <SelectValue placeholder="Overall" />
               </SelectTrigger>
@@ -179,8 +221,36 @@ export default function AdminHome() {
                 <SelectItem value="week">This week</SelectItem>
                 <SelectItem value="month">This month</SelectItem>
                 <SelectItem value="year">This year</SelectItem>
+                <SelectItem value="custom">Date to date</SelectItem>
               </SelectContent>
             </Select>
+            {selectedPeriod === "custom" && (
+              <div className="relative" ref={calendarRef}>
+                <button
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="flex items-center gap-2 min-w-[180px] px-3 py-2 border border-neutral-300 rounded-md bg-white text-neutral-900 hover:bg-neutral-50 transition-colors"
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm">{dateRangeDisplay}</span>
+                </button>
+                {showCalendar && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowCalendar(false)}
+                    />
+                    <div className="absolute top-full right-0 mt-2 z-50 shadow-lg">
+                      <DateRangeCalendar
+                        startDate={startDate}
+                        endDate={endDate}
+                        onDateRangeChange={handleDateRangeChange}
+                        onClose={() => setShowCalendar(false)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -278,11 +278,11 @@ export default function OrderDetails() {
       doc.setFontSize(10)
       doc.setFont("helvetica", "normal")
       doc.text("Item Subtotal:", 15, yPosition)
-      doc.text(`₹${orderData.billing.itemSubtotal}`, pageWidth - 15, yPosition, { align: "right" })
+      doc.text(`Rs. ${orderData.billing.itemSubtotal}`, pageWidth - 15, yPosition, { align: "right" })
       yPosition += 6
 
       doc.text("Taxes:", 15, yPosition)
-      doc.text(`₹${orderData.billing.taxes}`, pageWidth - 15, yPosition, { align: "right" })
+      doc.text(`Rs. ${orderData.billing.taxes}`, pageWidth - 15, yPosition, { align: "right" })
       yPosition += 6
 
       // Dashed line for total
@@ -294,7 +294,7 @@ export default function OrderDetails() {
       doc.setFont("helvetica", "bold")
       doc.setFontSize(11)
       doc.text("Total Bill:", 15, yPosition)
-      doc.text(`₹${orderData.billing.total}`, pageWidth - 15, yPosition, { align: "right" })
+      doc.text(`Rs. ${orderData.billing.total}`, pageWidth - 15, yPosition, { align: "right" })
       yPosition += 6
 
       doc.setFontSize(9)

@@ -276,7 +276,7 @@ export function useOrdersManagement(orders, statusKey, title) {
         doc.setTextColor(30, 30, 30)
         doc.setFont(undefined, 'bold')
         const totalAmount = typeof order.totalAmount === 'number' ? order.totalAmount.toFixed(2) : order.totalAmount
-        doc.text(`Total Amount: ₹${totalAmount}`, 14, startY)
+        doc.text(`Total Amount: Rs. ${totalAmount}`, 14, startY)
         startY += 8
       }
       

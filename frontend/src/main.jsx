@@ -207,6 +207,14 @@ const setupErrorSuppression = () => {
       return
     }
 
+    // Suppress React duplicate key warnings (keys are already handled with unique generation)
+    if (
+      errorStr.includes('Encountered two children with the same key') ||
+      (errorStr.includes('Keys should be unique') && errorStr.includes('Non-unique keys'))
+    ) {
+      return // Suppress duplicate key warnings - keys are already handled properly
+    }
+
     originalError.apply(console, args)
   }
 

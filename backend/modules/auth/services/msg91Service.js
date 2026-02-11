@@ -1,9 +1,6 @@
 
 import axios from "axios";
-import dotenv from "dotenv";
-
-// Load environment variables if not already loaded
-dotenv.config();
+import { getMSG91Credentials } from "../../../shared/utils/envService.js";
 
 /**
  * MSG91 SMS Service for Bakalaa
@@ -11,9 +8,10 @@ dotenv.config();
  */
 class Msg91Service {
     constructor() {
-        this.authKey = process.env.MSG91_AUTH_KEY;
-        this.senderId = process.env.MSG91_SENDER_ID;
-        this.templateId = process.env.MSG91_DLT_TE_ID;
+        // Credentials will be loaded dynamically from database/env
+        this.authKey = null;
+        this.senderId = null;
+        this.templateId = null;
         // Base URL for sending SMS via GET request
         this.baseUrl = "https://api.msg91.com/api/sendhttp.php";
     }
@@ -56,8 +54,15 @@ class Msg91Service {
      */
     async sendOTP(phone, otp, purpose = 'register', role = 'user') {
         try {
-            if (!this.authKey || !this.senderId || !this.templateId) {
-                console.error("❌ MSG91 Configuration Error: Missing credentials in .env");
+            // Load credentials dynamically from database/env
+            const creds = await getMSG91Credentials();
+            const authKey = creds.authKey?.trim();
+            const senderId = creds.senderId?.trim();
+            const templateId = creds.templateId?.trim();
+
+            if (!authKey || !senderId || !templateId) {
+                console.error("❌ MSG91 Configuration Error: Missing credentials");
+                console.error("   Please check MSG91_AUTH_KEY, MSG91_SENDER_ID, and MSG91_DLT_TE_ID in environment variables");
                 throw new Error("MSG91 credentials not configured.");
             }
 
@@ -72,13 +77,13 @@ class Msg91Service {
 
             // Prepare query parameters for sendhttp.php
             const params = new URLSearchParams({
-                authkey: this.authKey,
+                authkey: authKey,
                 mobiles: normalizedPhone,
                 message: message,
-                sender: this.senderId,
+                sender: senderId,
                 route: "4", // Transactional route
                 country: "91",
-                DLT_TE_ID: this.templateId,
+                DLT_TE_ID: templateId,
                 response: "json" // Request JSON response
             });
 
@@ -142,15 +147,25 @@ class Msg91Service {
         // Re-use send logic but with custom message
         // Note: This might fail DLT if template not registered for arbitrary text
         try {
+            // Load credentials dynamically from database/env
+            const creds = await getMSG91Credentials();
+            const authKey = creds.authKey?.trim();
+            const senderId = creds.senderId?.trim();
+            const templateId = creds.templateId?.trim();
+
+            if (!authKey || !senderId || !templateId) {
+                throw new Error("MSG91 credentials not configured.");
+            }
+
             const normalizedPhone = this.normalizePhoneNumber(phone);
             const params = new URLSearchParams({
-                authkey: this.authKey,
+                authkey: authKey,
                 mobiles: normalizedPhone,
                 message: message,
-                sender: this.senderId,
+                sender: senderId,
                 route: "4",
                 country: "91",
-                DLT_TE_ID: this.templateId, // Using the same OTP template ID might fail for custom messages! 
+                DLT_TE_ID: templateId, // Using the same OTP template ID might fail for custom messages! 
                 // Ideally we need a separate template ID or just try without it (might fail)
                 response: "json"
             });

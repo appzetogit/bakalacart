@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronLeft, Search, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, Phone, X, Crosshair } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -221,7 +221,10 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
           (errorStr.includes('AJAXError') && errorStr.includes('olamaps.io')) ||
           // Suppress image loading errors (handled gracefully by OptimizedImage component)
           errorStr.includes('Image failed to load') ||
-          errorStr.includes('Failed to load image')) {
+          errorStr.includes('Failed to load image') ||
+          // Suppress React duplicate key warnings (keys are already handled with unique generation)
+          errorStr.includes('Encountered two children with the same key') ||
+          (errorStr.includes('Keys should be unique') && errorStr.includes('Non-unique keys'))) {
         // Silently ignore these non-critical errors
         return
       }
@@ -2183,6 +2186,51 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
     toast.info("To edit address, please delete and add a new one")
   }
 
+  // Memoize filtered addresses with unique keys to prevent duplicate key errors
+  const filteredAddressesWithKeys = useMemo(() => {
+    if (!addresses || addresses.length === 0) return []
+    
+    // First remove duplicates by ID (keep first occurrence)
+    const uniqueById = addresses.filter((address, index, self) => {
+      if (!address.id) return true // Keep addresses without ID
+      const firstIndex = self.findIndex(addr => addr.id === address.id)
+      return index === firstIndex
+    })
+    
+    // Then remove duplicates by label (keep first occurrence)
+    const filteredAddresses = uniqueById.filter((address, index, self) => {
+      const firstIndex = self.findIndex(addr => addr.label === address.label)
+      return index === firstIndex
+    })
+    
+    // Create unique keys for each address
+    return filteredAddresses.map((address, index) => {
+      const addressContent = JSON.stringify({
+        id: address.id || '',
+        label: address.label || '',
+        street: address.street || '',
+        city: address.city || '',
+        state: address.state || '',
+        zipCode: address.zipCode || '',
+        additionalDetails: address.additionalDetails || ''
+      })
+      // Create a stable hash from address content
+      let hash = 0
+      for (let i = 0; i < addressContent.length; i++) {
+        const char = addressContent.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash // Convert to 32-bit integer
+      }
+      // Combine index, hash, ID, and label for absolute uniqueness
+      const uniqueKey = `location-addr-${index}-${Math.abs(hash)}-${address.id || index}-${address.label || 'label'}-${address.street?.substring(0, 10) || ''}`
+      
+      return {
+        address,
+        uniqueKey
+      }
+    })
+  }, [addresses])
+
   if (!isOpen) return null
 
   // If showing address form, render full-screen address form
@@ -2487,17 +2535,11 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                 </h2>
               </div>
               <div className="bg-white dark:bg-[#1a1a1a]">
-                {addresses
-                  .filter((address, index, self) => {
-                    // Filter out duplicate addresses with same label - keep only first occurrence
-                    const firstIndex = self.findIndex(addr => addr.label === address.label)
-                    return index === firstIndex
-                  })
-                  .map((address, index) => {
+                {filteredAddressesWithKeys.map(({ address, uniqueKey }, index) => {
                   const IconComponent = getAddressIcon(address)
                   return (
                     <div
-                      key={address.id}
+                      key={uniqueKey}
                       className="px-4 sm:px-6 lg:px-8"
                       style={{ animation: `slideUp 0.3s ease-out ${0.25 + index * 0.05}s both` }}
                     >

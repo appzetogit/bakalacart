@@ -156,6 +156,18 @@ export async function getSMSHubIndiaCredentials() {
 }
 
 /**
+ * Get MSG91 credentials
+ * @returns {Promise<Object>} { authKey, senderId, templateId }
+ */
+export async function getMSG91Credentials() {
+  return {
+    authKey: await getEnvVar('MSG91_AUTH_KEY'),
+    senderId: await getEnvVar('MSG91_SENDER_ID'),
+    templateId: await getEnvVar('MSG91_DLT_TE_ID')
+  };
+}
+
+/**
  * Get Google Maps API Key
  * @returns {Promise<string>} Google Maps API Key
  */

@@ -1959,7 +1959,7 @@ export default function RestaurantDetails() {
 
       {/* Menu Button - Sticky at page bottom right (hidden when filter or menu sheet open) */}
       {!showFilterSheet && !showMenuSheet && !showMenuOptionsSheet && (
-        <div className="sticky dark:bg-[#1a1a1a] bottom-4 flex justify-end px-4 z-50 mt-auto">
+        <div className="sticky dark:bg-[#1a1a1a] bottom-4 flex justify-end px-4 z-40 mt-auto">
           <Button
             className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2 shadow-lg px-6 py-2.5 rounded-lg"
             size="lg"
@@ -3038,8 +3038,8 @@ export default function RestaurantDetails() {
 
       {/* Add to Cart Animation Component */}
       <AddToCartAnimation
-        bottomOffset={150}
-        linkTo="/cart"
+        bottomOffset={10}
+        linkTo="/user/cart"
         hideOnPages={true}
       />
 

@@ -959,37 +959,86 @@ export default function OrdersMain() {
     }
   }
 
-  // Handle PDF download
+  // Handle PDF download with complete receipt details
   const handlePrint = async () => {
-    if (!newOrder) {
+    const orderToPrint = popupOrder || newOrder
+    if (!orderToPrint) {
       console.warn('No order data available for PDF generation')
+      toast.error('No order data available')
       return
     }
 
     try {
+      // Fetch complete order details from API to get all information
+      let completeOrderData = orderToPrint
+      try {
+        const orderId = orderToPrint.orderMongoId || orderToPrint.orderId
+        if (orderId) {
+          const response = await restaurantAPI.getOrderById(orderId)
+          if (response.data?.success && response.data.data) {
+            // API returns { order, settlement } structure
+            const apiOrder = response.data.data.order || response.data.data
+            completeOrderData = { ...orderToPrint, ...apiOrder }
+            console.log('📋 Complete order data for receipt:', {
+              orderId: apiOrder.orderId,
+              hasUserId: !!apiOrder.userId,
+              userIdType: typeof apiOrder.userId,
+              userIdName: apiOrder.userId?.name,
+              hasPricing: !!apiOrder.pricing,
+              pricing: apiOrder.pricing
+            })
+          }
+        }
+      } catch (apiError) {
+        console.warn('Could not fetch complete order details, using available data:', apiError)
+      }
+
       // Create new PDF document
       const doc = new jsPDF()
       
-      // Set font
-      doc.setFont('helvetica', 'bold')
+      let yPos = 20
       
       // Header
+      doc.setFont('helvetica', 'bold')
       doc.setFontSize(20)
-      doc.text('Order Receipt', 105, 20, { align: 'center' })
+      doc.text('ORDER RECEIPT', 105, yPos, { align: 'center' })
+      yPos += 10
       
       // Restaurant name
       doc.setFontSize(14)
       doc.setFont('helvetica', 'normal')
-      doc.text(orderToPrint.restaurantName || 'Restaurant', 105, 30, { align: 'center' })
+      doc.text(completeOrderData.restaurantName || 'Restaurant', 105, yPos, { align: 'center' })
+      yPos += 8
       
-      // Order details
+      // Restaurant location (where order was placed from)
+      if (completeOrderData.restaurantLocation || completeOrderData.restaurantAddress) {
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'italic')
+        const restaurantAddress = completeOrderData.restaurantLocation?.address || 
+                                  completeOrderData.restaurantAddress || 
+                                  'Restaurant address not available'
+        const restaurantAddrLines = doc.splitTextToSize(restaurantAddress, 170)
+        doc.text(restaurantAddrLines, 105, yPos, { align: 'center' })
+        yPos += restaurantAddrLines.length * 5 + 5
+      }
+      
+      // Divider line
+      doc.setDrawColor(200, 200, 200)
+      doc.line(20, yPos, 190, yPos)
+      yPos += 8
+      
+      // Order details section
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Order ID: ${orderToPrint.orderId || 'N/A'}`, 20, 45)
-      doc.setFont('helvetica', 'normal')
+      doc.text('ORDER DETAILS', 20, yPos)
+      yPos += 7
       
-      const orderDate = orderToPrint.createdAt 
-        ? new Date(orderToPrint.createdAt).toLocaleString('en-GB', { 
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Order ID: ${completeOrderData.orderId || 'N/A'}`, 20, yPos)
+      yPos += 6
+      
+      const orderDate = completeOrderData.createdAt 
+        ? new Date(completeOrderData.createdAt).toLocaleString('en-GB', { 
             day: 'numeric', 
             month: 'short', 
             year: 'numeric',
@@ -997,48 +1046,126 @@ export default function OrdersMain() {
             minute: '2-digit' 
           })
         : new Date().toLocaleString('en-GB')
+      doc.text(`Order Date & Time: ${orderDate}`, 20, yPos)
+      yPos += 6
       
-      doc.text(`Date: ${orderDate}`, 20, 52)
-      
-      // Customer address
-      if (orderToPrint.customerAddress) {
-        doc.setFont('helvetica', 'bold')
-        doc.text('Delivery Address:', 20, 62)
-        doc.setFont('helvetica', 'normal')
-        const addressText = [
-          orderToPrint.customerAddress.street,
-          orderToPrint.customerAddress.city,
-          orderToPrint.customerAddress.state
-        ].filter(Boolean).join(', ') || 'Address not available'
-        const addressLines = doc.splitTextToSize(addressText, 170)
-        doc.text(addressLines, 20, 69)
+      if (completeOrderData.estimatedDeliveryTime) {
+        doc.text(`Estimated Delivery: ${completeOrderData.estimatedDeliveryTime} minutes`, 20, yPos)
+        yPos += 6
       }
       
-      // Items table
-      let yPos = 85
-      if (orderToPrint.items && orderToPrint.items.length > 0) {
+      yPos += 3
+      
+      // Customer details section
+      doc.setFont('helvetica', 'bold')
+      doc.text('CUSTOMER DETAILS', 20, yPos)
+      yPos += 7
+      
+      doc.setFont('helvetica', 'normal')
+      // Try multiple paths for customer name
+      const customerName = completeOrderData.customerName || 
+                          completeOrderData.userName ||
+                          completeOrderData.user?.name || 
+                          completeOrderData.user?.fullName ||
+                          completeOrderData.userId?.name || 
+                          completeOrderData.userId?.fullName ||
+                          (typeof completeOrderData.userId === 'object' && completeOrderData.userId?.name) ||
+                          'Customer'
+      doc.text(`Name: ${customerName}`, 20, yPos)
+      yPos += 6
+      
+      // Try multiple paths for customer phone
+      const customerPhone = completeOrderData.customerPhone || 
+                           completeOrderData.userPhone ||
+                           completeOrderData.user?.phone || 
+                           completeOrderData.userId?.phone || 
+                           (typeof completeOrderData.userId === 'object' && completeOrderData.userId?.phone) ||
+                           completeOrderData.phone || 
+                           completeOrderData.address?.phone ||
+                           'Not provided'
+      doc.text(`Phone: ${customerPhone}`, 20, yPos)
+      yPos += 6
+      
+      // Try multiple paths for customer email
+      const customerEmail = completeOrderData.customerEmail ||
+                           completeOrderData.userEmail ||
+                           completeOrderData.user?.email || 
+                           completeOrderData.userId?.email || 
+                           (typeof completeOrderData.userId === 'object' && completeOrderData.userId?.email) ||
+                           completeOrderData.email || 
+                           'Not provided'
+      doc.text(`Email: ${customerEmail}`, 20, yPos)
+      yPos += 8
+      
+      // Customer delivery address section
+      if (completeOrderData.customerAddress || completeOrderData.address) {
+        const address = completeOrderData.customerAddress || completeOrderData.address
         doc.setFont('helvetica', 'bold')
-        doc.text('Items:', 20, yPos)
+        doc.text('DELIVERY ADDRESS', 20, yPos)
+        yPos += 7
+        
+        doc.setFont('helvetica', 'normal')
+        const addressParts = [
+          address.label && `Label: ${address.label}`,
+          address.street,
+          address.additionalDetails,
+          address.city,
+          address.state,
+          address.zipCode,
+          address.pincode
+        ].filter(Boolean)
+        
+        if (addressParts.length > 0) {
+          addressParts.forEach(part => {
+            const lines = doc.splitTextToSize(part, 170)
+            doc.text(lines, 20, yPos)
+            yPos += lines.length * 5
+          })
+        } else {
+          doc.text('Address not available', 20, yPos)
+          yPos += 5
+        }
+        
+        // Location coordinates if available
+        if (address.location?.coordinates) {
+          yPos += 3
+          doc.setFontSize(8)
+          doc.setFont('helvetica', 'italic')
+          doc.text(
+            `Coordinates: ${address.location.coordinates[1]?.toFixed(6)}, ${address.location.coordinates[0]?.toFixed(6)}`,
+            20,
+            yPos
+          )
+          yPos += 5
+        }
+        yPos += 3
+      }
+      
+      // Food items section
+      if (completeOrderData.items && completeOrderData.items.length > 0) {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('FOOD ITEMS', 20, yPos)
         yPos += 8
         
-        // Prepare table data
-        const tableData = orderToPrint.items.map(item => [
-          item.name || 'Item',
+        // Prepare table data with more details
+        const tableData = completeOrderData.items.map((item, index) => [
+          `${index + 1}. ${item.name || 'Item'}`,
           item.quantity || 1,
-          `₹${(item.price || 0).toFixed(2)}`,
-          `₹${((item.price || 0) * (item.quantity || 1)).toFixed(2)}`
+          `Rs. ${(item.price || 0).toFixed(2)}`,
+          `Rs. ${((item.price || 0) * (item.quantity || 1)).toFixed(2)}`
         ])
         
         autoTable(doc, {
           startY: yPos,
-          head: [['Item', 'Qty', 'Price', 'Total']],
+          head: [['Item Name', 'Qty', 'Unit Price', 'Total']],
           body: tableData,
           theme: 'striped',
-          headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold' },
+          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold' },
           styles: { fontSize: 9 },
           columnStyles: {
-            0: { cellWidth: 80 },
-            1: { cellWidth: 30, halign: 'center' },
+            0: { cellWidth: 90 },
+            1: { cellWidth: 25, halign: 'center' },
             2: { cellWidth: 35, halign: 'right' },
             3: { cellWidth: 35, halign: 'right' }
           }
@@ -1047,59 +1174,163 @@ export default function OrdersMain() {
         yPos = doc.lastAutoTable.finalY + 10
       }
       
-      // Total
+      // Pricing breakdown
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(12)
-      doc.text(`Total: ₹${(orderToPrint.total || 0).toFixed(2)}`, 20, yPos)
-      
-      // Payment status
-      yPos += 10
       doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Payment Status: ${orderToPrint.status === 'confirmed' ? 'Paid' : 'Pending'}`, 20, yPos)
+      doc.text('PRICING BREAKDOWN', 20, yPos)
+      yPos += 7
       
-      // Estimated delivery time
-      if (orderToPrint.estimatedDeliveryTime) {
-        yPos += 8
-        doc.text(`Estimated Delivery: ${orderToPrint.estimatedDeliveryTime} minutes`, 20, yPos)
+      doc.setFont('helvetica', 'normal')
+      // Extract pricing with multiple fallbacks
+      const pricing = completeOrderData.pricing || {}
+      const subtotal = pricing.subtotal || 
+                      completeOrderData.subtotal || 
+                      (completeOrderData.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0) || 0)
+      const deliveryFee = pricing.deliveryFee || 
+                         completeOrderData.deliveryFee || 0
+      const platformFee = pricing.platformFee || 
+                         completeOrderData.platformFee || 0
+      const tax = pricing.tax || 
+                 pricing.gst ||
+                 completeOrderData.tax || 
+                 completeOrderData.gst || 0
+      const discount = pricing.discount || 
+                      completeOrderData.discount || 0
+      const total = pricing.total || 
+                   completeOrderData.total || 0
+      
+      // Always show subtotal
+      doc.text(`Subtotal: Rs. ${subtotal.toFixed(2)}`, 20, yPos)
+      yPos += 6
+      
+      // Show discount if applicable
+      if (discount > 0) {
+        doc.text(`Discount: -Rs. ${discount.toFixed(2)}`, 20, yPos)
+        yPos += 6
       }
       
-      // Notes
-      if (orderToPrint.note) {
-        yPos += 10
+      // Always show delivery fee (even if 0, to be transparent)
+      doc.text(`Delivery Fee: Rs. ${deliveryFee.toFixed(2)}`, 20, yPos)
+      yPos += 6
+      
+      // Always show platform fee (even if 0, to be transparent)
+      doc.text(`Platform Fee: Rs. ${platformFee.toFixed(2)}`, 20, yPos)
+      yPos += 6
+      
+      // Always show GST/Tax (even if 0, to be transparent)
+      doc.text(`GST (Tax): Rs. ${tax.toFixed(2)}`, 20, yPos)
+      yPos += 6
+      
+      yPos += 3
+      doc.setDrawColor(0, 0, 0)
+      doc.line(20, yPos, 190, yPos)
+      yPos += 5
+      
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text(`TOTAL: Rs. ${total.toFixed(2)}`, 20, yPos)
+      yPos += 10
+      
+      // Payment details section
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PAYMENT DETAILS', 20, yPos)
+      yPos += 7
+      
+      doc.setFont('helvetica', 'normal')
+      const paymentMethod = completeOrderData.paymentMethod || 
+                           completeOrderData.payment?.method || 
+                           'Not specified'
+      const paymentMethodDisplay = paymentMethod === 'cash' || paymentMethod === 'cod' 
+        ? 'Cash on Delivery (COD)' 
+        : paymentMethod === 'razorpay' 
+        ? 'Online Payment (Razorpay)' 
+        : paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)
+      
+      doc.text(`Payment Method: ${paymentMethodDisplay}`, 20, yPos)
+      yPos += 6
+      
+      const paymentStatus = completeOrderData.status === 'confirmed' || 
+                           completeOrderData.payment?.status === 'paid' 
+        ? 'Paid' 
+        : paymentMethod === 'cash' || paymentMethod === 'cod' 
+        ? 'Cash on Delivery' 
+        : 'Pending'
+      doc.text(`Payment Status: ${paymentStatus}`, 20, yPos)
+      yPos += 6
+      
+      // Transaction ID if available
+      if (completeOrderData.payment?.transactionId || completeOrderData.transactionId) {
+        doc.text(
+          `Transaction ID: ${completeOrderData.payment?.transactionId || completeOrderData.transactionId}`,
+          20,
+          yPos
+        )
+        yPos += 6
+      }
+      
+      // Payment date if available
+      if (completeOrderData.payment?.paidAt || completeOrderData.paidAt) {
+        const paidDate = new Date(completeOrderData.payment?.paidAt || completeOrderData.paidAt)
+          .toLocaleString('en-GB', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+        doc.text(`Payment Date: ${paidDate}`, 20, yPos)
+        yPos += 6
+      }
+      
+      yPos += 5
+      
+      // Additional notes
+      if (completeOrderData.note) {
         doc.setFont('helvetica', 'bold')
-        doc.text('Note:', 20, yPos)
+        doc.text('SPECIAL INSTRUCTIONS', 20, yPos)
+        yPos += 7
         doc.setFont('helvetica', 'normal')
-        const noteLines = doc.splitTextToSize(orderToPrint.note, 170)
-        doc.text(noteLines, 20, yPos + 7)
+        const noteLines = doc.splitTextToSize(completeOrderData.note, 170)
+        doc.text(noteLines, 20, yPos)
+        yPos += noteLines.length * 5 + 5
       }
       
       // Send cutlery
-      if (orderToPrint.sendCutlery) {
-        yPos += 15
+      if (completeOrderData.sendCutlery) {
         doc.setFont('helvetica', 'normal')
-        doc.text('✓ Send cutlery requested', 20, yPos)
+        doc.text('✓ Cutlery requested', 20, yPos)
+        yPos += 6
       }
       
       // Footer
       const pageHeight = doc.internal.pageSize.height
+      if (yPos > pageHeight - 20) {
+        doc.addPage()
+        yPos = 20
+      }
+      
+      doc.setDrawColor(200, 200, 200)
+      doc.line(20, pageHeight - 20, 190, pageHeight - 20)
+      
       doc.setFontSize(8)
       doc.setFont('helvetica', 'italic')
       doc.text(
-        `Generated on ${new Date().toLocaleString('en-GB')}`,
+        `Receipt generated on ${new Date().toLocaleString('en-GB')}`,
         105,
         pageHeight - 10,
         { align: 'center' }
       )
       
       // Download PDF
-      const fileName = `Order-${orderToPrint.orderId || 'Receipt'}-${Date.now()}.pdf`
+      const fileName = `Receipt-${completeOrderData.orderId || 'Order'}-${Date.now()}.pdf`
       doc.save(fileName)
       
-      console.log('✅ PDF generated successfully:', fileName)
+      console.log('✅ PDF receipt generated successfully:', fileName)
+      toast.success('Receipt downloaded successfully!')
     } catch (error) {
-      console.error('❌ Error generating PDF:', error)
-      alert('Failed to generate PDF. Please try again.')
+      console.error('❌ Error generating PDF receipt:', error)
+      toast.error('Failed to generate receipt. Please try again.')
     }
   }
 
@@ -1518,6 +1749,23 @@ export default function OrdersMain() {
 
                 {/* Content */}
                 <div className="px-4 py-4 max-h-[60vh] overflow-y-auto">
+                  {/* Status warning for cancelled orders */}
+                  {((popupOrder || newOrder)?.status === 'cancelled') && (
+                    <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-yellow-800 mb-1">
+                            Order Status: Cancelled
+                          </p>
+                          <p className="text-xs text-yellow-700">
+                            This order was cancelled but can be reactivated by accepting it. Click "Accept Order" to proceed.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Customer info */}
                   <div className="mb-4">
                     <h4 className="text-sm font-semibold text-gray-900">
@@ -1671,9 +1919,19 @@ export default function OrdersMain() {
                     {/* Reject button */}
                     <button
                       onClick={handleRejectClick}
-                      className="w-full bg-white border-2 border-red-500 text-red-600 py-3 rounded-lg font-semibold text-sm hover:bg-red-50 transition-colors"
+                      className="w-full py-3.5 rounded-lg font-semibold text-sm transition-colors"
+                      style={{ 
+                        backgroundColor: '#dc2626', 
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
+                      onMouseDown={(e) => e.target.style.backgroundColor = '#991b1b'}
+                      onMouseUp={(e) => e.target.style.backgroundColor = '#dc2626'}
                     >
-                      Reject Order
+                      REJECT
                     </button>
                   </div>
                 </div>
@@ -1762,7 +2020,7 @@ export default function OrdersMain() {
                     disabled={!rejectReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${
                       rejectReason
-                        ? "!bg-black !text-white"
+                        ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
                   >

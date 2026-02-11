@@ -255,11 +255,32 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Order not found');
     }
 
-    // Allow accepting orders with status 'pending' or 'confirmed'
+    // Allow accepting orders with status 'pending', 'confirmed', or 'preparing'
+    // Also allow reactivating 'cancelled' orders if they were cancelled by restaurant or auto-cancelled
     // 'confirmed' status means payment is verified, restaurant can still accept
     // If order is already 'preparing', it means it was already accepted - allow re-acceptance
-    if (!['pending', 'confirmed', 'preparing'].includes(order.status)) {
+    // If order is 'cancelled' but was cancelled by restaurant (not by user/admin), allow reactivation
+    const allowedStatuses = ['pending', 'confirmed', 'preparing'];
+    const isRestaurantCancelled = order.status === 'cancelled' && 
+                                  (order.cancelledBy === 'restaurant' || 
+                                   order.cancellationReason?.includes('time limit') ||
+                                   order.cancellationReason?.includes('not accepted'));
+    
+    if (!allowedStatuses.includes(order.status) && !isRestaurantCancelled) {
       return errorResponse(res, 400, `Order cannot be accepted. Current status: ${order.status}. Only orders with status 'pending', 'confirmed', or 'preparing' can be accepted.`);
+    }
+    
+    // If order was cancelled by restaurant or auto-cancelled, reactivate it
+    if (isRestaurantCancelled) {
+      console.log(`🔄 Reactivating cancelled order ${order.orderId} (cancelled by: ${order.cancelledBy})`);
+      order.status = 'pending'; // Reset to pending so it can be accepted
+      order.cancellationReason = undefined;
+      order.cancelledBy = undefined;
+      order.cancelledAt = undefined;
+      // Clear any cancellation tracking
+      if (order.tracking?.cancelled) {
+        order.tracking.cancelled = { status: false, timestamp: null };
+      }
     }
 
     const previousStatus = order.status;

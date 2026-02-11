@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { CheckCircle, MapPin, CreditCard, ArrowLeft } from "lucide-react"
@@ -30,6 +30,48 @@ export default function Checkout() {
   const deliveryFee = 2.99 * 83
   const tax = subtotal * 0.08
   const total = subtotal + deliveryFee + tax
+
+  // Memoize filtered addresses with unique keys to prevent duplicate key errors
+  const filteredAddressesWithKeys = useMemo(() => {
+    if (!addresses || addresses.length === 0) return []
+    
+    // First remove duplicates by ID (keep first occurrence)
+    const uniqueById = addresses.filter((address, index, self) => {
+      if (!address.id) return true // Keep addresses without ID
+      const firstIndex = self.findIndex(addr => addr.id === address.id)
+      return index === firstIndex
+    })
+    
+    // Then remove duplicates by label (keep first occurrence)
+    const filteredAddresses = uniqueById.filter((address, index, self) => {
+      const firstIndex = self.findIndex(addr => addr.label === address.label)
+      return index === firstIndex
+    })
+    
+    // Create unique keys for each address
+    return filteredAddresses.map((address, index) => {
+      const addressContent = JSON.stringify({
+        id: address.id || '',
+        label: address.label || '',
+        street: address.street || '',
+        city: address.city || '',
+        state: address.state || ''
+      })
+      // Create a stable hash from address content
+      let hash = 0
+      for (let i = 0; i < addressContent.length; i++) {
+        const char = addressContent.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash
+      }
+      const uniqueKey = `checkout-addr-${index}-${Math.abs(hash)}-${address.id || index}-${address.label || 'label'}`
+      
+      return {
+        address,
+        uniqueKey
+      }
+    })
+  }, [addresses])
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress || !selectedPayment) {
@@ -120,7 +162,7 @@ export default function Checkout() {
                 <CardContent className="space-y-4">
                   {addresses.length > 0 ? (
                     <div className="space-y-3">
-                      {addresses.map((address) => {
+                      {filteredAddressesWithKeys.map(({ address, uniqueKey }, index) => {
                         const isSelected = selectedAddress === address.id
                         const addressString = [
                           address.street,
@@ -130,7 +172,7 @@ export default function Checkout() {
 
                         return (
                           <div
-                            key={address.id}
+                            key={uniqueKey}
                             className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
                               isSelected
                                 ? "border-yellow-500 bg-yellow-50"
