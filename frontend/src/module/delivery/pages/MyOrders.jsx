@@ -69,6 +69,36 @@ export default function MyOrders() {
   // Socket URL for delivery namespace
   const SOCKET_URL = API_BASE_URL.replace('/api', '')
 
+  // Helper functions for chat history
+  const getChatHistoryKey = (orderId) => {
+    return `delivery_chat_${orderId}`
+  }
+
+  const loadChatHistory = (orderId) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      const saved = localStorage.getItem(key)
+      if (saved) {
+        const messages = JSON.parse(saved)
+        console.log(`📜 Loaded ${messages.length} messages from history for order ${orderId}`)
+        return messages
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    }
+    return []
+  }
+
+  const saveChatHistory = (orderId, messages) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      localStorage.setItem(key, JSON.stringify(messages))
+      console.log(`💾 Saved ${messages.length} messages to history for order ${orderId}`)
+    } catch (error) {
+      console.error('Error saving chat history:', error)
+    }
+  }
+
   // Initialize Socket for Chat
   useEffect(() => {
     if (!chatOpen || !selectedOrderForChat) return
@@ -76,38 +106,195 @@ export default function MyOrders() {
     const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
     if (!orderId) return
 
-    // Connect to delivery socket namespace
-    const socket = io(`${SOCKET_URL}/delivery`, {
-      transports: ['websocket', 'polling']
-    })
+    let socket = null
 
-    socket.on('connect', () => {
-      console.log('✅ Connected to delivery chat socket')
-      // Join delivery room
-      const deliveryPartnerId = selectedOrderForChat.deliveryPartnerId || 
-                                 selectedOrderForChat.assignmentInfo?.deliveryPartnerId
-      if (deliveryPartnerId) {
-        socket.emit('join-delivery', deliveryPartnerId)
+    // Initialize socket connection
+    const initializeSocket = async () => {
+      try {
+        // Get current delivery partner's ID from profile
+        const profileResponse = await deliveryAPI.getProfile()
+        const deliveryPartnerId = profileResponse?.data?.data?.profile?._id || 
+                                 profileResponse?.data?.data?.profile?.id ||
+                                 profileResponse?.data?.data?._id
+
+        if (!deliveryPartnerId) {
+          console.error('❌ Delivery partner ID not found in profile')
+          toast.error('Unable to connect to chat. Please try again.')
+          return
+        }
+
+        console.log('✅ Delivery partner ID:', deliveryPartnerId)
+
+        // Connect to delivery socket namespace
+        socket = io(`${SOCKET_URL}/delivery`, {
+          transports: ['websocket', 'polling']
+        })
+
+        socket.on('connect', () => {
+          console.log('✅ Connected to delivery chat socket')
+          // Join delivery room with current delivery partner's ID
+          socket.emit('join-delivery', deliveryPartnerId.toString())
+          console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
+        })
+
+        // Single message handler to avoid duplicates
+        const handleIncomingMessage = (data, source) => {
+          console.log(`📩 New chat message received (${source}):`, data)
+          console.log('🔍 Order matching check:', {
+            receivedOrderId: data.orderId,
+            receivedOrderMongoId: data.orderMongoId,
+            currentOrderId: orderId,
+            selectedOrderId: selectedOrderForChat._id,
+            selectedOrderIdString: selectedOrderForChat.orderId,
+            sender: data.sender
+          })
+          
+          // Get all possible order identifiers from the selected order
+          const possibleOrderIds = [
+            orderId,
+            selectedOrderForChat._id,
+            selectedOrderForChat.orderId,
+            String(orderId),
+            String(selectedOrderForChat._id),
+            String(selectedOrderForChat.orderId)
+          ].filter(Boolean) // Remove null/undefined
+          
+          // Get all possible order identifiers from the received message
+          const receivedOrderIds = [
+            data.orderId,
+            data.orderMongoId,
+            String(data.orderId),
+            String(data.orderMongoId)
+          ].filter(Boolean) // Remove null/undefined
+          
+          // Check if any received orderId matches any possible orderId
+          const orderIdMatch = possibleOrderIds.some(possibleId => 
+            receivedOrderIds.some(receivedId => {
+              // Exact match
+              if (possibleId === receivedId) return true
+              // String comparison
+              if (String(possibleId) === String(receivedId)) return true
+              // Case-insensitive string comparison
+              if (String(possibleId).toLowerCase() === String(receivedId).toLowerCase()) return true
+              return false
+            })
+          )
+          
+          // If message is from user and we're in a chat, accept it regardless of orderId match
+          // This is because user messages should always be shown when chat is open
+          const isUserMessage = data.sender === 'user'
+          
+          console.log('🔍 OrderId match check:', {
+            orderIdMatch,
+            isUserMessage,
+            chatOpen,
+            hasSelectedOrder: !!selectedOrderForChat,
+            possibleOrderIds,
+            receivedOrderIds
+          })
+          
+          // Accept message if:
+          // 1. OrderId matches exactly, OR
+          // 2. It's a user message and chat is open (we trust the backend to send correct messages to the right delivery partner room)
+          // Since backend filters by delivery partner room, if message reaches here and it's from user, it's likely for current order
+          const shouldAcceptMessage = orderIdMatch || (isUserMessage && chatOpen && selectedOrderForChat && data.sender === 'user')
+          
+          console.log('🔍 Should accept message:', shouldAcceptMessage, {
+            reason: orderIdMatch ? 'orderId match' : (isUserMessage && chatOpen && selectedOrderForChat ? 'user message in open chat' : 'no match')
+          })
+          
+          if (shouldAcceptMessage) {
+            console.log('✅ Message matches current order, adding to chat')
+            setChatMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              // Check by exact match first (message + timestamp + sender)
+              const exactMatch = prev.some(msg => {
+                const msgKey = `${msg.message}_${msg.timestamp}_${msg.sender}`
+                const dataKey = `${data.message}_${data.timestamp}_${data.sender}`
+                return msgKey === dataKey
+              })
+              
+              if (exactMatch) {
+                console.log('⚠️ Exact duplicate message detected, skipping')
+                return prev
+              }
+              
+              // Also check for near-duplicates: same message content and sender within 2 seconds
+              // This handles cases where server timestamp differs slightly from client timestamp
+              const nearDuplicate = prev.some(msg => {
+                if (msg.message === data.message && msg.sender === data.sender) {
+                  const timeDiff = Math.abs(msg.timestamp - data.timestamp)
+                  if (timeDiff < 2000) { // Within 2 seconds
+                    return true
+                  }
+                }
+                return false
+              })
+              
+              if (nearDuplicate) {
+                console.log('⚠️ Near-duplicate message detected (same content within 2s), skipping')
+                return prev
+              }
+              
+              console.log('✅ Adding new message to chat')
+              return [...prev, data]
+            })
+          } else {
+            console.log('⚠️ Message rejected - orderId does not match:', {
+              receivedOrderId: data.orderId,
+              receivedOrderMongoId: data.orderMongoId,
+              currentOrderId: orderId,
+              selectedOrderId: selectedOrderForChat._id,
+              selectedOrderIdString: selectedOrderForChat.orderId,
+              possibleOrderIds,
+              receivedOrderIds,
+              sender: data.sender,
+              chatOpen,
+              hasSelectedOrder: !!selectedOrderForChat
+            })
+          }
+        }
+
+        // Listen to both events but use single handler to prevent duplicates
+        socket.on('chat-message', (data) => handleIncomingMessage(data, 'chat-message'))
+        socket.on('receive-chat-message', (data) => handleIncomingMessage(data, 'receive-chat-message'))
+
+        // Listen for room join confirmation
+        socket.on('delivery-room-joined', (data) => {
+          console.log('✅ Delivery room joined successfully:', data)
+        })
+
+        socket.on('connect_error', (error) => {
+          console.error('❌ Socket connection error:', error)
+          toast.error('Failed to connect to chat. Please try again.')
+        })
+
+        setChatSocket(socket)
+      } catch (error) {
+        console.error('❌ Error initializing socket:', error)
+        toast.error('Failed to initialize chat. Please try again.')
       }
-    })
+    }
 
-    socket.on('chat-message', (data) => {
-      console.log('📩 New chat message received:', data)
-      setChatMessages(prev => [...prev, data])
-    })
-
-    socket.on('receive-chat-message', (data) => {
-      console.log('📩 Chat message received:', data)
-      setChatMessages(prev => [...prev, data])
-    })
-
-    setChatSocket(socket)
+    initializeSocket()
 
     return () => {
-      socket.disconnect()
-      setChatSocket(null)
+      if (socket) {
+        socket.disconnect()
+        setChatSocket(null)
+      }
     }
   }, [chatOpen, selectedOrderForChat])
+
+  // Save chat history whenever messages change
+  useEffect(() => {
+    if (selectedOrderForChat && chatMessages.length > 0) {
+      const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
+      if (orderId) {
+        saveChatHistory(orderId, chatMessages)
+      }
+    }
+  }, [chatMessages, selectedOrderForChat])
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -118,9 +305,19 @@ export default function MyOrders() {
 
   // Handle opening chat
   const handleOpenChat = (order) => {
+    const orderId = order.orderId || order._id
     setSelectedOrderForChat(order)
     setChatOpen(true)
-    setChatMessages([])
+    
+    // Load chat history for this order
+    if (orderId) {
+      const history = loadChatHistory(orderId)
+      setChatMessages(history)
+      console.log(`📜 Loaded ${history.length} messages from history`)
+    } else {
+      setChatMessages([])
+    }
+    
     setNewMessage("")
   }
 
@@ -128,7 +325,8 @@ export default function MyOrders() {
   const handleCloseChat = () => {
     setChatOpen(false)
     setSelectedOrderForChat(null)
-    setChatMessages([])
+    // Don't clear messages - they're saved in history and will be reloaded when chat reopens
+    // setChatMessages([]) // Removed - keep messages for history
     setNewMessage("")
     if (chatSocket) {
       chatSocket.disconnect()
@@ -143,22 +341,29 @@ export default function MyOrders() {
     const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
     if (!orderId) return
 
+    const messageText = newMessage.trim()
+    const messageTimestamp = Date.now()
+
+    // Create message object
+    const messageData = {
+      message: messageText,
+      sender: 'delivery',
+      timestamp: messageTimestamp,
+      orderId: orderId,
+      orderMongoId: selectedOrderForChat._id || orderId
+    }
+
     // Send message to server
     chatSocket.emit('send-chat-message', {
-      orderId,
-      message: newMessage.trim(),
+      orderId: orderId,
+      message: messageText,
       deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
                          selectedOrderForChat.assignmentInfo?.deliveryPartnerId,
-      timestamp: Date.now()
+      timestamp: messageTimestamp
     })
 
-    // Add message to local state immediately for better UX
-    setChatMessages(prev => [...prev, {
-      message: newMessage.trim(),
-      sender: 'delivery',
-      timestamp: Date.now()
-    }])
-
+    // Don't add message optimistically - wait for server echo to avoid duplicates
+    // The server will echo the message back through socket, and it will be added via handleIncomingMessage
     setNewMessage("")
   }
 
@@ -987,11 +1192,12 @@ export default function MyOrders() {
   }
 
   // Handle location button click - navigate to DeliveryHome with order data (restaurant location)
+  // Handle restaurant location click - Show polyline from delivery boy's live location to restaurant
   const handleRestaurantLocationClick = async (order, e) => {
     e.stopPropagation()
 
     try {
-      // Get current location
+      // Get current live location
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           timeout: 5000,
@@ -1023,20 +1229,18 @@ export default function MyOrders() {
         estimatedEarnings: order.pricing?.deliveryFee || 0
       }
 
-      // Store order data in localStorage for DeliveryHome to use
-      // IMPORTANT: Only set route flags if order is already accepted
-      const isOrderAccepted = isAcceptedByDeliveryBoy(order)
+      // Store order data in localStorage for DeliveryHome
+      // Set shouldShowPolyline to true only when location icon is clicked
       localStorage.setItem('deliveryActiveOrder', JSON.stringify({
         restaurantInfo: orderData,
         showMap: true,
-        showRoute: isOrderAccepted, // Only show route if order is accepted
-        showRoutePath: isOrderAccepted, // Only enable route path if order is accepted
+        showRoute: true,
+        showRoutePath: true,
         hasDirectionsAPI: true,
-        acceptedAt: isOrderAccepted ? new Date().toISOString() : null,
         currentLocation: currentLocation,
         navigationMode: 'restaurant', // Route to restaurant
-        shouldShowPolyline: isOrderAccepted, // Only show polyline if order is accepted
-        enableLiveTracking: isOrderAccepted // Only enable live tracking if order is accepted
+        shouldShowPolyline: true, // Show polyline when location icon is clicked
+        enableLiveTracking: true
       }))
 
       // Navigate to DeliveryHome
@@ -1047,12 +1251,12 @@ export default function MyOrders() {
     }
   }
 
-  // Handle customer location button click - navigate to DeliveryHome with customer route
+  // Handle customer location click - Show polyline from delivery boy's live location to customer
   const handleCustomerLocationClick = async (order, e) => {
     e.stopPropagation()
 
     try {
-      // Get current location
+      // Get current live location
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           timeout: 5000,
@@ -1083,19 +1287,17 @@ export default function MyOrders() {
         estimatedEarnings: order.pricing?.deliveryFee || 0
       }
 
-      // Store order data in localStorage for DeliveryHome to use
-      // IMPORTANT: Only set route flags if order is already accepted
-      const isOrderAccepted = isAcceptedByDeliveryBoy(order)
+      // Store order data in localStorage for DeliveryHome
+      // Set shouldShowPolyline to true only when location icon is clicked
       localStorage.setItem('deliveryActiveOrder', JSON.stringify({
         restaurantInfo: orderData,
         showMap: true,
-        showRoute: isOrderAccepted, // Only show route if order is accepted
-        showRoutePath: isOrderAccepted, // Only enable route path if order is accepted
+        showRoute: true,
+        showRoutePath: true,
         hasDirectionsAPI: true,
-        acceptedAt: isOrderAccepted ? new Date().toISOString() : null,
         currentLocation: currentLocation,
         navigationMode: 'customer', // Route to customer
-        shouldShowPolyline: isOrderAccepted // Only show polyline if order is accepted
+        shouldShowPolyline: true // Show polyline when location icon is clicked
       }))
 
       // Navigate to DeliveryHome
@@ -2121,46 +2323,38 @@ export default function MyOrders() {
       />
 
       {/* Chat Modal */}
-      <AnimatePresence>
-        {chatOpen && selectedOrderForChat && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCloseChat}
-              className="absolute inset-0 bg-black/50"
-            />
-            
-            {/* Chat Box */}
-            <motion.div
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full sm:w-[500px] h-[600px] sm:h-[700px] bg-white dark:bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col z-10"
-            >
-              {/* Chat Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Chat with Customer</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Order: {selectedOrderForChat.orderId || selectedOrderForChat._id}
-                    </p>
-                  </div>
+      <Dialog open={chatOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseChat()
+        } else {
+          setChatOpen(true)
+        }
+      }}>
+        <DialogContent className="max-w-full sm:max-w-[500px] h-[600px] sm:h-[700px] p-0 flex flex-col">
+          <DialogHeader className="p-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <button
-                  onClick={handleCloseChat}
-                  className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </button>
+                <div>
+                  <DialogTitle className="font-semibold text-gray-900 dark:text-white">
+                    Chat with Customer
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Order: {selectedOrderForChat?.orderId || selectedOrderForChat?._id}
+                  </DialogDescription>
+                </div>
               </div>
+              <button
+                onClick={handleCloseChat}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                aria-label="Close chat"
+              >
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+          </DialogHeader>
 
               {/* Messages Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-[#0a0a0a] scroll-smooth">
@@ -2233,10 +2427,8 @@ export default function MyOrders() {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

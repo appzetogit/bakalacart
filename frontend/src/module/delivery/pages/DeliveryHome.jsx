@@ -4247,6 +4247,10 @@ export default function DeliveryHome() {
         // CRITICAL: Update localStorage to prevent polyline recreation on page reload
         const activeOrderData = localStorage.getItem('deliveryActiveOrder');
         if (activeOrderData) {
+          const parsedData = JSON.parse(activeOrderData);
+          // Reset shouldShowPolyline flag when order is delivered
+          parsedData.shouldShowPolyline = false;
+          localStorage.setItem('deliveryActiveOrder', JSON.stringify(parsedData));
           try {
             const parsed = JSON.parse(activeOrderData);
             parsed.shouldShowPolyline = false;
@@ -7424,11 +7428,26 @@ export default function DeliveryHome() {
                 setRiderLocation(freshLocation);
                 lastLocationRef.current = freshLocation;
                 
-                // Calculate route with fresh location
-                if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng) {
+                // Calculate route based on navigationMode (restaurant or customer)
+                const navigationMode = activeOrderData.navigationMode || 'restaurant'
+                let destination = null
+                
+                if (navigationMode === 'customer') {
+                  // Route to customer
+                  if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.customerLat && activeOrderData.restaurantInfo.customerLng) {
+                    destination = { lat: activeOrderData.restaurantInfo.customerLat, lng: activeOrderData.restaurantInfo.customerLng }
+                  }
+                } else {
+                  // Route to restaurant
+                  if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng) {
+                    destination = { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
+                  }
+                }
+                
+                if (destination) {
                   calculateRouteWithDirectionsAPI(
                     freshLocation,
-                    { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
+                    destination
                   ).then(result => {
                     if (result && result.routes && result.routes.length > 0) {
                       setDirectionsResponse(result);
@@ -7463,11 +7482,24 @@ export default function DeliveryHome() {
               },
               (error) => {
                 console.warn('⚠️ Could not get fresh GPS location, using saved location:', error);
-                // Fallback to saved location
-                if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && currentRiderLocation && currentRiderLocation.length === 2) {
+                // Fallback to saved location - check navigationMode
+                const navigationMode = activeOrderData.navigationMode || 'restaurant'
+                let destination = null
+                
+                if (navigationMode === 'customer') {
+                  if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.customerLat && activeOrderData.restaurantInfo.customerLng) {
+                    destination = { lat: activeOrderData.restaurantInfo.customerLat, lng: activeOrderData.restaurantInfo.customerLng }
+                  }
+                } else {
+                  if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng) {
+                    destination = { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
+                  }
+                }
+                
+                if (destination && currentRiderLocation && currentRiderLocation.length === 2) {
                   calculateRouteWithDirectionsAPI(
                     currentRiderLocation,
-                    { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
+                    destination
                   ).then(result => {
                     if (result && result.routes && result.routes.length > 0) {
                       setDirectionsResponse(result);
@@ -7485,17 +7517,35 @@ export default function DeliveryHome() {
               },
               { timeout: 5000, enableHighAccuracy: true }
             );
-          } else if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng && currentRiderLocation && currentRiderLocation.length === 2 && isOrderAccepted) {
+          } else if (currentRiderLocation && currentRiderLocation.length === 2 && isOrderAccepted) {
             // Try to recalculate with Directions API first (if flag indicates we had Directions API before)
             if (activeOrderData.hasDirectionsAPI || shouldShowPolyline) {
-              console.log('🔄 Recalculating route with Directions API for restored order...');
-              console.log('📍 From (Delivery Boy):', currentRiderLocation);
-              console.log('📍 To (Restaurant):', { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng });
+              const navigationMode = activeOrderData.navigationMode || 'restaurant'
+              let destination = null
               
-              calculateRouteWithDirectionsAPI(
-                currentRiderLocation,
-                { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
-              ).then(result => {
+              if (navigationMode === 'customer') {
+                // Route to customer
+                if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.customerLat && activeOrderData.restaurantInfo.customerLng) {
+                  destination = { lat: activeOrderData.restaurantInfo.customerLat, lng: activeOrderData.restaurantInfo.customerLng }
+                  console.log('🔄 Recalculating route with Directions API for restored order...');
+                  console.log('📍 From (Delivery Boy):', currentRiderLocation);
+                  console.log('📍 To (Customer):', destination);
+                }
+              } else {
+                // Route to restaurant
+                if (activeOrderData.restaurantInfo && activeOrderData.restaurantInfo.lat && activeOrderData.restaurantInfo.lng) {
+                  destination = { lat: activeOrderData.restaurantInfo.lat, lng: activeOrderData.restaurantInfo.lng }
+                  console.log('🔄 Recalculating route with Directions API for restored order...');
+                  console.log('📍 From (Delivery Boy):', currentRiderLocation);
+                  console.log('📍 To (Restaurant):', destination);
+                }
+              }
+              
+              if (destination) {
+                calculateRouteWithDirectionsAPI(
+                  currentRiderLocation,
+                  destination
+                ).then(result => {
                 if (result && result.routes && result.routes.length > 0) {
                   setDirectionsResponse(result);
                   directionsResponseRef.current = result; // Store in ref for callbacks
@@ -7546,6 +7596,9 @@ export default function DeliveryHome() {
                   console.log('✅ Using fallback route coordinates from localStorage');
                 }
               });
+              } else {
+                console.log('🚫 No destination available for route calculation');
+              }
             } else if (activeOrderData.routeCoordinates && activeOrderData.routeCoordinates.length > 0 && shouldShowPolyline) {
               // CRITICAL: Don't restore polyline if order is delivered
               const isOrderDeliveredRestore = activeOrderData.restaurantInfo && (
@@ -7658,6 +7711,19 @@ export default function DeliveryHome() {
       setDirectionsResponse(null);
       setRoutePolyline([]);
       setShowRoutePath(false);
+      
+      // CRITICAL: Reset shouldShowPolyline flag in localStorage when order is delivered
+      const activeOrderData = localStorage.getItem('deliveryActiveOrder');
+      if (activeOrderData) {
+        try {
+          const parsedData = JSON.parse(activeOrderData);
+          parsedData.shouldShowPolyline = false;
+          localStorage.setItem('deliveryActiveOrder', JSON.stringify(parsedData));
+          console.log('🚫 Reset shouldShowPolyline flag in localStorage');
+        } catch (error) {
+          console.error('Error updating localStorage:', error);
+        }
+      }
     }
   }, [selectedRestaurant?.orderStatus, selectedRestaurant?.status, selectedRestaurant?.deliveryPhase, selectedRestaurant?.deliveryState?.currentPhase, selectedRestaurant?.deliveryState?.status, showOrderDeliveredAnimation]);
 
@@ -7708,40 +7774,30 @@ export default function DeliveryHome() {
   }, [selectedRestaurant, showOrderDeliveredAnimation]);
 
   // Ensure polyline is displayed and updated when rider location changes (LIVE TRACKING)
-  // CRITICAL: Only show polyline in two conditions:
-  // 1. Location icon clicked after accept (shouldShowPolyline = true) → Delivery Boy → Restaurant
-  // 2. Order picked up (bill upload + accept) → Delivery Boy → User
+  // CRITICAL: Only show polyline when location icon is clicked (shouldShowPolyline = true)
+  // Flow: Location icon click → Show polyline from delivery boy's live location to destination
   useEffect(() => {
     if (!selectedRestaurant || !window.deliveryMapInstance || !window.google || !window.google.maps) {
       return;
     }
 
-    // Check if polyline should be shown
+    // Check if polyline should be shown (only when location icon is clicked)
     const activeOrderData = localStorage.getItem('deliveryActiveOrder');
     const shouldShowPolyline = activeOrderData ? JSON.parse(activeOrderData).shouldShowPolyline : false;
     
-    // Check delivery phase - if order is picked up, show polyline to customer
+    // Check if order is delivered - CRITICAL: Don't show polyline if delivered
     const deliveryPhase = selectedRestaurant.deliveryPhase || selectedRestaurant.deliveryState?.currentPhase || '';
     const deliveryStateStatus = selectedRestaurant.deliveryState?.status || '';
     const orderStatus = selectedRestaurant.orderStatus || selectedRestaurant.status || '';
     
-    const isPickedUp = deliveryPhase === 'en_route_to_delivery' || 
-      deliveryStateStatus === 'picked_up' ||
-      orderStatus === 'out_for_delivery';
-    
-    // Check if reached drop - don't show polyline
-    const isReachedDrop = deliveryStateStatus === 'arrived_drop' ||
-      deliveryPhase === 'at_delivery';
-    
-    // Check if order is delivered - CRITICAL: Don't show polyline if delivered
     const isDelivered = orderStatus === 'delivered' ||
       orderStatus === 'completed' ||
       deliveryPhase === 'delivered' ||
       deliveryPhase === 'completed' ||
       deliveryStateStatus === 'delivered';
     
-    // Show polyline only if: (location icon clicked) OR (order is picked up) AND not reached drop AND not delivered
-    const shouldShow = (shouldShowPolyline || isPickedUp) && !isReachedDrop && !isDelivered;
+    // Show polyline ONLY if location icon was clicked AND order is not delivered
+    const shouldShow = shouldShowPolyline && !isDelivered;
 
     if (!shouldShow) {
       // Clear polylines if conditions not met (reached drop OR delivered)

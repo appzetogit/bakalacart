@@ -291,20 +291,70 @@ deliveryNamespace.on('connection', (socket) => {
 
       console.log(`💬 Delivery partner sent message for order ${orderId}:`, message);
 
-      // 1. Emit to the User (Main Namespace Order Room)
-      io.to(`order:${orderId}`).emit('receive-chat-message', {
+      // Find the order to get both orderId formats (ORD-xxx and MongoDB _id)
+      const { default: Order } = await import('./modules/order/models/Order.js');
+      let order = null;
+      
+      try {
+        // Try to find order by MongoDB _id first
+        if (orderId && mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+          order = await Order.findById(orderId).select('orderId _id').lean();
+        }
+        
+        // If not found, try with orderId string (ORD-xxx format)
+        if (!order) {
+          order = await Order.findOne({ orderId: orderId }).select('orderId _id').lean();
+        }
+        
+        // Last resort: try finding by _id as string
+        if (!order && mongoose.Types.ObjectId.isValid(orderId)) {
+          order = await Order.findById(new mongoose.Types.ObjectId(orderId)).select('orderId _id').lean();
+        }
+      } catch (error) {
+        console.error('❌ Error finding order for delivery message:', error);
+      }
+
+      // Prepare message data
+      const messageData = {
         ...data,
-        sender: 'delivery', // Mark sender as delivery
+        orderId: order?.orderId || orderId, // Prefer orderId string (ORD-xxx format)
+        orderMongoId: order?._id ? order._id.toString() : (orderId && mongoose.Types.ObjectId.isValid(orderId) ? orderId : null),
+        sender: 'delivery',
         timestamp: Date.now()
+      };
+
+      // Emit to the User (Main Namespace Order Room) - try both orderId formats
+      const orderIdString = order?.orderId || orderId;
+      const orderMongoId = order?._id ? order._id.toString() : (orderId && mongoose.Types.ObjectId.isValid(orderId) ? orderId : null);
+
+      console.log(`📤 Emitting delivery message to user rooms:`, {
+        orderIdString,
+        orderMongoId,
+        originalOrderId: orderId
       });
+
+      // Emit to orderId string room (ORD-xxx format)
+      if (orderIdString) {
+        io.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Emitted to order:${orderIdString} room`);
+      }
+
+      // Also emit to MongoDB _id room if different
+      if (orderMongoId && orderMongoId !== orderIdString) {
+        io.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderMongoId} room`);
+      }
+
+      // Also emit to original orderId room (in case it's different from both)
+      if (orderId && orderId !== orderIdString && orderId !== orderMongoId) {
+        io.to(`order:${orderId}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderId} room (original)`);
+      }
 
       // 2. Emit back to Delivery Partner (in case they have multiple devices or just for confirmation)
       if (data.deliveryPartnerId) {
-        deliveryNamespace.to(`delivery:${data.deliveryPartnerId}`).emit('chat-message', {
-          ...data,
-          sender: 'delivery',
-          timestamp: Date.now()
-        });
+        deliveryNamespace.to(`delivery:${data.deliveryPartnerId}`).emit('chat-message', messageData);
+        console.log(`✅ Emitted back to delivery partner ${data.deliveryPartnerId}`);
       }
 
     } catch (error) {
@@ -619,17 +669,153 @@ io.on('connection', (socket) => {
       // 2. Emit to the Delivery Partner
       // We need to find the delivery partner for this order to target them
       const { default: Order } = await import('./modules/order/models/Order.js');
-      const order = await Order.findById(orderId).select('deliveryPartnerId').lean();
+      
+      // Try multiple ways to find the order
+      let order = null;
+      try {
+        console.log(`🔍 Looking for order with orderId: ${orderId}`);
+        
+        // First try with MongoDB _id (if it's a valid ObjectId)
+        if (orderId && mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+          try {
+            order = await Order.findById(orderId)
+              .select('deliveryPartnerId orderId')
+              .populate('deliveryPartnerId', '_id')
+              .lean();
+            if (order) {
+              console.log(`✅ Found order by MongoDB _id: ${orderId}`);
+            }
+          } catch (e) {
+            console.log(`⚠️ Error finding by _id: ${e.message}`);
+          }
+        }
+        
+        // If not found, try with orderId string (ORD-xxx format)
+        if (!order) {
+          try {
+            order = await Order.findOne({ orderId: orderId })
+              .select('deliveryPartnerId orderId')
+              .populate('deliveryPartnerId', '_id')
+              .lean();
+            if (order) {
+              console.log(`✅ Found order by orderId string: ${orderId}`);
+            }
+          } catch (e) {
+            console.log(`⚠️ Error finding by orderId string: ${e.message}`);
+          }
+        }
+        
+        // Last resort: try finding by _id as string
+        if (!order && mongoose.Types.ObjectId.isValid(orderId)) {
+          try {
+            order = await Order.findById(new mongoose.Types.ObjectId(orderId))
+              .select('deliveryPartnerId orderId')
+              .populate('deliveryPartnerId', '_id')
+              .lean();
+            if (order) {
+              console.log(`✅ Found order by ObjectId conversion: ${orderId}`);
+            }
+          } catch (e) {
+            console.log(`⚠️ Could not convert to ObjectId: ${e.message}`);
+          }
+        }
+        
+        if (!order) {
+          console.warn(`⚠️ Order not found with orderId: ${orderId}`);
+        }
+      } catch (error) {
+        console.error('❌ Error finding order:', error);
+      }
 
-      if (order?.deliveryPartnerId) {
-        const deliveryPartnerId = order.deliveryPartnerId.toString();
-        // Emit to the delivery namespace room for this delivery partner
-        deliveryNamespace.to(`delivery:${deliveryPartnerId}`).emit('chat-message', {
-          ...data,
-          sender: 'user',
-          timestamp: Date.now()
-        });
-        console.log(`💬 Forwarded user message to delivery partner ${deliveryPartnerId}`);
+      if (!order) {
+        console.error(`❌ Order not found for orderId: ${orderId}. Cannot forward message to delivery partner.`);
+        return;
+      }
+
+      if (!order.deliveryPartnerId) {
+        console.warn(`⚠️ Order ${order.orderId || orderId} does not have a delivery partner assigned yet. Cannot forward message.`);
+        return;
+      }
+
+      // Handle both ObjectId and string formats, and populated objects
+      let deliveryPartnerId = null;
+      
+      // Check if deliveryPartnerId is populated (has _id property)
+      if (order.deliveryPartnerId && typeof order.deliveryPartnerId === 'object') {
+        if (order.deliveryPartnerId._id) {
+          deliveryPartnerId = order.deliveryPartnerId._id.toString();
+        } else if (mongoose.Types.ObjectId.isValid(order.deliveryPartnerId)) {
+          deliveryPartnerId = order.deliveryPartnerId.toString();
+        } else {
+          deliveryPartnerId = String(order.deliveryPartnerId);
+        }
+      } else {
+        // It's already a string or ObjectId
+        deliveryPartnerId = order.deliveryPartnerId.toString ? 
+          order.deliveryPartnerId.toString() : 
+          String(order.deliveryPartnerId);
+      }
+      
+      const room = `delivery:${deliveryPartnerId}`;
+      
+      console.log(`💬 Forwarding user message to delivery partner:`, {
+        deliveryPartnerId,
+        room,
+        orderId: order.orderId || orderId,
+        orderMongoId: order._id,
+        message: data.message,
+        orderFound: !!order,
+        deliveryPartnerIdType: typeof order.deliveryPartnerId,
+        deliveryPartnerIdValue: order.deliveryPartnerId
+      });
+      
+      // Emit to the delivery namespace room for this delivery partner
+      const messageData = {
+        ...data,
+        orderId: order.orderId || orderId, // Prefer orderId string (ORD-xxx format)
+        orderMongoId: order._id ? order._id.toString() : (orderId && mongoose.Types.ObjectId.isValid(orderId) ? orderId : null), // MongoDB _id as string
+        sender: 'user',
+        timestamp: Date.now()
+      };
+      
+      console.log(`📤 Preparing to emit user message to delivery partner:`, {
+        room,
+        messageData,
+        orderOrderId: order.orderId,
+        orderMongoId: order._id,
+        originalOrderId: orderId
+      });
+      
+      // Check room size before emitting
+      const roomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
+      console.log(`📊 Room ${room} has ${roomSize} socket(s) before emitting`);
+      
+      deliveryNamespace.to(room).emit('chat-message', messageData);
+      console.log(`✅ Emitted 'chat-message' to room ${room}:`, messageData);
+      
+      // Also emit to receive-chat-message event for compatibility
+      deliveryNamespace.to(room).emit('receive-chat-message', messageData);
+      console.log(`✅ Emitted 'receive-chat-message' to room ${room}`);
+      
+      // Also try ObjectId format if different (for compatibility)
+      if (mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+        const objectIdRoom = `delivery:${new mongoose.Types.ObjectId(deliveryPartnerId).toString()}`;
+        if (objectIdRoom !== room) {
+          const objectIdRoomSize = deliveryNamespace.adapter.rooms.get(objectIdRoom)?.size || 0;
+          console.log(`📊 ObjectId room ${objectIdRoom} has ${objectIdRoomSize} socket(s) before emitting`);
+          deliveryNamespace.to(objectIdRoom).emit('chat-message', messageData);
+          deliveryNamespace.to(objectIdRoom).emit('receive-chat-message', messageData);
+          console.log(`📤 Also sent to ObjectId room: ${objectIdRoom}`);
+        }
+      }
+      
+      // Log final room info for debugging
+      const finalRoomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
+      console.log(`✅ Forwarded user message to delivery partner ${deliveryPartnerId} in room ${room} (${finalRoomSize} socket(s) in room)`);
+      
+      if (finalRoomSize === 0) {
+        console.warn(`⚠️ WARNING: No sockets in room ${room}. Delivery partner may not be connected or not joined the room.`);
+        console.warn(`⚠️ Available rooms in delivery namespace:`, Array.from(deliveryNamespace.adapter.rooms.keys()).filter(r => r.startsWith('delivery:')));
       }
     } catch (error) {
       console.error('Error handling user chat message:', error);

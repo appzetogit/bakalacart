@@ -6,7 +6,6 @@ import { io } from "socket.io-client" // Import io
 import { API_BASE_URL } from "@/lib/api/config" // Import API_BASE_URL
 import {
   ArrowLeft,
-  Share2,
   RefreshCw,
   Phone,
   ChevronRight,
@@ -121,6 +120,36 @@ export default function OrderTracking() {
 
   const defaultAddress = getDefaultAddress()
 
+  // Helper functions for chat history
+  const getChatHistoryKey = (orderId) => {
+    return `user_chat_${orderId}`
+  }
+
+  const loadChatHistory = (orderId) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      const saved = localStorage.getItem(key)
+      if (saved) {
+        const messages = JSON.parse(saved)
+        console.log(`📜 Loaded ${messages.length} messages from history for order ${orderId}`)
+        return messages
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    }
+    return []
+  }
+
+  const saveChatHistory = (orderId, messages) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      localStorage.setItem(key, JSON.stringify(messages))
+      console.log(`💾 Saved ${messages.length} messages to history for order ${orderId}`)
+    } catch (error) {
+      console.error('Error saving chat history:', error)
+    }
+  }
+
   // Initialize Socket for Chat
   useEffect(() => {
     if (!orderId) return;
@@ -133,11 +162,32 @@ export default function OrderTracking() {
       console.log('✅ Connected to chat socket');
       // Join order room to listen for messages and tracking
       newSocket.emit('join-order-tracking', orderId);
+      console.log('✅ Joined order room with orderId:', orderId);
     });
 
     newSocket.on('receive-chat-message', (data) => {
       console.log('📩 New chat message received:', data);
-      setChatMessages(prev => [...prev, data]);
+      setChatMessages(prev => {
+        // Check for duplicates before adding
+        const messageKey = `${data.message}_${data.timestamp}_${data.sender}`
+        const exists = prev.some(msg => {
+          const msgKey = `${msg.message}_${msg.timestamp}_${msg.sender}`
+          return msgKey === messageKey
+        })
+        
+        if (exists) {
+          console.log('⚠️ Duplicate message detected, skipping')
+          return prev
+        }
+        
+        const updated = [...prev, data]
+        // Save to history whenever messages change
+        const orderIdToSave = order?._id || order?.orderId || orderId
+        if (orderIdToSave) {
+          saveChatHistory(orderIdToSave, updated)
+        }
+        return updated
+      });
 
       // If chat is closed, maybe show a toast or badge?
       // Check if message is from delivery partner
@@ -154,20 +204,69 @@ export default function OrderTracking() {
     };
   }, [orderId, chatOpen]);
 
+  // Join additional order room when order is loaded (for MongoDB _id format)
+  useEffect(() => {
+    if (!socket || !order?._id) return;
+    
+    // If order._id is different from orderId, join that room too
+    if (order._id !== orderId) {
+      socket.emit('join-order-tracking', order._id);
+      console.log('✅ Also joined order room with MongoDB _id:', order._id);
+    }
+  }, [socket, order?._id, orderId]);
+
   const handleSendMessage = () => {
     if (!newMessage.trim() || !socket) return;
+
+    // Get orderId - prefer MongoDB _id if available, otherwise use orderId from params
+    const orderIdToSend = order?._id || order?.orderId || orderId;
+
+    console.log('💬 Sending message:', {
+      orderId: orderIdToSend,
+      orderFromState: order?._id || order?.orderId,
+      orderIdFromParams: orderId,
+      message: newMessage
+    });
 
     // Send message to server
     // Server will broadcast receiving-chat-message back to us
     socket.emit('send-chat-message', {
-      orderId,
-      message: newMessage,
+      orderId: orderIdToSend, // Send MongoDB _id if available, otherwise orderId string
+      message: newMessage.trim(),
       sender: 'user',
       timestamp: Date.now()
     });
 
+    // Note: Message will be saved to history when received via socket
     setNewMessage("");
   };
+
+  // Load chat history when chat opens
+  useEffect(() => {
+    if (chatOpen && orderId) {
+      const orderIdToLoad = order?._id || order?.orderId || orderId
+      if (orderIdToLoad) {
+        const history = loadChatHistory(orderIdToLoad)
+        if (history.length > 0) {
+          setChatMessages(history)
+          console.log(`📜 Loaded ${history.length} messages from history`)
+        } else {
+          // If no history, start with empty array
+          setChatMessages([])
+        }
+      }
+    }
+  }, [chatOpen, orderId, order?._id, order?.orderId]);
+
+  // Save chat history whenever messages change
+  useEffect(() => {
+    if (chatMessages.length > 0 && orderId) {
+      const orderIdToSave = order?._id || order?.orderId || orderId
+      if (orderIdToSave) {
+        saveChatHistory(orderIdToSave, chatMessages)
+      }
+    }
+  }, [chatMessages, orderId, order?._id, order?.orderId]);
 
   // Poll for order updates (especially when delivery partner accepts)
   // Only poll if delivery partner is not yet assigned to avoid unnecessary updates
@@ -732,12 +831,7 @@ export default function OrderTracking() {
             </motion.button>
           </Link>
           <h2 className="font-semibold text-lg">{order.restaurant}</h2>
-          <motion.button
-            className="w-10 h-10 flex items-center justify-center"
-            whileTap={{ scale: 0.9 }}
-          >
-            <Share2 className="w-5 h-5" />
-          </motion.button>
+          <div className="w-10 h-10"></div>
         </div>
 
         {/* Status section */}
@@ -1057,6 +1151,9 @@ export default function OrderTracking() {
       {/* Chat Dialog */}
       <Dialog open={chatOpen} onOpenChange={setChatOpen}>
         <DialogContent className="sm:max-w-md w-[95%] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Chat with Delivery Partner</DialogTitle>
+          </DialogHeader>
           {/* Header */}
           <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
             <div className="flex items-center gap-3">
