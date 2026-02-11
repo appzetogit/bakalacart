@@ -38,21 +38,18 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
     currentCycleEnd.setDate(currentCycleStart.getDate() + 6);
     currentCycleEnd.setHours(23, 59, 59, 999);
 
-    // Query for restaurant orders - handle multiple restaurantId formats
-    const restaurantIdVariations = [restaurantId];
+    // CRITICAL: Query for restaurant orders - ensure strict filtering by restaurantId
+    // Convert restaurantId to ObjectId for proper matching
+    let restaurantObjectId = null;
     if (mongoose.Types.ObjectId.isValid(restaurantId)) {
-      const objectIdString = new mongoose.Types.ObjectId(restaurantId).toString();
-      if (!restaurantIdVariations.includes(objectIdString)) {
-        restaurantIdVariations.push(objectIdString);
-      }
+      restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
     }
 
-    const restaurantIdQuery = {
-      $or: [
-        { restaurantId: { $in: restaurantIdVariations } },
-        { restaurantId: restaurantId }
-      ]
-    };
+    // CRITICAL: Use strict restaurantId filter to ensure each restaurant only sees their own orders
+    // This prevents orders from appearing in multiple restaurant wallets
+    const restaurantIdQuery = restaurantObjectId 
+      ? { restaurantId: restaurantObjectId }  // Use ObjectId for exact match
+      : { restaurantId: restaurantId };       // Fallback to string match
 
     // Get commission setup for restaurant
     let restaurantCommission = null;
@@ -128,9 +125,9 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
       };
     };
 
-    // Get current cycle orders (delivered orders in current week)
+    // CRITICAL: Get current cycle orders (delivered orders in current week)
     // Query orders that were delivered in the current cycle
-    // First try with deliveredAt, if not found, use tracking.delivered.timestamp as fallback
+    // IMPORTANT: Use strict restaurantId matching to prevent cross-restaurant order leakage
     let currentCycleOrders = await Order.find({
       ...restaurantIdQuery,
       status: 'delivered',
@@ -140,8 +137,18 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
       ]
     })
     .populate('userId', 'name phone email')
-    .select('orderId userId items pricing payment status address createdAt deliveredAt tracking')
+    .select('orderId restaurantId userId items pricing payment status address createdAt deliveredAt tracking')
     .lean();
+    
+    // CRITICAL: Double-check that all orders belong to this restaurant (safety filter)
+    // This prevents any orders from other restaurants from appearing due to query issues
+    currentCycleOrders = currentCycleOrders.filter(order => {
+      const orderRestaurantId = order.restaurantId?._id?.toString() || order.restaurantId?.toString() || order.restaurantId;
+      const expectedRestaurantId = restaurantObjectId?.toString() || restaurantId;
+      return orderRestaurantId === expectedRestaurantId;
+    });
+    
+    console.log(`🔒 Filtered current cycle orders: ${currentCycleOrders.length} orders belong to restaurant ${restaurantId}`);
 
     // If no orders found with deliveredAt/tracking, check by createdAt as last resort
     if (currentCycleOrders.length === 0) {
@@ -325,8 +332,8 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
-      // Query orders that were delivered in the past cycle
-      // First try with deliveredAt, if not found, use tracking.delivered.timestamp as fallback
+      // CRITICAL: Query orders that were delivered in the past cycle
+      // IMPORTANT: Use strict restaurantId matching to prevent cross-restaurant order leakage
       let pastCycleOrders = await Order.find({
         ...restaurantIdQuery,
         status: 'delivered',
@@ -336,7 +343,18 @@ export const getRestaurantFinance = asyncHandler(async (req, res) => {
         ]
       })
       .populate('userId', 'name phone email')
+      .select('orderId restaurantId userId items pricing payment status address createdAt deliveredAt tracking')
       .lean();
+      
+      // CRITICAL: Double-check that all orders belong to this restaurant (safety filter)
+      // This prevents any orders from other restaurants from appearing due to query issues
+      pastCycleOrders = pastCycleOrders.filter(order => {
+        const orderRestaurantId = order.restaurantId?._id?.toString() || order.restaurantId?.toString() || order.restaurantId;
+        const expectedRestaurantId = restaurantObjectId?.toString() || restaurantId;
+        return orderRestaurantId === expectedRestaurantId;
+      });
+      
+      console.log(`🔒 Filtered past cycle orders: ${pastCycleOrders.length} orders belong to restaurant ${restaurantId}`);
 
       // If no orders found with deliveredAt/tracking, check by createdAt as last resort
       if (pastCycleOrders.length === 0) {

@@ -85,12 +85,15 @@ const withdrawalRequestSchema = new mongoose.Schema({
 });
 
 // Restaurant Wallet Schema
+// IMPORTANT: Each restaurant has its own separate wallet
+// The unique constraint on restaurantId ensures no restaurant can have multiple wallets
+// and no wallet can be shared between restaurants
 const restaurantWalletSchema = new mongoose.Schema({
   restaurantId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Restaurant',
     required: true,
-    unique: true,
+    unique: true, // CRITICAL: Ensures one wallet per restaurant
     index: true
   },
   // Balance fields
@@ -125,11 +128,24 @@ const restaurantWalletSchema = new mongoose.Schema({
 });
 
 // Indexes
-restaurantWalletSchema.index({ restaurantId: 1 });
+restaurantWalletSchema.index({ restaurantId: 1 }, { unique: true }); // Ensure unique index
 restaurantWalletSchema.index({ 'transactions.orderId': 1 });
 restaurantWalletSchema.index({ 'transactions.status': 1 });
 restaurantWalletSchema.index({ 'transactions.type': 1 });
 restaurantWalletSchema.index({ lastTransactionAt: -1 });
+
+// Pre-save hook to ensure restaurantId is always an ObjectId
+restaurantWalletSchema.pre('save', function(next) {
+  // Ensure restaurantId is a valid ObjectId
+  if (this.restaurantId && !(this.restaurantId instanceof mongoose.Types.ObjectId)) {
+    if (mongoose.Types.ObjectId.isValid(this.restaurantId)) {
+      this.restaurantId = new mongoose.Types.ObjectId(this.restaurantId);
+    } else {
+      return next(new Error(`Invalid restaurantId format: ${this.restaurantId}. Must be a valid MongoDB ObjectId.`));
+    }
+  }
+  next();
+});
 
 // Virtual for pending balance (earned but not withdrawn)
 restaurantWalletSchema.virtual('pendingBalance').get(function() {
@@ -208,16 +224,52 @@ restaurantWalletSchema.methods.updateTransactionStatus = function(transactionId,
 };
 
 // Static method to get wallet by restaurant ID or create if doesn't exist
+// CRITICAL: Ensures each restaurant has a separate wallet by using MongoDB ObjectId
 restaurantWalletSchema.statics.findOrCreateByRestaurantId = async function(restaurantId) {
-  let wallet = await this.findOne({ restaurantId });
+  // Validate and convert restaurantId to ObjectId
+  if (!restaurantId) {
+    throw new Error('Restaurant ID is required');
+  }
+
+  // Convert to ObjectId if it's a string
+  let restaurantObjectId;
+  if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+    restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
+  } else {
+    throw new Error(`Invalid restaurant ID format: ${restaurantId}. Must be a valid MongoDB ObjectId.`);
+  }
+
+  // Find wallet by restaurantId (using ObjectId for exact match)
+  let wallet = await this.findOne({ restaurantId: restaurantObjectId });
   
   if (!wallet) {
-    wallet = await this.create({
-      restaurantId,
-      totalBalance: 0,
-      totalWithdrawn: 0,
-      totalEarned: 0
-    });
+    // Create new wallet for this restaurant
+    // The unique constraint on restaurantId ensures no duplicate wallets
+    try {
+      wallet = await this.create({
+        restaurantId: restaurantObjectId,
+        totalBalance: 0,
+        totalWithdrawn: 0,
+        totalEarned: 0
+      });
+      console.log(`✅ Created new wallet for restaurant: ${restaurantObjectId}`);
+    } catch (error) {
+      // If unique constraint violation, try to find the wallet again (race condition)
+      if (error.code === 11000) {
+        console.warn(`⚠️ Wallet creation race condition detected for restaurant ${restaurantObjectId}, fetching existing wallet`);
+        wallet = await this.findOne({ restaurantId: restaurantObjectId });
+        if (!wallet) {
+          throw new Error(`Failed to create or find wallet for restaurant ${restaurantObjectId}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  // Verify wallet belongs to the correct restaurant
+  if (wallet.restaurantId.toString() !== restaurantObjectId.toString()) {
+    throw new Error(`Wallet restaurantId mismatch: expected ${restaurantObjectId}, got ${wallet.restaurantId}`);
   }
   
   return wallet;

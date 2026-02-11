@@ -16,6 +16,9 @@ const logger = winston.createLogger({
 /**
  * Get Restaurant Wallet
  * GET /api/restaurant/wallet
+ * 
+ * IMPORTANT: Each restaurant can only access their own wallet.
+ * The wallet is isolated by restaurantId from the authenticated restaurant.
  */
 export const getWallet = asyncHandler(async (req, res) => {
   try {
@@ -25,7 +28,8 @@ export const getWallet = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
 
-    // Find or create wallet
+    // Find or create wallet for THIS restaurant only
+    // The unique constraint ensures each restaurant has exactly one separate wallet
     const wallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurant._id);
 
     // Get recent transactions (last 50)
@@ -64,6 +68,8 @@ export const getWallet = asyncHandler(async (req, res) => {
  * Get Restaurant Wallet Transactions
  * GET /api/restaurant/wallet/transactions
  * Query params: page, limit, type, status
+ * 
+ * IMPORTANT: Returns transactions only for the authenticated restaurant's wallet.
  */
 export const getWalletTransactions = asyncHandler(async (req, res) => {
   try {
@@ -74,6 +80,7 @@ export const getWalletTransactions = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
 
+    // Get wallet for THIS restaurant only (isolated by restaurantId)
     const wallet = await RestaurantWallet.findOne({ restaurantId: restaurant._id });
 
     if (!wallet) {
@@ -134,6 +141,8 @@ export const getWalletTransactions = asyncHandler(async (req, res) => {
  * Get Restaurant Wallet Stats
  * GET /api/restaurant/wallet/stats
  * Query params: startDate, endDate
+ * 
+ * IMPORTANT: Returns stats only for the authenticated restaurant's wallet.
  */
 export const getWalletStats = asyncHandler(async (req, res) => {
   try {
@@ -144,6 +153,7 @@ export const getWalletStats = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
 
+    // Get wallet for THIS restaurant only (isolated by restaurantId)
     const wallet = await RestaurantWallet.findOne({ restaurantId: restaurant._id });
 
     if (!wallet) {

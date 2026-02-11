@@ -2127,9 +2127,21 @@ export const completeDelivery = asyncHandler(async (req, res) => {
           restaurantEarning: restaurantEarning
         });
 
-        // Update restaurant wallet
-        if (restaurant._id) {
-          const restaurantWallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurant._id);
+        // CRITICAL: Update restaurant wallet - ensure we use the correct restaurant from order
+        // Double-check that restaurant._id matches order.restaurantId to prevent cross-restaurant credits
+        const orderRestaurantId = order.restaurantId?._id || order.restaurantId;
+        const restaurantIdToUse = restaurant._id;
+        
+        // Verify restaurant ID matches order's restaurant ID
+        const orderRestaurantIdStr = orderRestaurantId?.toString();
+        const restaurantIdStr = restaurantIdToUse?.toString();
+        
+        if (orderRestaurantIdStr !== restaurantIdStr) {
+          console.error(`❌ CRITICAL: Restaurant ID mismatch! Order restaurant: ${orderRestaurantIdStr}, Restaurant from order: ${restaurantIdStr}`);
+          console.error(`❌ Skipping wallet update to prevent cross-restaurant credit`);
+          // Don't credit wallet if IDs don't match
+        } else if (restaurantIdToUse) {
+          const restaurantWallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurantIdToUse);
 
           // Check if transaction already exists for this order
           const existingRestaurantTransaction = restaurantWallet.transactions?.find(
@@ -2150,16 +2162,17 @@ export const completeDelivery = asyncHandler(async (req, res) => {
 
             await restaurantWallet.save();
 
-            logger.info(`💰 Earning added to restaurant wallet: ${restaurant._id}`, {
-              restaurantId: restaurant.restaurantId || restaurant._id.toString(),
+            logger.info(`💰 Earning added to restaurant wallet: ${restaurantIdToUse}`, {
+              restaurantId: restaurant.restaurantId || restaurantIdToUse.toString(),
               orderId: orderIdForLog,
+              orderRestaurantId: orderRestaurantIdStr,
               orderTotal: orderTotal,
               commissionAmount: commissionAmount,
               restaurantEarning: restaurantEarning,
               walletBalance: restaurantWallet.totalBalance
             });
 
-            console.log(`✅ Restaurant earning ₹${restaurantEarning.toFixed(2)} added to wallet`);
+            console.log(`✅ Restaurant earning ₹${restaurantEarning.toFixed(2)} added to wallet for restaurant ${restaurantIdToUse}`);
             console.log(`💰 New restaurant wallet balance: ₹${restaurantWallet.totalBalance.toFixed(2)}`);
           }
         }

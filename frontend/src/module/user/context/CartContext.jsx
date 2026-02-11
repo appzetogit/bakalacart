@@ -1,5 +1,6 @@
 // src/context/cart-context.jsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 
 // Default cart context value to prevent errors during initial render
 const defaultCartContext = {
@@ -59,50 +60,106 @@ export function CartProvider({ children }) {
   }, [cart])
 
   const addToCart = (item, sourcePosition = null) => {
-    setCart((prev) => {
-      // CRITICAL: Validate restaurant consistency
-      // If cart already has items, ensure new item belongs to the same restaurant
-      if (prev.length > 0) {
-        const firstItemRestaurantId = prev[0]?.restaurantId;
-        const firstItemRestaurantName = prev[0]?.restaurant;
-        const newItemRestaurantId = item?.restaurantId;
-        const newItemRestaurantName = item?.restaurant;
-        
-        // Normalize restaurant names for comparison (trim and case-insensitive)
-        const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
-        const firstRestaurantNameNormalized = normalizeName(firstItemRestaurantName);
-        const newRestaurantNameNormalized = normalizeName(newItemRestaurantName);
-        
-        // Check restaurant name first (more reliable than IDs which can have different formats)
-        // If names match, allow it even if IDs differ (same restaurant, different ID format)
-        if (firstRestaurantNameNormalized && newRestaurantNameNormalized) {
-          if (firstRestaurantNameNormalized !== newRestaurantNameNormalized) {
-            console.error('❌ Cannot add item: Restaurant name mismatch!', {
-              cartRestaurantId: firstItemRestaurantId,
-              cartRestaurantName: firstItemRestaurantName,
-              newItemRestaurantId: newItemRestaurantId,
-              newItemRestaurantName: newItemRestaurantName
-            });
-            throw new Error(`Cart already contains items from "${firstItemRestaurantName}". Please clear cart or complete order first.`);
-          }
-          // Names match - allow it (even if IDs differ, it's the same restaurant)
-        } else if (firstItemRestaurantId && newItemRestaurantId) {
-          // If names are not available, fallback to ID comparison
-          if (firstItemRestaurantId !== newItemRestaurantId) {
-            console.error('❌ Cannot add item: Cart contains items from different restaurant!', {
-              cartRestaurantId: firstItemRestaurantId,
-              cartRestaurantName: firstItemRestaurantName,
-              newItemRestaurantId: newItemRestaurantId,
-              newItemRestaurantName: newItemRestaurantName
-            });
-            throw new Error(`Cart already contains items from "${firstItemRestaurantName || 'another restaurant'}". Please clear cart or complete order first.`);
+    try {
+      setCart((prev) => {
+        // CRITICAL: Validate restaurant consistency
+        // If cart already has items, ensure new item belongs to the same restaurant
+        if (prev.length > 0) {
+          const firstItemRestaurantId = prev[0]?.restaurantId;
+          const firstItemRestaurantName = prev[0]?.restaurant;
+          const newItemRestaurantId = item?.restaurantId;
+          const newItemRestaurantName = item?.restaurant;
+          
+          // Normalize restaurant names for comparison (trim and case-insensitive)
+          const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
+          const firstRestaurantNameNormalized = normalizeName(firstItemRestaurantName);
+          const newRestaurantNameNormalized = normalizeName(newItemRestaurantName);
+          
+          // Check restaurant name first (more reliable than IDs which can have different formats)
+          // If names match, allow it even if IDs differ (same restaurant, different ID format)
+          if (firstRestaurantNameNormalized && newRestaurantNameNormalized) {
+            if (firstRestaurantNameNormalized !== newRestaurantNameNormalized) {
+              // Show user-friendly toast notification
+              toast.error(
+                `Cannot add items from different restaurants!`,
+                {
+                  description: `Your cart already contains items from "${firstItemRestaurantName}". Please clear your cart or complete the order first to add items from "${newItemRestaurantName}".`,
+                  duration: 5000,
+                }
+              );
+              // Log as warning (not error) since this is expected behavior handled gracefully
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ Restaurant mismatch prevented:', {
+                  cartRestaurantId: firstItemRestaurantId,
+                  cartRestaurantName: firstItemRestaurantName,
+                  newItemRestaurantId: newItemRestaurantId,
+                  newItemRestaurantName: newItemRestaurantName
+                });
+              }
+              // Return previous cart without changes
+              return prev;
+            }
+            // Names match - allow it (even if IDs differ, it's the same restaurant)
+          } else if (firstItemRestaurantId && newItemRestaurantId) {
+            // If names are not available, fallback to ID comparison
+            if (firstItemRestaurantId !== newItemRestaurantId) {
+              // Show user-friendly toast notification
+              toast.error(
+                `Cannot add items from different restaurants!`,
+                {
+                  description: `Your cart already contains items from "${firstItemRestaurantName || 'another restaurant'}". Please clear your cart or complete the order first.`,
+                  duration: 5000,
+                }
+              );
+              // Log as warning (not error) since this is expected behavior handled gracefully
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ Restaurant mismatch prevented:', {
+                  cartRestaurantId: firstItemRestaurantId,
+                  cartRestaurantName: firstItemRestaurantName,
+                  newItemRestaurantId: newItemRestaurantId,
+                  newItemRestaurantName: newItemRestaurantName
+                });
+              }
+              // Return previous cart without changes
+              return prev;
+            }
           }
         }
-      }
-      
-      const existing = prev.find((i) => i.id === item.id)
-      if (existing) {
-        // Set last add event for animation when incrementing existing item
+        
+        const existing = prev.find((i) => i.id === item.id)
+        if (existing) {
+          // Set last add event for animation when incrementing existing item
+          if (sourcePosition) {
+            setLastAddEvent({
+              product: {
+                id: item.id,
+                name: item.name,
+                imageUrl: item.image || item.imageUrl,
+              },
+              sourcePosition,
+            })
+            // Clear after animation completes (increased delay)
+            setTimeout(() => setLastAddEvent(null), 1500)
+          }
+          return prev.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          )
+        }
+        
+        // Validate item has required restaurant info
+        if (!item.restaurantId && !item.restaurant) {
+          toast.error('Cannot add item: Missing restaurant information. Please refresh the page.');
+          // Log as warning in development only
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ Cannot add item: Missing restaurant information!', item);
+          }
+          // Return previous cart without changes
+          return prev;
+        }
+        
+        const newItem = { ...item, quantity: 1 }
+        
+        // Set last add event for animation if sourcePosition is provided
         if (sourcePosition) {
           setLastAddEvent({
             product: {
@@ -112,38 +169,17 @@ export function CartProvider({ children }) {
             },
             sourcePosition,
           })
-          // Clear after animation completes (increased delay)
+          // Clear after animation completes (increased delay to allow full animation)
           setTimeout(() => setLastAddEvent(null), 1500)
         }
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        )
-      }
-      
-      // Validate item has required restaurant info
-      if (!item.restaurantId && !item.restaurant) {
-        console.error('❌ Cannot add item: Missing restaurant information!', item);
-        throw new Error('Item is missing restaurant information. Please refresh the page.');
-      }
-      
-      const newItem = { ...item, quantity: 1 }
-      
-      // Set last add event for animation if sourcePosition is provided
-      if (sourcePosition) {
-        setLastAddEvent({
-          product: {
-            id: item.id,
-            name: item.name,
-            imageUrl: item.image || item.imageUrl,
-          },
-          sourcePosition,
-        })
-        // Clear after animation completes (increased delay to allow full animation)
-        setTimeout(() => setLastAddEvent(null), 1500)
-      }
-      
-      return [...prev, newItem]
-    })
+        
+        return [...prev, newItem]
+      })
+    } catch (error) {
+      // Fallback error handling (should not reach here with new implementation)
+      toast.error('Failed to add item to cart. Please try again.');
+      console.error('❌ Error adding item to cart:', error);
+    }
   }
 
   const removeFromCart = (itemId, sourcePosition = null, productInfo = null) => {

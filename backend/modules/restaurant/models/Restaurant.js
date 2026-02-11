@@ -380,5 +380,27 @@ restaurantSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// Post-save hook: Automatically create a separate wallet for each restaurant
+// This ensures every restaurant has its own isolated wallet from creation
+restaurantSchema.post('save', async function (doc, next) {
+  // Only create wallet if this is a new restaurant (not an update)
+  if (this.isNew && doc._id) {
+    try {
+      // Dynamically import to avoid circular dependencies
+      const RestaurantWallet = (await import('./RestaurantWallet.js')).default;
+      
+      // Create wallet for this restaurant (findOrCreateByRestaurantId handles duplicates)
+      await RestaurantWallet.findOrCreateByRestaurantId(doc._id);
+      
+      console.log(`✅ Wallet automatically created for new restaurant: ${doc._id} (${doc.name || 'Unnamed'})`);
+    } catch (error) {
+      // Log error but don't fail restaurant creation
+      // Wallet will be created on first access via findOrCreateByRestaurantId
+      console.error(`⚠️ Failed to auto-create wallet for restaurant ${doc._id}:`, error.message);
+    }
+  }
+  next();
+});
+
 export default mongoose.model('Restaurant', restaurantSchema);
 
