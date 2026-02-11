@@ -113,6 +113,23 @@ const environmentVariableSchema = new mongoose.Schema(
       trim: true
     },
     
+    // MSG91
+    MSG91_AUTH_KEY: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    MSG91_SENDER_ID: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    MSG91_DLT_TE_ID: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    
     // Google Maps
     VITE_GOOGLE_MAPS_API_KEY: {
       type: String,
@@ -168,6 +185,9 @@ environmentVariableSchema.methods.toEnvObject = function() {
     'SMTP_USER',
     'SMTP_PASS',
     'SMSINDIAHUB_API_KEY',
+    'MSG91_AUTH_KEY',
+    'MSG91_SENDER_ID',
+    'MSG91_DLT_TE_ID',
     'VITE_GOOGLE_MAPS_API_KEY'
   ];
   
@@ -198,6 +218,9 @@ environmentVariableSchema.pre('save', function(next) {
     'SMTP_USER',
     'SMTP_PASS',
     'SMSINDIAHUB_API_KEY',
+    'MSG91_AUTH_KEY',
+    'MSG91_SENDER_ID',
+    'MSG91_DLT_TE_ID',
     'VITE_GOOGLE_MAPS_API_KEY'
   ];
   

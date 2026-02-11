@@ -39,6 +39,11 @@ export default function SystemAddons() {
     SMSINDIAHUB_API_KEY: "",
     SMSINDIAHUB_SENDER_ID: "",
     
+    // MSG91
+    MSG91_AUTH_KEY: "",
+    MSG91_SENDER_ID: "",
+    MSG91_DLT_TE_ID: "",
+    
     // Google Maps
     VITE_GOOGLE_MAPS_API_KEY: "",
   })
@@ -255,6 +260,21 @@ export default function SystemAddons() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField label="SMS Hub India API Key" fieldKey="SMSINDIAHUB_API_KEY" />
               <InputField label="SMS Hub India Sender ID" fieldKey="SMSINDIAHUB_SENDER_ID" />
+            </div>
+          </div>
+
+          {/* MSG91 Section */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                <Key className="w-4 h-4 text-teal-600" />
+              </div>
+              MSG91 Configuration
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField label="MSG91 Auth Key" fieldKey="MSG91_AUTH_KEY" type="password" />
+              <InputField label="MSG91 Sender ID" fieldKey="MSG91_SENDER_ID" />
+              <InputField label="MSG91 DLT Template ID" fieldKey="MSG91_DLT_TE_ID" />
             </div>
           </div>
 
