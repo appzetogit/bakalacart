@@ -28,8 +28,11 @@ export default function RestaurantNavbar({
           setRestaurantData(data)
         }
       } catch (error) {
-        // Only log error if it's not a network/timeout error (backend might be down/slow)
-        if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          console.log("Maintenance mode active - skipping restaurant data fetch")
+        } else if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+          // Only log error if it's not a network/timeout error (backend might be down/slow)
           console.error("Error fetching restaurant data:", error)
         }
         // Continue with default values if fetch fails

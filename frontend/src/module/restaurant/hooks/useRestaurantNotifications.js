@@ -30,7 +30,12 @@ export const useRestaurantNotifications = () => {
           setRestaurantId(id);
         }
       } catch (error) {
-        console.error('Error fetching restaurant:', error);
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          console.log("Maintenance mode active - skipping restaurant ID fetch")
+        } else {
+          console.error('Error fetching restaurant:', error);
+        }
       }
     };
     fetchRestaurantId();

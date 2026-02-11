@@ -1,5 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { isModuleAuthenticated } from "@/lib/utils/auth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import MaintenanceModeScreen from "./MaintenanceModeScreen";
 
 /**
  * Role-based Protected Route Component
@@ -7,6 +9,23 @@ import { isModuleAuthenticated } from "@/lib/utils/auth";
  */
 export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const location = useLocation();
+  
+  // Check maintenance mode for user and restaurant roles
+  const userMaintenance = useMaintenanceMode("user");
+  const restaurantMaintenance = useMaintenanceMode("restaurantDelivery");
+  
+  // Determine which maintenance mode to check based on role
+  let maintenanceCheck = null;
+  if (requiredRole === "user") {
+    maintenanceCheck = userMaintenance;
+  } else if (requiredRole === "restaurant") {
+    maintenanceCheck = restaurantMaintenance;
+  }
+
+  // Show maintenance screen if maintenance mode is enabled
+  if (maintenanceCheck && !maintenanceCheck.loading && maintenanceCheck.isMaintenanceMode) {
+    return <MaintenanceModeScreen />;
+  }
 
   // Check if user is authenticated for the required module using module-specific token
   if (!requiredRole) {

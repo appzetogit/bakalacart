@@ -1216,7 +1216,12 @@ export const adminAPI = {
 
   // Business Settings Management
   getBusinessSettings: () => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS);
+    // Add cache-busting timestamp to force fresh data
+    return apiClient.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS, {
+      params: {
+        _t: Date.now()
+      }
+    });
   },
 
   updateBusinessSettings: (data, files = {}) => {
@@ -1224,10 +1229,36 @@ export const adminAPI = {
 
     // Add text fields
     Object.keys(data).forEach(key => {
-      if (key !== 'logo' && key !== 'favicon') {
+      if (key !== 'logo' && key !== 'favicon' && key !== 'maintenanceMode') {
         formData.append(key, data[key]);
       }
     });
+
+    // Handle maintenanceMode - send as JSON string
+    const maintenanceModeToSend = data.maintenanceMode || {
+      user: { isEnabled: false, startDate: null, endDate: null },
+      restaurantDelivery: { isEnabled: false, startDate: null, endDate: null }
+    };
+    
+    // Ensure boolean values are properly set
+    const normalizedMaintenanceMode = {
+      user: {
+        isEnabled: Boolean(maintenanceModeToSend.user?.isEnabled ?? false),
+        startDate: maintenanceModeToSend.user?.startDate || null,
+        endDate: maintenanceModeToSend.user?.endDate || null
+      },
+      restaurantDelivery: {
+        isEnabled: Boolean(maintenanceModeToSend.restaurantDelivery?.isEnabled ?? false),
+        startDate: maintenanceModeToSend.restaurantDelivery?.startDate || null,
+        endDate: maintenanceModeToSend.restaurantDelivery?.endDate || null
+      }
+    };
+    
+    const maintenanceModeJson = JSON.stringify(normalizedMaintenanceMode);
+    console.log('📤 Appending maintenanceMode to FormData:', maintenanceModeJson);
+    console.log('   User isEnabled:', normalizedMaintenanceMode.user.isEnabled);
+    console.log('   Restaurant isEnabled:', normalizedMaintenanceMode.restaurantDelivery.isEnabled);
+    formData.append('maintenanceMode', maintenanceModeJson);
 
     // Add files
     if (files.logo) {

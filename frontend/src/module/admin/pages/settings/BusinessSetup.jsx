@@ -22,6 +22,18 @@ export default function BusinessSetup() {
     address: "",
     state: "",
     pincode: "",
+    maintenanceMode: {
+      user: {
+        isEnabled: false,
+        startDate: null,
+        endDate: null
+      },
+      restaurantDelivery: {
+        isEnabled: false,
+        startDate: null,
+        endDate: null
+      }
+    }
   });
 
   // Fetch business settings on mount
@@ -32,10 +44,19 @@ export default function BusinessSetup() {
   const fetchBusinessSettings = async () => {
     try {
       setLoading(true);
+      // Add cache-busting timestamp to force fresh data
       const response = await adminAPI.getBusinessSettings();
       const settings = response?.data?.data || response?.data;
       
+      console.log('📥 Fetched settings:', JSON.stringify(settings?.maintenanceMode, null, 2));
+      
       if (settings) {
+        // Use explicit boolean checks instead of || false to preserve actual false values
+        const userMaintenanceEnabled = settings.maintenanceMode?.user?.isEnabled === true;
+        const restaurantMaintenanceEnabled = settings.maintenanceMode?.restaurantDelivery?.isEnabled === true;
+        
+        console.log('✅ Parsed maintenanceMode - User:', userMaintenanceEnabled, 'Restaurant:', restaurantMaintenanceEnabled);
+        
         setFormData({
           companyName: settings.companyName || "",
           email: settings.email || "",
@@ -44,6 +65,18 @@ export default function BusinessSetup() {
           address: settings.address || "",
           state: settings.state || "",
           pincode: settings.pincode || "",
+          maintenanceMode: {
+            user: {
+              isEnabled: userMaintenanceEnabled,
+              startDate: settings.maintenanceMode?.user?.startDate || null,
+              endDate: settings.maintenanceMode?.user?.endDate || null
+            },
+            restaurantDelivery: {
+              isEnabled: restaurantMaintenanceEnabled,
+              startDate: settings.maintenanceMode?.restaurantDelivery?.startDate || null,
+              endDate: settings.maintenanceMode?.restaurantDelivery?.endDate || null
+            }
+          }
         });
         
         // Set logo and favicon previews if they exist
@@ -96,7 +129,21 @@ export default function BusinessSetup() {
         address: formData.address.trim(),
         state: formData.state.trim(),
         pincode: formData.pincode.trim(),
+        maintenanceMode: {
+          user: {
+            isEnabled: Boolean(formData.maintenanceMode?.user?.isEnabled ?? false),
+            startDate: formData.maintenanceMode?.user?.startDate || null,
+            endDate: formData.maintenanceMode?.user?.endDate || null
+          },
+          restaurantDelivery: {
+            isEnabled: Boolean(formData.maintenanceMode?.restaurantDelivery?.isEnabled ?? false),
+            startDate: formData.maintenanceMode?.restaurantDelivery?.startDate || null,
+            endDate: formData.maintenanceMode?.restaurantDelivery?.endDate || null
+          }
+        }
       };
+      
+      console.log('📤 Sending maintenanceMode:', JSON.stringify(dataToSend.maintenanceMode, null, 2));
 
       // Prepare files
       const files = {};
@@ -113,6 +160,37 @@ export default function BusinessSetup() {
       if (updatedSettings) {
         // Clear cache to force reload
         clearCache();
+        
+        // Update form data with saved values including maintenanceMode
+        console.log('📥 Received updated settings:', JSON.stringify(updatedSettings?.maintenanceMode, null, 2));
+        
+        const savedUserMaintenance = updatedSettings.maintenanceMode?.user?.isEnabled === true;
+        const savedRestaurantMaintenance = updatedSettings.maintenanceMode?.restaurantDelivery?.isEnabled === true;
+        
+        console.log('✅ Parsed saved maintenanceMode - User:', savedUserMaintenance, 'Restaurant:', savedRestaurantMaintenance);
+        
+        setFormData((prev) => ({
+          ...prev,
+          companyName: updatedSettings.companyName || prev.companyName,
+          email: updatedSettings.email || prev.email,
+          phoneCountryCode: updatedSettings.phone?.countryCode || prev.phoneCountryCode,
+          phoneNumber: updatedSettings.phone?.number || prev.phoneNumber,
+          address: updatedSettings.address || prev.address,
+          state: updatedSettings.state || prev.state,
+          pincode: updatedSettings.pincode || prev.pincode,
+          maintenanceMode: {
+            user: {
+              isEnabled: savedUserMaintenance,
+              startDate: updatedSettings.maintenanceMode?.user?.startDate || prev.maintenanceMode.user.startDate,
+              endDate: updatedSettings.maintenanceMode?.user?.endDate || prev.maintenanceMode.user.endDate
+            },
+            restaurantDelivery: {
+              isEnabled: savedRestaurantMaintenance,
+              startDate: updatedSettings.maintenanceMode?.restaurantDelivery?.startDate || prev.maintenanceMode.restaurantDelivery.startDate,
+              endDate: updatedSettings.maintenanceMode?.restaurantDelivery?.endDate || prev.maintenanceMode.restaurantDelivery.endDate
+            }
+          }
+        }));
         
         // Update previews with new URLs if files were uploaded
         if (updatedSettings.logo?.url) {
@@ -132,6 +210,9 @@ export default function BusinessSetup() {
       }
 
       toast.success("Business settings saved successfully");
+      
+      // Refetch settings to ensure we have the latest data from server
+      await fetchBusinessSettings();
       
       // Dispatch event to notify other components (like AdminNavbar)
       window.dispatchEvent(new Event('businessSettingsUpdated'));
@@ -631,6 +712,69 @@ export default function BusinessSetup() {
             </div>
           </div>
 
+          {/* Maintenance Mode Section */}
+          <div className="px-4 py-4 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <span>Maintenance Mode</span>
+            </h3>
+            
+            <div className="space-y-4">
+              {/* User Maintenance Mode */}
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-slate-900 mb-1">User App Maintenance Mode</p>
+                  <p className="text-[11px] text-slate-500">
+                    {formData.maintenanceMode.user.isEnabled 
+                      ? "User app is currently in maintenance mode" 
+                      : "User app is operational"}
+                  </p>
+                </div>
+                <ToggleSwitch
+                  enabled={formData.maintenanceMode.user.isEnabled}
+                  onChange={(enabled) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      maintenanceMode: {
+                        ...prev.maintenanceMode,
+                        user: {
+                          ...prev.maintenanceMode.user,
+                          isEnabled: enabled
+                        }
+                      }
+                    }));
+                  }}
+                />
+              </div>
+
+              {/* Restaurant Delivery Maintenance Mode */}
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-slate-900 mb-1">Restaurant Delivery Maintenance Mode</p>
+                  <p className="text-[11px] text-slate-500">
+                    {formData.maintenanceMode.restaurantDelivery.isEnabled 
+                      ? "Restaurant delivery is currently in maintenance mode" 
+                      : "Restaurant delivery is operational"}
+                  </p>
+                </div>
+                <ToggleSwitch
+                  enabled={formData.maintenanceMode.restaurantDelivery.isEnabled}
+                  onChange={(enabled) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      maintenanceMode: {
+                        ...prev.maintenanceMode,
+                        restaurantDelivery: {
+                          ...prev.maintenanceMode.restaurantDelivery,
+                          isEnabled: enabled
+                        }
+                      }
+                    }));
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Save Button Section */}
           <div className="px-4 py-4 border-t border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -670,13 +814,11 @@ export default function BusinessSetup() {
   );
 }
 
-function ToggleSwitch({ initial = false }) {
-  const [enabled, setEnabled] = useState(initial);
-
+function ToggleSwitch({ enabled = false, onChange }) {
   return (
     <button
       type="button"
-      onClick={() => setEnabled((prev) => !prev)}
+      onClick={() => onChange && onChange(!enabled)}
       className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${
         enabled ? "bg-blue-600 border-blue-600 justify-end" : "bg-slate-200 border-slate-300 justify-start"
       }`}

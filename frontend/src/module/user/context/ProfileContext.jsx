@@ -145,14 +145,26 @@ export function ProfileProvider({ children }) {
         setLoading(true)
         
         // Fetch user profile
-        const response = await authAPI.getCurrentUser()
-        const userData = response?.data?.data?.user || response?.data?.user || response?.data
-        
-        if (userData) {
-          setUserProfile(userData)
-          // Update localStorage
-          localStorage.setItem("user_user", JSON.stringify(userData))
-          localStorage.setItem("userProfile", JSON.stringify(userData))
+        try {
+          const response = await authAPI.getCurrentUser()
+          const userData = response?.data?.data?.user || response?.data?.user || response?.data
+          
+          if (userData) {
+            setUserProfile(userData)
+            // Update localStorage
+            localStorage.setItem("user_user", JSON.stringify(userData))
+            localStorage.setItem("userProfile", JSON.stringify(userData))
+          }
+        } catch (profileError) {
+          // Handle 503 (maintenance mode) gracefully
+          if (profileError?.response?.status === 503) {
+            console.log("Maintenance mode active - skipping profile fetch")
+            // Don't throw - just skip profile fetch and continue to addresses
+            // The maintenance screen will be shown by UserLayout
+          } else {
+            // Re-throw other errors to be caught by outer catch
+            throw profileError
+          }
         }
 
         // Fetch addresses
@@ -164,7 +176,14 @@ export function ProfileProvider({ children }) {
           setAddresses(deduplicated)
           localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
         } catch (addressError) {
-          console.error("Error fetching addresses:", addressError)
+          // Handle 503 (maintenance mode) gracefully - don't log as error
+          if (addressError?.response?.status === 503) {
+            // Maintenance mode is active - silently skip fetching addresses
+            // The maintenance screen will be shown by UserLayout
+            console.log("Maintenance mode active - skipping address fetch")
+          } else {
+            console.error("Error fetching addresses:", addressError)
+          }
           // Try to load from localStorage as fallback
           const saved = localStorage.getItem("userAddresses")
           if (saved) {
@@ -179,8 +198,15 @@ export function ProfileProvider({ children }) {
           }
         }
       } catch (error) {
-        // Silently handle error - use existing profile from localStorage
-        console.error("Error fetching user profile:", error)
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Maintenance mode is active - silently skip fetching profile
+          // The maintenance screen will be shown by UserLayout
+          console.log("Maintenance mode active - skipping profile fetch")
+        } else {
+          // Silently handle other errors - use existing profile from localStorage
+          console.error("Error fetching user profile:", error)
+        }
         // Try to load from localStorage as fallback
         const saved = localStorage.getItem("userAddresses")
         if (saved) {

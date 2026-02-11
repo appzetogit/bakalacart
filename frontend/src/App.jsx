@@ -13,13 +13,33 @@ const LoadingFallback = () => (
 )
 
 // Helper to ensure dynamic imports work with Vite aliases
-const lazyImport = (importFn) => lazy(() => {
+const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
   return importFn().catch((error) => {
     // Log a helpful error message for dynamic import failures
     console.error('❌ Dynamic import failed. This is usually a Vite dev server cache issue.', {
       error,
       suggestion: 'Try: 1) Stop dev server, 2) Delete node_modules/.vite folder, 3) Restart dev server'
     })
+    
+    // If fallback path is provided, try it
+    if (fallbackPath) {
+      console.log('🔄 Trying fallback import path...')
+      return import(fallbackPath).catch((fallbackError) => {
+        console.error('❌ Fallback import also failed:', fallbackError)
+        // Retry original after delay
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            importFn()
+              .then(resolve)
+              .catch((retryError) => {
+                console.error('❌ Dynamic import failed after retry. Please restart the dev server.', retryError)
+                reject(retryError)
+              })
+          }, 1000)
+        })
+      })
+    }
+    
     // Retry once after a short delay
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -136,7 +156,8 @@ const AdminRouter = lazy(() => import("@/module/admin/components/AdminRouter"))
 const AdminLogin = lazy(() => import("@/module/admin/pages/auth/AdminLogin"))
 const AdminSignup = lazy(() => import("@/module/admin/pages/auth/AdminSignup"))
 const AdminForgotPassword = lazy(() => import("@/module/admin/pages/auth/AdminForgotPassword"))
-const DeliveryRouter = lazy(() => import("@/module/delivery/components/DeliveryRouter"))
+// DeliveryRouter with enhanced error handling and retry
+const DeliveryRouter = lazyImport(() => import("@/module/delivery/components/DeliveryRouter"))
 const DeliverySignIn = lazy(() => import("@/module/delivery/pages/auth/SignIn"))
 const DeliverySignup = lazy(() => import("@/module/delivery/pages/auth/Signup"))
 const DeliveryOTP = lazy(() => import("@/module/delivery/pages/auth/OTP"))

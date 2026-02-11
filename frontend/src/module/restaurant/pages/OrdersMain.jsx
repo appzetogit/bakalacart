@@ -78,6 +78,16 @@ function CompletedOrders({ onSelectOrder }) {
       } catch (error) {
         if (!isMounted) return
         
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Service is temporarily unavailable (maintenance mode or server overload)
+          // Silently skip - this is expected during maintenance
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
+        
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {
           console.error('Error fetching completed orders:', error)
         }
@@ -282,6 +292,16 @@ function CancelledOrders({ onSelectOrder }) {
         }
       } catch (error) {
         if (!isMounted) return
+        
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Service is temporarily unavailable (maintenance mode or server overload)
+          // Silently skip - this is expected during maintenance
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
         
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {
           console.error('Error fetching cancelled orders:', error)
@@ -532,8 +552,11 @@ export default function OrdersMain() {
           }
         }
       } catch (error) {
-        // Only log error if it's not a network/timeout error (backend might be down/slow)
-        if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          console.log("Maintenance mode active - skipping restaurant status fetch")
+        } else if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+          // Only log error if it's not a network/timeout error (backend might be down/slow)
           console.error("Error fetching restaurant status:", error)
         }
         // Set loading to false so UI doesn't stay in loading state
@@ -752,9 +775,12 @@ export default function OrdersMain() {
           }
         }
       } catch (error) {
-        // Don't log 401 errors - axios interceptor handles token refresh/redirect
-        // Only log other errors (500, network errors, etc.)
-        if (error.response?.status !== 401) {
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          console.log("Maintenance mode active - skipping confirmed orders check")
+        } else if (error.response?.status !== 401) {
+          // Don't log 401 errors - axios interceptor handles token refresh/redirect
+          // Only log other errors (500, network errors, etc.)
           console.error('Error checking confirmed orders:', error)
         }
       }
@@ -2431,6 +2457,16 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
       } catch (error) {
         if (!isMounted) return
         
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Service is temporarily unavailable (maintenance mode or server overload)
+          // Silently skip - this is expected during maintenance
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
+        
         // Don't log network errors, 404, or 401 errors
         // 401 is handled by axios interceptor (token refresh/redirect)
         // 404 means no orders found (normal)
@@ -2664,6 +2700,16 @@ function ReadyOrders({ onSelectOrder }) {
       } catch (error) {
         if (!isMounted) return
         
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Service is temporarily unavailable (maintenance mode or server overload)
+          // Silently skip - this is expected during maintenance
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
+        
         // Don't log network errors repeatedly - they're expected if backend is down
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {
           console.error('Error fetching ready orders:', error)
@@ -2780,6 +2826,16 @@ const OutForDeliveryOrders = ({ onSelectOrder }) => {
         }
       } catch (error) {
         if (!isMounted) return
+        
+        // Handle 503 (maintenance mode) gracefully - don't log as error
+        if (error?.response?.status === 503) {
+          // Service is temporarily unavailable (maintenance mode or server overload)
+          // Silently skip - this is expected during maintenance
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
         
         // Don't log network errors repeatedly - they're expected if backend is down
         if (error.code !== 'ERR_NETWORK' && error.response?.status !== 404) {

@@ -10,6 +10,8 @@ import BottomNavigation from "./BottomNavigation"
 import DesktopNavbar from "./DesktopNavbar"
 import { registerFCMToken } from "@/services/pushNotificationService"
 import { getModuleToken } from "@/lib/utils/auth"
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode"
+import MaintenanceModeScreen from "@/components/MaintenanceModeScreen"
 
 // Create SearchOverlay context with default value
 const SearchOverlayContext = createContext({
@@ -103,7 +105,9 @@ function LocationSelectorProvider({ children }) {
 
 export default function UserLayout() {
   const location = useLocation()
+  const { isMaintenanceMode, loading } = useMaintenanceMode("user")
 
+  // CRITICAL: All hooks must be called before any conditional returns
   useEffect(() => {
     // Reset scroll to top whenever location changes (pathname, search, or hash)
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -125,6 +129,12 @@ export default function UserLayout() {
 
     registerToken();
   }, []);
+  
+  // Show maintenance screen if maintenance mode is enabled
+  // This must be AFTER all hooks are called
+  if (!loading && isMaintenanceMode) {
+    return <MaintenanceModeScreen />
+  }
 
   // Note: Authentication checks and redirects are handled by ProtectedRoute components
   // UserLayout should not interfere with authentication redirects

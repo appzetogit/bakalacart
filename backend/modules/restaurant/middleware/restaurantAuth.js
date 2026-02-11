@@ -1,6 +1,7 @@
 import jwtService from '../../auth/services/jwtService.js';
 import Restaurant from '../models/Restaurant.js';
 import { errorResponse } from '../../../shared/utils/response.js';
+import { checkMaintenanceMode } from '../../../shared/middleware/maintenanceMode.js';
 
 /**
  * Restaurant Authentication Middleware
@@ -119,7 +120,9 @@ export const authenticate = async (req, res, next) => {
     req.restaurant = restaurant;
     req.token = decoded;
 
-    next();
+    // Check maintenance mode for restaurant delivery
+    const maintenanceCheck = checkMaintenanceMode('restaurantDelivery');
+    return maintenanceCheck(req, res, next);
   } catch (error) {
     return errorResponse(res, 401, error.message || 'Invalid token');
   }

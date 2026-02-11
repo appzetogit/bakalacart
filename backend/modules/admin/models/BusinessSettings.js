@@ -64,17 +64,33 @@ const businessSettingsSchema = new mongoose.Schema(
       }
     },
     maintenanceMode: {
-      isEnabled: {
-        type: Boolean,
-        default: false
+      user: {
+        isEnabled: {
+          type: Boolean,
+          default: false
+        },
+        startDate: {
+          type: Date,
+          default: null
+        },
+        endDate: {
+          type: Date,
+          default: null
+        }
       },
-      startDate: {
-        type: Date,
-        default: null
-      },
-      endDate: {
-        type: Date,
-        default: null
+      restaurantDelivery: {
+        isEnabled: {
+          type: Boolean,
+          default: false
+        },
+        startDate: {
+          type: Date,
+          default: null
+        },
+        endDate: {
+          type: Date,
+          default: null
+        }
       }
     },
     // Global Delivery Partner cash limit (applies to all delivery partners)

@@ -1,6 +1,7 @@
 import jwtService from '../services/jwtService.js';
 import User from '../models/User.js';
 import { errorResponse } from '../../../shared/utils/response.js';
+import { checkMaintenanceMode } from '../../../shared/middleware/maintenanceMode.js';
 
 /**
  * Authentication Middleware

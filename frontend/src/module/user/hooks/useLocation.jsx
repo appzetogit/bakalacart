@@ -75,6 +75,13 @@ export function useLocation() {
       
       console.log("✅ Live location successfully stored in database")
     } catch (err) {
+      // Handle 503 (maintenance mode) gracefully - don't log as error
+      if (err.response?.status === 503) {
+        // Service is temporarily unavailable (maintenance mode or server overload)
+        // Silently skip - this is expected during maintenance
+        return
+      }
+      
       // Only log non-network and non-auth errors
       if (err.code !== "ERR_NETWORK" && err.response?.status !== 404 && err.response?.status !== 401) {
         console.error("❌ DB location update error:", err)

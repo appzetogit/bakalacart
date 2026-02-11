@@ -12,10 +12,14 @@ import {
 } from '../controllers/userController.js';
 import { authenticate } from '../../auth/middleware/auth.js';
 import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
+import { checkMaintenanceMode } from '../../../shared/middleware/maintenanceMode.js';
 import userWalletRoutes from './userWalletRoutes.js';
 import complaintRoutes from './complaintRoutes.js';
 
 const router = express.Router();
+
+// Check maintenance mode for user app
+router.use(checkMaintenanceMode('user'));
 
 // All routes require user authentication
 router.use(authenticate);
