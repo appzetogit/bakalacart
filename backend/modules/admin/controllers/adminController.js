@@ -2539,17 +2539,31 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
       ? restaurant._id 
       : new mongoose.Types.ObjectId(restaurant._id);
     
-    // Get all settlements for this restaurant
+    // Get all settlements for this restaurant - only include settlements where order still exists
     const allSettlements = await OrderSettlement.find({
       restaurantId: restaurantIdForSettlement
     }).lean();
     
-    // Calculate totals from settlements
+    // Filter settlements to only include those where order still exists
+    const validSettlementOrderIds = allSettlements.map(s => s.orderId).filter(Boolean);
+    const existingOrders = await Order.find({
+      _id: { $in: validSettlementOrderIds }
+    }).select('_id').lean();
+    
+    const existingOrderIds = new Set(existingOrders.map(o => o._id.toString()));
+    const validSettlements = allSettlements.filter(s => {
+      const orderIdStr = s.orderId?.toString ? s.orderId.toString() : String(s.orderId);
+      return existingOrderIds.has(orderIdStr);
+    });
+    
+    logger.info(`📊 Filtered settlements: ${allSettlements.length} total, ${validSettlements.length} with existing orders`);
+    
+    // Calculate totals from valid settlements only
     let totalCommission = 0;
     let totalRestaurantEarning = 0;
     let totalFoodPrice = 0;
     
-    allSettlements.forEach(s => {
+    validSettlements.forEach(s => {
       totalCommission += s.restaurantEarning?.commission || 0;
       totalRestaurantEarning += s.restaurantEarning?.netEarning || 0;
       totalFoodPrice += s.restaurantEarning?.foodPrice || 0;
@@ -2559,11 +2573,22 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     totalRestaurantEarning = Math.round(totalRestaurantEarning * 100) / 100;
     totalFoodPrice = Math.round(totalFoodPrice * 100) / 100;
     
-    // Get monthly settlements
-    const monthlySettlements = await OrderSettlement.find({
+    // Get monthly settlements - only include settlements where order still exists
+    const monthlySettlementsRaw = await OrderSettlement.find({
       restaurantId: restaurantIdForSettlement,
       createdAt: { $gte: startOfMonth }
     }).lean();
+    
+    // Filter to only valid settlements (order exists)
+    const monthlySettlementOrderIds = monthlySettlementsRaw.map(s => s.orderId).filter(Boolean);
+    const existingMonthlyOrders = await Order.find({
+      _id: { $in: monthlySettlementOrderIds }
+    }).select('_id').lean();
+    const existingMonthlyOrderIds = new Set(existingMonthlyOrders.map(o => o._id.toString()));
+    const monthlySettlements = monthlySettlementsRaw.filter(s => {
+      const orderIdStr = s.orderId?.toString ? s.orderId.toString() : String(s.orderId);
+      return existingMonthlyOrderIds.has(orderIdStr);
+    });
     
     let monthlyCommission = 0;
     let monthlyRestaurantEarning = 0;
@@ -2576,11 +2601,22 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     monthlyRestaurantEarning = Math.round(monthlyRestaurantEarning * 100) / 100;
     const monthlyProfit = monthlyRestaurantEarning; // Restaurant profit = net earning
 
-    // Get yearly settlements
-    const yearlySettlements = await OrderSettlement.find({
+    // Get yearly settlements - only include settlements where order still exists
+    const yearlySettlementsRaw = await OrderSettlement.find({
       restaurantId: restaurantIdForSettlement,
       createdAt: { $gte: startOfYear }
     }).lean();
+    
+    // Filter to only valid settlements (order exists)
+    const yearlySettlementOrderIds = yearlySettlementsRaw.map(s => s.orderId).filter(Boolean);
+    const existingYearlyOrders = await Order.find({
+      _id: { $in: yearlySettlementOrderIds }
+    }).select('_id').lean();
+    const existingYearlyOrderIds = new Set(existingYearlyOrders.map(o => o._id.toString()));
+    const yearlySettlements = yearlySettlementsRaw.filter(s => {
+      const orderIdStr = s.orderId?.toString ? s.orderId.toString() : String(s.orderId);
+      return existingYearlyOrderIds.has(orderIdStr);
+    });
     
     let yearlyCommission = 0;
     let yearlyRestaurantEarning = 0;
@@ -2593,12 +2629,23 @@ export const getRestaurantAnalytics = asyncHandler(async (req, res) => {
     yearlyRestaurantEarning = Math.round(yearlyRestaurantEarning * 100) / 100;
     const yearlyProfit = yearlyRestaurantEarning; // Restaurant profit = net earning
 
-    // Get average monthly profit (last 12 months)
+    // Get average monthly profit (last 12 months) - only include settlements where order still exists
     const last12MonthsStart = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-    const last12MonthsSettlements = await OrderSettlement.find({
+    const last12MonthsSettlementsRaw = await OrderSettlement.find({
       restaurantId: restaurantIdForSettlement,
       createdAt: { $gte: last12MonthsStart }
     }).lean();
+    
+    // Filter to only valid settlements (order exists)
+    const last12MonthsOrderIds = last12MonthsSettlementsRaw.map(s => s.orderId).filter(Boolean);
+    const existingLast12MonthsOrders = await Order.find({
+      _id: { $in: last12MonthsOrderIds }
+    }).select('_id').lean();
+    const existingLast12MonthsOrderIds = new Set(existingLast12MonthsOrders.map(o => o._id.toString()));
+    const last12MonthsSettlements = last12MonthsSettlementsRaw.filter(s => {
+      const orderIdStr = s.orderId?.toString ? s.orderId.toString() : String(s.orderId);
+      return existingLast12MonthsOrderIds.has(orderIdStr);
+    });
     
     // Group by month
     const monthlyEarningsMap = new Map();

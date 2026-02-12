@@ -5,6 +5,7 @@ import Payment from '../../payment/models/Payment.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import OrderSettlement from '../../order/models/OrderSettlement.js';
 import DeliveryWallet from '../models/DeliveryWallet.js';
+import DeliveryBoyCommission from '../../admin/models/DeliveryBoyCommission.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 
@@ -152,11 +153,12 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           { orderId: { $in: orderObjectIds } },
           { orderNumber: { $in: orderNumbers } }
         ]
-      }).select('orderId orderNumber deliveryPartnerEarning').lean();
+      }).select('_id orderId orderNumber deliveryPartnerEarning').lean();
       
       logger.info(`Found ${settlements.length} settlements for ${orderIds.length} orders`);
       
-      settlements.forEach(settlement => {
+      // Recalculate settlements that might have old formula
+      for (const settlement of settlements) {
         let orderIdKeys = [];
         
         // Try to match by orderId first
@@ -173,7 +175,54 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           }
         }
         
-        const totalEarning = settlement.deliveryPartnerEarning?.totalEarning || 0;
+        let totalEarning = settlement.deliveryPartnerEarning?.totalEarning || 0;
+        let deliveryPartnerEarning = settlement.deliveryPartnerEarning;
+        
+        // Check if settlement was calculated with old formula and recalculate if needed
+        if (deliveryPartnerEarning && deliveryPartnerEarning.distance > 0 && deliveryPartnerEarning.distanceCommission > 0) {
+          const oldDistance = deliveryPartnerEarning.distance;
+          const oldDistanceCommission = deliveryPartnerEarning.distanceCommission;
+          const oldCommissionPerKm = deliveryPartnerEarning.commissionPerKm || 0;
+          
+          // Detect old formula: if distanceCommission ≈ distance × commissionPerKm (entire distance charged)
+          // New formula: distanceCommission = (distance - minDistance) × commissionPerKm (only extra distance)
+          if (oldCommissionPerKm > 0) {
+            const expectedOldFormula = oldDistance * oldCommissionPerKm;
+            const tolerance = 0.01;
+            
+            // If it matches old formula (entire distance charged), recalculate with new formula
+            if (Math.abs(oldDistanceCommission - expectedOldFormula) < tolerance) {
+              try {
+                const commissionResult = await DeliveryBoyCommission.calculateCommission(oldDistance);
+                const newDistanceCommission = commissionResult.breakdown.distanceCommission;
+                const newTotalEarning = commissionResult.commission;
+                
+                // Only update if there's a difference (old formula was used)
+                if (Math.abs(oldDistanceCommission - newDistanceCommission) > tolerance) {
+                  logger.info(`🔄 Recalculating settlement for order ${settlement.orderNumber || settlement.orderId}: Old: ₹${totalEarning.toFixed(2)}, New: ₹${newTotalEarning.toFixed(2)}`);
+                  
+                  // Update settlement in database
+                  await OrderSettlement.findByIdAndUpdate(settlement._id, {
+                    $set: {
+                      'deliveryPartnerEarning.distanceCommission': newDistanceCommission,
+                      'deliveryPartnerEarning.totalEarning': newTotalEarning
+                    }
+                  });
+                  
+                  // Update local values
+                  totalEarning = newTotalEarning;
+                  deliveryPartnerEarning = {
+                    ...deliveryPartnerEarning,
+                    distanceCommission: newDistanceCommission,
+                    totalEarning: newTotalEarning
+                  };
+                }
+              } catch (recalcError) {
+                logger.warn(`Could not recalculate settlement for order ${settlement.orderNumber || settlement.orderId}:`, recalcError.message);
+              }
+            }
+          }
+        }
         
         // Set earnings for all matching order IDs
         orderIdKeys.forEach(orderIdKey => {
@@ -183,14 +232,14 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           if (!settlementMap.has(orderIdKey)) {
             settlementMap.set(orderIdKey, totalEarning);
             // Store full settlement details for breakdown
-            if (settlement.deliveryPartnerEarning && settlement.deliveryPartnerEarning.totalEarning > 0) {
+            if (deliveryPartnerEarning && deliveryPartnerEarning.totalEarning > 0) {
               settlementDetailsMap.set(orderIdKey, {
-                deliveryPartnerEarning: settlement.deliveryPartnerEarning
+                deliveryPartnerEarning: deliveryPartnerEarning
               });
             }
           }
         });
-      });
+      }
       
       // Log all order IDs and their earnings for debugging
       if (settlementMap.size > 0) {

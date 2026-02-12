@@ -2180,6 +2180,8 @@ export const assignOrderToDeliveryBoy = asyncHandler(async (req, res) => {
 export const getDeliveryBoysForAssignment = asyncHandler(async (req, res) => {
   try {
     const Delivery = (await import('../../delivery/models/Delivery.js')).default;
+    const DeliveryWallet = (await import('../../delivery/models/DeliveryWallet.js')).default;
+    const BusinessSettings = (await import('../models/BusinessSettings.js')).default;
 
     // Get all approved and active delivery boys
     const deliveryBoys = await Delivery.find({
@@ -2190,14 +2192,61 @@ export const getDeliveryBoysForAssignment = asyncHandler(async (req, res) => {
       .sort({ name: 1 })
       .lean();
 
-    // Transform for dropdown
-    const transformedDeliveryBoys = deliveryBoys.map(db => ({
-      _id: db._id.toString(),
-      id: db._id.toString(),
-      name: db.name,
-      phone: db.phone,
-      isOnline: db.availability?.isOnline || false
-    }));
+    // Get cash limit from business settings
+    let totalCashLimit = 750; // Default value
+    try {
+      const settings = await BusinessSettings.getSettings();
+      // Check if deliveryCashLimit exists and is a valid number
+      if (settings?.deliveryCashLimit !== undefined && settings?.deliveryCashLimit !== null) {
+        const configured = Number(settings.deliveryCashLimit);
+        if (Number.isFinite(configured) && configured >= 0) {
+          totalCashLimit = configured;
+        }
+      }
+      // If not set or invalid, use default 750
+      console.log('💰 Cash Limit for assignment:', { 
+        settingsValue: settings?.deliveryCashLimit, 
+        totalCashLimit 
+      });
+    } catch (e) {
+      console.error('Error fetching cash limit from settings:', e);
+      // Keep default value of 750
+      totalCashLimit = 750;
+    }
+
+    // Get wallet data for all delivery boys
+    const deliveryIds = deliveryBoys.map(db => db._id);
+    const wallets = await DeliveryWallet.find({
+      deliveryId: { $in: deliveryIds }
+    }).lean();
+
+    // Create a map for quick wallet lookup
+    const walletMap = new Map();
+    wallets.forEach(wallet => {
+      const deliveryId = wallet.deliveryId?.toString();
+      if (deliveryId) {
+        walletMap.set(deliveryId, wallet);
+      }
+    });
+
+    // Transform for dropdown with wallet info
+    const transformedDeliveryBoys = deliveryBoys.map(db => {
+      const dbId = db._id.toString();
+      const wallet = walletMap.get(dbId);
+      const cashInHand = Math.max(0, Number(wallet?.cashInHand) || 0);
+      const availableCashLimit = Math.max(0, totalCashLimit - cashInHand);
+
+      return {
+        _id: dbId,
+        id: dbId,
+        name: db.name,
+        phone: db.phone,
+        isOnline: db.availability?.isOnline || false,
+        cashInHand: cashInHand,
+        totalCashLimit: totalCashLimit,
+        availableCashLimit: availableCashLimit
+      };
+    });
 
     return successResponse(res, 200, 'Delivery boys retrieved successfully', {
       deliveryBoys: transformedDeliveryBoys

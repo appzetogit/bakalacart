@@ -27,6 +27,8 @@ import {
   IndianRupee,
   Loader2,
   Camera,
+  MessageSquare,
+  Send,
 } from "lucide-react"
 import BottomPopup from "../components/BottomPopup"
 import FeedNavbar from "../components/FeedNavbar"
@@ -43,7 +45,16 @@ import { formatCurrency } from "../../restaurant/utils/currency"
 import { getAllDeliveryOrders } from "../utils/deliveryOrderStatus"
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications"
 import { deliveryAPI, restaurantAPI, uploadAPI } from "@/lib/api"
+import { API_BASE_URL } from "@/lib/api/config"
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications"
+import io from "socket.io-client"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey"
 import { Loader } from "@googlemaps/js-api-loader"
 import {
@@ -536,6 +547,250 @@ export default function DeliveryHome() {
   const [showOrderIdConfirmationPopup, setShowOrderIdConfirmationPopup] = useState(false)
   const [showReachedDropPopup, setShowReachedDropPopup] = useState(false)
   const [showOrderDeliveredAnimation, setShowOrderDeliveredAnimation] = useState(false)
+  
+  // Chat State
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [newMessage, setNewMessage] = useState("")
+  const [chatSocket, setChatSocket] = useState(null)
+  const chatMessagesEndRef = useRef(null)
+  
+  // Socket URL for delivery namespace
+  const SOCKET_URL = API_BASE_URL.replace('/api', '')
+  
+  // Helper functions for chat history
+  const getChatHistoryKey = (orderId) => {
+    return `delivery_chat_${orderId}`
+  }
+
+  const loadChatHistory = (orderId) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      const saved = localStorage.getItem(key)
+      if (saved) {
+        const messages = JSON.parse(saved)
+        console.log(`📜 Loaded ${messages.length} messages from history for order ${orderId}`)
+        return messages
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    }
+    return []
+  }
+
+  const saveChatHistory = (orderId, messages) => {
+    try {
+      const key = getChatHistoryKey(orderId)
+      localStorage.setItem(key, JSON.stringify(messages))
+      console.log(`💾 Saved ${messages.length} messages to history for order ${orderId}`)
+    } catch (error) {
+      console.error('Error saving chat history:', error)
+    }
+  }
+  
+  // Handle opening chat
+  const handleOpenChat = () => {
+    if (!selectedRestaurant) return
+    
+    const orderId = selectedRestaurant.orderId || selectedRestaurant._id
+    setChatOpen(true)
+    
+    // Load chat history for this order
+    if (orderId) {
+      const history = loadChatHistory(orderId)
+      setChatMessages(history)
+      console.log(`📜 Loaded ${history.length} messages from history`)
+    } else {
+      setChatMessages([])
+    }
+    
+    setNewMessage("")
+  }
+
+  // Handle closing chat
+  const handleCloseChat = () => {
+    setChatOpen(false)
+    setNewMessage("")
+    if (chatSocket) {
+      chatSocket.disconnect()
+      setChatSocket(null)
+    }
+  }
+
+  // Handle sending message
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !chatSocket || !selectedRestaurant) return
+
+    const orderId = selectedRestaurant.orderId || selectedRestaurant._id
+    if (!orderId) return
+
+    const messageText = newMessage.trim()
+    const messageTimestamp = Date.now()
+
+    // Send message to server
+    chatSocket.emit('send-chat-message', {
+      orderId: orderId,
+      message: messageText,
+      deliveryPartnerId: selectedRestaurant.deliveryPartnerId || 
+                         selectedRestaurant.assignmentInfo?.deliveryPartnerId,
+      timestamp: messageTimestamp
+    })
+
+    setNewMessage("")
+  }
+  
+  // Initialize Socket for Chat
+  useEffect(() => {
+    if (!chatOpen || !selectedRestaurant) return
+
+    const orderId = selectedRestaurant.orderId || selectedRestaurant._id
+    if (!orderId) return
+
+    let socket = null
+
+    // Initialize socket connection
+    const initializeSocket = async () => {
+      try {
+        // Get current delivery partner's ID from profile
+        const profileResponse = await deliveryAPI.getProfile()
+        const deliveryPartnerId = profileResponse?.data?.data?.profile?._id || 
+                                 profileResponse?.data?.data?.profile?.id ||
+                                 profileResponse?.data?.data?._id
+
+        if (!deliveryPartnerId) {
+          console.error('❌ Delivery partner ID not found in profile')
+          toast.error('Unable to connect to chat. Please try again.')
+          return
+        }
+
+        console.log('✅ Delivery partner ID:', deliveryPartnerId)
+
+        // Connect to delivery socket namespace
+        socket = io(`${SOCKET_URL}/delivery`, {
+          transports: ['websocket', 'polling']
+        })
+
+        socket.on('connect', () => {
+          console.log('✅ Connected to delivery chat socket')
+          // Join delivery room with current delivery partner's ID
+          socket.emit('join-delivery', deliveryPartnerId.toString())
+          console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
+        })
+
+        // Single message handler to avoid duplicates
+        const handleIncomingMessage = (data, source) => {
+          console.log(`📩 New chat message received (${source}):`, data)
+          
+          // Get all possible order identifiers from the selected order
+          const possibleOrderIds = [
+            orderId,
+            selectedRestaurant._id,
+            selectedRestaurant.orderId,
+            String(orderId),
+            String(selectedRestaurant._id),
+            String(selectedRestaurant.orderId)
+          ].filter(Boolean)
+          
+          // Get all possible order identifiers from the received message
+          const receivedOrderIds = [
+            data.orderId,
+            data.orderMongoId,
+            String(data.orderId),
+            String(data.orderMongoId)
+          ].filter(Boolean)
+          
+          // Check if any received orderId matches any possible orderId
+          const orderIdMatch = possibleOrderIds.some(possibleId => 
+            receivedOrderIds.some(receivedId => {
+              if (possibleId === receivedId) return true
+              if (String(possibleId) === String(receivedId)) return true
+              if (String(possibleId).toLowerCase() === String(receivedId).toLowerCase()) return true
+              return false
+            })
+          )
+          
+          const isUserMessage = data.sender === 'user'
+          const shouldAcceptMessage = orderIdMatch || (isUserMessage && chatOpen && selectedRestaurant)
+          
+          if (shouldAcceptMessage) {
+            setChatMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              const exactMatch = prev.some(msg => {
+                const msgKey = `${msg.message}_${msg.timestamp}_${msg.sender}`
+                const dataKey = `${data.message}_${data.timestamp}_${data.sender}`
+                return msgKey === dataKey
+              })
+              
+              if (exactMatch) {
+                return prev
+              }
+              
+              // Check for near-duplicates
+              const nearDuplicate = prev.some(msg => {
+                if (msg.message === data.message && msg.sender === data.sender) {
+                  const timeDiff = Math.abs(msg.timestamp - data.timestamp)
+                  if (timeDiff < 2000) {
+                    return true
+                  }
+                }
+                return false
+              })
+              
+              if (nearDuplicate) {
+                return prev
+              }
+              
+              return [...prev, data]
+            })
+          }
+        }
+
+        // Listen to both events
+        socket.on('chat-message', (data) => handleIncomingMessage(data, 'chat-message'))
+        socket.on('receive-chat-message', (data) => handleIncomingMessage(data, 'receive-chat-message'))
+
+        socket.on('delivery-room-joined', (data) => {
+          console.log('✅ Delivery room joined successfully:', data)
+        })
+
+        socket.on('connect_error', (error) => {
+          console.error('❌ Socket connection error:', error)
+          toast.error('Failed to connect to chat. Please try again.')
+        })
+
+        setChatSocket(socket)
+      } catch (error) {
+        console.error('❌ Error initializing socket:', error)
+        toast.error('Failed to initialize chat. Please try again.')
+      }
+    }
+
+    initializeSocket()
+
+    return () => {
+      if (socket) {
+        socket.disconnect()
+        setChatSocket(null)
+      }
+    }
+  }, [chatOpen, selectedRestaurant])
+
+  // Save chat history whenever messages change
+  useEffect(() => {
+    if (selectedRestaurant && chatMessages.length > 0) {
+      const orderId = selectedRestaurant.orderId || selectedRestaurant._id
+      if (orderId) {
+        saveChatHistory(orderId, chatMessages)
+      }
+    }
+  }, [chatMessages, selectedRestaurant])
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
   const [showCustomerReviewPopup, setShowCustomerReviewPopup] = useState(false)
   const [showPaymentPage, setShowPaymentPage] = useState(false)
   const [customerRating, setCustomerRating] = useState(0)
@@ -12490,8 +12745,11 @@ export default function DeliveryHome() {
               <Phone className="w-5 h-5 text-gray-700" />
               <span className="text-gray-700 font-medium">Call</span>
             </button>
-            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <MapPin className="w-5 h-5 text-gray-700" />
+            <button 
+              onClick={handleOpenChat}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <MessageSquare className="w-5 h-5 text-gray-700" />
               <span className="text-gray-700 font-medium">Chat</span>
             </button>
             <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
@@ -12563,6 +12821,115 @@ export default function DeliveryHome() {
           </div>
         </div>
       </BottomPopup>
+
+      {/* Chat Dialog */}
+      <Dialog open={chatOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseChat()
+        } else {
+          setChatOpen(true)
+        }
+      }}>
+        <DialogContent className="max-w-full sm:max-w-[500px] h-[600px] sm:h-[700px] p-0 flex flex-col">
+          <DialogHeader className="p-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <DialogTitle className="font-semibold text-gray-900 dark:text-white">
+                    Chat with Customer
+                  </DialogTitle>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Order: {selectedRestaurant?.orderId || selectedRestaurant?._id || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseChat}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                aria-label="Close chat"
+              >
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+          </DialogHeader>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-[#0a0a0a] scroll-smooth">
+            {chatMessages.length === 0 ? (
+              <div className="text-center py-10 space-y-3">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-gray-400" />
+                </div>
+                <h4 className="text-gray-900 dark:text-white font-medium">Start a conversation</h4>
+                <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[200px] mx-auto">
+                  Communicate with the customer about delivery instructions or updates.
+                </p>
+              </div>
+            ) : (
+              chatMessages.map((msg, index) => {
+                const isDelivery = msg.sender === 'delivery'
+                return (
+                  <div
+                    key={index}
+                    className={`flex ${isDelivery ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                        isDelivery
+                          ? 'bg-purple-600 text-white rounded-br-none'
+                          : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
+                      }`}
+                    >
+                      <p>{msg.message}</p>
+                      <p
+                        className={`text-[10px] mt-1 text-right ${
+                          isDelivery ? 'text-purple-100' : 'text-gray-400 dark:text-gray-500'
+                        }`}
+                      >
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+            <div ref={chatMessagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0a0a]">
+            <div className="flex items-end gap-2">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
+                placeholder="Type a message..."
+                className="flex-1 min-h-[44px] max-h-32 resize-none border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500"
+                rows={1}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || !chatSocket}
+                className="w-11 h-11 bg-purple-600 text-white rounded-lg flex items-center justify-center hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                aria-label="Send message"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Order Delivered Bottom Popup - shown instantly after Reached Drop is confirmed */}
       <BottomPopup

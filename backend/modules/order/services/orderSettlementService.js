@@ -221,8 +221,32 @@ export const calculateOrderSettlement = async (orderId) => {
         console.log(`✅ Updated deliveryPartnerId in settlement: ${deliveryPartnerIdValue.toString()}`);
       }
       
-      // Always update earnings if delivery partner exists and we have earnings
-      if (deliveryPartnerIdValue && deliveryPartnerEarning.totalEarning > 0) {
+      // Check if settlement was calculated with old formula (entire distance instead of extra distance)
+      // Old formula: distanceCommission = distance × commissionPerKm
+      // New formula: distanceCommission = (distance - minDistance) × commissionPerKm
+      let needsRecalculation = false;
+      if (deliveryPartnerIdValue && deliveryPartnerEarning.distance > 0 && settlement.deliveryPartnerEarning?.distanceCommission > 0) {
+        const oldDistanceCommission = settlement.deliveryPartnerEarning.distanceCommission;
+        const oldDistance = settlement.deliveryPartnerEarning.distance;
+        const oldCommissionPerKm = settlement.deliveryPartnerEarning.commissionPerKm || deliveryPartnerEarning.commissionPerKm;
+        
+        // Detect old formula: if distanceCommission ≈ distance × commissionPerKm (within 0.01 tolerance)
+        const expectedOldFormula = oldDistance * oldCommissionPerKm;
+        const tolerance = 0.01;
+        if (Math.abs(oldDistanceCommission - expectedOldFormula) < tolerance) {
+          // This might be old formula, but also check if distance > minDistance
+          // If distance > minDistance and old formula was used, we need to recalculate
+          const deliveryCommission = await DeliveryBoyCommission.calculateCommission(oldDistance);
+          const expectedNewFormula = deliveryCommission.breakdown.distanceCommission;
+          if (Math.abs(oldDistanceCommission - expectedNewFormula) > tolerance) {
+            needsRecalculation = true;
+            console.log(`🔄 Detected old formula settlement. Old: ₹${oldDistanceCommission.toFixed(2)}, New: ₹${expectedNewFormula.toFixed(2)}. Recalculating...`);
+          }
+        }
+      }
+      
+      // Always update earnings if delivery partner exists and we have earnings (or if recalculation needed)
+      if (deliveryPartnerIdValue && (deliveryPartnerEarning.totalEarning > 0 || needsRecalculation)) {
         settlement.deliveryPartnerEarning = deliveryPartnerEarning;
         console.log(`✅ Updated deliveryPartnerEarning: ₹${deliveryPartnerEarning.totalEarning}`);
       } else if (deliveryPartnerIdValue && deliveryPartnerEarning.totalEarning === 0) {

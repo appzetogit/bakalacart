@@ -25,42 +25,40 @@ export const useDeliveryNotifications = () => {
   
   const playNotificationSound = useCallback(() => {
     try {
-      // Get current selected sound preference from localStorage
+      // Always get fresh selected sound preference from localStorage
       const selectedSound = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
       const soundFile = selectedSound === 'original' ? originalSound : alertSound;
       
-      // Update audio source if preference changed or initialize if not exists
+      console.log('🔊 Playing notification sound:', {
+        selectedSound,
+        soundType: selectedSound === 'original' ? 'Original' : 'Zomato Tone',
+        soundFile
+      });
+      
+      // Always create a new Audio instance to ensure we use the selected sound
+      // This ensures the selected sound is always used, even if preference changed
       if (audioRef.current) {
-        const currentSrc = audioRef.current.src;
-        const newSrc = soundFile;
-        // Check if source needs to be updated
-        if (!currentSrc.includes(newSrc.split('/').pop())) {
-          audioRef.current.pause();
-          audioRef.current.src = newSrc;
-          audioRef.current.load();
-          console.log('🔊 Audio source updated to:', selectedSound === 'original' ? 'Original' : 'Zomato Tone');
-        }
-      } else {
-        // Initialize audio if not exists
-        audioRef.current = new Audio(soundFile);
-        audioRef.current.volume = 0.7;
+        audioRef.current.pause();
+        audioRef.current = null;
       }
       
-      if (audioRef.current) {
-        // Only play if user has interacted with the page (browser autoplay policy)
-        if (!userInteractedRef.current) {
-          console.log('🔇 Audio playback skipped - user has not interacted with page yet');
-          return;
-        }
-        
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(error => {
-          // Don't log autoplay policy errors as they're expected
-          if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
-            console.warn('Error playing notification sound:', error);
-          }
-        });
+      // Create new audio with selected sound
+      audioRef.current = new Audio(soundFile);
+      audioRef.current.volume = 0.7;
+      
+      // Only play if user has interacted with the page (browser autoplay policy)
+      if (!userInteractedRef.current) {
+        console.log('🔇 Audio playback skipped - user has not interacted with page yet');
+        return;
       }
+      
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(error => {
+        // Don't log autoplay policy errors as they're expected
+        if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
+          console.warn('Error playing notification sound:', error);
+        }
+      });
     } catch (error) {
       // Don't log autoplay policy errors
       if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {

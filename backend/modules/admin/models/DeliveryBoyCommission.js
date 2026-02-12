@@ -169,21 +169,22 @@ deliveryBoyCommissionSchema.statics.calculateCommission = async function(distanc
   let distanceCommission = 0;
   
   // Per km commission logic based on admin commission rules:
-  // - Base payout: Always given (e.g., ₹10)
-  // - If distance > minDistance: Additional commission per km for the entire distance
-  // Example scenarios (assuming minDistance = 4, commissionPerKm = 5, basePayout = 10):
-  // - Distance = 4 km: commission = ₹10 (base only, 4 is not > 4)
-  // - Distance = 5 km: commission = ₹10 + (5 × ₹5) = ₹35
-  // - Distance = 6 km: commission = ₹10 + (6 × ₹5) = ₹40
-  // - Distance = 2 km: commission = ₹10 (base only, 2 < 4)
-  // - Distance = 10 km: commission = ₹10 + (10 × ₹5) = ₹60
+  // - Base payout: Always given (e.g., ₹15) - covers distance up to minDistance
+  // - If distance > minDistance: Additional commission per km ONLY for the extra distance
+  // Example scenarios (assuming minDistance = 4, commissionPerKm = 5, basePayout = 15):
+  // - Distance = 4 km: commission = ₹15 (base only, 4 is not > 4)
+  // - Distance = 5.81 km: commission = ₹15 + ((5.81 - 4) × ₹5) = ₹15 + ₹9.05 = ₹24.05
+  // - Distance = 6 km: commission = ₹15 + ((6 - 4) × ₹5) = ₹15 + ₹10 = ₹25
+  // - Distance = 2 km: commission = ₹15 (base only, 2 < 4)
+  // - Distance = 10 km: commission = ₹15 + ((10 - 4) × ₹5) = ₹15 + ₹30 = ₹45
   if (distance > applicableRule.minDistance) {
-    // Apply per km commission for the ENTIRE distance if distance > minDistance
-    // This means: Total distance × commissionPerKm
-    // Example: If minDistance = 4, commissionPerKm = 5, distance = 5
-    // Then: 5 × 5 = ₹25 additional, total = ₹10 + ₹25 = ₹35
-    distanceCommission = distance * applicableRule.commissionPerKm;
-    console.log(`📊 Distance commission calculation: ${distance.toFixed(2)} km × ₹${applicableRule.commissionPerKm}/km = ₹${distanceCommission.toFixed(2)}`);
+    // Apply per km commission ONLY for the EXTRA distance above minDistance
+    // Formula: (distance - minDistance) × commissionPerKm
+    // Example: If minDistance = 4, commissionPerKm = 5, distance = 5.81
+    // Then: (5.81 - 4) × 5 = 1.81 × 5 = ₹9.05 additional, total = ₹15 + ₹9.05 = ₹24.05
+    const extraDistance = distance - applicableRule.minDistance;
+    distanceCommission = extraDistance * applicableRule.commissionPerKm;
+    console.log(`📊 Distance commission calculation: (${distance.toFixed(2)} - ${applicableRule.minDistance}) km × ₹${applicableRule.commissionPerKm}/km = ${extraDistance.toFixed(2)} km × ₹${applicableRule.commissionPerKm}/km = ₹${distanceCommission.toFixed(2)}`);
   } else {
     // If distance <= minDistance, only base payout is given (distanceCommission = 0)
     console.log(`📊 Distance ${distance.toFixed(2)} km ≤ minDistance ${applicableRule.minDistance} km, only base payout applies`);

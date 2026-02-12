@@ -321,50 +321,50 @@ export default function OrderAssign() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-900 border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <button
                       onClick={toggleSelectAll}
-                      className="flex items-center gap-2 hover:text-gray-700"
+                      className="flex items-center gap-1 hover:text-gray-700"
                     >
                       {selectedOrders.size === orders.length && orders.length > 0 ? (
-                        <CheckSquare className="w-4 h-4" />
+                        <CheckSquare className="w-3 h-3" />
                       ) : (
-                        <Square className="w-4 h-4" />
+                        <Square className="w-3 h-3" />
                       )}
                       Select
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Order ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Customer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Restaurant
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Customer Location
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Restaurant Zone & Pin
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Food Items
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Restaurant Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Delivery Boy Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Date & Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -375,87 +375,87 @@ export default function OrderAssign() {
                   const isSelected = selectedOrders.has(orderId)
                   return (
                   <tr key={orderId} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       <button
                         onClick={() => toggleOrderSelection(orderId)}
                         className="flex items-center justify-center"
                       >
                         {isSelected ? (
-                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                          <CheckSquare className="w-3 h-3 text-blue-600" />
                         ) : (
-                          <Square className="w-5 h-5 text-gray-400" />
+                          <Square className="w-3 h-3 text-gray-400" />
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="text-xs font-medium text-gray-900 dark:text-white">
                         {order.orderId}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="text-xs text-gray-900 dark:text-white">
                         {order.customerName}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400">
                         {order.customerPhone}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="text-xs text-gray-900 dark:text-white">
                         {order.restaurant}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white max-w-xs">
+                    <td className="px-2 py-2">
+                      <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
                         {order.address ? (
-                          <div className="space-y-1">
+                          <div className="space-y-0.5">
                             {order.address.formattedAddress ? (
                               <div className="flex items-start gap-1">
-                                <MapPin className="w-3 h-3 mt-0.5 text-gray-500 flex-shrink-0" />
-                                <span className="text-xs break-words">{order.address.formattedAddress}</span>
+                                <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
+                                <span className="text-[10px] break-words line-clamp-2">{order.address.formattedAddress}</span>
                               </div>
                             ) : (
                               <>
                                 {order.address.street && (
-                                  <div className="text-xs">{order.address.street}</div>
+                                  <div className="text-[10px] line-clamp-1">{order.address.street}</div>
                                 )}
                                 {(order.address.area || order.address.city) && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-[10px] text-gray-500 line-clamp-1">
                                     {[order.address.area, order.address.city].filter(Boolean).join(', ')}
                                   </div>
                                 )}
                                 {(order.address.state || order.address.zipCode || order.address.pincode) && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-[10px] text-gray-500">
                                     {[order.address.state, order.address.zipCode || order.address.pincode].filter(Boolean).join(' - ')}
                                   </div>
                                 )}
                               </>
                             )}
                             {order.address.additionalDetails && (
-                              <div className="text-xs text-gray-400 italic">
+                              <div className="text-[10px] text-gray-400 italic line-clamp-1">
                                 {order.address.additionalDetails}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400 dark:text-gray-500 text-xs">Not available</span>
+                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not available</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white max-w-xs">
-                        <div className="space-y-1">
+                    <td className="px-2 py-2">
+                      <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
+                        <div className="space-y-0.5">
                           {order.restaurantZoneName ? (
                             <div className="flex items-center gap-1">
-                              <Navigation className="w-3 h-3 text-blue-600" />
-                              <span className="text-xs font-medium">{order.restaurantZoneName}</span>
+                              <Navigation className="w-2.5 h-2.5 text-blue-600" />
+                              <span className="text-[10px] font-medium">{order.restaurantZoneName}</span>
                             </div>
                           ) : null}
                           {order.restaurantLocation ? (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-[10px] text-gray-500">
                               <div className="flex items-start gap-1">
-                                <MapPin className="w-3 h-3 mt-0.5 text-gray-500 flex-shrink-0" />
-                                <span className="break-words">
+                                <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
+                                <span className="break-words line-clamp-2">
                                   {/* Priority 1: formattedAddress (live location from Google Maps) */}
                                   {order.restaurantLocation.formattedAddress && 
                                    order.restaurantLocation.formattedAddress.trim() !== '' &&
@@ -504,88 +504,91 @@ export default function OrderAssign() {
                               </div>
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-400">Pin location not set</div>
+                            <div className="text-[10px] text-gray-400">Pin location not set</div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white max-w-xs">
+                    <td className="px-2 py-2">
+                      <div className="text-xs text-gray-900 dark:text-white max-w-[150px]">
                         {order.items && order.items.length > 0 ? (
-                          <div className="space-y-1">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <span className="font-medium">{item.name || 'Item'}</span>
-                                <span className="text-gray-500 dark:text-gray-400">
+                          <div className="space-y-0.5">
+                            {order.items.slice(0, 2).map((item, idx) => (
+                              <div key={idx} className="flex items-center gap-1">
+                                <span className="font-medium text-[10px]">{item.name || 'Item'}</span>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
                                   (Qty: {item.quantity || 1})
                                 </span>
                               </div>
                             ))}
+                            {order.items.length > 2 && (
+                              <div className="text-[10px] text-gray-500">+{order.items.length - 2} more</div>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-gray-400 dark:text-gray-500">No items</span>
+                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">No items</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="text-xs font-medium text-gray-900 dark:text-white">
                         ₹{order.totalAmount?.toFixed(2) || "0.00"}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       {order.restaurantAccepted ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          <CheckCircle2 className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
                           Accepted
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                          <XCircle className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                          <XCircle className="w-2.5 h-2.5" />
                           Not Accepted
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       {order.isAssigned || order.deliveryPartnerId ? (
                         order.isDeliveryBoyAccepted ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
                             Accepted
                           </span>
                         ) : order.isDeliveryBoyPending ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
                             Pending
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
                             Assigned
                           </span>
                         )
                       ) : (
-                        <span className="text-gray-400 dark:text-gray-500 text-xs">Not Assigned</span>
+                        <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not Assigned</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="text-xs text-gray-900 dark:text-white">
                         {order.date}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400">
                         {order.time}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       {order.canReassign ? (
                         <Button
                           onClick={() => handleAssignClick(order)}
                           disabled={assigningOrderId === order.id}
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
                         >
                           {assigningOrderId === order.id ? (
                             <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               Assigning...
                             </>
                           ) : (
@@ -593,8 +596,8 @@ export default function OrderAssign() {
                           )}
                         </Button>
                       ) : order.isAssigned && !order.canReassign ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          <CheckCircle2 className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
                           Accepted
                         </span>
                       ) : (
@@ -602,11 +605,11 @@ export default function OrderAssign() {
                           onClick={() => handleAssignClick(order)}
                           disabled={assigningOrderId === order.id}
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
                         >
                           {assigningOrderId === order.id ? (
                             <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               Assigning...
                             </>
                           ) : (
@@ -653,58 +656,55 @@ export default function OrderAssign() {
 
       {/* Assign Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+        <DialogContent className="sm:max-w-[420px] max-h-[85vh] overflow-y-auto p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               Assign Delivery Boy
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400 mt-1.5 text-base">
+            <DialogDescription className="text-xs text-gray-600 dark:text-gray-400 mt-1">
               Select a delivery boy to assign this order
             </DialogDescription>
           </DialogHeader>
           
           {/* Order Details Card */}
           {selectedOrder && (
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-5 border-2 border-gray-200 dark:border-gray-700 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Order Details</span>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Order Details</span>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Order ID:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white font-mono">{selectedOrder.orderId}</span>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Order ID:</span>
+                  <span className="font-medium text-gray-900 dark:text-white font-mono">{selectedOrder.orderId}</span>
                 </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Customer:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedOrder.customerName}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Customer:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.customerName}</span>
                 </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Restaurant:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedOrder.restaurant}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Restaurant:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{selectedOrder.restaurant}</span>
                 </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Amount:</span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <IndianRupee className="w-4 h-4" />
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Amount:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+                    <IndianRupee className="w-3 h-3" />
                     {selectedOrder.totalAmount?.toFixed(2) || "0.00"}
                   </span>
                 </div>
                 {selectedOrder.items && selectedOrder.items.length > 0 && (
-                  <div className="pt-3 mt-3 border-t-2 border-gray-200 dark:border-gray-700">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Items:</span>
-                    <div className="space-y-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                      {selectedOrder.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm py-1">
-                          <span className="text-gray-700 dark:text-gray-300 font-medium">{item.name}</span>
-                          <span className="text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md text-xs font-semibold">Qty: {item.quantity || 1}</span>
+                  <div className="pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="space-y-1">
+                      {selectedOrder.items.slice(0, 2).map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
+                          <span className="text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px]">Qty: {item.quantity || 1}</span>
                         </div>
                       ))}
-                      {selectedOrder.items.length > 3 && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium pt-1 block border-t border-gray-200 dark:border-gray-700 mt-2">
-                          +{selectedOrder.items.length - 3} more items
+                      {selectedOrder.items.length > 2 && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                          +{selectedOrder.items.length - 2} more items
                         </span>
                       )}
                     </div>
@@ -715,24 +715,20 @@ export default function OrderAssign() {
           )}
 
           {/* Delivery Boy Selection */}
-          <div className="space-y-3 mt-6">
-            <label className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2.5 uppercase tracking-wide">
-              <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               Select Delivery Boy
             </label>
             {isLoadingDeliveryBoys ? (
-              <div className="flex items-center justify-center p-10 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
-                <span className="ml-3 text-sm font-medium text-gray-600 dark:text-gray-400">Loading delivery boys...</span>
+              <div className="flex items-center justify-center p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
+                <span className="ml-2 text-xs text-gray-600 dark:text-gray-400">Loading...</span>
               </div>
             ) : deliveryBoys.length === 0 ? (
-              <div className="text-center p-10 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800">
-                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <User className="w-6 h-6 text-gray-400" />
-                </div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No delivery boys available</p>
+              <div className="text-center p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                <User className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-xs text-gray-500 dark:text-gray-400">No delivery boys available</p>
               </div>
             ) : (
               <Select
@@ -744,41 +740,79 @@ export default function OrderAssign() {
                   })
                 }}
               >
-                <SelectTrigger className="w-full h-12 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-                  <SelectValue placeholder="Choose a delivery boy" className="text-gray-600 dark:text-gray-400" />
+                <SelectTrigger className="w-full h-9 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm">
+                  {selectedDeliveryBoy[selectedOrder?.id] ? (() => {
+                    const selectedDb = deliveryBoys.find(db => (db._id || db.id) === selectedDeliveryBoy[selectedOrder?.id])
+                    if (selectedDb) {
+                      const isOnline = selectedDb.isOnline || false
+                      return (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-medium text-sm">{selectedDb.name || "Unknown"}</span>
+                          {isOnline ? (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full"></div>
+                              Online
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+                              Offline
+                            </span>
+                          )}
+                        </div>
+                      )
+                    }
+                    return <SelectValue placeholder="Choose a delivery boy" />
+                  })() : <SelectValue placeholder="Choose a delivery boy" />}
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px] z-[60]">
+                <SelectContent className="max-h-[250px] z-[60]">
                   {deliveryBoys.length > 0 ? (
                     deliveryBoys.map((db) => {
                       const dbId = db._id || db.id
                       const dbName = db.name || "Unknown"
                       const dbPhone = db.phone || ""
                       const isOnline = db.isOnline || false
+                      const cashInHand = Number(db.cashInHand) || 0
+                      // Use totalCashLimit from backend, or default to 750 if not provided
+                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null) 
+                        ? Number(db.totalCashLimit) 
+                        : 750
+                      const availableCashLimit = Number(db.availableCashLimit) || 0
+                      const isCashLimitExceeded = cashInHand >= totalCashLimit
                       
                       return (
                         <SelectItem 
                           key={dbId} 
                           value={dbId?.toString()} 
-                          className="cursor-pointer py-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          className="cursor-pointer py-2"
                         >
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 shadow-sm">
-                                <User className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                          <div className="flex items-start justify-between w-full gap-2">
+                            <div className="flex items-start gap-2 flex-1 min-w-0 overflow-hidden">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               </div>
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <span className="font-semibold text-gray-900 dark:text-white truncate text-base">{dbName}</span>
+                              <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{dbName}</span>
                                 {dbPhone && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
-                                    <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate">
+                                    <Phone className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate">{dbPhone}</span>
                                   </span>
                                 )}
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className={`text-[10px] font-medium whitespace-nowrap ${isCashLimitExceeded ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                    Cash: ₹{cashInHand.toFixed(2)} / ₹{totalCashLimit.toFixed(2)}
+                                  </span>
+                                  {isCashLimitExceeded && (
+                                    <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                                      OUT
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             {isOnline && (
-                              <span className="px-2.5 py-1 text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded-full flex items-center gap-1.5 flex-shrink-0 shadow-sm">
-                                <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></div>
+                              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap mt-0.5">
+                                <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full"></div>
                                 Online
                               </span>
                             )}
@@ -787,7 +821,7 @@ export default function OrderAssign() {
                       )
                     })
                   ) : (
-                    <div className="px-4 py-3 text-sm text-gray-500 text-center">No delivery boys available</div>
+                    <div className="px-4 py-2 text-xs text-gray-500 text-center">No delivery boys available</div>
                   )}
                 </SelectContent>
               </Select>
@@ -795,7 +829,7 @@ export default function OrderAssign() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-6 mt-6 border-t-2 border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
             <Button
               variant="outline"
               onClick={() => {
@@ -803,18 +837,18 @@ export default function OrderAssign() {
                 setSelectedOrder(null)
                 setSelectedDeliveryBoy({})
               }}
-              className="min-w-[120px] h-11 font-semibold border-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="min-w-[80px] h-8 text-xs"
             >
               Cancel
             </Button>
             <Button
               onClick={handleAssign}
               disabled={!selectedDeliveryBoy[selectedOrder?.id] || assigningOrderId === selectedOrder?.id}
-              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] h-11 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[80px] h-8 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {assigningOrderId === selectedOrder?.id ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                   Assigning...
                 </>
               ) : (
@@ -827,90 +861,133 @@ export default function OrderAssign() {
 
       {/* Bulk Assign Dialog */}
       <Dialog open={bulkAssignDialogOpen} onOpenChange={setBulkAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+        <DialogContent className="sm:max-w-[400px] p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
               Bulk Assign Orders
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400 mt-2">
+            <DialogDescription className="text-xs text-gray-600 dark:text-gray-400 mt-1">
               Assign {selectedOrders.size} order{selectedOrders.size > 1 ? 's' : ''} to a delivery boy
             </DialogDescription>
           </DialogHeader>
           
           {/* Selected Orders Info */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 mb-3">
-              <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Selected Orders</span>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Selected Orders ({selectedOrders.size})</span>
             </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {Array.from(selectedOrders).map((orderId) => {
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {Array.from(selectedOrders).slice(0, 5).map((orderId) => {
                 const order = orders.find(o => (o.id || o._id) === orderId)
                 return order ? (
-                  <div key={orderId} className="flex items-center justify-between text-sm">
+                  <div key={orderId} className="flex items-center justify-between text-xs">
                     <span className="text-gray-700 dark:text-gray-300">{order.orderId}</span>
                     <span className="text-gray-500 dark:text-gray-400">₹{order.totalAmount?.toFixed(2) || "0.00"}</span>
                   </div>
                 ) : null
               })}
+              {selectedOrders.size > 5 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                  +{selectedOrders.size - 5} more orders
+                </div>
+              )}
             </div>
           </div>
 
           {/* Delivery Boy Selection */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-              <User className="w-4 h-4" />
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               Select Delivery Boy
             </label>
             {isLoadingDeliveryBoys ? (
-              <div className="flex items-center justify-center p-8 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                <span className="ml-2 text-sm text-gray-500">Loading delivery boys...</span>
+              <div className="flex items-center justify-center p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                <span className="ml-2 text-xs text-gray-500">Loading...</span>
               </div>
             ) : deliveryBoys.length === 0 ? (
-              <div className="text-center p-8 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+              <div className="text-center p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
                 <User className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No delivery boys available</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">No delivery boys available</p>
               </div>
             ) : (
               <Select
                 value={bulkDeliveryBoyId}
                 onValueChange={setBulkDeliveryBoyId}
               >
-                <SelectTrigger className="w-full h-11">
-                  <SelectValue placeholder="Choose a delivery boy" />
+                <SelectTrigger className="w-full h-9 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm">
+                  {bulkDeliveryBoyId ? (() => {
+                    const selectedDb = deliveryBoys.find(db => (db._id || db.id) === bulkDeliveryBoyId)
+                    if (selectedDb) {
+                      const isOnline = selectedDb.isOnline || false
+                      return (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-medium text-sm">{selectedDb.name || "Unknown"}</span>
+                          {isOnline ? (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full"></div>
+                              Online
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+                              Offline
+                            </span>
+                          )}
+                        </div>
+                      )
+                    }
+                    return <SelectValue placeholder="Choose a delivery boy" />
+                  })() : <SelectValue placeholder="Choose a delivery boy" />}
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px] z-[60]">
+                <SelectContent className="max-h-[250px] z-[60]">
                   {deliveryBoys.length > 0 ? (
                     deliveryBoys.map((db) => {
                       const dbId = db._id || db.id
                       const dbName = db.name || "Unknown"
                       const dbPhone = db.phone || ""
                       const isOnline = db.isOnline || false
+                      const cashInHand = Number(db.cashInHand) || 0
+                      // Use totalCashLimit from backend, or default to 750 if not provided
+                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null) 
+                        ? Number(db.totalCashLimit) 
+                        : 750
+                      const availableCashLimit = Number(db.availableCashLimit) || 0
+                      const isCashLimitExceeded = cashInHand >= totalCashLimit
                       
                       return (
                         <SelectItem 
                           key={dbId} 
                           value={dbId?.toString()} 
-                          className="cursor-pointer py-3"
+                          className="cursor-pointer py-2"
                         >
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
+                          <div className="flex items-start justify-between w-full gap-2">
+                            <div className="flex items-start gap-2 flex-1 min-w-0 overflow-hidden">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0 mt-0.5">
                                 <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-medium text-gray-900 dark:text-white truncate">{dbName}</span>
+                              <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{dbName}</span>
                                 {dbPhone && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate">
                                     <Phone className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate">{dbPhone}</span>
                                   </span>
                                 )}
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className={`text-[10px] font-medium whitespace-nowrap ${isCashLimitExceeded ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                    Cash: ₹{cashInHand.toFixed(2)} / ₹{totalCashLimit.toFixed(2)}
+                                  </span>
+                                  {isCashLimitExceeded && (
+                                    <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 py-0.5 rounded whitespace-nowrap flex-shrink-0">
+                                      OUT
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             {isOnline && (
-                              <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full flex items-center gap-1 flex-shrink-0">
+                              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap mt-0.5">
                                 <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
                                 Online
                               </span>
@@ -920,7 +997,7 @@ export default function OrderAssign() {
                       )
                     })
                   ) : (
-                    <div className="px-4 py-2 text-sm text-gray-500">No delivery boys available</div>
+                    <div className="px-4 py-2 text-xs text-gray-500">No delivery boys available</div>
                   )}
                 </SelectContent>
               </Select>
@@ -928,29 +1005,29 @@ export default function OrderAssign() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
             <Button
               variant="outline"
               onClick={() => {
                 setBulkAssignDialogOpen(false)
                 setBulkDeliveryBoyId("")
               }}
-              className="min-w-[100px]"
+              className="min-w-[80px] h-8 text-xs"
             >
               Cancel
             </Button>
             <Button
               onClick={handleBulkAssign}
               disabled={!bulkDeliveryBoyId || isBulkAssigning}
-              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[80px] h-8 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isBulkAssigning ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                   Assigning...
                 </>
               ) : (
-                `Assign ${selectedOrders.size} Order${selectedOrders.size > 1 ? 's' : ''}`
+                `Assign ${selectedOrders.size}`
               )}
             </Button>
           </div>

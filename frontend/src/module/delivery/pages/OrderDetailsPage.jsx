@@ -190,6 +190,50 @@ export default function OrderDetailsPage() {
   const paymentMethod = (orderData.payment?.method || 'razorpay').toLowerCase()
   const isCOD = paymentMethod === 'cash' || paymentMethod === 'cod'
   const earnings = orderData.pricing?.deliveryFee || orderData.estimatedEarnings || 0
+  
+  // Calculate distance and time
+  const getDistance = () => {
+    // Priority 1: From settlement (most accurate for delivered orders)
+    if (orderData.settlement?.deliveryPartnerEarning?.distance) {
+      return Number(orderData.settlement.deliveryPartnerEarning.distance).toFixed(2)
+    }
+    // Priority 2: From routeToDelivery
+    if (orderData.deliveryState?.routeToDelivery?.distance) {
+      return Number(orderData.deliveryState.routeToDelivery.distance).toFixed(2)
+    }
+    // Priority 3: From assignmentInfo
+    if (orderData.assignmentInfo?.distance) {
+      return Number(orderData.assignmentInfo.distance).toFixed(2)
+    }
+    // Priority 4: From estimatedEarnings
+    if (orderData.estimatedEarnings?.distance) {
+      return Number(orderData.estimatedEarnings.distance).toFixed(2)
+    }
+    return null
+  }
+  
+  const getTimeTaken = () => {
+    if (!orderData.createdAt || !orderData.deliveredAt) return null
+    
+    try {
+      const startTime = new Date(orderData.createdAt)
+      const endTime = new Date(orderData.deliveredAt)
+      const diffMs = endTime - startTime
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffHours = Math.floor(diffMins / 60)
+      const remainingMins = diffMins % 60
+      
+      if (diffHours > 0) {
+        return `${diffHours} hr ${remainingMins} min`
+      }
+      return `${diffMins} min`
+    } catch (e) {
+      return null
+    }
+  }
+  
+  const distance = getDistance()
+  const timeTaken = getTimeTaken()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -234,6 +278,31 @@ export default function OrderDetailsPage() {
               </div>
             )}
           </div>
+          {/* Distance and Time Taken */}
+          {(distance || timeTaken) && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4">
+                {distance && (
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <p className="text-xs text-gray-500">Distance</p>
+                      <p className="text-sm font-semibold text-gray-900">{distance} km</p>
+                    </div>
+                  </div>
+                )}
+                {timeTaken && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-green-600" />
+                    <div>
+                      <p className="text-xs text-gray-500">Time Taken</p>
+                      <p className="text-sm font-semibold text-gray-900">{timeTaken}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Customer Details */}

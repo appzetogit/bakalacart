@@ -16,7 +16,6 @@ import {
   Ticket,
   Bell,
   ChevronRight,
-  IndianRupee,
   Sparkles,
   LogOut,
   X
@@ -35,11 +34,16 @@ export default function ProfilePage() {
   const profileRef = useRef(null)
   const navButtonsRef = useRef(null)
   const sectionsRef = useRef(null)
+  const previewAudioRef = useRef(null) // Ref to track preview audio
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAlertSoundPopup, setShowAlertSoundPopup] = useState(false)
   const [selectedAlertSound, setSelectedAlertSound] = useState(() => {
     // Load from localStorage, default to "zomato_tone"
+    return localStorage.getItem('delivery_alert_sound') || 'zomato_tone'
+  })
+  const [tempSelectedSound, setTempSelectedSound] = useState(() => {
+    // Temporary selection for preview (not saved until Set is clicked)
     return localStorage.getItem('delivery_alert_sound') || 'zomato_tone'
   })
 
@@ -107,6 +111,18 @@ export default function ProfilePage() {
       clearTimeout(timeoutId)
     }
   }, [location.pathname, animationKey])
+
+  // Cleanup preview audio when popup closes
+  useEffect(() => {
+    if (!showAlertSoundPopup) {
+      // Stop preview audio if popup is closed
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause()
+        previewAudioRef.current.currentTime = 0
+        previewAudioRef.current = null
+      }
+    }
+  }, [showAlertSoundPopup])
 
   // Fetch profile data
   useEffect(() => {
@@ -297,22 +313,6 @@ export default function ProfilePage() {
 
         {/* Sections */}
         <div ref={sectionsRef} className="space-y-4">
-          {/* Referral bonus */}
-          <Card 
-            onClick={() => navigate("/delivery/refer-and-earn")}
-            className="py-0 bg-white border-0 shadow-none cursor-pointer hover:bg-gray-200 transition-colors"
-          >
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-medium mb-1">₹2000 referral bonus</h3>
-                <p className="text-gray-600 text-sm">Refer your friend and earn</p>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12">
-                <IndianRupee className="w-8 h-8 text-yellow-400" />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Support Section */}
           <div>
             <h3 className="text-base font-medium mb-3 px-1">Support</h3>
@@ -337,7 +337,11 @@ export default function ProfilePage() {
           <div>
             <h3 className="text-base font-medium mb-3 px-1">Partner options</h3>
             <Card 
-              onClick={() => setShowAlertSoundPopup(true)}
+              onClick={() => {
+                // Initialize temp selection with current selection when opening popup
+                setTempSelectedSound(selectedAlertSound)
+                setShowAlertSoundPopup(true)
+              }}
               className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors"
             >
               <CardContent className="p-4 flex items-center justify-between">
@@ -376,7 +380,17 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold">Order alert sound</h3>
               <button
-                onClick={() => setShowAlertSoundPopup(false)}
+                onClick={() => {
+                  // Stop preview audio if playing
+                  if (previewAudioRef.current) {
+                    previewAudioRef.current.pause()
+                    previewAudioRef.current.currentTime = 0
+                    previewAudioRef.current = null
+                  }
+                  // Reset to original selection if cancelled
+                  setTempSelectedSound(selectedAlertSound)
+                  setShowAlertSoundPopup(false)
+                }}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -393,27 +407,40 @@ export default function ProfilePage() {
                     type="radio"
                     name="alertSound"
                     value="original"
-                    checked={selectedAlertSound === 'original'}
+                    checked={tempSelectedSound === 'original'}
                     onChange={(e) => {
-                      setSelectedAlertSound(e.target.value)
-                      localStorage.setItem('delivery_alert_sound', e.target.value)
-                      // Play preview sound
+                      setTempSelectedSound(e.target.value)
+                      // Stop any previously playing preview sound
+                      if (previewAudioRef.current) {
+                        previewAudioRef.current.pause()
+                        previewAudioRef.current.currentTime = 0
+                        previewAudioRef.current = null
+                      }
+                      // Play preview sound (only once, no loop)
                       try {
                         console.log('🔊 Playing preview sound: Original', { originalSoundPath: originalSound })
                         const audio = new Audio(originalSound)
                         audio.volume = 0.7
+                        audio.loop = false // Don't loop preview
+                        previewAudioRef.current = audio
                         const playPromise = audio.play()
                         if (playPromise !== undefined) {
                           playPromise
                             .then(() => {
                               console.log('✅ Preview sound playing: Original')
+                              // Auto-stop when sound ends
+                              audio.addEventListener('ended', () => {
+                                previewAudioRef.current = null
+                              })
                             })
                             .catch(err => {
                               console.error('❌ Preview audio error:', err)
+                              previewAudioRef.current = null
                             })
                         }
                       } catch (err) {
                         console.error('❌ Could not create preview audio:', err)
+                        previewAudioRef.current = null
                       }
                     }}
                     className="w-5 h-5 text-black focus:ring-2 focus:ring-black"
@@ -427,27 +454,40 @@ export default function ProfilePage() {
                     type="radio"
                     name="alertSound"
                     value="zomato_tone"
-                    checked={selectedAlertSound === 'zomato_tone'}
+                    checked={tempSelectedSound === 'zomato_tone'}
                     onChange={(e) => {
-                      setSelectedAlertSound(e.target.value)
-                      localStorage.setItem('delivery_alert_sound', e.target.value)
-                      // Play preview sound
+                      setTempSelectedSound(e.target.value)
+                      // Stop any previously playing preview sound
+                      if (previewAudioRef.current) {
+                        previewAudioRef.current.pause()
+                        previewAudioRef.current.currentTime = 0
+                        previewAudioRef.current = null
+                      }
+                      // Play preview sound (only once, no loop)
                       try {
                         console.log('🔊 Playing preview sound: Zomato Tone', { alertSoundPath: alertSound })
                         const audio = new Audio(alertSound)
                         audio.volume = 0.7
+                        audio.loop = false // Don't loop preview
+                        previewAudioRef.current = audio
                         const playPromise = audio.play()
                         if (playPromise !== undefined) {
                           playPromise
                             .then(() => {
                               console.log('✅ Preview sound playing: Zomato Tone')
+                              // Auto-stop when sound ends
+                              audio.addEventListener('ended', () => {
+                                previewAudioRef.current = null
+                              })
                             })
                             .catch(err => {
                               console.error('❌ Preview audio error:', err)
+                              previewAudioRef.current = null
                             })
                         }
                       } catch (err) {
                         console.error('❌ Could not create preview audio:', err)
+                        previewAudioRef.current = null
                       }
                     }}
                     className="w-5 h-5 text-black focus:ring-2 focus:ring-black"
@@ -456,13 +496,26 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Ok Button */}
+            {/* Set Button */}
             <div className="p-4 border-t border-gray-200">
               <button
-                onClick={() => setShowAlertSoundPopup(false)}
+                onClick={() => {
+                  // Stop preview audio if playing
+                  if (previewAudioRef.current) {
+                    previewAudioRef.current.pause()
+                    previewAudioRef.current.currentTime = 0
+                    previewAudioRef.current = null
+                  }
+                  // Save the selected sound
+                  setSelectedAlertSound(tempSelectedSound)
+                  localStorage.setItem('delivery_alert_sound', tempSelectedSound)
+                  setShowAlertSoundPopup(false)
+                  // Show success message
+                  toast.success(`Alert sound set to ${tempSelectedSound === 'original' ? 'Original' : 'Zomato Tone'}`)
+                }}
                 className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
               >
-                Ok
+                Set
               </button>
             </div>
           </div>
