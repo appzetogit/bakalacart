@@ -145,6 +145,7 @@ export const API_ENDPOINTS = {
       RESET_PASSWORD: '/restaurant/auth/reset-password',
     },
     PROFILE: '/restaurant/profile',
+    OUTLETS: '/restaurant/owner/outlets',
     DELIVERY_STATUS: '/restaurant/delivery-status',
     STAFF: '/restaurant/staff',
     MENU: '/restaurant/menu',

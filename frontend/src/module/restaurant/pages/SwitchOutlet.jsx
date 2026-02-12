@@ -2,27 +2,45 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import Lenis from "lenis"
-import { ArrowLeft, Search, Power } from "lucide-react"
+import { ArrowLeft, Search, Power, Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { clearModuleAuth } from "@/lib/utils/auth"
-import { authAPI } from "@/lib/api"
+import { authAPI, restaurantAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
 
 export default function SwitchOutlet() {
   const navigate = useNavigate()
   const [showOffline, setShowOffline] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [outlets, setOutlets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Mock outlet data - replace with actual data from your API/store
-  const outlets = [
-    {
-      id: 20959122,
-      name: "Kadhai Chammach Restaurant",
-      address: "By Pass Road (South)",
-      image: "/api/placeholder/80/80", // Replace with actual image URL
-      status: "offline", // "online" or "offline"
+  // Fetch real outlet data from API
+  useEffect(() => {
+    const fetchOutlets = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await restaurantAPI.getRestaurantOutlets()
+        
+        if (response?.data?.success && response?.data?.data?.outlets) {
+          const outletsData = response.data.data.outlets
+          setOutlets(outletsData)
+        } else {
+          setOutlets([])
+        }
+      } catch (err) {
+        console.error("Error fetching outlets:", err)
+        setError("Failed to load outlets. Please try again.")
+        setOutlets([])
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    fetchOutlets()
+  }, [])
 
   const mappedOutletsCount = outlets.length
 
@@ -180,9 +198,29 @@ export default function SwitchOutlet() {
           </label>
         </motion.div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
         {/* Outlet Cards */}
-        <div className="space-y-4 mb-8">
-          {visibleOutlets.map((outlet, index) => (
+        {!loading && !error && (
+          <div className="space-y-4 mb-8">
+            {visibleOutlets.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-sm">No outlets found</p>
+              </div>
+            ) : (
+              visibleOutlets.map((outlet, index) => (
             <motion.div
               key={outlet.id}
               initial={{ opacity: 0, y: 8 }}
@@ -224,7 +262,7 @@ export default function SwitchOutlet() {
                     {outlet.address}
                   </p>
                   <p className="text-xs text-gray-600">
-                    Outlet ID: {outlet.id}
+                    Outlet ID: {outlet.restaurantId || outlet.id}
                   </p>
                   
                 </div>
@@ -243,8 +281,10 @@ export default function SwitchOutlet() {
                     </span>
                   </div>
             </motion.div>
-          ))}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Information Message */}
         <motion.div

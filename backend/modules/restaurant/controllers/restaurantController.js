@@ -342,6 +342,82 @@ export const getRestaurantByOwner = async (req, res) => {
   }
 };
 
+// Get all restaurants owned by the same owner (for switch outlet)
+export const getRestaurantsByOwner = async (req, res) => {
+  try {
+    const currentRestaurant = req.restaurant;
+    
+    // Find all restaurants with the same owner email or phone
+    const query = {
+      $or: []
+    };
+
+    // Match by owner email if available
+    if (currentRestaurant.ownerEmail) {
+      query.$or.push({ ownerEmail: currentRestaurant.ownerEmail });
+    }
+
+    // Match by owner phone if available
+    if (currentRestaurant.ownerPhone) {
+      query.$or.push({ ownerPhone: currentRestaurant.ownerPhone });
+    }
+
+    // Also match by email/phone if they exist
+    if (currentRestaurant.email) {
+      query.$or.push({ email: currentRestaurant.email });
+    }
+
+    if (currentRestaurant.phone) {
+      query.$or.push({ phone: currentRestaurant.phone });
+    }
+
+    // If no matching criteria, return only current restaurant
+    if (query.$or.length === 0) {
+      const restaurants = [{
+        id: currentRestaurant._id,
+        restaurantId: currentRestaurant.restaurantId,
+        name: currentRestaurant.name,
+        address: currentRestaurant.location?.address || 
+                 `${currentRestaurant.location?.area || ''} ${currentRestaurant.location?.city || ''}`.trim() ||
+                 'Address not available',
+        image: currentRestaurant.profileImage?.url || null,
+        status: currentRestaurant.isAcceptingOrders ? 'online' : 'offline',
+        isActive: currentRestaurant.isActive
+      }];
+
+      return successResponse(res, 200, 'Restaurants retrieved successfully', {
+        outlets: restaurants,
+      });
+    }
+
+    // Find all restaurants with matching owner
+    const restaurants = await Restaurant.find(query)
+      .select('_id restaurantId name location profileImage isAcceptingOrders isActive')
+      .lean();
+
+    // Map to outlet format
+    const outlets = restaurants.map(restaurant => ({
+      id: restaurant.restaurantId || restaurant._id.toString(),
+      restaurantId: restaurant.restaurantId,
+      mongoId: restaurant._id.toString(),
+      name: restaurant.name,
+      address: restaurant.location?.address || 
+               `${restaurant.location?.area || ''} ${restaurant.location?.city || ''}`.trim() ||
+               'Address not available',
+      image: restaurant.profileImage?.url || null,
+      status: restaurant.isAcceptingOrders && restaurant.isActive ? 'online' : 'offline',
+      isActive: restaurant.isActive
+    }));
+
+    return successResponse(res, 200, 'Restaurants retrieved successfully', {
+      outlets,
+    });
+  } catch (error) {
+    console.error('Error fetching restaurants by owner:', error);
+    return errorResponse(res, 500, 'Failed to fetch restaurants');
+  }
+};
+
 // Create/Update restaurant from onboarding data
 export const createRestaurantFromOnboarding = async (onboardingData, restaurantId) => {
   try {

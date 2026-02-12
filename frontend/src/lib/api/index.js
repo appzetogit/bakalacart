@@ -523,6 +523,11 @@ export const restaurantAPI = {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.BY_OWNER);
   },
 
+  // Get all restaurants/outlets by owner (for switch outlet)
+  getRestaurantOutlets: () => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.OUTLETS);
+  },
+
   // Menu operations (for restaurant module)
   getMenu: () => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.MENU);
