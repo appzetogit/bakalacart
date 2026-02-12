@@ -125,6 +125,12 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
             });
         }
 
+        // CRITICAL: Deduplicate tokens to prevent duplicate notifications
+        // Remove duplicates and empty values before sending
+        targetTokens = [...new Set(targetTokens.filter(Boolean))];
+
+        console.log(`📊 [Admin Notification] Collected ${targetTokens.length} unique tokens for target: ${sendTo}`);
+
         // Save notification to history
         const newNotification = await Notification.create({
             title,
@@ -157,7 +163,9 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
             };
 
             // Send via Firebase
+            console.log(`📤 [Admin Notification] Sending notification with tag: ${payload.data.tag} to ${targetTokens.length} unique tokens`);
             const result = await sendPushNotification(targetTokens, payload);
+            console.log(`✅ [Admin Notification] Notification sent. Success: ${result?.successCount || 0}, Failed: ${result?.failureCount || 0}`);
 
             if (result && result.cleanupTokens && result.cleanupTokens.length > 0) {
                 await cleanupInvalidTokens(result.cleanupTokens);

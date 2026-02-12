@@ -53,23 +53,12 @@ export const sendPushNotification = async (tokens, payload) => {
             },
             tokens: uniqueTokens,
             android: {
-                collapseKey: tag, // Deduplication for Android
+                collapseKey: tag, // Deduplication for Android - same tag = same notification
                 priority: 'high',
-                // For Native Apps: If 'notification' is included here, Android OS shows it automatically.
-                // If the app also has an 'onMessage' listener that shows a notification, you get two.
-                // WE REMOVE THE ANDROID NOTIFICATION BLOCK to let the App handle it via 'data' only.
-                // OR we keep it but ensure 'data' doesn't contain the same info if the app is naive.
-                // BEST BET: Keep notification for background but use 'tag' correctly.
-                notification: {
-                    title: payload.title,
-                    body: payload.body,
-                    tag: tag,
-                    icon: 'notification_icon',
-                    color: '#008037',
-                    image: payload.image || null,
-                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-                    sound: 'default'
-                }
+                // CRITICAL: We DO NOT include 'notification' block here to prevent duplicates
+                // The app handles notifications via 'data' payload in onMessage handler
+                // If we include both 'notification' and 'data', Android OS shows one AND app shows another = 2 notifications
+                // By using only 'data', the app's onMessage handler shows the notification once
             },
             apns: {
                 headers: {

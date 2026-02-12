@@ -98,6 +98,11 @@ export default function PushNotification() {
       return
     }
 
+    // Prevent double submission
+    if (sending) {
+      return
+    }
+
     try {
       setSending(true)
       const submitData = new FormData()
