@@ -16,14 +16,76 @@ firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
+// Function to play notification sound using Web Audio API
+async function playNotificationSound() {
+    try {
+        // Audio file path - must be accessible from service worker
+        const audioUrl = '/audio/alert.mp3';
+        
+        console.log('🔊 [SW] Attempting to play notification sound:', audioUrl);
+        
+        // Fetch the audio file
+        const response = await fetch(audioUrl);
+        if (!response.ok) {
+            console.warn('[SW] Could not fetch audio file:', response.status);
+            return;
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Create AudioContext and decode audio
+        const audioContext = new (self.AudioContext || self.webkitAudioContext)();
+        
+        // Resume AudioContext if suspended (required for some browsers)
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+        
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Create source and play
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        
+        // Play the sound
+        source.start(0);
+        
+        console.log('✅ [SW] Notification sound played successfully');
+        
+        // Clean up after playback
+        source.onended = () => {
+            try {
+                audioContext.close();
+            } catch (e) {
+                // Ignore errors during cleanup
+            }
+        };
+        
+    } catch (error) {
+        console.warn('[SW] Could not play notification sound:', error);
+        // Fallback: The notification's built-in sound property will handle it
+    }
+}
+
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Received background message:', payload);
 
+    // Play sound for new order notifications (even when app is closed)
+    const isNewOrder = payload.data?.type === 'new_order' || payload.data?.orderId;
+    if (isNewOrder) {
+        console.log('🔔 [SW] New order notification received - will play sound');
+        playNotificationSound();
+    }
+
     // If payload has notification object, the browser will show it automatically.
-    // If we call showNotification here, it will result in double notifications.
+    // We don't need to call showNotification here to avoid double notifications.
+    // However, we still want to play the sound, which we already did above.
     if (payload.notification) {
-        console.log('[SW] Payload has notification object, let browser handle automatically');
+        console.log('[SW] Payload has notification object, browser will show it automatically');
+        // Sound is already played above for new orders
+        // The notification sound property in webpush will also trigger browser sound
         return;
     }
 
@@ -34,6 +96,7 @@ messaging.onBackgroundMessage((payload) => {
     // Icon and Image needs to be absolute URLs for maximum compatibility
     const icon = payload.data?.icon || '/bakalalogo.png';
     const image = payload.data?.image || null;
+    const sound = payload.data?.sound || (isNewOrder ? '/audio/alert.mp3' : null);
 
     const notificationOptions = {
         body: body,
@@ -45,6 +108,11 @@ messaging.onBackgroundMessage((payload) => {
         requireInteraction: true,
         vibrate: [200, 100, 200]
     };
+
+    // Add sound if available
+    if (sound) {
+        notificationOptions.sound = sound;
+    }
 
     console.log(`🔔 [SW] Displaying manual notification: ${title} (Tag: ${tag})`);
     return self.registration.showNotification(title, notificationOptions);

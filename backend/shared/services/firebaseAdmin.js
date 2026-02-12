@@ -40,6 +40,12 @@ export const sendPushNotification = async (tokens, payload) => {
     try {
         const tag = payload.data?.tag || payload.data?.orderId || payload.data?.notificationId || Date.now().toString();
         const iconUrl = payload.data?.icon || 'https://bakalacart.com/bakalalogo.png';
+        
+        // Determine if this is a new order notification that needs sound
+        const isNewOrder = payload.data?.type === 'new_order' || payload.data?.orderId;
+        // Get base URL for sound file (should match your frontend domain)
+        const baseUrl = process.env.CORS_ORIGIN || 'https://bakalacart.com';
+        const soundUrl = isNewOrder ? `${baseUrl}/audio/alert.mp3` : null;
 
         const message = {
             // Data payload for all (Metadata for custom handlers)
@@ -49,7 +55,8 @@ export const sendPushNotification = async (tokens, payload) => {
                 title: payload.title,
                 body: payload.body,
                 icon: iconUrl,
-                image: payload.image || ''
+                image: payload.image || '',
+                sound: soundUrl || '' // Include sound URL in data for service worker
             },
             tokens: uniqueTokens,
             android: {
@@ -90,7 +97,8 @@ export const sendPushNotification = async (tokens, payload) => {
                     icon: iconUrl,
                     badge: iconUrl,
                     image: payload.image || null,
-                    requireInteraction: true
+                    requireInteraction: true,
+                    sound: soundUrl || undefined // Include sound for web push notifications (especially for new orders)
                 },
                 fcmOptions: {
                     link: (payload.data?.click_action && !payload.data.click_action.includes('_CLICK'))

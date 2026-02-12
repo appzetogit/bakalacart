@@ -252,31 +252,29 @@ export const createOrder = async (req, res) => {
       zoneName: restaurantZone?.name || restaurantZone?.zoneName
     });
 
-    // CRITICAL: Validate user's zone matches restaurant's zone (strict zone matching)
+    // NOTE: Cross-zone orders are now allowed
+    // Users can order from restaurants in different zones
     const { zoneId: userZoneId } = req.body; // User's zone ID from frontend
 
     if (userZoneId) {
       const restaurantZoneId = restaurantZone._id.toString();
 
       if (restaurantZoneId !== userZoneId) {
-        logger.warn('⚠️ Zone mismatch - user and restaurant are in different zones:', {
+        logger.info('ℹ️ Cross-zone order - user and restaurant are in different zones (allowed):', {
           userZoneId,
           restaurantZoneId,
           restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
           restaurantName: restaurant.name
         });
-        return res.status(403).json({
-          success: false,
-          message: 'This restaurant is not available in your zone. Please select a restaurant from your current delivery zone.'
+        // Cross-zone orders are now allowed, so we continue with order creation
+      } else {
+        logger.info('✅ Zone match - user and restaurant are in the same zone:', {
+          zoneId: userZoneId,
+          restaurantId: restaurant._id?.toString() || restaurant.restaurantId
         });
       }
-
-      logger.info('✅ Zone match validated - user and restaurant are in the same zone:', {
-        zoneId: userZoneId,
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId
-      });
     } else {
-      logger.warn('⚠️ User zoneId not provided in order request - zone validation skipped');
+      logger.info('ℹ️ User zoneId not provided in order request - proceeding with order');
     }
 
     assignedRestaurantId = restaurant._id?.toString() || restaurant.restaurantId;
