@@ -153,25 +153,17 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       });
     } else {
       // Login (with optional auto-registration)
-      // Find user by email/phone AND role to ensure correct module access
-      const findQuery = phone
-        ? { phone, role: userRole }
-        : { email, role: userRole };
-      user = await User.findOne(findQuery);
-
-      if (!user && !name) {
-        // OTP has NOT been verified yet in this flow.
-        // Tell the client that we need user's name to proceed with auto-registration.
-        // The client should collect name and call this endpoint again with the same OTP and name.
-        return successResponse(res, 200, 'User not found. Please provide name for registration.', {
-          needsName: true,
-          identifierType,
-          identifier
-        });
-      }
-
+      // IMPORTANT: Verify OTP FIRST before checking if user exists
+      // This ensures wrong OTPs are rejected before showing name input
+      
       // Handle reset-password purpose
       if (purpose === 'reset-password') {
+        // Find user first for reset-password
+        const findQuery = phone
+          ? { phone, role: userRole }
+          : { email, role: userRole };
+        user = await User.findOne(findQuery);
+        
         if (!user) {
           return errorResponse(res, 404, `No ${userRole} account found with this email.`);
         }
@@ -184,11 +176,25 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         });
       }
 
-      // At this point, either:
-      // - user exists (normal login), or
-      // - user does not exist but name is provided (auto-registration)
-      // In both cases we must verify OTP first.
+      // For login purpose: Verify OTP FIRST (this will throw error if invalid)
       await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+
+      // OTP is valid, now check if user exists
+      const findQuery = phone
+        ? { phone, role: userRole }
+        : { email, role: userRole };
+      user = await User.findOne(findQuery);
+
+      if (!user && !name) {
+        // OTP is verified and valid, but user doesn't exist
+        // Tell the client that we need user's name to proceed with auto-registration.
+        // The client should collect name and call this endpoint again with the same OTP and name.
+        return successResponse(res, 200, 'User not found. Please provide name for registration.', {
+          needsName: true,
+          identifierType,
+          identifier
+        });
+      }
 
       if (!user) {
         // Auto-register new user after OTP verification

@@ -2074,7 +2074,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       label: "Home",
       phone: "",
     })
-    navigate("/")
+    onClose()
+    // Navigate to home page
+    navigate("/", { replace: true })
   }
 
   const handleSelectSavedAddress = async (address) => {
@@ -2456,7 +2458,8 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
               size="icon"
               onClick={() => {
                 onClose()
-                navigate("/")
+                // Navigate to home page
+                navigate("/", { replace: true })
               }}
               className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 -ml-2"
             >

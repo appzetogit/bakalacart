@@ -13,22 +13,6 @@ const logger = winston.createLogger({
   ]
 });
 
-// Test phone numbers that should use default OTP
-const TEST_PHONE_NUMBERS = [
-  '7610416911',
-  '7691810506',
-  '9009925021',
-  '6375095971',
-];
-
-// Test email addresses that should use default OTP
-const TEST_EMAIL_ADDRESSES = [
-  'panchalajay717@gmail.com',
-];
-
-// Default OTP for test phone numbers and emails
-const DEFAULT_TEST_OTP = '110211';
-
 /**
  * Extract phone number digits (without country code)
  * @param {string} phone - Phone number in format like "+91 9098569620" or "+91-9098569620"
@@ -45,26 +29,6 @@ const extractPhoneDigits = (phone) => {
   }
   // If exactly 10 digits or less, return as is
   return digits.length <= 10 ? digits : digits.slice(-10);
-};
-
-/**
- * Check if a phone number is a test number
- * @param {string} phone - Phone number in any format
- * @returns {boolean} - True if phone number is a test number
- */
-const isTestPhoneNumber = (phone) => {
-  const phoneDigits = extractPhoneDigits(phone);
-  return TEST_PHONE_NUMBERS.includes(phoneDigits);
-};
-
-/**
- * Check if an email is a test email
- * @param {string} email - Email address
- * @returns {boolean} - True if email is a test email
- */
-const isTestEmail = (email) => {
-  if (!email) return false;
-  return TEST_EMAIL_ADDRESSES.includes(email.toLowerCase().trim());
 };
 
 /**
@@ -113,10 +77,8 @@ class OTPService {
         }
       }
 
-      // Generate OTP (use default for test phone numbers or test emails)
-      const otp = ((phone && isTestPhoneNumber(phone)) || (email && isTestEmail(email)))
-        ? DEFAULT_TEST_OTP
-        : generateOTP();
+      // Generate random OTP - all numbers must go through proper msg91 verification
+      const otp = generateOTP();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
       // Build query for invalidating previous OTPs
@@ -144,29 +106,11 @@ class OTPService {
       // Send OTP via SMS or Email
       if (phone) {
         console.log(`🚀 [OTP_SERVICE] Sending SMS for role: ${role} to: ${phone}`);
-        // Skip actual SMS sending for test phone numbers
-        if (!isTestPhoneNumber(phone)) {
-          // Use MSG91 for phone OTP
-          await msg91Service.sendOTP(phone, otp, purpose, role);
-        } else {
-          logger.info(`Skipping SMS for test phone number: ${phone}`, {
-            phone,
-            purpose,
-            otp
-          });
-        }
+        // Always use MSG91 for phone OTP - proper verification required
+        await msg91Service.sendOTP(phone, otp, purpose, role);
       } else if (email) {
-        // Skip actual email sending for test emails
-        if (!isTestEmail(email)) {
-          // Keep email service as is
-          await emailService.sendOTP(email, otp, purpose);
-        } else {
-          logger.info(`Skipping email for test email: ${email}`, {
-            email,
-            purpose,
-            otp
-          });
-        }
+        // Always send email OTP - proper verification required
+        await emailService.sendOTP(email, otp, purpose);
       }
 
       logger.info(`OTP generated and sent to ${identifier} (${identifierType})`, {
@@ -210,25 +154,13 @@ class OTPService {
       const identifier = phone || email;
       const identifierType = phone ? 'phone' : 'email';
 
-      // Check if this is a test phone number or test email and OTP matches default test OTP
-      if ((phone && isTestPhoneNumber(phone) && otp === DEFAULT_TEST_OTP) ||
-        (email && isTestEmail(email) && otp === DEFAULT_TEST_OTP)) {
-        logger.info(`Test OTP verified for ${phone || email}`, {
-          phone,
-          email,
-          purpose
-        });
-        return {
-          success: true,
-          message: 'OTP verified successfully'
-        };
-      }
-
-      // Verify OTP from database
-      // For reset-password purpose, allow already-verified OTPs within 10 minutes
+      // Always verify OTP from database - no bypass allowed
+      // All OTPs must be sent via msg91 and verified from database
+      // For reset-password and login purposes, allow already-verified OTPs within expiry time
+      // This is needed for the flow where OTP is verified first, then name is collected
       let otpRecord;
 
-      if (purpose === 'reset-password') {
+      if (purpose === 'reset-password' || purpose === 'login') {
         // First try to find unverified OTP
         const unverifiedQuery = {
           otp,
@@ -241,15 +173,14 @@ class OTPService {
 
         otpRecord = await Otp.findOne(unverifiedQuery);
 
-        // If not found, check for already-verified OTP within last 10 minutes
+        // If not found, check for already-verified OTP within expiry time
+        // This allows re-verification when user submits name after initial OTP verification
         if (!otpRecord) {
-          const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
           const verifiedQuery = {
             otp,
             purpose,
             verified: true,
-            expiresAt: { $gt: new Date() },
-            updatedAt: { $gt: tenMinutesAgo }
+            expiresAt: { $gt: new Date() }
           };
           if (phone) verifiedQuery.phone = phone;
           if (email) verifiedQuery.email = email;
@@ -257,7 +188,8 @@ class OTPService {
           otpRecord = await Otp.findOne(verifiedQuery);
 
           if (otpRecord) {
-            // OTP already verified and still valid (within 10 minutes)
+            // OTP already verified and still valid (within expiry time)
+            // This is needed for the flow: verify OTP -> ask for name -> complete registration
             return {
               success: true,
               message: 'OTP verified successfully'
@@ -265,7 +197,7 @@ class OTPService {
           }
         }
       } else {
-        // For other purposes, only check unverified OTPs
+        // For other purposes (like register), only check unverified OTPs
         const query = {
           otp,
           purpose,

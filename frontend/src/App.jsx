@@ -24,7 +24,7 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
     // If fallback path is provided, try it
     if (fallbackPath) {
       console.log('🔄 Trying fallback import path...')
-      return import(fallbackPath).catch((fallbackError) => {
+      return import(/* @vite-ignore */ fallbackPath).catch((fallbackError) => {
         console.error('❌ Fallback import also failed:', fallbackError)
         // Retry original after delay
         return new Promise((resolve, reject) => {

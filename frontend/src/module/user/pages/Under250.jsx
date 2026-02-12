@@ -130,13 +130,21 @@ export default function Under250() {
     return filtered
   }, [under250Restaurants, selectedSort, under30MinsFilter])
 
-  // Fetch under 250 banners from API
+  // Fetch under 250 banners from API with timeout handling
   useEffect(() => {
+    const abortController = new AbortController()
+    const timeoutId = setTimeout(() => {
+      abortController.abort()
+    }, 10000) // 10 second timeout for banner fetch (faster than default 30s)
+
     const fetchBanners = async () => {
       try {
         console.log('🖼️ [Under 250] Starting to fetch banners...')
         setLoadingBanner(true)
-        const response = await api.get('/hero-banners/under-250/public')
+        const response = await api.get('/hero-banners/under-250/public', {
+          signal: abortController.signal,
+          timeout: 10000 // 10 second timeout
+        })
         console.log('🖼️ [Under 250] API response:', {
           success: response.data?.success,
           bannersCount: response.data?.data?.banners?.length || 0,
@@ -153,20 +161,53 @@ export default function Under250() {
           setBannerImage(null)
         }
       } catch (error) {
-        console.error('🖼️ [Under 250] ❌ Error fetching under 250 banners:', error)
-        console.error('🖼️ [Under 250] Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        })
-        setBannerImage(null)
+        // Check if request was canceled (aborted) - this is expected and shouldn't be logged as error
+        const errorMessage = error.message?.toLowerCase() || ''
+        const isCanceled = error.code === 'ECONNABORTED' || 
+                          error.name === 'AbortError' || 
+                          error.name === 'CanceledError' ||
+                          errorMessage === 'canceled' ||
+                          errorMessage.includes('canceled') ||
+                          errorMessage.includes('aborted')
+        const isTimeout = errorMessage.includes('timeout')
+        
+        if (isCanceled) {
+          // Request was canceled (component unmounted or timeout) - silently ignore
+          // Don't log or update state for canceled requests
+          // The finally block will handle cleanup
+        } else if (isTimeout) {
+          // Timeout occurred - log as warning but don't treat as critical error
+          if (import.meta.env.DEV) {
+            console.warn('🖼️ [Under 250] Banner fetch timeout (non-critical)')
+          }
+          setBannerImage(null)
+        } else {
+          // Real error occurred - log it
+          console.error('🖼️ [Under 250] ❌ Error fetching under 250 banners:', error)
+          console.error('🖼️ [Under 250] Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          })
+          setBannerImage(null)
+        }
       } finally {
-        setLoadingBanner(false)
-        console.log('🖼️ [Under 250] Fetch completed. Banner image:', bannerImage)
+        clearTimeout(timeoutId)
+        // Only update loading state and log if request wasn't canceled
+        if (!abortController.signal.aborted) {
+          setLoadingBanner(false)
+          console.log('🖼️ [Under 250] Fetch completed. Banner image:', bannerImage)
+        }
       }
     }
 
     fetchBanners()
+
+    // Cleanup function
+    return () => {
+      abortController.abort()
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   // Fetch restaurants with dishes under ₹250 from backend

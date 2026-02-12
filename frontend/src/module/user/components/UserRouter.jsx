@@ -1,12 +1,20 @@
 import { Routes, Route } from "react-router-dom"
+import { lazy, Suspense } from "react"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
 import UserLayout from "./UserLayout"
 
+// Loading component for lazy-loaded routes
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+  </div>
+)
+
 // Home & Discovery
 import Home from "../pages/Home"
 import Coffee from "../pages/Coffee"
-import Under250 from "../pages/Under250"
+const Under250 = lazy(() => import("../pages/Under250"))
 import CategoryPage from "../pages/CategoryPage"
 import Restaurants from "../pages/restaurants/Restaurants"
 import RestaurantDetails from "../pages/restaurants/RestaurantDetails"
@@ -92,7 +100,14 @@ export default function UserRouter() {
           </ProtectedRoute>
         } 
       />
-      <Route path="/under-250" element={<Under250 />} />
+      <Route 
+        path="/under-250" 
+        element={
+          <Suspense fallback={<LoadingFallback />}>
+            <Under250 />
+          </Suspense>
+        } 
+      />
       <Route path="/category/:category" element={<CategoryPage />} />
       <Route path="/restaurants" element={<Restaurants />} />
       <Route path="/restaurants/:slug" element={<RestaurantDetails />} />
