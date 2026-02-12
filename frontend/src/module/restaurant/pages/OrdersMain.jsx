@@ -2264,8 +2264,24 @@ function OrderCard({
   deliveryPartnerId,
   onSelect,
   onCancel,
+  onMarkReady,
 }) {
   const isReady = status === "Ready"
+  const [isMarkingReady, setIsMarkingReady] = useState(false)
+
+  const handleMarkReady = async (e) => {
+    e.stopPropagation()
+    if (isMarkingReady) return
+    
+    setIsMarkingReady(true)
+    try {
+      await onMarkReady?.({ orderId, mongoId, customerName })
+    } catch (error) {
+      console.error('Error marking order as ready:', error)
+    } finally {
+      setIsMarkingReady(false)
+    }
+  }
 
   return (
     <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
@@ -2379,15 +2395,36 @@ function OrderCard({
               </div>
             )}
           </div>
-          {/* Hide ETA for ready orders */}
-          {status !== 'ready' && eta && (
-            <div className="flex items-baseline gap-1">
-              <span className="text-[11px] text-gray-500">ETA</span>
-              <span className="text-xs font-medium text-black">
-                {eta}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Hide ETA for ready orders */}
+            {status !== 'ready' && eta && (
+              <div className="flex items-baseline gap-1">
+                <span className="text-[11px] text-gray-500">ETA</span>
+                <span className="text-xs font-medium text-black">
+                  {eta}
+                </span>
+              </div>
+            )}
+            {/* Mark as Ready button - only show for preparing orders */}
+            {status === 'preparing' && onMarkReady && (
+              <button
+                type="button"
+                onClick={handleMarkReady}
+                disabled={isMarkingReady}
+                className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                title="Mark as Ready"
+              >
+                {isMarkingReady ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Marking...</span>
+                  </>
+                ) : (
+                  <span>Mark as Ready</span>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2400,6 +2437,59 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
+  
+  // Handler for marking order as ready
+  const handleMarkReady = async ({ orderId, mongoId, customerName }) => {
+    try {
+      await restaurantAPI.markOrderReady(mongoId || orderId)
+      toast.success(`Order ${orderId} marked as ready`)
+      // Order will be removed from preparing list on next fetch
+      // Force a refresh after a short delay
+      setTimeout(() => {
+        // Trigger a refresh by updating a state or refetching
+        const fetchOrders = async () => {
+          try {
+            const response = await restaurantAPI.getOrders()
+            if (response.data?.success && response.data.data?.orders) {
+              const preparingOrders = response.data.data.orders.filter(
+                order => order.status === 'preparing'
+              )
+              const transformedOrders = preparingOrders.map(order => {
+                const initialETA = order.estimatedDeliveryTime || 30
+                const preparingTimestamp = order.tracking?.preparing?.timestamp 
+                  ? new Date(order.tracking.preparing.timestamp)
+                  : new Date(order.createdAt)
+                
+                return {
+                  orderId: order.orderId || order._id,
+                  mongoId: order._id,
+                  status: order.status || 'preparing',
+                  customerName: order.userId?.name || 'Customer',
+                  type: order.deliveryFleet === 'standard' ? 'Home Delivery' : 'Express Delivery',
+                  tableOrToken: null,
+                  timePlaced: new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                  initialETA,
+                  preparingTimestamp,
+                  itemsSummary: order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items',
+                  photoUrl: order.items?.[0]?.image || null,
+                  photoAlt: order.items?.[0]?.name || 'Order',
+                  deliveryPartnerId: order.deliveryPartnerId || null
+                }
+              })
+              setOrders(transformedOrders)
+            }
+          } catch (error) {
+            console.error('Error refreshing orders:', error)
+          }
+        }
+        fetchOrders()
+      }, 500)
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to mark order as ready'
+      toast.error(errorMessage)
+      throw error
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -2642,6 +2732,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
                 deliveryPartnerId={order.deliveryPartnerId}
                 onSelect={onSelectOrder}
                 onCancel={onCancel}
+                onMarkReady={handleMarkReady}
               />
             )
           })}
