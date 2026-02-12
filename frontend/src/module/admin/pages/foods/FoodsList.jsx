@@ -1,14 +1,27 @@
 import { useState, useMemo, useEffect } from "react"
-import { Search, Trash2, Loader2 } from "lucide-react"
+import { Search, Trash2, Loader2, Filter, X } from "lucide-react"
 import { adminAPI, restaurantAPI } from "@/lib/api"
 import apiClient from "@/lib/api"
 import { toast } from "sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function FoodsList() {
   const [searchQuery, setSearchQuery] = useState("")
   const [foods, setFoods] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  
+  // Filter states
+  const [selectedRestaurant, setSelectedRestaurant] = useState("all")
+  const [selectedFoodType, setSelectedFoodType] = useState("all")
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState("all")
+  const [selectedAvailability, setSelectedAvailability] = useState("all")
 
   // Fetch all foods from all restaurants
   useEffect(() => {
@@ -55,7 +68,8 @@ export default function FoodsList() {
                       sectionName: section.name || "Unknown Section",
                       price: item.price || 0,
                       foodType: item.foodType || "Non-Veg",
-                      approvalStatus: item.approvalStatus || 'pending',
+                      approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
+                      isAvailable: item.isAvailable !== false,
                       originalItem: item // Keep original item data
                     })
                   })
@@ -79,7 +93,8 @@ export default function FoodsList() {
                           subsectionName: subsection.name || "Unknown Subsection",
                           price: item.price || 0,
                           foodType: item.foodType || "Non-Veg",
-                          approvalStatus: item.approvalStatus || 'pending',
+                          approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
+                          isAvailable: item.isAvailable !== false,
                           originalItem: item // Keep original item data
                         })
                       })
@@ -140,9 +155,16 @@ export default function FoodsList() {
     return `FOOD${lastDigits}`
   }
 
+  // Get unique restaurants for filter dropdown
+  const uniqueRestaurants = useMemo(() => {
+    const restaurants = [...new Set(foods.map(food => food.restaurantName).filter(Boolean))]
+    return restaurants.sort()
+  }, [foods])
+
   const filteredFoods = useMemo(() => {
     let result = [...foods]
     
+    // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(food =>
@@ -152,8 +174,65 @@ export default function FoodsList() {
       )
     }
 
+    // Restaurant filter
+    if (selectedRestaurant !== "all") {
+      result = result.filter(food => food.restaurantName === selectedRestaurant)
+    }
+
+    // Food Type filter
+    if (selectedFoodType !== "all") {
+      result = result.filter(food => {
+        // Handle both "Veg"/"Non-Veg" and "veg"/"non-veg" formats
+        const foodType = (food.foodType || "Non-Veg").toLowerCase().replace(/-/g, "-")
+        const filterType = selectedFoodType.toLowerCase().replace(/-/g, "-")
+        // Normalize: "non-veg" or "non veg" should match "Non-Veg"
+        const normalizedFoodType = foodType.replace(/\s+/g, "-")
+        const normalizedFilterType = filterType.replace(/\s+/g, "-")
+        return normalizedFoodType === normalizedFilterType
+      })
+    }
+
+    // Approval Status filter
+    if (selectedApprovalStatus !== "all") {
+      result = result.filter(food => {
+        const status = (food.approvalStatus || "pending").toLowerCase().trim()
+        const filterStatus = selectedApprovalStatus.toLowerCase().trim()
+        return status === filterStatus
+      })
+    }
+
+    // Availability filter
+    if (selectedAvailability !== "all") {
+      result = result.filter(food => {
+        if (selectedAvailability === "available") {
+          // Available: isAvailable is true AND approvalStatus is not rejected
+          return food.isAvailable === true && food.approvalStatus !== 'rejected'
+        } else if (selectedAvailability === "unavailable") {
+          // Unavailable: isAvailable is false OR approvalStatus is rejected
+          return food.isAvailable === false || food.approvalStatus === 'rejected'
+        }
+        return true
+      })
+    }
+
     return result
-  }, [foods, searchQuery])
+  }, [foods, searchQuery, selectedRestaurant, selectedFoodType, selectedApprovalStatus, selectedAvailability])
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSelectedRestaurant("all")
+    setSelectedFoodType("all")
+    setSelectedApprovalStatus("all")
+    setSelectedAvailability("all")
+    setSearchQuery("")
+  }
+
+  // Check if any filter is active
+  const hasActiveFilters = selectedRestaurant !== "all" || 
+                          selectedFoodType !== "all" || 
+                          selectedApprovalStatus !== "all" || 
+                          selectedAvailability !== "all" ||
+                          searchQuery.trim() !== ""
 
   const handleDelete = async (id) => {
     const food = foods.find(f => f.id === id)
@@ -283,6 +362,99 @@ export default function FoodsList() {
                 className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Section */}
+        <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-600" />
+              <h3 className="text-sm font-semibold text-slate-700">Filters</h3>
+            </div>
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Clear All
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Restaurant Filter */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Restaurant
+              </label>
+              <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+                <SelectTrigger className="w-full h-9 text-sm bg-white">
+                  <SelectValue placeholder="All Restaurants" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Restaurants</SelectItem>
+                  {uniqueRestaurants.map((restaurant) => (
+                    <SelectItem key={restaurant} value={restaurant}>
+                      {restaurant}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Food Type Filter */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Food Type
+              </label>
+              <Select value={selectedFoodType} onValueChange={setSelectedFoodType}>
+                <SelectTrigger className="w-full h-9 text-sm bg-white">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="veg">Veg</SelectItem>
+                  <SelectItem value="non-veg">Non-Veg</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Approval Status Filter */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Approval Status
+              </label>
+              <Select value={selectedApprovalStatus} onValueChange={setSelectedApprovalStatus}>
+                <SelectTrigger className="w-full h-9 text-sm bg-white">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Availability Filter */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Availability
+              </label>
+              <Select value={selectedAvailability} onValueChange={setSelectedAvailability}>
+                <SelectTrigger className="w-full h-9 text-sm bg-white">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="unavailable">Unavailable</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

@@ -802,6 +802,7 @@ export default function ItemDetailsPage() {
                         src={images[currentImageIndex]}
                         alt={`${itemName} - Image ${currentImageIndex + 1}`}
                         className="w-full h-full object-cover"
+                        style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                       />
                     ) : null}
                   </motion.div>

@@ -236,3 +236,36 @@
   .touch-pan-x {
     touch-action: pan-x;
   }
+  
+  /* Prevent zoom on images - mobile fix */
+  img,
+  picture img,
+  [class*="avatar"] img,
+  [class*="Avatar"] img {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: auto;
+  }
+  
+  /* Prevent zoom on profile images specifically */
+  img[alt*="Profile"],
+  img[alt*="profile"],
+  [class*="profile"] img {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Prevent zoom on restaurant images */
+  img[alt*="restaurant"],
+  img[alt*="Restaurant"],
+  img[alt*="food"],
+  img[alt*="Food"] {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }

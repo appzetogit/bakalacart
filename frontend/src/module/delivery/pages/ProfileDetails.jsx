@@ -87,6 +87,7 @@ export default function ProfileDetails() {
           src={profile?.profileImage?.url || profile?.documents?.photo || "https://i.pravatar.cc/400?img=12"}
           alt="Profile"
           className="w-full h-auto max-h-96 object-contain"
+          style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         />
       </div>
 
@@ -430,6 +431,7 @@ export default function ProfileDetails() {
                 src={selectedDocument.url}
                 alt={selectedDocument.name}
                 className="w-full h-auto rounded-lg"
+                style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
               />
             </div>
           </div>

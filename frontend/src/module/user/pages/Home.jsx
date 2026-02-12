@@ -128,6 +128,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
           src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"
           alt={restaurantName}
           className="w-full h-full object-cover"
+          style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
           loading={priority ? 'eager' : 'lazy'}
         />
       </div>
@@ -204,6 +205,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                   src={displayImages[currentIndex]}
                   alt={`${restaurantName} - Image ${currentIndex + 1}`}
                   className="w-full h-full object-cover"
+                  style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                   loading={priority && currentIndex === 0 ? 'eager' : 'lazy'}
                   onError={(e) => {
                     console.error(`❌ Image failed to load for "${restaurantName}":`, displayImages[currentIndex])

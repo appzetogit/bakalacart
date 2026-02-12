@@ -428,6 +428,7 @@ export default function FeedNavbar({ className = "" }) {
               src={profileImage}
               alt="Profile"
               className="w-full h-full object-cover"
+              style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
               onError={() => {
                 setImageError(true);
               }}

@@ -102,6 +102,7 @@ export default function StickyCartCard() {
                     src={restaurantImage} 
                     alt={restaurantName}
                     className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover"
+                    style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                   />
                 </div>
 
