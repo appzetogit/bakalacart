@@ -223,10 +223,8 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { preparationTime } = req.body;
 
-    // Check if restaurant is accepting orders
-    if (restaurant.isAcceptingOrders === false) {
-      return errorResponse(res, 403, 'Restaurant is not accepting orders. Please enable order acceptance in settings.');
-    }
+    // Note: Removed isAcceptingOrders check - restaurants can manually accept individual orders
+    // even if their general status is set to not accepting orders
 
     const restaurantId = restaurant._id?.toString() ||
       restaurant.restaurantId ||

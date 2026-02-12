@@ -119,17 +119,16 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50"
+      data-modal-backdrop
       style={{ 
         position: 'fixed', 
         top: 0, 
         left: 0, 
         right: 0, 
         bottom: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        zIndex: 9999
       }}
       onClick={(e) => {
         // Close modal when clicking on backdrop
@@ -138,13 +137,20 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         }
       }}
     >
-      {/* Mobile Container */}
+      {/* Mobile Container - Perfectly Centered */}
       <div 
-        className="w-full max-w-[400px] max-h-[90vh] bg-white shadow-xl overflow-hidden flex flex-col relative rounded-xl"
+        className="bg-white shadow-xl overflow-hidden flex flex-col rounded-xl"
         style={{
-          margin: 'auto',
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'calc(100% - 2rem)',
+          maxWidth: '400px',
+          maxHeight: '90vh',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          zIndex: 10000
         }}
         onClick={(e) => e.stopPropagation()}
       >

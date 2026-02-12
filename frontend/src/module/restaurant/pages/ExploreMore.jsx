@@ -14,7 +14,6 @@ import {
   Users,
   Settings,
   Bell,
-  Truck,
   FileText,
   Star,
   MessageSquare,
@@ -681,7 +680,6 @@ export default function ExploreMore() {
   ]
 
   const settingsItems = [
-    { id: 3, label: "Delivery settings", icon: Truck, route: "/restaurant/delivery-settings" },
     { id: 4, label: "Zone Setup", icon: MapPin, route: "/restaurant/zone-setup" },
   ]
 

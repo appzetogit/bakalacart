@@ -1923,22 +1923,13 @@ export default function OrdersMain() {
 
                   {/* Accept and Reject buttons */}
                   <div className="space-y-3">
-                    {/* Accept button - enabled only if restaurant is accepting orders */}
+                    {/* Accept button - always enabled */}
                     <div className="relative">
                       <button
                         onClick={handleAcceptOrder}
-                        disabled={!restaurantStatus.isAcceptingOrders}
-                        className={`w-full py-3.5 rounded-lg font-semibold text-sm transition-colors ${
-                          restaurantStatus.isAcceptingOrders
-                            ? 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800'
-                            : 'bg-gray-400 text-white cursor-not-allowed opacity-50'
-                        }`}
+                        className="w-full py-3.5 rounded-lg font-semibold text-sm transition-colors bg-green-600 text-white hover:bg-green-700 active:bg-green-800"
                       >
-                        <span>
-                          {restaurantStatus.isAcceptingOrders 
-                            ? 'Accept Order' 
-                            : 'Accept (Restaurant cannot accept orders)'}
-                        </span>
+                        <span>Accept Order</span>
                       </button>
                     </div>
 
