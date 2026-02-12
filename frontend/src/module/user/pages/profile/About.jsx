@@ -106,7 +106,7 @@ export default function About() {
                   <div className="relative bg-white dark:bg-gray-800 rounded-xl p-4 md:p-6 shadow-xl overflow-hidden flex items-center justify-center">
                     <img
                       src={businessSettings?.logo?.url || aboutData.logo || '/bakalalogo.png'}
-                      alt={`${aboutData.appName} Logo`}
+                      alt={`${businessSettings?.companyName || aboutData.appName} Logo`}
                       className="max-h-32 md:max-h-40 object-contain w-auto"
                       onError={(e) => {
                         e.target.src = '/bakalalogo.png'
@@ -122,7 +122,7 @@ export default function About() {
                 transition={{ delay: 0.3, duration: 0.5 }}
                 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2"
               >
-                {aboutData.appName}
+                {businessSettings?.companyName || aboutData.appName}
               </motion.h2>
 
               <motion.p
@@ -303,7 +303,7 @@ export default function About() {
           className="text-center mt-8 mb-4"
         >
           <p className="text-sm text-gray-500 dark:text-gray-500">
-            © {new Date().getFullYear()} Bakala Cart. All rights reserved.
+            © {new Date().getFullYear()} {businessSettings?.companyName || 'Bakala Cart'}. All rights reserved.
           </p>
         </motion.div>
       </div>

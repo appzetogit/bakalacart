@@ -328,65 +328,50 @@ export const updateBusinessSettings = asyncHandler(async (req, res) => {
       }
     }
 
-    // Set updated by
-    if (req.admin && req.admin._id) {
-      settings.updatedBy = req.admin._id;
+    // Add logo and favicon to updateData if they were updated
+    if (settings.logo?.url) {
+      updateData.logo = settings.logo;
+    }
+    if (settings.favicon?.url) {
+      updateData.favicon = settings.favicon;
     }
 
-    // CRITICAL: Save maintenanceMode FIRST using findOneAndUpdate with $set
-    // This ensures atomic persistence and prevents save() from overwriting it
+    // Add maintenanceMode to updateData if it was provided
     if (maintenanceMode !== undefined && maintenanceMode !== null) {
-      const updateData = {
-        'maintenanceMode.user.isEnabled': settings.maintenanceMode.user.isEnabled,
-        'maintenanceMode.user.startDate': settings.maintenanceMode.user.startDate,
-        'maintenanceMode.user.endDate': settings.maintenanceMode.user.endDate,
-        'maintenanceMode.restaurantDelivery.isEnabled': settings.maintenanceMode.restaurantDelivery.isEnabled,
-        'maintenanceMode.restaurantDelivery.startDate': settings.maintenanceMode.restaurantDelivery.startDate,
-        'maintenanceMode.restaurantDelivery.endDate': settings.maintenanceMode.restaurantDelivery.endDate
-      };
-      
-      console.log('🔄 STEP 1: Using findOneAndUpdate with $set for maintenanceMode:', JSON.stringify(updateData, null, 2));
-      console.log('   User isEnabled:', updateData['maintenanceMode.user.isEnabled'], '(type:', typeof updateData['maintenanceMode.user.isEnabled'], ')');
-      console.log('   Restaurant isEnabled:', updateData['maintenanceMode.restaurantDelivery.isEnabled'], '(type:', typeof updateData['maintenanceMode.restaurantDelivery.isEnabled'], ')');
-      
-      // Use findOneAndUpdate to atomically update maintenanceMode
+      updateData['maintenanceMode.user.isEnabled'] = settings.maintenanceMode.user.isEnabled;
+      updateData['maintenanceMode.user.startDate'] = settings.maintenanceMode.user.startDate;
+      updateData['maintenanceMode.user.endDate'] = settings.maintenanceMode.user.endDate;
+      updateData['maintenanceMode.restaurantDelivery.isEnabled'] = settings.maintenanceMode.restaurantDelivery.isEnabled;
+      updateData['maintenanceMode.restaurantDelivery.startDate'] = settings.maintenanceMode.restaurantDelivery.startDate;
+      updateData['maintenanceMode.restaurantDelivery.endDate'] = settings.maintenanceMode.restaurantDelivery.endDate;
+    }
+
+    // Set updated by
+    if (req.admin && req.admin._id) {
+      updateData.updatedBy = req.admin._id;
+    }
+
+    // CRITICAL: Save ALL fields using findOneAndUpdate with $set
+    // This ensures atomic persistence for all updates (basic fields, logo, favicon, maintenanceMode)
+    if (Object.keys(updateData).length > 0) {
+      console.log('🔄 Using findOneAndUpdate with $set for all fields:', JSON.stringify(updateData, null, 2));
+      // Use findOneAndUpdate to atomically update all fields at once
       const updatedDoc = await BusinessSettings.findOneAndUpdate(
         { _id: settings._id },
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, upsert: false }
       );
       
       if (!updatedDoc) {
         console.error('❌ findOneAndUpdate returned null!');
-        throw new Error('Failed to update maintenance mode');
+        throw new Error('Failed to update business settings');
       }
       
-      console.log('✅ STEP 1: findOneAndUpdate completed');
-      console.log('   Updated doc maintenanceMode:', JSON.stringify(updatedDoc.maintenanceMode, null, 2));
-      console.log('   User isEnabled after update:', updatedDoc.maintenanceMode?.user?.isEnabled);
-      console.log('   Restaurant isEnabled after update:', updatedDoc.maintenanceMode?.restaurantDelivery?.isEnabled);
+      console.log('✅ All settings updated successfully via findOneAndUpdate');
       
       // Update the settings object to reflect the updated values
       settings = updatedDoc;
       
-      // IMPORTANT: Remove maintenanceMode from modified paths to prevent save() from overwriting it
-      if (settings.isModified && settings.isModified('maintenanceMode')) {
-        settings.unmarkModified('maintenanceMode');
-        settings.unmarkModified('maintenanceMode.user');
-        settings.unmarkModified('maintenanceMode.restaurantDelivery');
-      }
-    }
-
-    console.log('💾 STEP 2: Saving other settings (logo, favicon, etc.)...');
-    
-    // Save other fields (logo, favicon, etc.) - maintenanceMode is already saved via findOneAndUpdate
-    // IMPORTANT: maintenanceMode is unmarked to prevent overwriting
-    try {
-      await settings.save({ validateBeforeSave: true });
-      console.log('✅ STEP 2: Other settings saved successfully');
-    } catch (saveError) {
-      console.error('❌ Error during save:', saveError);
-      throw saveError;
     }
     
     // Reload from database using lean() to get actual saved values (no Mongoose defaults)

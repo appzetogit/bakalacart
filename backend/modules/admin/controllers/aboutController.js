@@ -1,4 +1,5 @@
 import About from '../models/About.js';
+import BusinessSettings from '../models/BusinessSettings.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 
@@ -8,13 +9,17 @@ import asyncHandler from '../../../shared/middleware/asyncHandler.js';
  */
 export const getAboutPublic = asyncHandler(async (req, res) => {
   try {
-    const about = await About.findOne({ isActive: true })
+    // Fetch about data
+    let about = await About.findOne({ isActive: true })
       .select('-updatedBy -createdAt -updatedAt -__v')
       .lean();
 
+    // Fetch business settings to override appName and logo
+    const businessSettings = await BusinessSettings.findOne().lean();
+
+    // Default about data if none exists
     if (!about) {
-      // Return default data if no about page exists
-      return successResponse(res, 200, 'About page data retrieved successfully', {
+      about = {
         appName: 'Bakala Cart',
         version: '1.0.0',
         description: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
@@ -73,7 +78,17 @@ export const getAboutPublic = asyncHandler(async (req, res) => {
             order: 2
           }
         ]
-      });
+      };
+    }
+
+    // Merge business settings: override appName and logo if available
+    if (businessSettings) {
+      if (businessSettings.companyName) {
+        about.appName = businessSettings.companyName;
+      }
+      if (businessSettings.logo?.url) {
+        about.logo = businessSettings.logo.url;
+      }
     }
 
     return successResponse(res, 200, 'About page data retrieved successfully', about);
