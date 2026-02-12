@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import loginBg from "@/assets/loginbanner.png"
+import api from "@/lib/api"
+import { API_ENDPOINTS } from "@/lib/api/config"
 
 export default function RestaurantSignIn() {
   const navigate = useNavigate()
@@ -18,6 +20,24 @@ export default function RestaurantSignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [companyName, setCompanyName] = useState("Bakala Cart")
+
+  // Fetch business settings for company name
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      try {
+        const response = await api.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC)
+        if (response.data.success && response.data.data?.companyName) {
+          setCompanyName(response.data.data.companyName)
+        }
+      } catch (error) {
+        console.error('Error fetching business settings:', error)
+        // Keep default "Bakala Cart" if fetch fails
+      }
+    }
+    
+    fetchBusinessSettings()
+  }, [])
 
   // Redirect to restaurant home if already authenticated
   useEffect(() => {
@@ -89,7 +109,7 @@ export default function RestaurantSignIn() {
             <h1 className="text-3xl xl:text-4xl font-extrabold mb-4 tracking-wide leading-tight">
               WELCOME TO
               <br />
-              Bakala Cart
+              {companyName}
             </h1>
             <p className="text-base xl:text-lg opacity-95 max-w-xl">
               Manage your restaurant, orders and website easily from a single dashboard.
@@ -111,7 +131,7 @@ export default function RestaurantSignIn() {
             </div>
             <div className="flex flex-col items-start">
               <span className="text-2xl font-bold tracking-wide text-primary-orange">
-                Bakala Cart
+                {companyName}
               </span>
               <span className="text-xs font-medium text-gray-500">
                 Restaurant Panel

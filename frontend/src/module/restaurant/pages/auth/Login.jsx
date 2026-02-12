@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import { setAuthData } from "@/lib/utils/auth"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
+import api from "@/lib/api"
+import { API_ENDPOINTS } from "@/lib/api/config"
 import {
   Select,
   SelectContent,
@@ -56,6 +58,24 @@ export default function RestaurantLogin() {
   })
   const [isSending, setIsSending] = useState(false)
   const [apiError, setApiError] = useState("")
+  const [companyName, setCompanyName] = useState("Bakala Cart")
+
+  // Fetch business settings for company name
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      try {
+        const response = await api.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC)
+        if (response.data.success && response.data.data?.companyName) {
+          setCompanyName(response.data.data.companyName)
+        }
+      } catch (error) {
+        console.error('Error fetching business settings:', error)
+        // Keep default "Bakala Cart" if fetch fails
+      }
+    }
+    
+    fetchBusinessSettings()
+  }, [])
 
   // Get selected country details dynamically
   const selectedCountry = countryCodes.find(c => c.code === formData.countryCode) || countryCodes[2] // Default to India (+91)
@@ -362,7 +382,7 @@ export default function RestaurantLogin() {
             }}
           >
 
-            Bakala Cart
+            {companyName}
           </h1>
         </div>
 

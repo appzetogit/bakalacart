@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bell, HelpCircle, Menu, Search, SlidersHorizontal, Calendar, Reply, ChevronLeft, Send, X, Loader2, ChevronRight } from "lucide-react"
+import { Bell, HelpCircle, Menu, Search, SlidersHorizontal, Calendar, ChevronLeft, Send, X, Loader2, ChevronRight } from "lucide-react"
 import { DateRangeCalendar } from "@/components/ui/date-range-calendar"
 import BottomNavOrders from "../components/BottomNavOrders"
 import { restaurantAPI } from "@/lib/api"
@@ -888,35 +888,6 @@ export default function Feedback() {
                       </p>
                     </div>
 
-                    {/* Reply section - show if reply exists */}
-                    {review.reply && (
-                      <div className="mt-2 rounded-xl bg-blue-50 px-3 py-2 relative">
-                        {/* Speech bubble tail for reply */}
-                        <div className="absolute -top-2 right-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-blue-50"></div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] text-gray-600 font-medium">
-                            Your reply
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800">
-                          {review.reply}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Reply link */}
-                    <div className="flex justify-end">
-                      <button 
-                        className="text-xs font-medium text-blue-700 flex items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleReviewClick(review)
-                        }}
-                      >
-                        <Reply className="w-3.5 h-3.5" />
-                        <span>{review.reply ? "Edit Reply" : "Reply"}</span>
-                      </button>
-                    </div>
                   </div>
                     ))
                   )}

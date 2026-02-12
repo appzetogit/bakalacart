@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import api from "@/lib/api"
+import { API_ENDPOINTS } from "@/lib/api/config"
 // Mock data removed - using API data only
 
 export default function RestaurantWelcome() {
@@ -12,6 +14,7 @@ export default function RestaurantWelcome() {
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [companyName, setCompanyName] = useState("Bakala Cart")
   const carouselRef = useRef(null)
 
   // Minimum swipe distance (in pixels)
@@ -142,6 +145,23 @@ export default function RestaurantWelcome() {
     navigate("/restaurant/signup")
   }
 
+  // Fetch business settings for company name
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      try {
+        const response = await api.get(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC)
+        if (response.data.success && response.data.data?.companyName) {
+          setCompanyName(response.data.data.companyName)
+        }
+      } catch (error) {
+        console.error('Error fetching business settings:', error)
+        // Keep default "Bakala Cart" if fetch fails
+      }
+    }
+    
+    fetchBusinessSettings()
+  }, [])
+
   // Fetch carousel data from API
   useEffect(() => {
     // TODO: Fetch carousel data from API
@@ -232,7 +252,7 @@ export default function RestaurantWelcome() {
                               textStroke: "0.5px white"
                             }}
                           >
-                            Bakala Cart
+                            {companyName}
                           </h1>
                         
                           <div className="w-12 h-[0.1px] bg-white mt-0 mb-3" />
@@ -285,7 +305,7 @@ export default function RestaurantWelcome() {
                   textStroke: "0.5px white"
                 }}
               >
-                Bakala Cart
+                {companyName}
               </h1>
               <div className="w-12 h-[0.1px] bg-white mx-auto mb-3" />
             </div>
