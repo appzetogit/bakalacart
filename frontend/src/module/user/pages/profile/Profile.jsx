@@ -37,6 +37,7 @@ import {
 import { authAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
 import { clearModuleAuth } from "@/lib/utils/auth"
+import Footer from "../../components/Footer"
 
 export default function Profile() {
   const { userProfile, vegMode, setVegMode } = useProfile()
@@ -238,7 +239,7 @@ export default function Profile() {
 
   return (
     <AnimatedPage className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a]">
-      <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10">
+      <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 pb-24 md:pb-12">
         {/* Back Arrow */}
         <div className="mb-4">
           <Link to="/user">
@@ -665,6 +666,11 @@ export default function Profile() {
               </Card>
             </motion.div>
           </div>
+        </div>
+
+        {/* Added space before footer/bottom nav */}
+        <div className="mt-8 md:mt-12">
+          <Footer />
         </div>
       </div>
 

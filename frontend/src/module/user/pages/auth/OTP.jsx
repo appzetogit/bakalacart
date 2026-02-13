@@ -381,19 +381,18 @@ export default function OTP() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col justify-center px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 pt-8 sm:pt-12 md:pt-16 lg:pt-20 pb-12 sm:pb-16 md:pb-20">
-        <div className="max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto w-full space-y-8 md:space-y-10 lg:space-y-12">
-          {/* Message */}
-          <div className="text-center space-y-2 md:space-y-3">
-            <p className="text-base md:text-lg lg:text-xl text-black dark:text-white">
+      <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 md:px-12 pt-4 sm:pt-8 md:pt-12 pb-6 sm:pb-12 overflow-y-auto">
+        <div className="max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto w-full space-y-6 md:space-y-10 lg:space-y-12">
+          <div className="text-center space-y-1 md:space-y-3">
+            <p className="text-sm md:text-lg lg:text-xl text-black dark:text-white">
               {showNameInput
                 ? "You're almost done! Please tell us your name to complete registration."
                 : contactType === "email"
-                  ? "We have sent a verification code to"
-                  : "We have sent a verification code to"}
+                  ? "Verification code sent to"
+                  : "Verification code sent to"}
             </p>
             {!showNameInput && (
-              <p className="text-base md:text-lg lg:text-xl text-black dark:text-white font-medium">
+              <p className="text-sm md:text-lg lg:text-xl text-black dark:text-white font-semibold">
                 {contactInfo}
               </p>
             )}
@@ -423,7 +422,7 @@ export default function OTP() {
                     onPaste={index === 0 ? handlePaste : undefined}
                     disabled={isLoading}
                     aria-label={`OTP digit ${index + 1} of ${otp.length}`}
-                    className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-18 lg:h-18 text-center text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold p-0 border-2 border-black dark:border-gray-600 rounded-lg focus-visible:ring-2 focus-visible:ring-[#E23744] focus-visible:border-[#E23744] dark:focus-visible:border-[#E23744] bg-white dark:bg-[#1a1a1a] text-black dark:text-white transition-all"
+                    className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 text-center text-base sm:text-xl md:text-2xl font-semibold p-0 border-2 border-black dark:border-gray-600 rounded-lg focus-visible:ring-2 focus-visible:ring-[#E23744] focus-visible:border-[#E23744] dark:focus-visible:border-[#E23744] bg-white dark:bg-[#1a1a1a] text-black dark:text-white transition-all"
                   />
                 ))}
               </div>
@@ -497,11 +496,11 @@ export default function OTP() {
       </div>
 
       {/* Go back to login methods */}
-      <div className="pt-4 md:pt-6 mt-auto px-6 md:px-8 lg:px-12 text-center pb-8 md:pb-12">
+      <div className="pt-2 md:pt-6 mt-auto px-6 md:px-8 text-center pb-4 md:pb-12">
         <button
           type="button"
           onClick={() => navigate("/user/auth/sign-in")}
-          className="text-sm md:text-base text-[#E23744] hover:text-[#d32f3d] hover:underline transition-colors font-medium"
+          className="text-xs md:text-base text-[#E23744] hover:text-[#d32f3d] hover:underline transition-colors font-medium"
         >
           Go back to login methods
         </button>

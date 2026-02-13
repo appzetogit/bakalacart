@@ -20,6 +20,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
+import { compressImage } from "@/lib/utils/imageUtils"
 
 // Gender options
 const genderOptions = [
@@ -54,28 +55,28 @@ const saveProfileToStorage = (data) => {
 export default function EditProfile() {
   const navigate = useNavigate()
   const { userProfile, updateUserProfile } = useProfile()
-  
+
   // Load from localStorage or use context
   const storedProfile = loadProfileFromStorage()
   const initialProfile = storedProfile || userProfile || {}
-  
+
   const initialFormData = {
     name: initialProfile.name ?? "",
     mobile: initialProfile.mobile ?? initialProfile.phone ?? "",
     email: initialProfile.email ?? "",
-    dateOfBirth: initialProfile.dateOfBirth 
-      ? (typeof initialProfile.dateOfBirth === 'string' 
-        ? dayjs(initialProfile.dateOfBirth) 
+    dateOfBirth: initialProfile.dateOfBirth
+      ? (typeof initialProfile.dateOfBirth === 'string'
+        ? dayjs(initialProfile.dateOfBirth)
         : dayjs(initialProfile.dateOfBirth))
       : null,
-    anniversary: initialProfile.anniversary 
-      ? (typeof initialProfile.anniversary === 'string' 
-        ? dayjs(initialProfile.anniversary) 
+    anniversary: initialProfile.anniversary
+      ? (typeof initialProfile.anniversary === 'string'
+        ? dayjs(initialProfile.anniversary)
         : dayjs(initialProfile.anniversary))
       : null,
     gender: initialProfile.gender ?? "",
   }
-  
+
   const [formData, setFormData] = useState(initialFormData)
   const [initialData] = useState(initialFormData)
   const [hasChanges, setHasChanges] = useState(false)
@@ -93,20 +94,20 @@ export default function EditProfile() {
       name: profile.name ?? "",
       mobile: profile.mobile ?? profile.phone ?? "",
       email: profile.email ?? "",
-      dateOfBirth: profile.dateOfBirth 
-        ? (typeof profile.dateOfBirth === 'string' 
-          ? dayjs(profile.dateOfBirth) 
+      dateOfBirth: profile.dateOfBirth
+        ? (typeof profile.dateOfBirth === 'string'
+          ? dayjs(profile.dateOfBirth)
           : dayjs(profile.dateOfBirth))
         : null,
-      anniversary: profile.anniversary 
-        ? (typeof profile.anniversary === 'string' 
-          ? dayjs(profile.anniversary) 
+      anniversary: profile.anniversary
+        ? (typeof profile.anniversary === 'string'
+          ? dayjs(profile.anniversary)
           : dayjs(profile.anniversary))
         : null,
       gender: profile.gender ?? "",
     }
     setFormData(newFormData)
-    
+
     // Update profile image
     if (profile.profileImage) {
       setProfileImage(profile.profileImage)
@@ -125,6 +126,16 @@ export default function EditProfile() {
   }, [formData, initialData])
 
   const handleChange = (field, value) => {
+    // For mobile field, only allow digits and validate India (+91) if it were editable
+    if (field === "mobile") {
+      const digitValue = value.replace(/\D/g, "").slice(0, 15)
+      setFormData(prev => ({
+        ...prev,
+        [field]: digitValue
+      }))
+      return
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -148,43 +159,55 @@ export default function EditProfile() {
       return
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB')
-      return
+    // Show immediate preview for better UX
+    const previewReader = new FileReader()
+    previewReader.onloadend = () => {
+      setImagePreview(previewReader.result)
     }
+    previewReader.readAsDataURL(file)
 
-    // Show preview
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setImagePreview(reader.result)
-    }
-    reader.readAsDataURL(file)
-
-    // Upload to server
     try {
       setIsUploadingImage(true)
-      const response = await userAPI.uploadProfileImage(file)
+
+      // Compress image before upload (especially important for high-res camera photos)
+      // This solves the "Unable to upload" issue due to large file sizes
+      let processedFile = file;
+      if (file.size > 1 * 1024 * 1024) { // If > 1MB, compress it
+        try {
+          processedFile = await compressImage(file, {
+            maxWidth: 1024,
+            maxHeight: 1024,
+            quality: 0.8
+          });
+        } catch (compressionError) {
+          console.warn('Image compression failed, trying original file:', compressionError);
+        }
+      }
+
+      // Upload to server
+      const response = await userAPI.uploadProfileImage(processedFile)
       const imageUrl = response?.data?.data?.profileImage || response?.data?.profileImage
-      
+
       if (imageUrl) {
         setProfileImage(imageUrl)
         setImagePreview(imageUrl)
-        toast.success('Profile image uploaded successfully')
-        
+        toast.success('Profile image updated')
+
         // Update context
         updateUserProfile({ profileImage: imageUrl })
-        
-        // Dispatch event to refresh profile
+
+        // Dispatch event to refresh profile across app
         window.dispatchEvent(new Event("userAuthChanged"))
       }
     } catch (error) {
       console.error('Error uploading image:', error)
-      toast.error(error?.response?.data?.message || 'Failed to upload image')
-      // Revert preview
+      toast.error(error?.response?.data?.message || 'Failed to upload photo')
+      // Revert preview on error
       setImagePreview(profileImage)
     } finally {
       setIsUploadingImage(false)
+      // Reset input value so same file can be selected again if needed
+      if (e.target) e.target.value = '';
     }
   }
 
@@ -232,7 +255,7 @@ export default function EditProfile() {
         window.dispatchEvent(new Event("userAuthChanged"))
 
         toast.success('Profile updated successfully')
-        
+
         // Navigate back
         navigate("/user/profile")
       }
@@ -259,7 +282,7 @@ export default function EditProfile() {
       {/* Header */}
       <div className="bg-white dark:bg-[#1a1a1a] sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-7xl mx-auto flex items-center gap-3 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 md:py-5 lg:py-6">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0"
           >
@@ -276,8 +299,8 @@ export default function EditProfile() {
           <div className="relative">
             <Avatar className="h-24 w-24 bg-blue-400 border-0">
               {imagePreview && (
-                <AvatarImage 
-                  src={imagePreview} 
+                <AvatarImage
+                  src={imagePreview}
                   alt={formData.name || 'User'}
                 />
               )}
@@ -286,7 +309,7 @@ export default function EditProfile() {
               </AvatarFallback>
             </Avatar>
             {/* Edit Icon */}
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingImage}
               className="absolute bottom-0 right-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -303,6 +326,7 @@ export default function EditProfile() {
               accept="image/*"
               onChange={handleImageSelect}
               className="hidden"
+            // Remove camera suggestions if any, relying on OS defaults for better compatibility
             />
           </div>
         </div>
@@ -339,18 +363,27 @@ export default function EditProfile() {
             {/* Mobile Field */}
             <div className="space-y-1.5">
               <Label htmlFor="mobile" className="text-sm font-medium text-gray-700 dark:text-white">
-                Mobile
+                Mobile Number
               </Label>
-              <div className="flex items-center gap-2">
+              <div className="relative group">
                 <Input
                   id="mobile"
                   type="tel"
                   value={formData.mobile}
-                  onChange={(e) => handleChange('mobile', e.target.value)}
-                  className="flex-1 h-12 text-base  border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white"
+                  readOnly
+                  className="flex-1 h-12 text-base border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 cursor-not-allowed rounded-lg pr-24"
                   placeholder="Mobile"
                 />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-bold rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800/50">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Verified
+                </div>
               </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                Verified mobile number cannot be changed from profile.
+              </p>
             </div>
 
             {/* Email Field */}
@@ -474,11 +507,10 @@ export default function EditProfile() {
         <Button
           onClick={handleUpdate}
           disabled={!hasChanges || isSaving || isUploadingImage}
-          className={`w-full h-14 rounded-xl font-semibold text-base transition-all ${
-            hasChanges && !isSaving && !isUploadingImage
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
+          className={`w-full h-14 rounded-xl font-semibold text-base transition-all ${hasChanges && !isSaving && !isUploadingImage
+            ? 'bg-green-600 hover:bg-green-700 text-white'
+            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
         >
           {isSaving ? (
             <>

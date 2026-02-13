@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useState } from "react"
 import { authAPI } from "@/lib/api"
 import { firebaseAuth } from "@/lib/firebase"
+import Footer from "../../components/Footer"
 
 export default function Logout() {
   const navigate = useNavigate()
@@ -55,7 +56,7 @@ export default function Logout() {
     } catch (err) {
       // Even if there's an error, we should still clear local data and logout
       console.error("Error during logout:", err)
-      
+
       // Clear local data anyway
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
@@ -64,7 +65,7 @@ export default function Logout() {
       window.dispatchEvent(new Event("userAuthChanged"))
 
       setError("An error occurred during logout, but you have been signed out locally.")
-      
+
       // Still navigate after showing error
       setTimeout(() => {
         navigate("/user/auth/sign-in", { replace: true })
@@ -156,6 +157,11 @@ export default function Logout() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Footer with space */}
+      <div className="mt-12 pb-24 md:pb-12 border-t border-gray-100 dark:border-gray-800 pt-8">
+        <Footer />
       </div>
     </AnimatedPage>
   )

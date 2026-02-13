@@ -66,7 +66,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   // SUPER SIMPLE Normalize images array - handle both string URLs and objects with url property
   const normalizeImages = (imgArray) => {
     if (!imgArray || !Array.isArray(imgArray)) return []
-    
+
     const urls = []
     imgArray.forEach(img => {
       // Handle string URLs directly
@@ -86,7 +86,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
         }
       }
     })
-    
+
     return urls.filter(url => url && url !== 'null' && url !== 'undefined')
   }
 
@@ -94,10 +94,10 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   const validImages = normalizeImages(images)
 
   // Use fallback if no valid images - always ensure we have at least one image
-  const displayImages = validImages.length > 0 
-    ? validImages 
+  const displayImages = validImages.length > 0
+    ? validImages
     : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"]
-  
+
   // Debug log for all restaurants (only first 3 to avoid spam)
   if (restaurantId && (restaurantName === "Sagar restaurant" || restaurantName?.includes("Sagar"))) {
     console.log(`🔍🔍🔍 RestaurantImageCarousel Debug for "${restaurantName}":`, {
@@ -144,7 +144,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   const handleTouchMove = (e) => {
     const currentX = e.touches[0].clientX
     const diff = touchStartX.current - currentX
-    
+
     // If swipe distance is significant, mark as swiping
     if (Math.abs(diff) > 10) {
       isSwiping.current = true
@@ -153,7 +153,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
 
   const handleTouchEnd = (e) => {
     if (!isSwiping.current) return
-    
+
     touchEndX.current = e.changedTouches[0].clientX
     const diff = touchStartX.current - touchEndX.current
     const minSwipeDistance = 50 // Minimum distance for swipe
@@ -167,7 +167,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
         setCurrentIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length)
       }
     }
-    
+
     // Reset
     isSwiping.current = false
     touchStartX.current = 0
@@ -175,7 +175,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   }
 
   return (
-    <div 
+    <div
       className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 group"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -247,11 +247,10 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                 setCurrentIndex(index)
               }}
               aria-label={`Go to image ${index + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                index === currentIndex
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${index === currentIndex
                   ? "w-6 bg-white"
                   : "w-1.5 bg-white/50 hover:bg-white/75"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -266,13 +265,13 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
         }}
         transition={{ duration: 0.4 }}
       />
-      
+
       {/* Shine Effect */}
       <motion.div
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
         variants={{
           rest: { x: "-100%" },
-          hover: { 
+          hover: {
             x: "200%",
             transition: {
               duration: 0.8,
@@ -389,14 +388,14 @@ export default function Home() {
   // Fetch hero banners from API
   useEffect(() => {
     console.log('🖼️ [Hero Banners] useEffect triggered - Component mounted or updated')
-    
+
     const fetchHeroBanners = async () => {
       try {
         console.log('🖼️ [Hero Banners] Starting to fetch banners...')
         console.log('🖼️ [Hero Banners] API Base URL:', API_BASE_URL)
         console.log('🖼️ [Hero Banners] Full API URL:', `${API_BASE_URL}/hero-banners/public`)
         setLoadingBanners(true)
-        
+
         const response = await api.get('/hero-banners/public')
         console.log('🖼️ [Hero Banners] API response received:', {
           success: response.data?.success,
@@ -404,11 +403,11 @@ export default function Home() {
           bannersCount: response.data?.data?.banners?.length || 0,
           fullResponse: response.data
         })
-        
+
         if (response.data && response.data.success && response.data.data) {
           const banners = response.data.data.banners || []
           console.log('🖼️ [Hero Banners] Raw banners array:', banners)
-          
+
           if (banners.length > 0) {
             // Filter out banners without imageUrl
             const validBanners = banners.filter(b => {
@@ -419,7 +418,7 @@ export default function Home() {
               return isValid
             })
             console.log('🖼️ [Hero Banners] Valid banners after filtering:', validBanners.length, validBanners)
-            
+
             if (validBanners.length > 0) {
               setHeroBannersData(validBanners)
               // Extract image URLs for display
@@ -457,12 +456,12 @@ export default function Home() {
           baseURL: error.config?.baseURL,
           fullError: error
         })
-        
+
         // Check if it's a network error
         if (!error.response) {
           console.error('🖼️ [Hero Banners] Network error - Backend might be down or CORS issue')
         }
-        
+
         // Fallback to empty array if API fails
         setHeroBannerImages([])
         setHeroBannersData([])
@@ -491,11 +490,11 @@ export default function Home() {
         if (response.data.success && response.data.data.categories) {
           const adminCategories = response.data.data.categories.map(cat => {
             // Check if image is valid (not empty, not placeholder, and is a valid URL)
-            const isValidImage = cat.image && 
-                                 cat.image.trim() !== '' && 
-                                 cat.image !== 'https://via.placeholder.com/40' &&
-                                 (cat.image.startsWith('http://') || cat.image.startsWith('https://'))
-            
+            const isValidImage = cat.image &&
+              cat.image.trim() !== '' &&
+              cat.image !== 'https://via.placeholder.com/40' &&
+              (cat.image.startsWith('http://') || cat.image.startsWith('https://'))
+
             return {
               id: cat.id,
               name: cat.name,
@@ -734,7 +733,7 @@ export default function Home() {
       getFavorites: () => []
     }
   }
-  
+
   const { addFavorite, removeFavorite, isFavorite, getFavorites } = profileContext
   const { addToCart, cart } = useCart()
   const { location, loading, requestLocation } = useLocation()
@@ -809,20 +808,20 @@ export default function Home() {
   const fetchRestaurants = useCallback(async (filters = {}, useCache = true) => {
     try {
       setLoadingRestaurants(true)
-      
+
       // Build query parameters from filters first (needed for cache key)
       const params = {}
-      
+
       // Sort by
       if (filters.sortBy) {
         params.sortBy = filters.sortBy
       }
-      
+
       // Cuisine
       if (filters.selectedCuisine) {
         params.cuisine = filters.selectedCuisine
       }
-      
+
       // Rating filters
       if (filters.activeFilters?.has('rating-45-plus')) {
         params.minRating = 4.5
@@ -831,54 +830,54 @@ export default function Home() {
       } else if (filters.activeFilters?.has('rating-35-plus')) {
         params.minRating = 3.5
       }
-      
+
       // Delivery time filters
       if (filters.activeFilters?.has('delivery-under-30')) {
         params.maxDeliveryTime = 30
       } else if (filters.activeFilters?.has('delivery-under-45')) {
         params.maxDeliveryTime = 45
       }
-      
+
       // Distance filters
       if (filters.activeFilters?.has('distance-under-1km')) {
         params.maxDistance = 1.0
       } else if (filters.activeFilters?.has('distance-under-2km')) {
         params.maxDistance = 2.0
       }
-      
+
       // Price filters
       if (filters.activeFilters?.has('price-under-200')) {
         params.maxPrice = 200
       } else if (filters.activeFilters?.has('price-under-500')) {
         params.maxPrice = 500
       }
-      
+
       // Offers filter
       if (filters.activeFilters?.has('has-offers')) {
         params.hasOffers = 'true'
       }
-      
+
       // Trust filters
       if (filters.activeFilters?.has('top-rated')) {
         params.topRated = 'true'
       } else if (filters.activeFilters?.has('trusted')) {
         params.trusted = 'true'
       }
-      
+
       // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
       if (zoneId) {
         params.zoneId = zoneId
       }
       // Note: We show all restaurants regardless of zone, but apply grayscale styling if user is out of service
-      
+
       console.log('Fetching restaurants with params:', params)
       const response = await restaurantAPI.getRestaurants(params)
       console.log('Restaurants API response:', response.data)
-      
+
       if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
         const restaurantsArray = response.data.data.restaurants
         console.log(`Fetched ${restaurantsArray.length} restaurants from API`)
-        
+
         // Cache restaurant data in localStorage for faster loading
         try {
           const cacheKey = `restaurants_cache_${JSON.stringify(params)}`
@@ -888,7 +887,7 @@ export default function Home() {
             filters: params
           }
           const cacheString = JSON.stringify(cacheData)
-          
+
           // Check localStorage quota and verify storage
           try {
             localStorage.setItem(cacheKey, cacheString)
@@ -927,7 +926,7 @@ export default function Home() {
             message: cacheError.message
           })
         }
-        
+
         // Debug: Check first restaurant's image data
         if (restaurantsArray.length > 0) {
           const firstRestaurant = restaurantsArray[0]
@@ -950,20 +949,20 @@ export default function Home() {
             firstMenuImageType: typeof firstRestaurant.menuImages?.[0]
           })
         }
-        
+
         if (restaurantsArray.length === 0) {
           console.warn('No restaurants found in API response')
           setRestaurantsData([])
           setLoadingRestaurants(false)
           return
         }
-        
+
         // Calculate distance helper function
         const calculateDistance = (lat1, lng1, lat2, lng2) => {
           const R = 6371 // Earth's radius in kilometers
           const dLat = (lat2 - lat1) * Math.PI / 180
           const dLng = (lng2 - lng1) * Math.PI / 180
-          const a = 
+          const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
             Math.sin(dLng / 2) * Math.sin(dLng / 2)
@@ -988,24 +987,24 @@ export default function Home() {
         } catch (cacheError) {
           console.warn('⚠️ Failed to cache restaurant data:', cacheError)
         }
-        
+
         // Transform API data to match expected format
         const transformedRestaurants = restaurantsArray.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
           const deliveryTime = restaurant.estimatedDeliveryTime || "25-30 mins"
-          
+
           // Calculate distance from user to restaurant
           let distance = restaurant.distance || "1.2 km"
-          
+
           // Get restaurant coordinates
           const restaurantLocation = restaurant.location
           const restaurantLat = restaurantLocation?.latitude || (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates) ? restaurantLocation.coordinates[1] : null)
           const restaurantLng = restaurantLocation?.longitude || (restaurantLocation?.coordinates && Array.isArray(restaurantLocation.coordinates) ? restaurantLocation.coordinates[0] : null)
-          
+
           // Calculate distance if both user and restaurant coordinates are available
           let distanceInKm = null
-          if (userLat && userLng && restaurantLat && restaurantLng && 
-              !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
+          if (userLat && userLng && restaurantLat && restaurantLng &&
+            !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
             distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
             // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
             if (distanceInKm >= 1) {
@@ -1015,12 +1014,12 @@ export default function Home() {
               distance = `${distanceInMeters} m`
             }
           }
-          
+
           // Get first cuisine or default
-          const cuisine = restaurant.cuisines && restaurant.cuisines.length > 0 
-            ? restaurant.cuisines[0] 
+          const cuisine = restaurant.cuisines && restaurant.cuisines.length > 0
+            ? restaurant.cuisines[0]
             : "Multi-cuisine"
-          
+
           // Helper function to extract image URLs from various formats
           const extractImageUrls = (imageArray) => {
             if (!imageArray) return []
@@ -1047,7 +1046,7 @@ export default function Home() {
               return []
             }
             if (imageArray.length === 0) return []
-            
+
             return imageArray.map(img => {
               // Handle string URLs
               if (typeof img === 'string' && img.trim() !== '') {
@@ -1081,10 +1080,10 @@ export default function Home() {
               return null
             }).filter(Boolean) // Remove any null/undefined/empty values
           }
-          
+
           // SUPER SIMPLE DIRECT EXTRACTION - menuImages are the cover images uploaded by admin
           let imageUrls = []
-          
+
           // First try coverImages
           if (restaurant.coverImages && Array.isArray(restaurant.coverImages) && restaurant.coverImages.length > 0) {
             restaurant.coverImages.forEach(img => {
@@ -1092,7 +1091,7 @@ export default function Home() {
               else if (img?.url && typeof img.url === 'string' && img.url.trim()) imageUrls.push(img.url.trim())
             })
           }
-          
+
           // Then try menuImages (admin uploads cover images as menuImages)
           if (imageUrls.length === 0 && restaurant.menuImages && Array.isArray(restaurant.menuImages) && restaurant.menuImages.length > 0) {
             restaurant.menuImages.forEach(img => {
@@ -1107,24 +1106,24 @@ export default function Home() {
               }
             })
           }
-          
+
           // Fallback to profileImage
           if (imageUrls.length === 0 && restaurant.profileImage?.url) {
             imageUrls.push(restaurant.profileImage.url)
           }
-          
+
           // Fallback to single image field
           if (imageUrls.length === 0 && restaurant.image && typeof restaurant.image === 'string' && restaurant.image.trim()) {
             imageUrls.push(restaurant.image.trim())
           }
-          
+
           // Final fallback
           if (imageUrls.length === 0) {
             imageUrls = ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"]
           }
-          
+
           const allImages = imageUrls
-          
+
           // Debug logging for Sagar Restaurant
           if (restaurant.name === "Sagar Restaurant" || restaurant.name?.includes("Sagar")) {
             console.log(`🔍🔍🔍 SAGAR RESTAURANT FINAL:`, {
@@ -1135,17 +1134,17 @@ export default function Home() {
               firstUrl: allImages[0]
             })
           }
-          
+
           // Keep single image for backward compatibility - ensure it's always a valid URL
-          const image = allImages && allImages.length > 0 && allImages[0] 
-            ? allImages[0] 
+          const image = allImages && allImages.length > 0 && allImages[0]
+            ? allImages[0]
             : "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"
-          
+
           // Ensure images array always has at least one valid URL
-          const finalImages = allImages && allImages.length > 0 
-            ? allImages 
+          const finalImages = allImages && allImages.length > 0
+            ? allImages
             : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"]
-          
+
           return {
             id: restaurant.restaurantId || restaurant._id,
             name: restaurant.name,
@@ -1157,8 +1156,8 @@ export default function Home() {
             image: image,
             images: finalImages, // Array of cover images for carousel (separate from menu images) - always has at least one image
             priceRange: restaurant.priceRange || "$$", // Use from API or default
-            featuredDish: restaurant.featuredDish || (restaurant.cuisines && restaurant.cuisines.length > 0 
-              ? `${restaurant.cuisines[0]} Special` 
+            featuredDish: restaurant.featuredDish || (restaurant.cuisines && restaurant.cuisines.length > 0
+              ? `${restaurant.cuisines[0]} Special`
               : "Special Dish"),
             featuredPrice: restaurant.featuredPrice || 249, // Use from API or default
             offer: restaurant.offer || "Flat ₹50 OFF above ₹199", // Use from API or default
@@ -1169,43 +1168,43 @@ export default function Home() {
             isAcceptingOrders: restaurant.isAcceptingOrders !== false, // Default to true if not specified
           }
         })
-        
+
         // Sort restaurants by distance (nearby first) - only if user location is available
         if (userLat && userLng) {
           transformedRestaurants.sort((a, b) => {
             // Available restaurants first, then unavailable
             const aAvailable = a.isActive && a.isAcceptingOrders
             const bAvailable = b.isActive && b.isAcceptingOrders
-            
+
             if (aAvailable !== bAvailable) {
               return aAvailable ? -1 : 1 // Available restaurants come first
             }
-            
+
             // If both have same availability, sort by distance
             const aDistance = a.distanceInKm !== null ? a.distanceInKm : Infinity
             const bDistance = b.distanceInKm !== null ? b.distanceInKm : Infinity
             return aDistance - bDistance
           })
         }
-        
+
         console.log('Transformed and sorted restaurants:', transformedRestaurants)
         setRestaurantsData(transformedRestaurants)
       } else {
         console.warn('Invalid API response structure:', response.data)
         setRestaurantsData([])
       }
-      } catch (error) {
-        console.error('Error fetching restaurants:', error)
-        console.error('Error details:', error.response?.data || error.message)
-        // Don't set hardcoded data here - let the useMemo fallback handle it
-        // This way, if API succeeds later, it will show the real data
-        setRestaurantsData([])
-      } finally {
-        setLoadingRestaurants(false)
-        console.log('Restaurant loading completed. restaurantsData length:', restaurantsData.length)
-      }
+    } catch (error) {
+      console.error('Error fetching restaurants:', error)
+      console.error('Error details:', error.response?.data || error.message)
+      // Don't set hardcoded data here - let the useMemo fallback handle it
+      // This way, if API succeeds later, it will show the real data
+      setRestaurantsData([])
+    } finally {
+      setLoadingRestaurants(false)
+      console.log('Restaurant loading completed. restaurantsData length:', restaurantsData.length)
+    }
   }, [zoneId])
-  
+
   // Fetch restaurants when appliedFilters change
   useEffect(() => {
     fetchRestaurants(appliedFilters)
@@ -1219,7 +1218,7 @@ export default function Home() {
       const R = 6371 // Earth's radius in kilometers
       const dLat = (lat2 - lat1) * Math.PI / 180
       const dLng = (lng2 - lng1) * Math.PI / 180
-      const a = 
+      const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLng / 2) * Math.sin(dLng / 2)
@@ -1237,14 +1236,14 @@ export default function Home() {
       const restaurantLat = restaurant.location?.latitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[1] : null)
       const restaurantLng = restaurant.location?.longitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[0] : null)
 
-      if (!restaurantLat || !restaurantLng || 
-          isNaN(restaurantLat) || isNaN(restaurantLng)) {
+      if (!restaurantLat || !restaurantLng ||
+        isNaN(restaurantLat) || isNaN(restaurantLng)) {
         return restaurant
       }
 
       const distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
       let calculatedDistance = null
-      
+
       // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
       if (distanceInKm >= 1) {
         calculatedDistance = `${distanceInKm.toFixed(1)} km`
@@ -1352,11 +1351,11 @@ export default function Home() {
         // Available restaurants first, then unavailable
         const aAvailable = a.isActive && a.isAcceptingOrders
         const bAvailable = b.isActive && b.isAcceptingOrders
-        
+
         if (aAvailable !== bAvailable) {
           return aAvailable ? -1 : 1 // Available restaurants come first
         }
-        
+
         // If both have same availability, sort by distance
         const aDistance = a.distanceInKm !== null && a.distanceInKm !== undefined ? a.distanceInKm : Infinity
         const bDistance = b.distanceInKm !== null && b.distanceInKm !== undefined ? b.distanceInKm : Infinity
@@ -1584,19 +1583,19 @@ export default function Home() {
                 const bannerData = heroBannersData[index]
                 const linkedRestaurants = bannerData?.linkedRestaurants || []
                 const hasLinkedRestaurants = linkedRestaurants.length > 0
-                
+
                 console.log(`🖼️ [Hero Banners] Rendering banner ${index + 1}:`, {
                   imageUrl: image,
                   hasImage: !!image,
                   imageType: typeof image
                 })
-                
+
                 return (
                   <div
                     key={index}
                     className="h-full flex-shrink-0 relative"
-                    style={{ 
-                      width: '100vw', 
+                    style={{
+                      width: '100vw',
                       cursor: hasLinkedRestaurants ? 'pointer' : 'default',
                       minHeight: '39vh'
                     }}
@@ -1624,7 +1623,7 @@ export default function Home() {
                         src={image}
                         alt={`Hero Banner ${index + 1}`}
                         className="w-full h-full object-cover"
-                        style={{ 
+                        style={{
                           objectFit: 'cover',
                           display: 'block',
                           minHeight: '100%',
@@ -1654,7 +1653,7 @@ export default function Home() {
         )}
 
         {/* Navbar */}
-        <motion.div 
+        <motion.div
           className="relative z-20 pt-2 sm:pt-3 lg:pt-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1668,14 +1667,14 @@ export default function Home() {
           {/* Content */}
           <div className="relative z-20 max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
             {/* Search Bar and VEG MODE Container - Sticky */}
-            <motion.div 
-              className="sticky top-4 z-30 flex items-center gap-3 sm:gap-4 lg:gap-6"
+            <motion.div
+              className="sticky top-4 md:top-20 z-30 flex items-center gap-3 sm:gap-4 lg:gap-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
             >
               {/* Enhanced Search Bar */}
-              <motion.div 
+              <motion.div
                 className="flex-1 relative"
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -1723,8 +1722,8 @@ export default function Home() {
               </motion.div>
 
               {/* VEG MODE Toggle */}
-              <motion.div 
-                ref={vegModeToggleRef} 
+              <motion.div
+                ref={vegModeToggleRef}
                 className="flex flex-col items-center gap-0.5 sm:gap-1 lg:gap-1.5 flex-shrink-0 relative"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1748,14 +1747,14 @@ export default function Home() {
       </div>
 
       {/* Rest of Content - Container Width with Unified Background */}
-      <motion.div 
+      <motion.div
         className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 lg:pt-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.4 }}
       >
         {/* Food Categories - Horizontal Scroll */}
-        <motion.section 
+        <motion.section
           className="space-y-1 sm:space-y-1.5 lg:space-y-2"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -1773,7 +1772,7 @@ export default function Home() {
             }}
           >
             {/* Offer Image - Static, Centered */}
-            <motion.div 
+            <motion.div
               className="flex-shrink-0 flex flex-col items-center justify-center cursor-pointer"
               initial={{ opacity: 0, scale: 0.8 }}
               whileInView={{ opacity: 1, scale: 1 }}
@@ -1803,14 +1802,14 @@ export default function Home() {
               <>
                 {/* Show only first 10 categories */}
                 {realCategories.slice(0, 10).map((category, index) => (
-                  <motion.div 
-                    key={category.id || index} 
+                  <motion.div
+                    key={category.id || index}
                     className="flex-shrink-0"
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ 
-                      duration: 0.4, 
+                    transition={{
+                      duration: 0.4,
                       delay: index * 0.05,
                       type: "spring",
                       stiffness: 100
@@ -1858,7 +1857,7 @@ export default function Home() {
                 ))}
                 {/* See All button - show if there are more than 10 categories */}
                 {realCategories.length > 10 && (
-                  <motion.div 
+                  <motion.div
                     className="flex-shrink-0 cursor-pointer"
                     initial={{ opacity: 0, scale: 0.8 }}
                     whileInView={{ opacity: 1, scale: 1 }}
@@ -1885,14 +1884,14 @@ export default function Home() {
               <>
                 {/* Show only first 10 categories */}
                 {landingCategories.slice(0, 10).map((category, index) => (
-                  <motion.div 
-                    key={category._id || index} 
+                  <motion.div
+                    key={category._id || index}
                     className="flex-shrink-0"
                     initial={{ opacity: 0, y: 20, scale: 0.9 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ 
-                      duration: 0.4, 
+                    transition={{
+                      duration: 0.4,
                       delay: index * 0.05,
                       type: "spring",
                       stiffness: 100
@@ -1938,7 +1937,7 @@ export default function Home() {
                 ))}
                 {/* See All button - show if there are more than 10 categories */}
                 {landingCategories.length > 10 && (
-                  <motion.div 
+                  <motion.div
                     className="flex-shrink-0 cursor-pointer"
                     initial={{ opacity: 0, scale: 0.8 }}
                     whileInView={{ opacity: 1, scale: 1 }}
@@ -1971,7 +1970,7 @@ export default function Home() {
         </motion.section>
 
         {/* Filters */}
-        <motion.section 
+        <motion.section
           className="py-1 lg:py-2"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -2031,8 +2030,8 @@ export default function Home() {
                     }
                     }
                     className={`h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 transition-all font-medium ${isActive
-                        ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
-                        : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'
+                      ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
+                      : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'
                       }`}
                   >
                     {Icon && <Icon className={`h-3 w-3 sm:h-4 sm:w-4 ${isActive ? 'fill-white' : ''}`} />}
@@ -2045,14 +2044,14 @@ export default function Home() {
         </motion.section>
 
         {/* Explore More Section */}
-        <motion.section 
+        <motion.section
           className="pt-2 sm:pt-3 lg:pt-4"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-50px" }}
           transition={{ duration: 0.5 }}
         >
-          <motion.h2 
+          <motion.h2
             className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-2 sm:mb-3 lg:mb-4 px-1"
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -2105,8 +2104,8 @@ export default function Home() {
                   initial={{ opacity: 0, y: 20, scale: 0.9 }}
                   whileInView={{ opacity: 1, y: 0, scale: 1 }}
                   viewport={{ once: true }}
-                  transition={{ 
-                    duration: 0.4, 
+                  transition={{
+                    duration: 0.4,
                     delay: index * 0.1,
                     type: "spring",
                     stiffness: 100
@@ -2138,40 +2137,40 @@ export default function Home() {
               landingExploreMore
                 .filter(item => item.id !== 'giftcard' && item.label?.toLowerCase() !== 'gift card')
                 .map((item, index) => (
-                <motion.div
-                  key={item._id}
-                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ 
-                    duration: 0.4, 
-                    delay: index * 0.1,
-                    type: "spring",
-                    stiffness: 100
-                  }}
-                  whileHover={{ scale: 1.1, y: -5 }}
-                  whileTap={{ scale: 0.95 }}
-                >
+                  <motion.div
+                    key={item._id}
+                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                    whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{
+                      duration: 0.4,
+                      delay: index * 0.1,
+                      type: "spring",
+                      stiffness: 100
+                    }}
+                    whileHover={{ scale: 1.1, y: -5 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
                     <Link to={item.link} className="flex-shrink-0 bg-white dark:bg-[#1a1a1a]/80 dark:text-white">
-                    <div className="flex flex-col items-center gap-2.5 w-24 sm:w-28 md:w-32 group">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a]/80 dark:text-white  flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
-                        <OptimizedImage
-                          src={item.imageUrl}
-                          alt={item.label}
-                          className="w-full h-full"
-                          sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 112px"
-                          objectFit="contain"
-                          placeholder="blur"
-                          onError={() => {}}
-                        />
+                      <div className="flex flex-col items-center gap-2.5 w-24 sm:w-28 md:w-32 group">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl bg-white dark:bg-[#1a1a1a]/80 dark:text-white  flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all duration-300 overflow-hidden p-2.5">
+                          <OptimizedImage
+                            src={item.imageUrl}
+                            alt={item.label}
+                            className="w-full h-full"
+                            sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 112px"
+                            objectFit="contain"
+                            placeholder="blur"
+                            onError={() => { }}
+                          />
+                        </div>
+                        <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">
+                          {item.label}
+                        </span>
                       </div>
-                      <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">
-                        {item.label}
-                      </span>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))
+                    </Link>
+                  </motion.div>
+                ))
             )}
           </div>
         </motion.section>
@@ -2179,14 +2178,14 @@ export default function Home() {
         {/* Featured Foods - Horizontal Scroll */}
 
         {/* Restaurants - Enhanced with Animations */}
-        <motion.section 
+        <motion.section
           className="space-y-0 pt-3 sm:pt-4 lg:pt-6 pb-20 md:pb-24"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
         >
-          <motion.div 
+          <motion.div
             className="px-1 mb-3 lg:mb-4"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -2204,7 +2203,7 @@ export default function Home() {
             {/* Loading Overlay */}
             <AnimatePresence>
               {(isLoadingFilterResults || loadingRestaurants) && (
-                <motion.div 
+                <motion.div
                   className="absolute inset-0 bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg min-h-[400px]"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -2230,13 +2229,13 @@ export default function Home() {
                     transition={{ duration: 0.3, delay: skeletonIndex * 0.1 }}
                   >
                     {/* Shimmer Overlay */}
-                    <div 
+                    <div
                       className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent"
                       style={{
                         animation: 'shimmer 2s infinite'
                       }}
                     ></div>
-                    
+
                     {/* Image Skeleton */}
                     <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
                       <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
@@ -2300,14 +2299,14 @@ export default function Home() {
                 }
 
                 return (
-                  <motion.div 
-                    key={restaurant.id} 
+                  <motion.div
+                    key={restaurant.id}
                     className="h-full"
                     initial={{ opacity: 0, y: 30, scale: 0.95 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true, margin: "-50px" }}
-                    transition={{ 
-                      duration: 0.5, 
+                    transition={{
+                      duration: 0.5,
                       delay: index * 0.1,
                       type: "spring",
                       stiffness: 100
@@ -2342,9 +2341,8 @@ export default function Home() {
                       }}
                     >
                       <Link to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
-                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${
-                          isOutOfService ? 'grayscale opacity-75' : ''
-                        }`}>
+                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isOutOfService ? 'grayscale opacity-75' : ''
+                          }`}>
                           {/* Image Section with Carousel */}
                           <div className="relative">
                             {(() => {
@@ -2352,10 +2350,10 @@ export default function Home() {
                               // The RestaurantImageCarousel component will handle normalization, so just pass the array directly
                               const imagesToPass = restaurant.images && Array.isArray(restaurant.images) && restaurant.images.length > 0
                                 ? restaurant.images
-                                : (restaurant.image 
-                                    ? [restaurant.image] 
-                                    : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"])
-                              
+                                : (restaurant.image
+                                  ? [restaurant.image]
+                                  : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"])
+
                               // Debug logging for Sagar Restaurant
                               if (restaurant.name === "Sagar Restaurant" || restaurant.name?.includes("Sagar")) {
                                 console.log(`🔍🔍🔍 Passing to Carousel for "${restaurant.name}":`, {
@@ -2367,9 +2365,9 @@ export default function Home() {
                                   firstImageType: typeof imagesToPass[0]
                                 })
                               }
-                              
+
                               return (
-                                <RestaurantImageCarousel 
+                                <RestaurantImageCarousel
                                   images={imagesToPass}
                                   restaurantName={restaurant.name}
                                   restaurantId={restaurant.id}
@@ -2379,7 +2377,7 @@ export default function Home() {
                             })()}
 
                             {/* Featured Dish Badge - Top Left */}
-                            <motion.div 
+                            <motion.div
                               className="absolute top-3 left-3 md:top-4 md:left-4 flex items-center z-10"
                               variants={{
                                 rest: { scale: 1, y: 0 },
@@ -2406,8 +2404,8 @@ export default function Home() {
                                 size="icon"
                                 onClick={handleToggleFavorite}
                                 className={`h-9 w-9 md:h-11 md:w-11 rounded-full border flex items-center justify-center transition-all duration-300 ${favorite
-                                    ? "border-red-500 bg-red-50 text-red-500"
-                                    : "border-white bg-white/90 text-gray-600 hover:bg-white"
+                                  ? "border-red-500 bg-red-50 text-red-500"
+                                  : "border-white bg-white/90 text-gray-600 hover:bg-white"
                                   }`}
                               >
                                 <Bookmark
@@ -2415,10 +2413,10 @@ export default function Home() {
                                     }`} />
                               </Button>
                             </motion.div>
-                            
+
                             {/* FREE delivery Badge - Bottom Left (only for first 3 restaurants) */}
                             {index < 3 && (
-                              <motion.div 
+                              <motion.div
                                 className="absolute bottom-2 left-0 sm:bottom-2 sm:left-0 z-10"
                                 variants={{
                                   rest: { x: 0, opacity: 1 },
@@ -2442,74 +2440,74 @@ export default function Home() {
                             transition={{ duration: 0.4, ease: "easeOut" }}
                           >
                             <CardContent className="p-3 sm:p-4 lg:p-5 pt-3 sm:pt-4 lg:pt-5 flex flex-col flex-grow">
-                            {/* Restaurant Name & Rating */}
-                            <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
-                              <div className="flex-1 min-w-0">
-                                <motion.h3 
-                                  className="text-md sm:text-md lg:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2"
+                              {/* Restaurant Name & Rating */}
+                              <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <motion.h3
+                                    className="text-md sm:text-md lg:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 lg:line-clamp-2"
+                                    variants={{
+                                      rest: {},
+                                      hover: { color: "rgb(34, 197, 94)" }
+                                    }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    {restaurant.name}
+                                  </motion.h3>
+                                </div>
+                                <motion.div
+                                  className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1"
                                   variants={{
-                                    rest: {},
-                                    hover: { color: "rgb(34, 197, 94)" }
+                                    rest: { scale: 1, rotate: 0 },
+                                    hover: { scale: 1.1, rotate: 5 }
                                   }}
-                                  transition={{ duration: 0.3 }}
+                                  transition={{ duration: 0.3, type: "spring", stiffness: 400 }}
                                 >
-                                  {restaurant.name}
-                                </motion.h3>
+                                  <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
+                                  <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
+                                </motion.div>
                               </div>
-                              <motion.div 
-                                className="flex-shrink-0 bg-green-600 text-white px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg flex items-center gap-1"
-                                variants={{
-                                  rest: { scale: 1, rotate: 0 },
-                                  hover: { scale: 1.1, rotate: 5 }
-                                }}
-                                transition={{ duration: 0.3, type: "spring", stiffness: 400 }}
-                              >
-                                <span className="text-sm lg:text-base font-bold">{restaurant.rating}</span>
-                                <Star className="h-3 w-3 lg:h-4 lg:w-4 fill-white text-white" />
-                              </motion.div>
-                            </div>
 
-                            {/* Delivery Time & Distance */}
-                            <motion.div 
-                              className="flex items-center gap-1 text-sm lg:text-base text-gray-500 mb-2 lg:mb-3"
-                              variants={{
-                                rest: { opacity: 0.7 },
-                                hover: { opacity: 1 }
-                              }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <Clock className="h-4 w-4 lg:h-5 lg:w-5 text-gray-500 dark:text-gray-400" strokeWidth={1.5} />
-                              <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.deliveryTime}</span>
-                              <span className="mx-1">|</span>
-                              <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.distance}</span>
-                            </motion.div>
-
-                            {/* Offer Badge */}
-                            {restaurant.offer && (
-                              <motion.div 
-                                className="flex items-center gap-2 text-sm lg:text-base mt-auto"
+                              {/* Delivery Time & Distance */}
+                              <motion.div
+                                className="flex items-center gap-1 text-sm lg:text-base text-gray-500 mb-2 lg:mb-3"
                                 variants={{
-                                  rest: { x: 0 },
-                                  hover: { x: 4 }
+                                  rest: { opacity: 0.7 },
+                                  hover: { opacity: 1 }
                                 }}
                                 transition={{ duration: 0.3 }}
                               >
-                                <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-black" strokeWidth={2} />
-                                <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
+                                <Clock className="h-4 w-4 lg:h-5 lg:w-5 text-gray-500 dark:text-gray-400" strokeWidth={1.5} />
+                                <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.deliveryTime}</span>
+                                <span className="mx-1">|</span>
+                                <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.distance}</span>
                               </motion.div>
-                            )}
+
+                              {/* Offer Badge */}
+                              {restaurant.offer && (
+                                <motion.div
+                                  className="flex items-center gap-2 text-sm lg:text-base mt-auto"
+                                  variants={{
+                                    rest: { x: 0 },
+                                    hover: { x: 4 }
+                                  }}
+                                  transition={{ duration: 0.3 }}
+                                >
+                                  <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-black" strokeWidth={2} />
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
+                                </motion.div>
+                              )}
                             </CardContent>
                           </motion.div>
-                          
+
                           {/* Border Glow Effect */}
                           <motion.div
                             className="absolute inset-0 rounded-md pointer-events-none z-0"
                             variants={{
-                              rest: { 
+                              rest: {
                                 boxShadow: "inset 0 0 0 0px rgba(34, 197, 94, 0)",
                                 border: "1px solid transparent"
                               },
-                              hover: { 
+                              hover: {
                                 boxShadow: "inset 0 0 0 1px rgba(34, 197, 94, 0.2)",
                                 border: "1px solid rgba(34, 197, 94, 0.3)"
                               }
@@ -2549,366 +2547,366 @@ export default function Home() {
             />
 
             {/* Modal Content */}
-            <motion.div 
+            <motion.div
               className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#1a1a1a] rounded-t-3xl max-h-[85vh] flex flex-col"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ 
-                type: "spring", 
-                damping: 30, 
+              transition={{
+                type: "spring",
+                damping: 30,
                 stiffness: 400,
                 duration: 0.3
               }}
             >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-4 border-b dark:border-gray-800">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Filters and sorting</h2>
-              <button
-                onClick={() => {
-                  setActiveFilters(new Set())
-                  setSortBy(null)
-                  setSelectedCuisine(null)
-                }}
-                className="text-green-600 font-medium text-sm"
-              >
-                Clear all
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex flex-1 overflow-hidden">
-              {/* Left Sidebar - Tabs */}
-              <div className="w-24 sm:w-28 bg-gray-50 dark:bg-[#0a0a0a] border-r dark:border-gray-800 flex flex-col">
-                {[
-                  { id: 'sort', label: 'Sort By', icon: ArrowDownUp },
-                  { id: 'time', label: 'Time', icon: Timer },
-                  { id: 'rating', label: 'Rating', icon: Star },
-                  { id: 'distance', label: 'Distance', icon: MapPin },
-                  { id: 'price', label: 'Dish Price', icon: IndianRupee },
-                  { id: 'cuisine', label: 'Cuisine', icon: UtensilsCrossed },
-                  { id: 'offers', label: 'Offers', icon: BadgePercent },
-                  { id: 'trust', label: 'Trust', icon: ShieldCheck },
-                ].map((tab) => {
-                  const Icon = tab.icon
-                  const isActive = activeScrollSection === tab.id || activeFilterTab === tab.id
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        setActiveFilterTab(tab.id)
-                        const section = filterSectionRefs.current[tab.id]
-                        if (section) {
-                          section.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        }
-                      }}
-                      className={`flex flex-col items-center gap-1 py-4 px-2 text-center relative transition-colors ${isActive ? 'bg-white dark:bg-[#1a1a1a] text-green-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                        }`}
-                    >
-                      {isActive && (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-600 rounded-r" />
-                      )}
-                      <Icon className="h-5 w-5" strokeWidth={1.5} />
-                      <span className="text-xs font-medium leading-tight">{tab.label}</span>
-                    </button>
-                  )
-                })}
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-4 border-b dark:border-gray-800">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Filters and sorting</h2>
+                <button
+                  onClick={() => {
+                    setActiveFilters(new Set())
+                    setSortBy(null)
+                    setSelectedCuisine(null)
+                  }}
+                  className="text-green-600 font-medium text-sm"
+                >
+                  Clear all
+                </button>
               </div>
 
-              {/* Right Content Area - Scrollable */}
-              <div ref={rightContentRef} className="flex-1 overflow-y-auto p-4">
-                {/* Sort By Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['sort'] = el}
-                  data-section-id="sort"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sort by</h3>
-                  <div className="flex flex-col gap-3">
-                    {[
-                      { id: null, label: 'Relevance' },
-                      { id: 'price-low', label: 'Price: Low to High' },
-                      { id: 'price-high', label: 'Price: High to Low' },
-                      { id: 'rating-high', label: 'Rating: High to Low' },
-                      { id: 'rating-low', label: 'Rating: Low to High' },
-                    ].map((option) => (
+              {/* Body */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Left Sidebar - Tabs */}
+                <div className="w-24 sm:w-28 bg-gray-50 dark:bg-[#0a0a0a] border-r dark:border-gray-800 flex flex-col">
+                  {[
+                    { id: 'sort', label: 'Sort By', icon: ArrowDownUp },
+                    { id: 'time', label: 'Time', icon: Timer },
+                    { id: 'rating', label: 'Rating', icon: Star },
+                    { id: 'distance', label: 'Distance', icon: MapPin },
+                    { id: 'price', label: 'Dish Price', icon: IndianRupee },
+                    { id: 'cuisine', label: 'Cuisine', icon: UtensilsCrossed },
+                    { id: 'offers', label: 'Offers', icon: BadgePercent },
+                    { id: 'trust', label: 'Trust', icon: ShieldCheck },
+                  ].map((tab) => {
+                    const Icon = tab.icon
+                    const isActive = activeScrollSection === tab.id || activeFilterTab === tab.id
+                    return (
                       <button
-                        key={option.id || 'relevance'}
-                        onClick={() => setSortBy(option.id)}
-                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id
-                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveFilterTab(tab.id)
+                          const section = filterSectionRefs.current[tab.id]
+                          if (section) {
+                            section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                          }
+                        }}
+                        className={`flex flex-col items-center gap-1 py-4 px-2 text-center relative transition-colors ${isActive ? 'bg-white dark:bg-[#1a1a1a] text-green-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                           }`}
                       >
-                        <span className={`text-sm font-medium ${sortBy === option.id ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                          {option.label}
-                        </span>
+                        {isActive && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-600 rounded-r" />
+                        )}
+                        <Icon className="h-5 w-5" strokeWidth={1.5} />
+                        <span className="text-xs font-medium leading-tight">{tab.label}</span>
                       </button>
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
 
-                {/* Time Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['time'] = el}
-                  data-section-id="time"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Delivery Time</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => toggleFilter('delivery-under-30')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-30')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                      <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 30 mins</span>
-                    </button>
-                    <button
-                      onClick={() => toggleFilter('delivery-under-45')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-45')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                      <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 45 mins</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Rating Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['rating'] = el}
-                  data-section-id="rating"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900  dark:text-white mb-4">Restaurant Rating</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => toggleFilter('rating-35-plus')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-35-plus')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <Star className={`h-6 w-6 ${activeFilters.has('rating-35-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                      <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 3.5+</span>
-                    </button>
-                    <button
-                      onClick={() => toggleFilter('rating-4-plus')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-4-plus')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <Star className={`h-6 w-6 ${activeFilters.has('rating-4-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                      <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.0+</span>
-                    </button>
-                    <button
-                      onClick={() => toggleFilter('rating-45-plus')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-45-plus')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <Star className={`h-6 w-6 ${activeFilters.has('rating-45-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
-                      <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.5+</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Distance Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['distance'] = el}
-                  data-section-id="distance"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Distance</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => toggleFilter('distance-under-1km')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                      <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 1 km</span>
-                    </button>
-                    <button
-                      onClick={() => toggleFilter('distance-under-2km')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                      <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 2 km</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Price Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['price'] = el}
-                  data-section-id="price"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dish Price</h3>
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => toggleFilter('price-under-200')}
-                      className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹200</span>
-                    </button>
-                    <button
-                      onClick={() => toggleFilter('price-under-500')}
-                      className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-500')
-                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                        }`}
-                    >
-                      <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹500</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cuisine Tab */}
-                <div
-                  ref={el => filterSectionRefs.current['cuisine'] = el}
-                  data-section-id="cuisine"
-                  className="space-y-4 mb-8"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Cuisine</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Chinese', 'American', 'Japanese', 'Italian', 'Mexican', 'Indian', 'Asian', 'Seafood', 'Desserts', 'Cafe', 'Healthy'].map((cuisine) => (
-                      <button
-                        key={cuisine}
-                        onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)}
-                        className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine
-                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
-                          }`}
-                      >
-                        <span className={`text-sm font-medium ${selectedCuisine === cuisine ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                          {cuisine}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Trust Markers Tab */}
-                {activeFilterTab === 'trust' && (
+                {/* Right Content Area - Scrollable */}
+                <div ref={rightContentRef} className="flex-1 overflow-y-auto p-4">
+                  {/* Sort By Tab */}
                   <div
-                    ref={el => filterSectionRefs.current['trust'] = el}
-                    data-section-id="trust"
+                    ref={el => filterSectionRefs.current['sort'] = el}
+                    data-section-id="sort"
                     className="space-y-4 mb-8"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Trust Markers</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sort by</h3>
                     <div className="flex flex-col gap-3">
-                      <button
-                        onClick={() => toggleFilter('top-rated')}
-                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('top-rated')
+                      {[
+                        { id: null, label: 'Relevance' },
+                        { id: 'price-low', label: 'Price: Low to High' },
+                        { id: 'price-high', label: 'Price: High to Low' },
+                        { id: 'rating-high', label: 'Rating: High to Low' },
+                        { id: 'rating-low', label: 'Rating: Low to High' },
+                      ].map((option) => (
+                        <button
+                          key={option.id || 'relevance'}
+                          onClick={() => setSortBy(option.id)}
+                          className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id
                             ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
                             : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                            }`}
+                        >
+                          <span className={`text-sm font-medium ${sortBy === option.id ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {option.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Time Tab */}
+                  <div
+                    ref={el => filterSectionRefs.current['time'] = el}
+                    data-section-id="time"
+                    className="space-y-4 mb-8"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Delivery Time</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => toggleFilter('delivery-under-30')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-30')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
                           }`}
                       >
-                        <span className={`text-sm font-medium ${activeFilters.has('top-rated') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Top Rated</span>
+                        <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
+                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 30 mins</span>
                       </button>
                       <button
-                        onClick={() => toggleFilter('trusted')}
-                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('trusted')
-                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                        onClick={() => toggleFilter('delivery-under-45')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-45')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
                           }`}
                       >
-                        <span className={`text-sm font-medium ${activeFilters.has('trusted') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Trusted by 1000+ users</span>
+                        <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
+                        <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 45 mins</span>
                       </button>
                     </div>
                   </div>
-                )}
-                
-                {/* Offers Tab */}
-                {activeFilterTab === 'offers' && (
+
+                  {/* Rating Tab */}
                   <div
-                    ref={el => filterSectionRefs.current['offers'] = el}
-                    data-section-id="offers"
+                    ref={el => filterSectionRefs.current['rating'] = el}
+                    data-section-id="rating"
                     className="space-y-4 mb-8"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Offers</h3>
-                    <div className="flex flex-col gap-3">
+                    <h3 className="text-lg font-semibold text-gray-900  dark:text-white mb-4">Restaurant Rating</h3>
+                    <div className="grid grid-cols-2 gap-3">
                       <button
-                        onClick={() => toggleFilter('has-offers')}
-                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('has-offers')
-                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                        onClick={() => toggleFilter('rating-35-plus')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-35-plus')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
                           }`}
                       >
-                        <span className={`text-sm font-medium ${activeFilters.has('has-offers') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Restaurants with offers</span>
+                        <Star className={`h-6 w-6 ${activeFilters.has('rating-35-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 3.5+</span>
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('rating-4-plus')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-4-plus')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <Star className={`h-6 w-6 ${activeFilters.has('rating-4-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.0+</span>
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('rating-45-plus')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-45-plus')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <Star className={`h-6 w-6 ${activeFilters.has('rating-45-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400 dark:text-gray-500'}`} />
+                        <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.5+</span>
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Footer */}
-            <div className="flex items-center gap-4 px-4 py-4 border-t dark:border-gray-800 bg-white dark:bg-[#1a1a1a]">
-              <button
-                onClick={() => setIsFilterOpen(false)}
-                className="flex-1 py-3 text-center font-semibold text-gray-700 dark:text-gray-300"
-              >
-                Close
-              </button>
-              <button
-                onClick={async () => {
-                  // Apply filters
-                  setAppliedFilters({
-                    activeFilters: new Set(activeFilters),
-                    sortBy,
-                    selectedCuisine
-                  })
-                  setIsLoadingFilterResults(true)
-                  setIsFilterOpen(false)
-                  
-                  // Refetch restaurants with new filters
-                  try {
-                    await fetchRestaurants({
+                  {/* Distance Tab */}
+                  <div
+                    ref={el => filterSectionRefs.current['distance'] = el}
+                    data-section-id="distance"
+                    className="space-y-4 mb-8"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Distance</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => toggleFilter('distance-under-1km')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
+                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 1 km</span>
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('distance-under-2km')}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
+                        <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under 2 km</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Price Tab */}
+                  <div
+                    ref={el => filterSectionRefs.current['price'] = el}
+                    data-section-id="price"
+                    className="space-y-4 mb-8"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dish Price</h3>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => toggleFilter('price-under-200')}
+                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹200</span>
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('price-under-500')}
+                        className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-500')
+                          ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                          }`}
+                      >
+                        <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹500</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cuisine Tab */}
+                  <div
+                    ref={el => filterSectionRefs.current['cuisine'] = el}
+                    data-section-id="cuisine"
+                    className="space-y-4 mb-8"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Cuisine</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {['Chinese', 'American', 'Japanese', 'Italian', 'Mexican', 'Indian', 'Asian', 'Seafood', 'Desserts', 'Cafe', 'Healthy'].map((cuisine) => (
+                        <button
+                          key={cuisine}
+                          onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)}
+                          className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine
+                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                            }`}
+                        >
+                          <span className={`text-sm font-medium ${selectedCuisine === cuisine ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {cuisine}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trust Markers Tab */}
+                  {activeFilterTab === 'trust' && (
+                    <div
+                      ref={el => filterSectionRefs.current['trust'] = el}
+                      data-section-id="trust"
+                      className="space-y-4 mb-8"
+                    >
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Trust Markers</h3>
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => toggleFilter('top-rated')}
+                          className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('top-rated')
+                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                            }`}
+                        >
+                          <span className={`text-sm font-medium ${activeFilters.has('top-rated') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Top Rated</span>
+                        </button>
+                        <button
+                          onClick={() => toggleFilter('trusted')}
+                          className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('trusted')
+                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                            }`}
+                        >
+                          <span className={`text-sm font-medium ${activeFilters.has('trusted') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Trusted by 1000+ users</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Offers Tab */}
+                  {activeFilterTab === 'offers' && (
+                    <div
+                      ref={el => filterSectionRefs.current['offers'] = el}
+                      data-section-id="offers"
+                      className="space-y-4 mb-8"
+                    >
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Offers</h3>
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => toggleFilter('has-offers')}
+                          className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('has-offers')
+                            ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-800 hover:border-green-600'
+                            }`}
+                        >
+                          <span className={`text-sm font-medium ${activeFilters.has('has-offers') ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>Restaurants with offers</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-4 px-4 py-4 border-t dark:border-gray-800 bg-white dark:bg-[#1a1a1a]">
+                <button
+                  onClick={() => setIsFilterOpen(false)}
+                  className="flex-1 py-3 text-center font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={async () => {
+                    // Apply filters
+                    setAppliedFilters({
                       activeFilters: new Set(activeFilters),
                       sortBy,
                       selectedCuisine
                     })
-                  } catch (error) {
-                    console.error('Error applying filters:', error)
-                  } finally {
-                    setIsLoadingFilterResults(false)
-                  }
-                }}
-                className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${activeFilters.size > 0 || sortBy || selectedCuisine
+                    setIsLoadingFilterResults(true)
+                    setIsFilterOpen(false)
+
+                    // Refetch restaurants with new filters
+                    try {
+                      await fetchRestaurants({
+                        activeFilters: new Set(activeFilters),
+                        sortBy,
+                        selectedCuisine
+                      })
+                    } catch (error) {
+                      console.error('Error applying filters:', error)
+                    } finally {
+                      setIsLoadingFilterResults(false)
+                    }
+                  }}
+                  className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${activeFilters.size > 0 || sortBy || selectedCuisine
                     ? 'bg-green-600 text-white hover:bg-green-700'
                     : 'bg-gray-200 text-gray-500'
-                  }`}
-                disabled={isLoadingFilterResults}
-              >
-                {isLoadingFilterResults ? (
-                  'Loading...'
-                ) : activeFilters.size > 0 || sortBy || selectedCuisine ? (
-                  `Show results`
-                ) : (
-                  'Show results'
-                )}
-              </button>
-            </div>
-          </motion.div>
-        </div>
+                    }`}
+                  disabled={isLoadingFilterResults}
+                >
+                  {isLoadingFilterResults ? (
+                    'Loading...'
+                  ) : activeFilters.size > 0 || sortBy || selectedCuisine ? (
+                    `Show results`
+                  ) : (
+                    'Show results'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -2979,8 +2977,8 @@ export default function Home() {
                       className="sr-only"
                     />
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${vegModeOption === "all"
-                        ? "border-green-600 dark:border-green-500 bg-green-600 dark:bg-green-500"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a]"
+                      ? "border-green-600 dark:border-green-500 bg-green-600 dark:bg-green-500"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a]"
                       }`}>
                       {vegModeOption === "all" && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-white" />
@@ -3007,8 +3005,8 @@ export default function Home() {
                       className="sr-only"
                     />
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${vegModeOption === "pure-veg"
-                        ? "border-green-600 dark:border-green-500 bg-green-600 dark:bg-green-500"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a]"
+                      ? "border-green-600 dark:border-green-500 bg-green-600 dark:bg-green-500"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a]"
                       }`}>
                       {vegModeOption === "pure-veg" && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-white" />
@@ -3176,24 +3174,24 @@ export default function Home() {
               <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 sm:py-5">
                 <div className="grid grid-cols-3 gap-4 sm:gap-5 md:gap-6">
                   {(realCategories.length > 0 ? realCategories : landingCategories).map((category, index) => {
-                    const categoryData = realCategories.length > 0 
+                    const categoryData = realCategories.length > 0
                       ? { name: category.name, image: category.image || '', slug: category.slug }
                       : { name: category.label, image: category.imageUrl || '', slug: category.slug }
-                    
+
                     return (
                       <motion.div
                         key={category.id || category._id || index}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ 
-                          duration: 0.3, 
+                        transition={{
+                          duration: 0.3,
                           delay: index * 0.02,
                           type: "spring",
                           stiffness: 100
                         }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <Link 
+                        <Link
                           to={`/user/category/${categoryData.slug || categoryData.name.toLowerCase().replace(/\s+/g, '-')}`}
                           onClick={() => setShowAllCategoriesModal(false)}
                           className="block"
@@ -3481,7 +3479,7 @@ export default function Home() {
                   transition={{ delay: 0.5 }}
                 >
                   Veg Mode for you
-                </motion.p> 
+                </motion.p>
               </motion.div>
             </div>
           </motion.div>

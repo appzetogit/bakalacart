@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { Mail, Phone, AlertCircle, Loader2 } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
@@ -63,6 +63,38 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState("")
   const redirectHandledRef = useRef(false)
+
+  // Prefill form data from sessionStorage if available (when coming back from OTP)
+  useEffect(() => {
+    const stored = sessionStorage.getItem("userAuthData")
+    if (stored) {
+      try {
+        const data = JSON.parse(stored)
+        if (data.method === "phone" && data.phone) {
+          setAuthMethod("phone")
+          // Split country code and number
+          const phoneParts = data.phone.split(" ")
+          if (phoneParts.length >= 2) {
+            setFormData(prev => ({
+              ...prev,
+              countryCode: phoneParts[0],
+              phone: phoneParts[1],
+              name: data.name || prev.name
+            }))
+          }
+        } else if (data.method === "email" && data.email) {
+          setAuthMethod("email")
+          setFormData(prev => ({
+            ...prev,
+            email: data.email,
+            name: data.name || prev.name
+          }))
+        }
+      } catch (e) {
+        console.error("Error parsing stored auth data:", e)
+      }
+    }
+  }, [])
 
   // Helper function to process signed-in user
   const processSignedInUser = async (user, source = "unknown") => {
@@ -470,9 +502,18 @@ export default function SignIn() {
       return "Phone number is required"
     }
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, "")
-    const phoneRegex = /^\d{7,15}$/
-    if (!phoneRegex.test(cleanPhone)) {
-      return "Phone number must be 7-15 digits"
+
+    // Specific validation for India (+91)
+    if (formData.countryCode === "+91") {
+      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+        return "Please enter a valid 10-digit mobile number"
+      }
+    } else {
+      // Generic validation for other countries
+      const phoneRegex = /^\d{7,15}$/
+      if (!phoneRegex.test(cleanPhone)) {
+        return "Phone number must be 7-15 digits"
+      }
     }
     return ""
   }
@@ -496,6 +537,18 @@ export default function SignIn() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
+
+    // For phone field, only allow digits
+    if (name === "phone") {
+      const digitValue = value.replace(/\D/g, "").slice(0, 15) // Only digits, max 15
+      setFormData({
+        ...formData,
+        [name]: digitValue,
+      })
+      setErrors({ ...errors, phone: validatePhone(digitValue) })
+      return
+    }
+
     setFormData({
       ...formData,
       [name]: value,
@@ -504,8 +557,6 @@ export default function SignIn() {
     // Real-time validation
     if (name === "email") {
       setErrors({ ...errors, email: validateEmail(value) })
-    } else if (name === "phone") {
-      setErrors({ ...errors, phone: validatePhone(value) })
     } else if (name === "name") {
       setErrors({ ...errors, name: validateName(value) })
     }
@@ -660,11 +711,11 @@ export default function SignIn() {
   }
 
   return (
-    <AnimatedPage className="max-h-screen flex flex-col bg-white dark:bg-[#0a0a0a] overflow-hidden !pb-0 md:flex-row md:overflow-hidden">
+    <AnimatedPage className="h-[100dvh] flex flex-col bg-white dark:bg-[#0a0a0a] overflow-hidden !pb-0 md:flex-row">
 
       {/* Mobile: Top Section - Banner Image */}
       {/* Desktop: Left Section - Banner Image */}
-      <div className="relative md:hidden w-full shrink-0" style={{ height: "45vh", minHeight: "300px" }}>
+      <div className="relative md:hidden w-full shrink-0" style={{ height: "30vh", minHeight: "180px" }}>
         <img
           src={loginBanner}
           alt="Food Banner"
@@ -684,14 +735,14 @@ export default function SignIn() {
 
       {/* Mobile: Bottom Section - White Login Form */}
       {/* Desktop: Right Section - Login Form */}
-      <div className="bg-white dark:bg-[#1a1a1a] p-3 sm:p-4 md:p-6 lg:p-8 xl:p-10 overflow-y-auto md:w-1/2 md:flex md:items-center md:justify-center md:h-screen">
-        <div className="max-w-md lg:max-w-lg xl:max-w-xl mx-auto space-y-6 md:space-y-8 lg:space-y-10 w-full">
+      <div className="min-h-[100dvh] bg-white dark:bg-[#1a1a1a] flex flex-col pb-12 p-4 sm:p-6 md:p-8 lg:p-10 overflow-y-auto md:w-1/2 md:flex md:items-center md:justify-center md:h-screen">
+        <div className="max-w-md lg:max-w-lg xl:max-w-xl mx-auto space-y-4 md:space-y-6 lg:space-y-8 w-full">
           {/* Heading */}
-          <div className="text-center space-y-2 md:space-y-3">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-black dark:text-white leading-tight">
+          <div className="text-center space-y-1 md:space-y-3">
+            <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-black dark:text-white leading-tight">
               Grocery & Food Delivery App
             </h2>
-            <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-400">
+            <p className="text-xs sm:text-base md:text-lg text-gray-600 dark:text-gray-400">
               Log in or sign up
             </p>
           </div>
@@ -898,16 +949,16 @@ export default function SignIn() {
           </div>
 
           {/* Legal Disclaimer */}
-          <div className="text-center text-xs md:text-sm text-gray-500 dark:text-gray-400 pt-4 md:pt-6">
+          <div className="text-center text-[10px] md:text-sm text-gray-500 dark:text-gray-400 pt-2 md:pt-6">
             <p className="mb-1 md:mb-2">
               By continuing, you agree to our
             </p>
-            <div className="flex justify-center gap-2 flex-wrap">
-              <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Terms of Service</a>
+            <div className="flex justify-center gap-2 flex-wrap text-gray-600 dark:text-gray-400">
+              <Link to="/terms" className="underline hover:text-[#E23744] transition-colors">Terms</Link>
               <span>•</span>
-              <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Privacy Policy</a>
+              <Link to="/privacy" className="underline hover:text-[#E23744] transition-colors">Privacy</Link>
               <span>•</span>
-              <a href="#" className="underline hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Content Policy</a>
+              <Link to="/content-policy" className="underline hover:text-[#E23744] transition-colors">Content Policy</Link>
             </div>
           </div>
         </div>
