@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom"
+import { Navigate, useLocation } from "react-router-dom"
 import { isModuleAuthenticated } from "@/lib/utils/auth"
 
 /**
@@ -12,6 +12,7 @@ import { isModuleAuthenticated } from "@/lib/utils/auth"
  * @param {string} props.redirectTo - Path to redirect to if authenticated (optional, defaults to module home)
  */
 export default function AuthRedirect({ children, module, redirectTo = null }) {
+  const location = useLocation()
   // Check if user is authenticated for this module
   const isAuthenticated = isModuleAuthenticated(module)
 
@@ -23,9 +24,10 @@ export default function AuthRedirect({ children, module, redirectTo = null }) {
     admin: "/admin",
   }
 
-  // If authenticated, redirect to module home page
+  // If authenticated, redirect to module home page or the page they came from
   if (isAuthenticated) {
-    const homePath = redirectTo || moduleHomePages[module] || "/"
+    const from = location.state?.from?.pathname || location.state?.from;
+    const homePath = from || redirectTo || moduleHomePages[module] || "/"
     return <Navigate to={homePath} replace />
   }
 

@@ -69,12 +69,12 @@ export function CartProvider({ children }) {
           const firstItemRestaurantName = prev[0]?.restaurant;
           const newItemRestaurantId = item?.restaurantId;
           const newItemRestaurantName = item?.restaurant;
-          
+
           // Normalize restaurant names for comparison (trim and case-insensitive)
           const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
           const firstRestaurantNameNormalized = normalizeName(firstItemRestaurantName);
           const newRestaurantNameNormalized = normalizeName(newItemRestaurantName);
-          
+
           // Check restaurant name first (more reliable than IDs which can have different formats)
           // If names match, allow it even if IDs differ (same restaurant, different ID format)
           if (firstRestaurantNameNormalized && newRestaurantNameNormalized) {
@@ -125,7 +125,7 @@ export function CartProvider({ children }) {
             }
           }
         }
-        
+
         const existing = prev.find((i) => i.id === item.id)
         if (existing) {
           // Set last add event for animation when incrementing existing item
@@ -145,7 +145,7 @@ export function CartProvider({ children }) {
             i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
           )
         }
-        
+
         // Validate item has required restaurant info
         if (!item.restaurantId && !item.restaurant) {
           toast.error('Cannot add item: Missing restaurant information. Please refresh the page.');
@@ -156,9 +156,9 @@ export function CartProvider({ children }) {
           // Return previous cart without changes
           return prev;
         }
-        
+
         const newItem = { ...item, quantity: 1 }
-        
+
         // Set last add event for animation if sourcePosition is provided
         if (sourcePosition) {
           setLastAddEvent({
@@ -172,7 +172,7 @@ export function CartProvider({ children }) {
           // Clear after animation completes (increased delay to allow full animation)
           setTimeout(() => setLastAddEvent(null), 1500)
         }
-        
+
         return [...prev, newItem]
       })
     } catch (error) {
@@ -223,7 +223,7 @@ export function CartProvider({ children }) {
       })
       return
     }
-    
+
     // When quantity decreases (but not to 0), also trigger removal animation
     setCart((prev) => {
       const existingItem = prev.find((i) => i.id === itemId)
@@ -251,38 +251,46 @@ export function CartProvider({ children }) {
 
   const getCartItem = (itemId) => cart.find((i) => i.id === itemId)
 
-  const clearCart = () => setCart([])
+  const clearCart = () => {
+    setCart([])
+    try {
+      localStorage.setItem("cart", JSON.stringify([]))
+      // Also clear any other related keys if necessary
+    } catch (error) {
+      console.error('Error clearing cart from storage:', error)
+    }
+  }
 
   // Clean cart to remove items from different restaurants
   // Keeps only items from the specified restaurant
   const cleanCartForRestaurant = (restaurantId, restaurantName) => {
     setCart((prev) => {
       if (prev.length === 0) return prev;
-      
+
       // Normalize restaurant name for comparison
       const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
       const targetRestaurantNameNormalized = normalizeName(restaurantName);
-      
+
       // Filter cart to keep only items from the target restaurant
       const cleanedCart = prev.filter((item) => {
         const itemRestaurantId = item?.restaurantId;
         const itemRestaurantName = item?.restaurant;
         const itemRestaurantNameNormalized = normalizeName(itemRestaurantName);
-        
+
         // Check by restaurant name first (more reliable)
         if (targetRestaurantNameNormalized && itemRestaurantNameNormalized) {
           return itemRestaurantNameNormalized === targetRestaurantNameNormalized;
         }
         // Fallback to ID comparison
         if (restaurantId && itemRestaurantId) {
-          return itemRestaurantId === restaurantId || 
-                 itemRestaurantId === restaurantId.toString() ||
-                 itemRestaurantId.toString() === restaurantId;
+          return itemRestaurantId === restaurantId ||
+            itemRestaurantId === restaurantId.toString() ||
+            itemRestaurantId.toString() === restaurantId;
         }
         // If no match, remove item
         return false;
       });
-      
+
       if (cleanedCart.length !== prev.length) {
         console.warn('🧹 Cleaned cart: Removed items from different restaurants', {
           before: prev.length,
@@ -290,7 +298,7 @@ export function CartProvider({ children }) {
           removed: prev.length - cleanedCart.length
         });
       }
-      
+
       return cleanedCart;
     });
   }
@@ -299,47 +307,47 @@ export function CartProvider({ children }) {
   // This runs only once on initial load to clean up any corrupted cart data from localStorage
   useEffect(() => {
     if (cart.length === 0) return;
-    
+
     // Get unique restaurant IDs and names
     const restaurantIds = cart.map(item => item.restaurantId).filter(Boolean);
     const restaurantNames = cart.map(item => item.restaurant).filter(Boolean);
     const uniqueRestaurantIds = [...new Set(restaurantIds)];
     const uniqueRestaurantNames = [...new Set(restaurantNames)];
-    
+
     // Normalize restaurant names for comparison
     const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
     const uniqueRestaurantNamesNormalized = uniqueRestaurantNames.map(normalizeName);
     const uniqueRestaurantNamesSet = new Set(uniqueRestaurantNamesNormalized);
-    
+
     // Check if cart has items from multiple restaurants
     if (uniqueRestaurantIds.length > 1 || uniqueRestaurantNamesSet.size > 1) {
       console.warn('⚠️ Cart contains items from multiple restaurants. Cleaning cart...', {
         restaurantIds: uniqueRestaurantIds,
         restaurantNames: uniqueRestaurantNames
       });
-      
+
       // Keep items from the first restaurant (most recent or first in cart)
       const firstRestaurantId = uniqueRestaurantIds[0];
       const firstRestaurantName = uniqueRestaurantNames[0];
-      
+
       setCart((prev) => {
         const normalizeName = (name) => name ? name.trim().toLowerCase() : '';
         const firstRestaurantNameNormalized = normalizeName(firstRestaurantName);
-        
+
         return prev.filter((item) => {
           const itemRestaurantId = item?.restaurantId;
           const itemRestaurantName = item?.restaurant;
           const itemRestaurantNameNormalized = normalizeName(itemRestaurantName);
-          
+
           // Check by restaurant name first
           if (firstRestaurantNameNormalized && itemRestaurantNameNormalized) {
             return itemRestaurantNameNormalized === firstRestaurantNameNormalized;
           }
           // Fallback to ID comparison
           if (firstRestaurantId && itemRestaurantId) {
-            return itemRestaurantId === firstRestaurantId || 
-                   itemRestaurantId === firstRestaurantId.toString() ||
-                   itemRestaurantId.toString() === firstRestaurantId;
+            return itemRestaurantId === firstRestaurantId ||
+              itemRestaurantId === firstRestaurantId.toString() ||
+              itemRestaurantId.toString() === firstRestaurantId;
           }
           return false;
         });
@@ -358,10 +366,10 @@ export function CartProvider({ children }) {
       },
       quantity: item.quantity || 1,
     }))
-    
+
     const itemCount = cart.reduce((total, item) => total + (item.quantity || 0), 0)
     const total = cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0)
-    
+
     return {
       items,
       itemCount,
