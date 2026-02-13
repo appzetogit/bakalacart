@@ -111,6 +111,9 @@ export default function OrderTracking() {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
+  const [showNoteDialog, setShowNoteDialog] = useState(false)
+  const [orderNote, setOrderNote] = useState("")
+  const [isUpdatingNote, setIsUpdatingNote] = useState(false)
 
   // Chat State
   const [chatOpen, setChatOpen] = useState(false);
@@ -150,6 +153,29 @@ export default function OrderTracking() {
     }
   }
 
+  // Sync orderNote with order.note
+  useEffect(() => {
+    if (order?.note) {
+      setOrderNote(order.note)
+    }
+  }, [order?.note])
+
+  const handleUpdateNote = async () => {
+    try {
+      setIsUpdatingNote(true)
+      const res = await orderAPI.updateOrderNote(order._id || order.orderId || orderId, orderNote)
+      if (res.data.success) {
+        toast.success("Delivery instructions updated")
+        setOrder(prev => ({ ...prev, note: orderNote }))
+        setShowNoteDialog(false)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update instructions")
+    } finally {
+      setIsUpdatingNote(false)
+    }
+  }
+
   // Initialize Socket for Chat
   useEffect(() => {
     if (!orderId) return;
@@ -174,12 +200,12 @@ export default function OrderTracking() {
           const msgKey = `${msg.message}_${msg.timestamp}_${msg.sender}`
           return msgKey === messageKey
         })
-        
+
         if (exists) {
           console.log('⚠️ Duplicate message detected, skipping')
           return prev
         }
-        
+
         const updated = [...prev, data]
         // Save to history whenever messages change
         const orderIdToSave = order?._id || order?.orderId || orderId
@@ -207,7 +233,7 @@ export default function OrderTracking() {
   // Join additional order room when order is loaded (for MongoDB _id format)
   useEffect(() => {
     if (!socket || !order?._id) return;
-    
+
     // If order._id is different from orderId, join that room too
     if (order._id !== orderId) {
       socket.emit('join-order-tracking', order._id);
@@ -439,11 +465,20 @@ export default function OrderTracking() {
           console.log('📍 Final restaurant coordinates:', restaurantCoords);
           console.log('📍 Customer coordinates:', apiOrder.address?.location?.coordinates);
 
+          // Extract restaurant phone with fallbacks
+          const restaurantPhone =
+            apiOrder.restaurantId?.primaryContactNumber ||
+            apiOrder.restaurantId?.phone ||
+            apiOrder.restaurantId?.ownerPhone ||
+            apiOrder.restaurantPhone ||
+            '';
+
           // Transform API order to match component structure
           const transformedOrder = {
             id: apiOrder.orderId || apiOrder._id,
             restaurant: apiOrder.restaurantName || 'Restaurant',
             restaurantId: apiOrder.restaurantId || null, // Include restaurantId for location access
+            restaurantPhone: restaurantPhone,
             userId: apiOrder.userId || null, // Include user data for phone number
             userName: apiOrder.userName || apiOrder.userId?.name || apiOrder.userId?.fullName || '',
             userPhone: apiOrder.userPhone || apiOrder.userId?.phone || '',
@@ -652,10 +687,19 @@ export default function OrderTracking() {
           }
         }
 
+        // Extract restaurant phone with fallbacks
+        const restaurantPhone =
+          apiOrder.restaurantId?.primaryContactNumber ||
+          apiOrder.restaurantId?.phone ||
+          apiOrder.restaurantId?.ownerPhone ||
+          apiOrder.restaurantPhone ||
+          '';
+
         const transformedOrder = {
           id: apiOrder.orderId || apiOrder._id,
           restaurant: apiOrder.restaurantName || 'Restaurant',
           restaurantId: apiOrder.restaurantId || null, // Include restaurantId for location access
+          restaurantPhone: restaurantPhone,
           userId: apiOrder.userId || null, // Include user data for phone number
           userName: apiOrder.userName || apiOrder.userId?.name || apiOrder.userId?.fullName || '',
           userPhone: apiOrder.userPhone || apiOrder.userId?.phone || '',
@@ -707,6 +751,17 @@ export default function OrderTracking() {
     } finally {
       setIsRefreshing(false)
     }
+  }
+
+  const handleCallRestaurant = () => {
+    const phone = order?.restaurantPhone
+    if (!phone) {
+      toast.error("Restaurant phone number not available")
+      return
+    }
+    // Clean the phone number (remove spaces, dashes, etc. but keep +)
+    const cleanedPhone = String(phone).replace(/[^\d+]/g, "")
+    window.location.href = `tel:${cleanedPhone}`
   }
 
   // Loading state
@@ -871,6 +926,42 @@ export default function OrderTracking() {
         </div>
       </motion.div>
 
+      {/* Delivery Instructions Dialog */}
+      <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delivery Instructions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="e.g. Leave it at the gate, building name, landmark, etc."
+              value={orderNote}
+              onChange={(e) => setOrderNote(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowNoteDialog(false)}
+                disabled={isUpdatingNote}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateNote}
+                disabled={isUpdatingNote}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isUpdatingNote ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Update Instructions
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
         {/* Food Cooking Status - Show until delivery partner accepts pickup */}
@@ -960,9 +1051,7 @@ export default function OrderTracking() {
               defaultAddress?.phone ||
               'Phone number not available'
             }
-            rightContent={
-              <span className="text-green-600 font-medium text-sm">Edit</span>
-            }
+            showArrow={false}
           />
           <SectionItem
             icon={HomeIcon}
@@ -1006,14 +1095,16 @@ export default function OrderTracking() {
 
               return 'Add delivery address'
             })()}
-            rightContent={
-              <span className="text-green-600 font-medium text-sm">Edit</span>
-            }
+            showArrow={false}
           />
           <SectionItem
             icon={MessageSquare}
-            title="Add delivery instructions"
-            subtitle=""
+            title={order?.note ? "Delivery instructions" : "Add delivery instructions"}
+            subtitle={order?.note || "Add directions, building details, etc."}
+            onClick={() => {
+              setOrderNote(order?.note || "")
+              setShowNoteDialog(true)
+            }}
           />
         </motion.div>
 
@@ -1065,6 +1156,7 @@ export default function OrderTracking() {
               <p className="text-sm text-gray-500">{order.address?.city || 'Local Area'}</p>
             </div>
             <motion.button
+              onClick={handleCallRestaurant}
               className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center"
               whileTap={{ scale: 0.9 }}
             >

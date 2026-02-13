@@ -56,12 +56,12 @@ const TrackingPage = () => {
   const { orderId } = useParams()
   const [loading, setLoading] = useState(true)
   const [orderData, setOrderData] = useState(null)
-  
+
   // Map coordinates
   const [restaurantPos, setRestaurantPos] = useState(null)
   const [userPos, setUserPos] = useState(null)
   const [center, setCenter] = useState(null)
-  
+
   // Order details
   const [restaurantName, setRestaurantName] = useState("")
   const [orderStatus, setOrderStatus] = useState("")
@@ -76,7 +76,7 @@ const TrackingPage = () => {
   useEffect(() => {
     const fetchTrackingData = async () => {
       if (!orderId) return
-      
+
       try {
         setLoading(true)
         // TODO: Fetch order tracking data from API
@@ -154,12 +154,12 @@ const TrackingPage = () => {
 
   return (
     <div className="relative min-h-screen bg-gray-900 font-sans overflow-hidden">
-      
+
       {/* --- 2. Floating Header (Green) --- */}
       <div className="absolute top-0 left-0 right-0 z-20 bg-[#23633F] p-4 pt-4 rounded-b-2xl shadow-lg">
         <div className="flex items-center justify-between text-white mb-3">
-          <ArrowLeft 
-            className="w-6 h-6 cursor-pointer" 
+          <ArrowLeft
+            className="w-6 h-6 cursor-pointer"
             onClick={() => navigate(-1)}
           />
           <div className="flex items-center gap-2">
@@ -169,7 +169,7 @@ const TrackingPage = () => {
           </div>
           <Share2 className="w-5 h-5 cursor-pointer" />
         </div>
-        
+
         <div className="text-center text-white">
           {orderStatus && (
             <h2 className="text-2xl font-bold mb-3 capitalize">{orderStatus}</h2>
@@ -186,7 +186,7 @@ const TrackingPage = () => {
       {/* --- 3. Google Map Background --- */}
       {center && restaurantPos && userPos && (
         <div className="absolute top-0 left-0 w-full h-full z-0">
-          <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "YOUR_GOOGLE_MAPS_API_KEY"}> 
+          <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "YOUR_GOOGLE_MAPS_API_KEY"}>
             <GoogleMap
               mapContainerStyle={containerStyle}
               center={center}
@@ -198,15 +198,15 @@ const TrackingPage = () => {
               }}
             >
               {/* Markers */}
-              <Marker 
-                position={restaurantPos} 
+              <Marker
+                position={restaurantPos}
                 icon={{
                   url: "http://maps.google.com/mapfiles/ms/icons/restaurant.png",
                   scaledSize: new window.google.maps.Size(40, 40)
                 }}
               />
-              <Marker 
-                position={userPos} 
+              <Marker
+                position={userPos}
                 icon={{
                   url: "http://maps.google.com/mapfiles/ms/icons/homegardenbusiness.png",
                   scaledSize: new window.google.maps.Size(40, 40)
@@ -241,8 +241,8 @@ const TrackingPage = () => {
               )}
               {progress > 0 && (
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-[#23633F] rounded-full" 
+                  <div
+                    className="h-full bg-[#23633F] rounded-full"
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
@@ -298,7 +298,6 @@ const TrackingPage = () => {
                     <p className="text-sm text-gray-400">{contactPerson.phone}</p>
                   )}
                 </div>
-                <span className="text-green-400 font-medium text-sm cursor-pointer">Edit</span>
               </div>
             </div>
           )}
@@ -312,7 +311,6 @@ const TrackingPage = () => {
                   <p className="font-semibold text-white">Delivery at Location</p>
                   <p className="text-sm text-gray-400">{deliveryAddress}</p>
                 </div>
-                <span className="text-green-400 font-medium text-sm cursor-pointer">Edit</span>
               </div>
             </div>
           )}

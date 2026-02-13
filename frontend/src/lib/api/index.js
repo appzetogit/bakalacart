@@ -1247,7 +1247,7 @@ export const adminAPI = {
       user: { isEnabled: false, startDate: null, endDate: null },
       restaurantDelivery: { isEnabled: false, startDate: null, endDate: null }
     };
-    
+
     // Ensure boolean values are properly set
     const normalizedMaintenanceMode = {
       user: {
@@ -1261,7 +1261,7 @@ export const adminAPI = {
         endDate: maintenanceModeToSend.restaurantDelivery?.endDate || null
       }
     };
-    
+
     const maintenanceModeJson = JSON.stringify(normalizedMaintenanceMode);
     console.log('📤 Appending maintenanceMode to FormData:', maintenanceModeJson);
     console.log('   User isEnabled:', normalizedMaintenanceMode.user.isEnabled);
@@ -1653,6 +1653,11 @@ export const orderAPI = {
   // Cancel order
   cancelOrder: (orderId, reason) => {
     return apiClient.patch(API_ENDPOINTS.ORDER.CANCEL.replace(':id', orderId), { reason });
+  },
+
+  // Update order note
+  updateOrderNote: (orderId, note) => {
+    return apiClient.patch(`/order/${orderId}/note`, { note });
   },
 };
 

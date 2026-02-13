@@ -1284,3 +1284,74 @@ export const calculateOrder = async (req, res) => {
   }
 };
 
+/**
+ * Update order note (delivery instructions)
+ * PATCH /api/order/:id/note
+ */
+export const updateOrderNote = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { note } = req.body;
+
+    if (note === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Note content is required'
+      });
+    }
+
+    // Find order by MongoDB _id or orderId
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+      order = await Order.findOne({
+        _id: id,
+        userId
+      });
+    }
+
+    if (!order) {
+      order = await Order.findOne({
+        orderId: id,
+        userId
+      });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Check order status - allow updates only if not delivered or cancelled
+    if (['delivered', 'cancelled'].includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Order is already ${order.status}. Cannot update delivery instructions.`
+      });
+    }
+
+    // Update note
+    order.note = note.trim();
+    await order.save();
+
+    logger.info(`Order note updated for order ${order.orderId} by user ${userId}`);
+
+    res.json({
+      success: true,
+      message: 'Delivery instructions updated successfully',
+      data: {
+        orderId: order.orderId,
+        note: order.note
+      }
+    });
+  } catch (error) {
+    logger.error(`Error updating order note: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update delivery instructions'
+    });
+  }
+};
+

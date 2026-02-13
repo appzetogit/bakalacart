@@ -1491,48 +1491,7 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Delivery Fleet Type */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <button
-                  onClick={() => setShowFleetOptions(!showFleetOptions)}
-                  className="flex items-center justify-between w-full"
-                >
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <Truck className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-sm md:text-base text-gray-800 dark:text-gray-200">Choose delivery fleet type</span>
-                  </div>
-                  {showFleetOptions ? <ChevronUp className="h-4 w-4 md:h-5 md:w-5 text-gray-400" /> : <ChevronDown className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />}
-                </button>
-
-                {showFleetOptions && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
-                    <button
-                      onClick={() => setDeliveryFleet("standard")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "standard" ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/20" : "border-gray-200 dark:border-gray-700"}`}
-                    >
-                      <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Standard Fleet</span>
-                        <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
-                          <Truck className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-400" />
-                        </div>
-                      </div>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Our standard food delivery experience</p>
-                    </button>
-                    <button
-                      onClick={() => setDeliveryFleet("veg")}
-                      className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 text-left transition-colors ${deliveryFleet === "veg" ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/20" : "border-gray-200 dark:border-gray-700"}`}
-                    >
-                      <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Special Veg-only Fleet</span>
-                        <div className="w-8 h-8 md:w-10 md:h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-                          <Leaf className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-400" />
-                        </div>
-                      </div>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Fleet delivering only from Pure Veg restaurants</p>
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Delivery Fleet selection removed as per request - default 'standard' is used in background */}
 
               {/* Delivery Address */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
@@ -1560,8 +1519,8 @@ export default function Cart() {
                               }}
                               disabled={!addressExists}
                               className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${addressExists
-                                  ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
-                                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                                ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
+                                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                                 }`}
                             >
                               {label}
@@ -1589,7 +1548,7 @@ export default function Cart() {
               </div>
 
               {/* Bill Details */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl lg:hidden">
                 <button
                   onClick={() => setShowBillDetails(!showBillDetails)}
                   className="flex items-center justify-between w-full"
@@ -1648,7 +1607,7 @@ export default function Cart() {
             </div>
 
             {/* Right Column - Order Summary (Desktop) */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 hidden lg:block">
               <div className="lg:sticky lg:top-24 space-y-4 md:space-y-6">
                 {/* Bill Summary Card */}
                 <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 md:py-5 rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-700">

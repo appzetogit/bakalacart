@@ -17,6 +17,15 @@ import { orderAPI, restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 
 export default function UserOrderDetails() {
   const navigate = useNavigate()
@@ -24,6 +33,9 @@ export default function UserOrderDetails() {
   const [order, setOrder] = useState(null)
   const [restaurant, setRestaurant] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showNoteDialog, setShowNoteDialog] = useState(false)
+  const [orderNote, setOrderNote] = useState("")
+  const [isUpdatingNote, setIsUpdatingNote] = useState(false)
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -72,6 +84,29 @@ export default function UserOrderDetails() {
 
     fetchOrderDetails()
   }, [orderId, navigate])
+
+  // Sync orderNote with order.note
+  useEffect(() => {
+    if (order?.note) {
+      setOrderNote(order.note)
+    }
+  }, [order?.note])
+
+  const handleUpdateNote = async () => {
+    try {
+      setIsUpdatingNote(true)
+      const res = await orderAPI.updateOrderNote(order._id || order.orderId || orderId, orderNote)
+      if (res.data.success) {
+        toast.success("Delivery instructions updated")
+        setOrder(prev => ({ ...prev, note: orderNote }))
+        setShowNoteDialog(false)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update instructions")
+    } finally {
+      setIsUpdatingNote(false)
+    }
+  }
 
   const handleCopyOrderId = async () => {
     if (!order) return
@@ -164,12 +199,12 @@ export default function UserOrderDetails() {
   const paymentMethod = order.payment?.method || "Online"
   const paymentDate = order.createdAt
     ? new Date(order.createdAt).toLocaleString("en-IN", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
     : ""
 
   const addressText =
@@ -187,6 +222,7 @@ export default function UserOrderDetails() {
   const restaurantPhone =
     restaurantObj.primaryContactNumber ||
     restaurantObj.phone ||
+    restaurantObj.ownerPhone ||
     restaurantObj.contactNumber ||
     order.restaurantPhone ||
     ""
@@ -196,31 +232,33 @@ export default function UserOrderDetails() {
       toast.error("Restaurant phone number not available")
       return
     }
-    window.location.href = `tel:${restaurantPhone}`
+    // Clean the phone number (remove spaces, dashes, etc. but keep +)
+    const cleanedPhone = String(restaurantPhone).replace(/[^\d+]/g, "")
+    window.location.href = `tel:${cleanedPhone}`
   }
 
   const handleDownloadSummary = () => {
     try {
       // Create new PDF document
       const doc = new jsPDF()
-      
+
       // Title
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
       doc.text('Bakala Cart Order: Summary and Receipt', 105, 20, { align: 'center' })
-      
+
       // Order details section
       let yPos = 35
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      
+
       // Order ID
       doc.setFont('helvetica', 'bold')
       doc.text('Order ID:', 20, yPos)
       doc.setFont('helvetica', 'normal')
       doc.text(orderIdDisplay, 60, yPos)
       yPos += 7
-      
+
       // Order Time
       doc.setFont('helvetica', 'bold')
       doc.text('Order Time:', 20, yPos)
@@ -228,14 +266,14 @@ export default function UserOrderDetails() {
       const orderTimeLines = doc.splitTextToSize(paymentDate || 'N/A', 130)
       doc.text(orderTimeLines, 60, yPos)
       yPos += orderTimeLines.length * 7
-      
+
       // Customer Name
       doc.setFont('helvetica', 'bold')
       doc.text('Customer Name:', 20, yPos)
       doc.setFont('helvetica', 'normal')
       doc.text(userName || 'Customer', 60, yPos)
       yPos += 7
-      
+
       // Delivery Address
       doc.setFont('helvetica', 'bold')
       doc.text('Delivery Address:', 20, yPos)
@@ -243,14 +281,14 @@ export default function UserOrderDetails() {
       const addressLines = doc.splitTextToSize(addressText || 'N/A', 130)
       doc.text(addressLines, 60, yPos)
       yPos += addressLines.length * 7
-      
+
       // Restaurant Name
       doc.setFont('helvetica', 'bold')
       doc.text('Restaurant Name:', 20, yPos)
       doc.setFont('helvetica', 'normal')
       doc.text(restaurantName, 60, yPos)
       yPos += 7
-      
+
       // Restaurant Address
       doc.setFont('helvetica', 'bold')
       doc.text('Restaurant Address:', 20, yPos)
@@ -258,7 +296,7 @@ export default function UserOrderDetails() {
       const restaurantAddressLines = doc.splitTextToSize(restaurantLocation || 'N/A', 130)
       doc.text(restaurantAddressLines, 60, yPos)
       yPos += restaurantAddressLines.length * 7 + 5
-      
+
       // Items table
       const tableData = items.map(item => [
         item.name || 'Item',
@@ -266,7 +304,7 @@ export default function UserOrderDetails() {
         `Rs. ${Number(item.price || 0).toFixed(2)}`,
         `Rs. ${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`
       ])
-      
+
       autoTable(doc, {
         startY: yPos,
         head: [['Item', 'Quantity', 'Unit Price', 'Total Price']],
@@ -281,20 +319,20 @@ export default function UserOrderDetails() {
           3: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
         }
       })
-      
+
       // Get final Y position after table (autoTable adds lastAutoTable property)
       const finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY : yPos + (tableData.length * 8) + 20
-      
+
       // Total
       doc.setFontSize(12)
       doc.setFont('helvetica', 'bold')
       doc.text('Total:', 145, finalY + 10, { align: 'right' })
       doc.text(`Rs. ${Number(pricing.total || 0).toFixed(2)}`, 195, finalY + 10, { align: 'right' })
-      
+
       // Save PDF instantly
       const fileName = `Order_Summary_${orderIdDisplay}_${Date.now()}.pdf`
       doc.save(fileName)
-      
+
       toast.success("Summary downloaded successfully!")
     } catch (error) {
       console.error("Error generating PDF:", error)
@@ -381,14 +419,12 @@ export default function UserOrderDetails() {
             <div key={idx} className="flex justify-between items-start mt-2">
               <div className="flex items-center gap-2">
                 <div
-                  className={`w-3 h-3 border ${
-                    item.isVeg ? "border-green-600" : "border-red-600"
-                  } flex items-center justify-center p-[1px]`}
+                  className={`w-3 h-3 border ${item.isVeg ? "border-green-600" : "border-red-600"
+                    } flex items-center justify-center p-[1px]`}
                 >
                   <div
-                    className={`w-full h-full rounded-full ${
-                      item.isVeg ? "bg-green-600" : "bg-red-600"
-                    }`}
+                    className={`w-full h-full rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"
+                      }`}
                   />
                 </div>
                 <span className="text-sm text-gray-700 font-medium">
@@ -400,6 +436,28 @@ export default function UserOrderDetails() {
               </span>
             </div>
           ))}
+        </div>
+
+        {/* Delivery Instructions */}
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gray-600" />
+              <h3 className="font-semibold text-gray-800 text-sm">Delivery Instructions</h3>
+            </div>
+            <button
+              onClick={() => {
+                setOrderNote(order.note || "")
+                setShowNoteDialog(true)
+              }}
+              className="text-xs font-medium text-red-600 hover:text-red-700"
+            >
+              {order.note ? "Edit" : "Add"}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 italic">
+            {order.note || "Add directions, building details, or landmark..."}
+          </p>
         </div>
 
         {/* Bill Summary Card */}
@@ -589,21 +647,21 @@ export default function UserOrderDetails() {
               // Use MongoDB _id (ObjectId) for the API call - backend complaint controller expects ObjectId
               // Priority: order._id (MongoDB ObjectId) > orderId from route params
               const orderMongoId = order._id || orderId
-              
+
               if (!orderMongoId) {
-                console.error("Order ID not available:", { 
+                console.error("Order ID not available:", {
                   order: order ? { _id: order._id, orderId: order.orderId } : null,
-                  routeOrderId: orderId 
+                  routeOrderId: orderId
                 })
                 toast.error("Order ID not available. Please refresh the page.")
                 return
               }
-              
+
               // Convert to string if it's an ObjectId object
-              const orderIdString = typeof orderMongoId === 'object' && orderMongoId.toString 
-                ? orderMongoId.toString() 
+              const orderIdString = typeof orderMongoId === 'object' && orderMongoId.toString
+                ? orderMongoId.toString()
                 : String(orderMongoId)
-              
+
               console.log("Navigating to complaint page with orderId:", orderIdString)
               navigate(`/user/complaints/submit/${encodeURIComponent(orderIdString)}`)
             }}
@@ -614,8 +672,41 @@ export default function UserOrderDetails() {
           </button>
         </div>
       )}
+      {/* Delivery Instructions Dialog */}
+      <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delivery Instructions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="e.g. Leave it at the gate, building name, landmark, etc."
+              value={orderNote}
+              onChange={(e) => setOrderNote(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowNoteDialog(false)}
+                disabled={isUpdatingNote}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateNote}
+                disabled={isUpdatingNote}
+                className="bg-[#E23744] hover:bg-red-700 text-white"
+              >
+                {isUpdatingNote ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Update Instructions
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-
-
