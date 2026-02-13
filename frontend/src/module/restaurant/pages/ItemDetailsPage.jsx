@@ -66,6 +66,9 @@ export default function ItemDetailsPage() {
   const [direction, setDirection] = useState(0)
   const carouselRef = useRef(null)
   const [isCategoryPopupOpen, setIsCategoryPopupOpen] = useState(false)
+  const [showImageSourceMenu, setShowImageSourceMenu] = useState(false)
+  const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
   const [isServesPopupOpen, setIsServesPopupOpen] = useState(false)
   const [isItemSizePopupOpen, setIsItemSizePopupOpen] = useState(false)
   const [isGstPopupOpen, setIsGstPopupOpen] = useState(false)
@@ -369,8 +372,15 @@ export default function ItemDetailsPage() {
     setImages([...images, ...newImagePreviews])
     setImageFiles(newImageFilesMap)
     
+    // Clear all file inputs
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ""
+    }
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = ""
     }
   }
 
@@ -929,26 +939,128 @@ export default function ItemDetailsPage() {
 
           {/* Add image button - redesigned */}
           <div className="px-4 py-4 bg-white border-t border-gray-100">
+            {/* Hidden file inputs for camera and gallery */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               multiple
               capture="environment"
               onChange={handleImageAdd}
               className="hidden"
-              id="image-upload"
+              id="camera-upload"
             />
-            <label
-              htmlFor="image-upload"
-              className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageAdd}
+              className="hidden"
+              id="gallery-upload"
+            />
+            
+            {/* Show menu on mobile, direct click on desktop */}
+            <button
+              onClick={() => {
+                // On mobile, show menu with camera and gallery options
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                  setShowImageSourceMenu(true)
+                } else {
+                  // On desktop, directly open file picker
+                  galleryInputRef.current?.click()
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95"
             >
               <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
                 <Plus className="w-4 h-4" />
               </div>
               <span>Add Images</span>
-            </label>
+            </button>
           </div>
+          
+          {/* Image Source Menu Modal - Mobile only */}
+          <AnimatePresence>
+            {showImageSourceMenu && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  className="fixed inset-0 bg-black/50 z-[9999]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowImageSourceMenu(false)}
+                />
+                
+                {/* Menu */}
+                <motion.div
+                  className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                >
+                  <div className="p-4">
+                    {/* Handle bar */}
+                    <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                    
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                      Select Image Source
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      {/* Camera Option */}
+                      <button
+                        onClick={() => {
+                          setShowImageSourceMenu(false)
+                          setTimeout(() => {
+                            cameraInputRef.current?.click()
+                          }, 300)
+                        }}
+                        className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                      >
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <Camera className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-semibold text-gray-900">Camera</p>
+                          <p className="text-sm text-gray-500">Take a new photo</p>
+                        </div>
+                      </button>
+                      
+                      {/* Gallery Option */}
+                      <button
+                        onClick={() => {
+                          setShowImageSourceMenu(false)
+                          setTimeout(() => {
+                            galleryInputRef.current?.click()
+                          }, 300)
+                        }}
+                        className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                      >
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-semibold text-gray-900">Gallery</p>
+                          <p className="text-sm text-gray-500">Choose from existing photos</p>
+                        </div>
+                      </button>
+                    </div>
+                    
+                    {/* Cancel Button */}
+                    <button
+                      onClick={() => setShowImageSourceMenu(false)}
+                      className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Form Fields */}
@@ -1057,12 +1169,20 @@ export default function ItemDetailsPage() {
             </label>
             <div className="space-y-3">
               <div className="relative">
-                <label className="block text-xs text-gray-600 mb-1">Base price</label>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Base price
+                  {hasVariants && (
+                    <span className="ml-2 text-xs text-gray-500 italic">
+                      (Disabled when variants are enabled)
+                    </span>
+                  )}
+                </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={basePrice}
                     onChange={(e) => {
+                      if (hasVariants) return // Prevent changes when variants are enabled
                       // Remove rupee symbol and any non-numeric characters except decimal point
                       const value = e.target.value.replace(/[₹\s,]/g, '').replace(/[^0-9.]/g, '')
                       // Allow only one decimal point
@@ -1073,6 +1193,10 @@ export default function ItemDetailsPage() {
                       setBasePrice(cleanedValue)
                     }}
                     onFocus={(e) => {
+                      if (hasVariants) {
+                        e.target.blur() // Prevent focus when disabled
+                        return
+                      }
                       handleInputFocus(e)
                       // Remove rupee symbol when focused for easier editing
                       if (e.target.value.startsWith('₹')) {
@@ -1080,11 +1204,24 @@ export default function ItemDetailsPage() {
                       }
                     }}
                     placeholder="Enter price"
-                    className="w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={hasVariants}
+                    className={`w-full pl-8 pr-12 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      hasVariants 
+                        ? 'border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-900 bg-gray-50'
+                    }`}
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-600">₹</span>
-                  <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100">
-                    <EditIcon className="w-4 h-4 text-gray-500" />
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${hasVariants ? 'text-gray-400' : 'text-gray-600'}`}>₹</span>
+                  <button 
+                    type="button"
+                    disabled={hasVariants}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full ${
+                      hasVariants 
+                        ? 'cursor-not-allowed opacity-50' 
+                        : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <EditIcon className={`w-4 h-4 ${hasVariants ? 'text-gray-400' : 'text-gray-500'}`} />
                   </button>
                 </div>
               </div>

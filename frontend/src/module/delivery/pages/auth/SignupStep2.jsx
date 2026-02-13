@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, X, Check } from "lucide-react"
+import { ArrowLeft, Upload, X, Check, Camera, Plus } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { deliveryAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { toast } from "sonner"
@@ -31,6 +32,9 @@ export default function SignupStep2() {
     drivingLicensePhoto: false
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showImageSourceMenu, setShowImageSourceMenu] = useState(null) // docType or null
+  const cameraInputRefs = useRef({})
+  const galleryInputRefs = useRef({})
 
   const handleFileSelect = async (docType, file) => {
     if (!file) return
@@ -136,6 +140,14 @@ export default function SignupStep2() {
     const uploaded = uploadedDocs[docType]
     const isUploading = uploading[docType]
 
+    // Initialize refs if not exists
+    if (!cameraInputRefs.current[docType]) {
+      cameraInputRefs.current[docType] = { current: null }
+    }
+    if (!galleryInputRefs.current[docType]) {
+      galleryInputRefs.current[docType] = { current: null }
+    }
+
     return (
       <div className="bg-white rounded-lg p-3 border border-gray-200">
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -162,22 +174,9 @@ export default function SignupStep2() {
             </div>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
-            <div className="flex flex-col items-center justify-center pt-3 pb-3">
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
-                  <p className="text-sm text-gray-500">Uploading...</p>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500 mb-1">Click to upload</p>
-                  <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
-                </>
-              )}
-            </div>
+          <>
             <input
+              ref={cameraInputRefs.current[docType]}
               type="file"
               className="hidden"
               accept="image/*"
@@ -186,11 +185,55 @@ export default function SignupStep2() {
                 const selectedFile = e.target.files[0]
                 if (selectedFile) {
                   handleFileSelect(docType, selectedFile)
+                  e.target.value = ""
                 }
               }}
               disabled={isUploading}
+              id={`camera-${docType}`}
             />
-          </label>
+            <input
+              ref={galleryInputRefs.current[docType]}
+              type="file"
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => {
+                const selectedFile = e.target.files[0]
+                if (selectedFile) {
+                  handleFileSelect(docType, selectedFile)
+                  e.target.value = ""
+                }
+              }}
+              disabled={isUploading}
+              id={`gallery-${docType}`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                  setShowImageSourceMenu(docType)
+                } else {
+                  galleryInputRefs.current[docType].current?.click()
+                }
+              }}
+              disabled={isUploading}
+              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors disabled:opacity-50"
+            >
+              <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
+                    <p className="text-sm text-gray-500">Uploading...</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500 mb-1">Click to upload</p>
+                    <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                  </>
+                )}
+              </div>
+            </button>
+          </>
         )}
       </div>
     )
@@ -236,6 +279,77 @@ export default function SignupStep2() {
           </button>
         </form>
       </div>
+      
+      {/* Image Source Menu Modal - Mobile only */}
+      <AnimatePresence>
+        {showImageSourceMenu && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/50 z-[9999]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowImageSourceMenu(null)}
+            />
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            >
+              <div className="p-4">
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                  Select Image Source
+                </h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowImageSourceMenu(null)
+                      setTimeout(() => {
+                        cameraInputRefs.current[showImageSourceMenu]?.current?.click()
+                      }, 300)
+                    }}
+                    className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900">Camera</p>
+                      <p className="text-sm text-gray-500">Take a new photo</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowImageSourceMenu(null)
+                      setTimeout(() => {
+                        galleryInputRefs.current[showImageSourceMenu]?.current?.click()
+                      }, 300)
+                    }}
+                    className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Plus className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900">Gallery</p>
+                      <p className="text-sm text-gray-500">Choose from existing photos</p>
+                    </div>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowImageSourceMenu(null)}
+                  className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -29,6 +29,7 @@ import {
   Camera,
   MessageSquare,
   Send,
+  Plus,
 } from "lucide-react"
 import BottomPopup from "../components/BottomPopup"
 import FeedNavbar from "../components/FeedNavbar"
@@ -823,6 +824,8 @@ export default function DeliveryHome() {
   const [billImageUploaded, setBillImageUploaded] = useState(false)
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
+  const [showBillImageSourceMenu, setShowBillImageSourceMenu] = useState(false)
   const [orderDeliveredButtonProgress, setOrderDeliveredButtonProgress] = useState(0)
   const [orderDeliveredIsAnimatingToComplete, setOrderDeliveredIsAnimatingToComplete] = useState(false)
   const orderDeliveredButtonRef = useRef(null)
@@ -4018,9 +4021,12 @@ export default function DeliveryHome() {
       setBillImageUploaded(false)
     } finally {
       setIsUploadingBill(false)
-      // Reset file input
+      // Reset file inputs
       if (cameraInputRef.current) {
         cameraInputRef.current.value = ''
+      }
+      if (galleryInputRef.current) {
+        galleryInputRef.current.value = ''
       }
     }
   }
@@ -4030,6 +4036,13 @@ export default function DeliveryHome() {
     const file = e.target.files?.[0]
     if (!file) return
     await processBillImageFile(file)
+    // Clear inputs
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
+    }
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = ''
+    }
   }
 
   const handleOrderIdConfirmTouchEnd = (e) => {
@@ -12590,10 +12603,26 @@ export default function DeliveryHome() {
                 {billImageUploaded ? '✅ Bill image uploaded' : 'Please capture bill image'}
               </p>
 
-              {/* Camera Button */}
+              {/* Bill Upload Button */}
               <div className="flex justify-center mb-4">
                 <button
-                  onClick={handleCameraCapture}
+                  onClick={() => {
+                    if (billImageUploaded) {
+                      // If already uploaded, allow re-upload
+                      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                        setShowBillImageSourceMenu(true)
+                      } else {
+                        galleryInputRef.current?.click()
+                      }
+                    } else {
+                      // First time upload - show menu on mobile, direct on desktop
+                      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                        setShowBillImageSourceMenu(true)
+                      } else {
+                        galleryInputRef.current?.click()
+                      }
+                    }
+                  }}
                   disabled={isUploadingBill}
                   className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill
                     ? 'bg-gray-400 cursor-not-allowed'
@@ -12615,13 +12644,13 @@ export default function DeliveryHome() {
                   ) : (
                     <>
                       <Camera className="w-5 h-5" />
-                      <span>Capture Bill</span>
+                      <span>Upload Bill</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* Hidden file input for camera (sr-only keeps it in DOM for mobile camera) */}
+              {/* Hidden file inputs for camera and gallery */}
               <input
                 id="bill-camera-input"
                 ref={cameraInputRef}
@@ -12631,6 +12660,85 @@ export default function DeliveryHome() {
                 onChange={handleBillImageSelect}
                 className="sr-only"
               />
+              <input
+                id="bill-gallery-input"
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBillImageSelect}
+                className="sr-only"
+              />
+              
+              {/* Image Source Menu Modal - Mobile only */}
+              <AnimatePresence>
+                {showBillImageSourceMenu && (
+                  <>
+                    <motion.div
+                      className="fixed inset-0 bg-black/50 z-[9999]"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setShowBillImageSourceMenu(false)}
+                    />
+                    <motion.div
+                      className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+                      initial={{ y: "100%" }}
+                      animate={{ y: 0 }}
+                      exit={{ y: "100%" }}
+                      transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                    >
+                      <div className="p-4">
+                        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                          Select Image Source
+                        </h3>
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => {
+                              setShowBillImageSourceMenu(false)
+                              setTimeout(() => {
+                                cameraInputRef.current?.click()
+                              }, 300)
+                            }}
+                            className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                          >
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                              <Camera className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="font-semibold text-gray-900">Camera</p>
+                              <p className="text-sm text-gray-500">Take a new photo</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowBillImageSourceMenu(false)
+                              setTimeout(() => {
+                                galleryInputRef.current?.click()
+                              }, 300)
+                            }}
+                            className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                          >
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                              <Plus className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="font-semibold text-gray-900">Gallery</p>
+                              <p className="text-sm text-gray-500">Choose from existing photos</p>
+                            </div>
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setShowBillImageSourceMenu(false)}
+                          className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Order Picked Up Button with Swipe */}
