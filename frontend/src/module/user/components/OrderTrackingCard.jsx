@@ -91,13 +91,26 @@ export default function OrderTrackingCard() {
     
     if (active) {
       setActiveOrder(active);
-      // Calculate estimated delivery time
-      const orderTime = new Date(active.createdAt || active.orderDate || active.created_at || active.date || Date.now());
-      const estimatedMinutes = active.estimatedDeliveryTime || active.estimatedTime || active.estimated_delivery_time || 35;
-      const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
-      const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
+      // Calculate estimated delivery time using preparingTimestamp (when order started preparing)
+      // This matches the restaurant side calculation
+      const preparingTimestamp = active.tracking?.preparing?.timestamp 
+        ? new Date(active.tracking.preparing.timestamp)
+        : active.preparingTimestamp
+          ? new Date(active.preparingTimestamp)
+          : new Date(active.createdAt || active.orderDate || active.created_at || active.date || Date.now());
+      
+      const now = new Date();
+      const elapsedMs = now - preparingTimestamp;
+      const elapsedMinutes = Math.floor(elapsedMs / 60000);
+      const initialETA = active.estimatedDeliveryTime || active.estimatedTime || active.estimated_delivery_time || 35;
+      const remaining = Math.max(0, initialETA - elapsedMinutes);
+      
       setTimeRemaining(remaining);
-      console.log('⏰ OrderTrackingCard - Time remaining:', remaining, 'minutes');
+      console.log('⏰ OrderTrackingCard - Time remaining:', remaining, 'minutes', {
+        initialETA,
+        elapsedMinutes,
+        preparingTimestamp: preparingTimestamp.toISOString()
+      });
     } else {
       setActiveOrder(null);
       setTimeRemaining(null);
@@ -133,10 +146,19 @@ export default function OrderTrackingCard() {
         return;
       }
 
-      const orderTime = new Date(currentActive.createdAt || currentActive.orderDate || currentActive.created_at || Date.now());
-      const estimatedMinutes = currentActive.estimatedDeliveryTime || currentActive.estimatedTime || currentActive.estimated_delivery_time || 35;
-      const deliveryTime = new Date(orderTime.getTime() + estimatedMinutes * 60000);
-      const remaining = Math.max(0, Math.floor((deliveryTime - new Date()) / 60000));
+      // Use preparingTimestamp (when order started preparing) instead of createdAt
+      // This matches the restaurant side calculation
+      const preparingTimestamp = currentActive.tracking?.preparing?.timestamp 
+        ? new Date(currentActive.tracking.preparing.timestamp)
+        : currentActive.preparingTimestamp
+          ? new Date(currentActive.preparingTimestamp)
+          : new Date(currentActive.createdAt || currentActive.orderDate || currentActive.created_at || Date.now());
+      
+      const now = new Date();
+      const elapsedMs = now - preparingTimestamp;
+      const elapsedMinutes = Math.floor(elapsedMs / 60000);
+      const initialETA = currentActive.estimatedDeliveryTime || currentActive.estimatedTime || currentActive.estimated_delivery_time || 35;
+      const remaining = Math.max(0, initialETA - elapsedMinutes);
       setTimeRemaining(remaining);
 
       if (remaining === 0) {

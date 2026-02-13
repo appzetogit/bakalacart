@@ -12539,20 +12539,20 @@ export default function DeliveryHome() {
               {/* Bill Upload Button */}
               <div className="flex justify-center mb-4">
                 <button
-                  onClick={() => {
-                    if (billImageUploaded) {
-                      // If already uploaded, allow re-upload
-                      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                        setShowBillImageSourceMenu(true)
-                      } else {
-                        galleryInputRef.current?.click()
-                      }
+                  onClick={async () => {
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                    
+                    if (isMobile) {
+                      // Show menu on mobile
+                      setShowBillImageSourceMenu(true)
                     } else {
-                      // First time upload - show menu on mobile, direct on desktop
-                      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                        setShowBillImageSourceMenu(true)
-                      } else {
-                        galleryInputRef.current?.click()
+                      // On desktop, directly open gallery with Flutter handler
+                      const file = await openGalleryWithFallback(
+                        { accept: 'image/*', multiple: false, quality: 0.8 },
+                        () => galleryInputRef.current?.click()
+                      )
+                      if (file) {
+                        await processBillImageFile(file)
                       }
                     }
                   }}
@@ -12627,11 +12627,19 @@ export default function DeliveryHome() {
                         </h3>
                         <div className="space-y-3">
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setShowBillImageSourceMenu(false)
-                              setTimeout(() => {
-                                cameraInputRef.current?.click()
-                              }, 300)
+                              
+                              // Try Flutter camera first
+                              const file = await openCameraWithFallback(
+                                { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+                                () => cameraInputRef.current?.click()
+                              )
+                              
+                              // If Flutter camera returned a file, process it
+                              if (file) {
+                                await processBillImageFile(file)
+                              }
                             }}
                             className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                           >
@@ -12639,16 +12647,24 @@ export default function DeliveryHome() {
                               <Camera className="w-6 h-6 text-green-600" />
                             </div>
                             <div className="flex-1 text-left">
-                              <p className="font-semibold text-gray-900">Camera</p>
-                              <p className="text-sm text-gray-500">Take a new photo</p>
+                              <p className="font-semibold text-gray-900">Take Photo</p>
+                              <p className="text-sm text-gray-500">Use camera to capture bill</p>
                             </div>
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setShowBillImageSourceMenu(false)
-                              setTimeout(() => {
-                                galleryInputRef.current?.click()
-                              }, 300)
+                              
+                              // Try Flutter gallery first
+                              const file = await openGalleryWithFallback(
+                                { accept: 'image/*', multiple: false, quality: 0.8 },
+                                () => galleryInputRef.current?.click()
+                              )
+                              
+                              // If Flutter gallery returned a file, process it
+                              if (file) {
+                                await processBillImageFile(file)
+                              }
                             }}
                             className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                           >
@@ -12656,8 +12672,8 @@ export default function DeliveryHome() {
                               <Plus className="w-6 h-6 text-blue-600" />
                             </div>
                             <div className="flex-1 text-left">
-                              <p className="font-semibold text-gray-900">Gallery</p>
-                              <p className="text-sm text-gray-500">Choose from existing photos</p>
+                              <p className="font-semibold text-gray-900">Choose from Gallery</p>
+                              <p className="text-sm text-gray-500">Select existing photo</p>
                             </div>
                           </button>
                         </div>

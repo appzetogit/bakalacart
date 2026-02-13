@@ -40,13 +40,21 @@ export default function Orders() {
       return null
     }
 
-    const createdAt = new Date(order.createdAt)
-    const now = new Date()
-    const elapsedMinutes = Math.floor((now - createdAt) / (1000 * 60))
+    // Use preparingTimestamp (when order started preparing) instead of createdAt
+    // This matches the restaurant side calculation
+    const preparingTimestamp = order.tracking?.preparing?.timestamp 
+      ? new Date(order.tracking.preparing.timestamp)
+      : order.preparingTimestamp
+        ? new Date(order.preparingTimestamp)
+        : new Date(order.createdAt) // Fallback to createdAt if preparing timestamp not available
     
-    // Get max ETA (use eta.max if available, otherwise estimatedDeliveryTime)
-    const maxETA = order.eta?.max || order.estimatedDeliveryTime || 30
-    const remainingMinutes = Math.max(0, maxETA - elapsedMinutes)
+    const now = new Date()
+    const elapsedMs = now - preparingTimestamp
+    const elapsedMinutes = Math.floor(elapsedMs / 60000)
+    
+    // Get initial ETA (use estimatedDeliveryTime, which is the total ETA from when preparation started)
+    const initialETA = order.estimatedDeliveryTime || order.eta?.max || 30
+    const remainingMinutes = Math.max(0, initialETA - elapsedMinutes)
     
     return remainingMinutes > 0 ? remainingMinutes : null
   }
@@ -261,6 +269,7 @@ export default function Orders() {
               eta: order.eta || { min: order.estimatedDeliveryTime || 30, max: order.estimatedDeliveryTime || 30 },
               estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
               preparationTime: order.preparationTime || 0,
+              preparingTimestamp: order.tracking?.preparing?.timestamp || order.createdAt, // Store preparing timestamp for countdown calculation
               deliveredAt: order.deliveredAt || null,
               deliveryPartnerName: order.deliveryPartnerId?.name || order.deliveryPartnerName || null,
               deliveryPartnerPhone: order.deliveryPartnerId?.phone || order.deliveryPartnerPhone || null,

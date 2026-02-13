@@ -1005,9 +1005,10 @@ export default function MyOrders() {
     }
   }
 
-  // Handle bill image capture/upload
+  // Handle bill image capture/upload - Show menu on mobile, direct gallery on desktop
   const handleBillImageCapture = async (order, e) => {
     e.stopPropagation()
+    e.preventDefault()
     const orderId = order.orderId || order._id
 
     // Initialize refs if not exists
@@ -1018,45 +1019,49 @@ export default function MyOrders() {
       galleryInputRefs.current[orderId] = { current: null }
     }
 
-    // Try Flutter camera first
-    const file = await openCameraWithFallback(
-      { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
-      () => {
-        // Fallback: show menu on mobile, direct on desktop
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-          setShowBillImageSourceMenu(orderId)
-          setActiveBillUploadOrder(order)
-        } else {
-          setActiveBillUploadOrder(order)
-          setTimeout(() => galleryInputRefs.current[orderId]?.current?.click(), 100)
-        }
-      }
-    )
+    // Check if mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 
-    // If Flutter camera returned a file, process it
-    if (file) {
-      await handleBillImageUpload(order, file)
+    if (isMobile) {
+      // Show menu on mobile
+      setShowBillImageSourceMenu(orderId)
+      setActiveBillUploadOrder(order)
+    } else {
+      // On desktop, directly open gallery
+      const file = await openGalleryWithFallback(
+        { accept: 'image/*', multiple: false, quality: 0.8 },
+        () => galleryInputRefs.current[orderId]?.current?.click()
+      )
+      if (file) {
+        await handleBillImageUpload(order, file)
+      }
     }
   }
 
   // Handle bill image file selection
   const handleBillImageSelect = async (order, e) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file) {
+      // Clear activeBillUploadOrder if no file selected
+      setActiveBillUploadOrder(null)
+      return
+    }
 
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file')
+      setActiveBillUploadOrder(null)
       return
     }
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size should be less than 5MB')
+      setActiveBillUploadOrder(null)
       return
     }
 
     await handleBillImageUpload(order, file)
     
-    // Clear inputs
+    // Clear inputs and activeBillUploadOrder after successful upload
     const orderId = order.orderId || order._id
     if (cameraInputRefs.current[orderId]?.current) {
       cameraInputRefs.current[orderId].current.value = ''
@@ -1067,27 +1072,50 @@ export default function MyOrders() {
     if (fileInputRefs.current) {
       fileInputRefs.current.value = ''
     }
+    setActiveBillUploadOrder(null)
   }
 
   // Upload bill image
   const handleBillImageUpload = async (order, file) => {
+    if (!file) {
+      console.error('❌ No file provided for bill upload')
+      return
+    }
+
     const orderId = order.orderId || order._id
+    if (!orderId) {
+      console.error('❌ No order ID found')
+      return
+    }
+
     setUploadingBills(prev => ({ ...prev, [orderId]: true }))
 
     try {
+      console.log('📸 Uploading bill image for order:', orderId, { fileName: file.name, fileSize: file.size, fileType: file.type })
+      
       const response = await uploadAPI.uploadMedia(file, {
         folder: 'appzeto/delivery/bills'
       })
 
+      console.log('📸 Bill upload response:', response?.data)
+
       if (response?.data?.success && response?.data?.data?.url) {
-        setBillImages(prev => ({ ...prev, [orderId]: response.data.data.url }))
+        const imageUrl = response.data.data.url
+        setBillImages(prev => ({ ...prev, [orderId]: imageUrl }))
         toast.success('Bill image uploaded!')
+        console.log('✅ Bill image uploaded successfully:', imageUrl)
       } else {
-        throw new Error('Upload failed')
+        console.error('❌ Upload failed - invalid response:', response?.data)
+        throw new Error('Upload failed - invalid response')
       }
     } catch (error) {
-      console.error('Error uploading bill:', error)
-      toast.error('Failed to upload bill image')
+      console.error('❌ Error uploading bill:', error)
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      })
+      toast.error(error.response?.data?.message || 'Failed to upload bill image. Please try again.')
     } finally {
       setUploadingBills(prev => ({ ...prev, [orderId]: false }))
     }
@@ -1215,6 +1243,14 @@ export default function MyOrders() {
   // Handle restaurant location click - Show polyline from delivery boy's live location to restaurant
   const handleRestaurantLocationClick = async (order, e) => {
     e.stopPropagation()
+    e.preventDefault()
+
+    // Prevent navigation for cancelled or delivered orders
+    const orderStatus = order.status || ''
+    if (orderStatus === 'cancelled' || orderStatus === 'Cancelled' || orderStatus === 'delivered' || orderStatus === 'completed') {
+      toast.error('Cannot view location for cancelled or delivered orders')
+      return
+    }
 
     try {
       // Get current live location
@@ -1274,6 +1310,14 @@ export default function MyOrders() {
   // Handle customer location click - Show polyline from delivery boy's live location to customer
   const handleCustomerLocationClick = async (order, e) => {
     e.stopPropagation()
+    e.preventDefault()
+
+    // Prevent navigation for cancelled or delivered orders
+    const orderStatus = order.status || ''
+    if (orderStatus === 'cancelled' || orderStatus === 'Cancelled' || orderStatus === 'delivered' || orderStatus === 'completed') {
+      toast.error('Cannot view location for cancelled or delivered orders')
+      return
+    }
 
     try {
       // Get current live location
@@ -1610,7 +1654,7 @@ export default function MyOrders() {
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-gray-800 text-lg leading-tight truncate">{restaurantName}</h3>
                           {/* Location Button - Show for pickup phase */}
-                          {isActive && activeTab === "pending" && isAcceptedByDeliveryBoy(order) && !isOrderPickedUp(order) && (
+                          {isActive && activeTab === "pending" && isAcceptedByDeliveryBoy(order) && !isOrderPickedUp(order) && !isCancelled && (
                             <button
                               onClick={(e) => handleRestaurantLocationClick(order, e)}
                               className="p-1.5 hover:bg-green-50 rounded-full transition-colors shrink-0"
@@ -1620,7 +1664,7 @@ export default function MyOrders() {
                             </button>
                           )}
                           {/* Location Button - Show for drop phase */}
-                          {isActive && activeTab === "pending" && isOrderPickedUp(order) && !isReachedDrop(order) && (
+                          {isActive && activeTab === "pending" && isOrderPickedUp(order) && !isReachedDrop(order) && !isCancelled && (
                             <button
                               onClick={(e) => handleCustomerLocationClick(order, e)}
                               className="p-1.5 hover:bg-blue-50 rounded-full transition-colors shrink-0"
@@ -1924,7 +1968,7 @@ export default function MyOrders() {
                           onReject={handleRejectOrder}
                         />
                       ) : // Phase 2: Accepted but not reached pickup - show Reached Pickup button
-                        !isReachedPickup(order) ? (
+                        !isReachedPickup(order) && !isCancelled ? (
                           <div className="flex items-center gap-2">
                             <div className="flex-1">
                               <ReachedPickupButton
@@ -1941,7 +1985,7 @@ export default function MyOrders() {
                             </button>
                           </div>
                         ) : // Phase 3: Reached pickup but not picked up - show Order Pickup with bill upload
-                          !isOrderPickedUp(order) ? (
+                          !isOrderPickedUp(order) && !isCancelled ? (
                             <OrderPickupButton
                               order={order}
                               onPickup={handleOrderPickup}
@@ -1950,7 +1994,7 @@ export default function MyOrders() {
                               onCameraClick={handleBillImageCapture}
                             />
                           ) : // Phase 4: Picked up but not reached drop - show Reached Drop button with Location Icon and Chat Icon
-                            !isReachedDrop(order) ? (
+                            !isReachedDrop(order) && !isCancelled ? (
                               <div className="flex items-center gap-2">
                                 <div className="flex-1">
                                   <ReachedDropButton
@@ -2399,12 +2443,37 @@ export default function MyOrders() {
                 </h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const orderId = showBillImageSourceMenu
+                      const order = activeBillUploadOrder
+                      
+                      if (!order) {
+                        setShowBillImageSourceMenu(null)
+                        setActiveBillUploadOrder(null)
+                        return
+                      }
+                      
+                      // Close menu first
                       setShowBillImageSourceMenu(null)
-                      setTimeout(() => {
-                        cameraInputRefs.current[orderId]?.current?.click()
-                      }, 300)
+                      
+                      // Try Flutter camera first
+                      const file = await openCameraWithFallback(
+                        { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+                        () => {
+                          // Fallback: Keep activeBillUploadOrder set for onChange handler
+                          setTimeout(() => {
+                            cameraInputRefs.current[orderId]?.current?.click()
+                          }, 100)
+                        }
+                      )
+                      
+                      // If Flutter camera returned a file, process it
+                      if (file) {
+                        setActiveBillUploadOrder(null) // Clear after successful Flutter upload
+                        await handleBillImageUpload(order, file)
+                      }
+                      // If file is null, fallback callback will trigger file input
+                      // and onChange handler will process it
                     }}
                     className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                   >
@@ -2412,31 +2481,42 @@ export default function MyOrders() {
                       <Camera className="w-6 h-6 text-green-600" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold text-gray-900">Camera</p>
-                      <p className="text-sm text-gray-500">Take a new photo</p>
+                      <p className="font-semibold text-gray-900">Take Photo</p>
+                      <p className="text-sm text-gray-500">Use camera to capture bill</p>
                     </div>
                   </button>
                   <button
                     onClick={async () => {
                       const orderId = showBillImageSourceMenu
                       const order = activeBillUploadOrder
+                      
+                      if (!order) {
+                        setShowBillImageSourceMenu(null)
+                        setActiveBillUploadOrder(null)
+                        return
+                      }
+                      
+                      // Close menu first
                       setShowBillImageSourceMenu(null)
-                      setActiveBillUploadOrder(null)
                       
                       // Try Flutter gallery first
                       const file = await openGalleryWithFallback(
-                        { accept: 'image/*', multiple: false },
+                        { accept: 'image/*', multiple: false, quality: 0.8 },
                         () => {
+                          // Fallback: Keep activeBillUploadOrder set for onChange handler
                           setTimeout(() => {
                             galleryInputRefs.current[orderId]?.current?.click()
-                          }, 300)
+                          }, 100)
                         }
                       )
                       
                       // If Flutter gallery returned a file, process it
-                      if (file && order) {
+                      if (file) {
+                        setActiveBillUploadOrder(null) // Clear after successful Flutter upload
                         await handleBillImageUpload(order, file)
                       }
+                      // If file is null, fallback callback will trigger file input
+                      // and onChange handler will process it
                     }}
                     className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                   >
@@ -2444,8 +2524,8 @@ export default function MyOrders() {
                       <Plus className="w-6 h-6 text-blue-600" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold text-gray-900">Gallery</p>
-                      <p className="text-sm text-gray-500">Choose from existing photos</p>
+                      <p className="font-semibold text-gray-900">Choose from Gallery</p>
+                      <p className="text-sm text-gray-500">Select existing photo</p>
                     </div>
                   </button>
                 </div>

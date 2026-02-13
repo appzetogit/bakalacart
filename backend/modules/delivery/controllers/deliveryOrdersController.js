@@ -500,10 +500,12 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     });
 
     // Check if order is in valid state to accept
-    const validStatuses = ['preparing', 'ready'];
+    // Allow pending, confirmed, preparing, and ready statuses
+    // This allows delivery boy to accept orders even if restaurant hasn't started preparing yet
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
     if (!validStatuses.includes(order.status)) {
       console.warn(`⚠️ Order ${order.orderId} cannot be accepted. Current status: ${order.status}, Valid statuses: ${validStatuses.join(', ')}`);
-      return errorResponse(res, 400, `Order cannot be accepted. Current status: ${order.status}. Order must be in 'preparing' or 'ready' status.`);
+      return errorResponse(res, 400, `Order cannot be accepted. Current status: ${order.status}. Order must be in 'pending', 'confirmed', 'preparing', or 'ready' status.`);
     }
 
     // Get restaurant location
