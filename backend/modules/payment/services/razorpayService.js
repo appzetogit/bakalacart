@@ -20,19 +20,20 @@ const initializeRazorpay = async () => {
   try {
     const credentials = await getRazorpayCredentials();
     const keyId = credentials.keyId;
-    // Fix: Ensure keySecret is properly retrieved
     const keySecret = credentials.keySecret;
 
-    logger.info('Razorpay credentials check:', {
-      hasKeyId: !!keyId,
-      hasKeySecret: !!keySecret,
-      // Log masked key to verify if it's test or live
-      maskedKeyId: keyId ? `${keyId.substring(0, 8)}...` : 'missing',
-      keySecretLength: keySecret?.length || 0
-    });
+    console.log('🔑 [Razorpay] Initializing with Key ID:', keyId ? keyId.substring(0, 10) + '...' : 'MISSING');
+
+    // Explicitly check for test/live mismatch in logs
+    if (keyId && keyId.startsWith('rzp_test')) {
+      console.warn('⚠️ [Razorpay] Using TEST mode keys.');
+    } else if (keyId && keyId.startsWith('rzp_live')) {
+      console.log('✅ [Razorpay] Using LIVE mode keys.');
+    }
 
     if (!keyId || !keySecret) {
-      logger.warn('Razorpay credentials not found. Payment gateway will not work.', {
+      console.warn('⚠️ [Razorpay] Credentials missing!');
+      logger.warn('Razorpay credentials not found.', {
         keyId: keyId ? 'present' : 'missing',
         keySecret: keySecret ? 'present' : 'missing'
       });
@@ -44,20 +45,17 @@ const initializeRazorpay = async () => {
         key_id: keyId,
         key_secret: keySecret
       });
-      logger.info('Razorpay initialized successfully with key:', keyId.substring(0, 8) + '...');
+      console.log('✅ [Razorpay] Instance created successfully.');
+      logger.info('Razorpay initialized successfully.');
       return razorpayInstance;
-    } catch (error) {
-      logger.error(`Error initializing Razorpay: ${error.message}`, {
-        error: error.message,
-        stack: error.stack
-      });
+    } catch (innerError) {
+      console.error('❌ [Razorpay] Initialization Error (Inner):', innerError.message);
+      logger.error(`Error initializing Razorpay instance: ${innerError.message}`);
       return null;
     }
   } catch (error) {
-    logger.error(`Error fetching Razorpay credentials: ${error.message}`, {
-      error: error.message,
-      stack: error.stack
-    });
+    console.error('❌ [Razorpay] Fatal Error fetching credentials:', error.message);
+    logger.error(`Error fetching Razorpay credentials: ${error.message}`);
     return null;
   }
 };
@@ -124,6 +122,13 @@ const createOrder = async (options) => {
       },
       stack: error.stack
     });
+
+    // If authentication failed (401), clear the instance so it re-initializes on next call
+    // This allows picking up .env changes without a full restart
+    if (error.statusCode === 401) {
+      console.warn('⚠️ [Razorpay] Authentication failed (401). Clearing instance to force re-initialization with potentially new keys.');
+      razorpayInstance = null;
+    }
 
     // Return more descriptive error message
     let errorMessage = 'Failed to create payment order';
@@ -241,4 +246,3 @@ export {
   fetchPayment,
   createRefund
 };
-

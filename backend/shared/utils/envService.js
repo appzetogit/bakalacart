@@ -93,14 +93,19 @@ export function clearEnvCache() {
 export async function getRazorpayCredentials() {
   // Check process.env first for forced overrides (useful for hotfixes)
   if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    console.log('📝 [EnvService] Using Razorpay keys from process.env (Key ID starting with:', process.env.RAZORPAY_KEY_ID.substring(0, 10), ')');
     return {
       keyId: process.env.RAZORPAY_KEY_ID,
       keySecret: process.env.RAZORPAY_KEY_SECRET
     };
   }
 
+  console.log('📝 [EnvService] Razorpay keys not found in process.env, checking database/envVars...');
   const apiKey = await getEnvVar('RAZORPAY_API_KEY');
   const secretKey = await getEnvVar('RAZORPAY_SECRET_KEY');
+
+  if (apiKey) console.log('📝 [EnvService] Found RAZORPAY_API_KEY in database/envVars');
+  if (secretKey) console.log('📝 [EnvService] Found RAZORPAY_SECRET_KEY in database/envVars');
 
   // Fallback to old env var names
   return {

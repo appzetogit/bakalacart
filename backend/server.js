@@ -11,7 +11,20 @@ import cron from 'node-cron';
 import mongoose from 'mongoose';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ override: true });
+
+// Manual cleanup for Razorpay keys (in case of quotes in .env)
+// Manual cleanup for Razorpay keys (in case of quotes or whitespace in .env)
+['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'].forEach(key => {
+  if (process.env[key]) {
+    // Remove quotes if present
+    if (process.env[key].startsWith('"') || process.env[key].startsWith("'")) {
+      process.env[key] = process.env[key].replace(/^["'](.*)["']$/, '$1');
+    }
+    // Trim whitespace
+    process.env[key] = process.env[key].trim();
+  }
+});
 
 // Import configurations
 import { connectDB } from './config/database.js';
@@ -93,6 +106,10 @@ if (missingEnvVars.length > 0) {
 // Initialize Express app
 const app = express();
 const httpServer = createServer(app);
+
+console.log('🔄 [SERVER] Server is starting/restarting...');
+console.log('Example app listening on port 5000!');
+console.log('✅ [SERVER] Force restart trigger: ' + new Date().toISOString());
 
 // Initialize Socket.IO with proper CORS configuration
 const allowedSocketOrigins = [
@@ -277,9 +294,9 @@ deliveryNamespace.on('connection', (socket) => {
         room: room,
         socketId: socket.id
       });
-      } else {
-        console.warn('⚠️ Delivery partner tried to join without deliveryId');
-      }
+    } else {
+      console.warn('⚠️ Delivery partner tried to join without deliveryId');
+    }
   });
 
   // Handle chat messages from Delivery Partner
@@ -294,18 +311,18 @@ deliveryNamespace.on('connection', (socket) => {
       // Find the order to get both orderId formats (ORD-xxx and MongoDB _id)
       const { default: Order } = await import('./modules/order/models/Order.js');
       let order = null;
-      
+
       try {
         // Try to find order by MongoDB _id first
         if (orderId && mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
           order = await Order.findById(orderId).select('orderId _id').lean();
         }
-        
+
         // If not found, try with orderId string (ORD-xxx format)
         if (!order) {
           order = await Order.findOne({ orderId: orderId }).select('orderId _id').lean();
         }
-        
+
         // Last resort: try finding by _id as string
         if (!order && mongoose.Types.ObjectId.isValid(orderId)) {
           order = await Order.findById(new mongoose.Types.ObjectId(orderId)).select('orderId _id').lean();
@@ -669,12 +686,12 @@ io.on('connection', (socket) => {
       // 2. Emit to the Delivery Partner
       // We need to find the delivery partner for this order to target them
       const { default: Order } = await import('./modules/order/models/Order.js');
-      
+
       // Try multiple ways to find the order
       let order = null;
       try {
         console.log(`🔍 Looking for order with orderId: ${orderId}`);
-        
+
         // First try with MongoDB _id (if it's a valid ObjectId)
         if (orderId && mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
           try {
@@ -689,7 +706,7 @@ io.on('connection', (socket) => {
             console.log(`⚠️ Error finding by _id: ${e.message}`);
           }
         }
-        
+
         // If not found, try with orderId string (ORD-xxx format)
         if (!order) {
           try {
@@ -704,7 +721,7 @@ io.on('connection', (socket) => {
             console.log(`⚠️ Error finding by orderId string: ${e.message}`);
           }
         }
-        
+
         // Last resort: try finding by _id as string
         if (!order && mongoose.Types.ObjectId.isValid(orderId)) {
           try {
@@ -719,7 +736,7 @@ io.on('connection', (socket) => {
             console.log(`⚠️ Could not convert to ObjectId: ${e.message}`);
           }
         }
-        
+
         if (!order) {
           console.warn(`⚠️ Order not found with orderId: ${orderId}`);
         }
@@ -739,7 +756,7 @@ io.on('connection', (socket) => {
 
       // Handle both ObjectId and string formats, and populated objects
       let deliveryPartnerId = null;
-      
+
       // Check if deliveryPartnerId is populated (has _id property)
       if (order.deliveryPartnerId && typeof order.deliveryPartnerId === 'object') {
         if (order.deliveryPartnerId._id) {
@@ -751,13 +768,13 @@ io.on('connection', (socket) => {
         }
       } else {
         // It's already a string or ObjectId
-        deliveryPartnerId = order.deliveryPartnerId.toString ? 
-          order.deliveryPartnerId.toString() : 
+        deliveryPartnerId = order.deliveryPartnerId.toString ?
+          order.deliveryPartnerId.toString() :
           String(order.deliveryPartnerId);
       }
-      
+
       const room = `delivery:${deliveryPartnerId}`;
-      
+
       console.log(`💬 Forwarding user message to delivery partner:`, {
         deliveryPartnerId,
         room,
@@ -768,7 +785,7 @@ io.on('connection', (socket) => {
         deliveryPartnerIdType: typeof order.deliveryPartnerId,
         deliveryPartnerIdValue: order.deliveryPartnerId
       });
-      
+
       // Emit to the delivery namespace room for this delivery partner
       const messageData = {
         ...data,
@@ -777,7 +794,7 @@ io.on('connection', (socket) => {
         sender: 'user',
         timestamp: Date.now()
       };
-      
+
       console.log(`📤 Preparing to emit user message to delivery partner:`, {
         room,
         messageData,
@@ -785,18 +802,18 @@ io.on('connection', (socket) => {
         orderMongoId: order._id,
         originalOrderId: orderId
       });
-      
+
       // Check room size before emitting
       const roomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
       console.log(`📊 Room ${room} has ${roomSize} socket(s) before emitting`);
-      
+
       deliveryNamespace.to(room).emit('chat-message', messageData);
       console.log(`✅ Emitted 'chat-message' to room ${room}:`, messageData);
-      
+
       // Also emit to receive-chat-message event for compatibility
       deliveryNamespace.to(room).emit('receive-chat-message', messageData);
       console.log(`✅ Emitted 'receive-chat-message' to room ${room}`);
-      
+
       // Also try ObjectId format if different (for compatibility)
       if (mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
         const objectIdRoom = `delivery:${new mongoose.Types.ObjectId(deliveryPartnerId).toString()}`;
@@ -808,11 +825,11 @@ io.on('connection', (socket) => {
           console.log(`📤 Also sent to ObjectId room: ${objectIdRoom}`);
         }
       }
-      
+
       // Log final room info for debugging
       const finalRoomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
       console.log(`✅ Forwarded user message to delivery partner ${deliveryPartnerId} in room ${room} (${finalRoomSize} socket(s) in room)`);
-      
+
       if (finalRoomSize === 0) {
         console.warn(`⚠️ WARNING: No sockets in room ${room}. Delivery partner may not be connected or not joined the room.`);
         console.warn(`⚠️ Available rooms in delivery namespace:`, Array.from(deliveryNamespace.adapter.rooms.keys()).filter(r => r.startsWith('delivery:')));

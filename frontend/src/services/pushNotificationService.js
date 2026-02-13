@@ -2,7 +2,7 @@
 import { messaging, getToken, onMessage, deleteToken } from '@/lib/firebase';
 import axios from 'axios';
 
-const VAPID_KEY = "BKcDctPiH-WKLjyXh6RkJAl0S4vYWFe47m-Q0aHbmHkBgX1hhf5DhZjrYMyclPEW1vk9LvHoHnltavn6Iv2by8w";
+const VAPID_KEY = "BHZMH56oZ8hv-NfRyAEwQJ_eRifGy5ZB7YbzSJAiUlT9UP0h4Wk8YLkQunbhs-FA7GFgafy_Iqrz5zRRbPpeqCg";
 
 // Register service worker
 async function registerServiceWorker() {
@@ -38,6 +38,7 @@ async function requestNotificationPermission() {
 // Get FCM token
 async function getFCMToken() {
     try {
+        console.log('🔄 [FCM Service] Initializing FCM...');
         const registration = await registerServiceWorker();
 
         // Ensure SW is up to date
@@ -47,47 +48,64 @@ async function getFCMToken() {
 
         // Check if permission granted
         if (Notification.permission !== 'granted') {
+            console.log('⚠️ [FCM Service] Notification permission not granted yet. Requesting...');
             const granted = await requestNotificationPermission();
-            if (!granted) return null;
+            if (!granted) {
+                console.warn('❌ [FCM Service] Notification permission denied by user.');
+                return null;
+            }
         }
 
-        const token = await getToken(messaging, {
-            vapidKey: VAPID_KEY,
-            serviceWorkerRegistration: registration
-        });
+        console.log('🔑 [FCM Service] Requesting FCM token with VAPID key:', VAPID_KEY ? VAPID_KEY.substring(0, 10) + '...' : 'MISSING');
 
-        if (token) {
-            console.log('✅ FCM Token obtained:', token);
+        try {
+            const token = await getToken(messaging, {
+                vapidKey: VAPID_KEY,
+                serviceWorkerRegistration: registration
+            });
 
-            // SPECIAL FIX: Force refresh ONCE if we suspect stuck token
-            // This flag can be manually cleared or versioned if needed again
-            const REFRESH_FIX_KEY = 'fcm_fix_v1_refresh_done';
-            if (!localStorage.getItem(REFRESH_FIX_KEY)) {
-                console.log('🔄 [FCM Fix] Forcing token refresh to clear potential stale tokens...');
-                try {
-                    await deleteToken(messaging);
-                    console.log('🗑️ [FCM Fix] Old token deleted.');
+            if (token) {
+                console.log('✅ [FCM Service] FCM Token obtained successfully:', token.substring(0, 15) + '...');
 
-                    // Get new token
-                    const newToken = await getToken(messaging, {
-                        vapidKey: VAPID_KEY,
-                        serviceWorkerRegistration: registration
-                    });
-                    console.log('✅ [FCM Fix] New FRESH token obtained:', newToken);
-                    localStorage.setItem(REFRESH_FIX_KEY, 'true');
-                    return newToken;
-                } catch (refreshError) {
-                    console.warn('⚠️ [FCM Fix] Failed to force refresh, using original token:', refreshError);
+                // SPECIAL FIX: Force refresh ONCE if we suspect stuck token
+                const REFRESH_FIX_KEY = 'fcm_fix_v1_refresh_done';
+                if (!localStorage.getItem(REFRESH_FIX_KEY)) {
+                    console.log('🔄 [FCM Fix] Forcing token refresh to clear potential stale tokens...');
+                    try {
+                        await deleteToken(messaging);
+                        console.log('🗑️ [FCM Fix] Old token deleted.');
+
+                        // Get new token
+                        const newToken = await getToken(messaging, {
+                            vapidKey: VAPID_KEY,
+                            serviceWorkerRegistration: registration
+                        });
+                        console.log('✅ [FCM Fix] New FRESH token obtained:', newToken ? newToken.substring(0, 15) + '...' : 'null');
+                        localStorage.setItem(REFRESH_FIX_KEY, 'true');
+                        return newToken;
+                    } catch (refreshError) {
+                        console.warn('⚠️ [FCM Fix] Failed to force refresh, using original token:', refreshError);
+                    }
                 }
+                return token;
+            } else {
+                console.warn('❌ [FCM Service] No FCM token returned (null/undefined).');
+                return null;
             }
-            return token;
-        } else {
-            console.log('❌ No FCM token available');
+        } catch (tokenError) {
+            console.error('❌ [FCM Service] Error during getToken:', tokenError);
+            if (tokenError.code === 'messaging/missing-current-browser-context') {
+                console.warn('⚠️ [FCM Service] Browser context missing (likely headless or restrictive environment).');
+            } else if (tokenError.message && tokenError.message.includes('Missing required authentication credential')) {
+                console.error('🚨 [FCM Service] CRITICAL: VAPID Key mismatch or invalid project config!');
+                console.error('   - Check if VAPID_KEY in pushNotificationService.js matches the key pair in Firebase Console -> Cloud Messaging -> Web Push Certificates.');
+                console.error('   - Check if firebaseConfig in firebase.js matches the project ID associated with the VAPID key.');
+                console.error('   - Ensure firebase-messaging-sw.js has the correct config.');
+            }
             return null;
         }
     } catch (error) {
-        console.error('❌ Error getting FCM token:', error);
-        // Don't throw to avoid crashing app init
+        console.error('❌ [FCM Service] Fatal error getting FCM token:', error);
         return null;
     }
 }

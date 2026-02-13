@@ -679,12 +679,19 @@ export const createOrder = async (req, res) => {
       razorpayOrderId: razorpayOrder?.id
     });
 
-    // Get Razorpay key ID from env service
+    // Get Razorpay key ID from env service - with robust fallback and logging
     let razorpayKeyId = null;
     if (razorpayOrder) {
       try {
-        const credentials = await getRazorpayCredentials();
-        razorpayKeyId = credentials.keyId || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+        // Prioritize process.env directly for immediate effect
+        if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_ID.startsWith('rzp_')) {
+          razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+          console.log('✅ Using Razorpay Key from process.env:', razorpayKeyId.substring(0, 10) + '...');
+        } else {
+          const credentials = await getRazorpayCredentials();
+          razorpayKeyId = credentials.keyId || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
+          console.log('✅ Using Razorpay Key from envService:', razorpayKeyId ? razorpayKeyId.substring(0, 10) + '...' : 'MISSING');
+        }
       } catch (error) {
         logger.warn(`Failed to get Razorpay key ID from env service: ${error.message}`);
         razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_API_KEY;
