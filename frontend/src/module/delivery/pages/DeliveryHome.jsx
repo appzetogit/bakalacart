@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 import {
   Lightbulb,
   HelpCircle,
@@ -3884,88 +3885,20 @@ export default function DeliveryHome() {
    * { success: false } or null
    */
   const handleCameraCapture = async () => {
-    try {
-      // Check if Flutter InAppWebView handler is available
-      if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
-        console.log('📸 Using Flutter InAppWebView camera handler')
-
-        // Call Flutter handler to open camera
-        const result = await window.flutter_inappwebview.callHandler('openCamera', {
-          source: 'camera', // 'camera' for camera, 'gallery' for file picker
-          accept: 'image/*',
-          multiple: false,
-          quality: 0.8 // Image quality (0.0 to 1.0)
-        })
-
-        console.log('📸 Flutter handler response:', result)
-
-        if (result && result.success) {
-          // Handle the result - could be base64, file path, or file object
-          let file = null
-
-          if (result.file) {
-            // If Flutter returns a File object (preferred method)
-            file = result.file
-            console.log('✅ Received File object from Flutter')
-          } else if (result.base64) {
-            // If Flutter returns base64, convert to File
-            console.log('📸 Converting base64 to File object')
-            let base64Data = result.base64
-
-            // Remove data URL prefix if present
-            if (base64Data.includes(',')) {
-              base64Data = base64Data.split(',')[1]
-            }
-
-            try {
-              const byteCharacters = atob(base64Data)
-              const byteNumbers = new Array(byteCharacters.length)
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i)
-              }
-              const byteArray = new Uint8Array(byteNumbers)
-              const mimeType = result.mimeType || 'image/jpeg'
-              const blob = new Blob([byteArray], { type: mimeType })
-              file = new File([blob], result.fileName || `bill-image-${Date.now()}.jpg`, { type: mimeType })
-              console.log('✅ Converted base64 to File:', { name: file.name, size: file.size, type: file.type })
-            } catch (base64Error) {
-              console.error('❌ Error converting base64 to File:', base64Error)
-              toast.error('Failed to process image. Please try again.')
-              return
-            }
-          } else if (result.filePath) {
-            // If Flutter returns file path, we need to fetch it
-            // This would require additional Flutter handler to read file
-            console.warn('⚠️ File path returned, but file reading not implemented')
-            toast.error('File path handling not implemented. Please use base64 or File object.')
-            return
-          }
-
-          if (file) {
-            // Process the file the same way as handleBillImageSelect
-            await processBillImageFile(file)
-          } else {
-            console.error('❌ No file data in Flutter response:', result)
-            toast.error('Failed to get image from camera')
-          }
-        } else {
-          console.log('ℹ️ Camera cancelled by user or failed')
-        }
-      } else {
-        // Fallback to standard file input for web browsers
-        console.log('📸 Flutter handler not available, using standard file input')
+    // Use utility function for Flutter camera integration
+    const file = await openCameraWithFallback(
+      { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+      () => {
+        // Fallback to standard file input
         if (cameraInputRef.current) {
           cameraInputRef.current.click()
         }
       }
-    } catch (error) {
-      console.error('❌ Error opening camera:', error)
-      toast.error('Failed to open camera. Please try again.')
+    )
 
-      // Fallback to standard file input
-      if (cameraInputRef.current) {
-        cameraInputRef.current.click()
-      }
+    // If Flutter camera returned a file, process it
+    if (file) {
+      await processBillImageFile(file)
     }
   }
 

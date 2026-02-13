@@ -28,6 +28,7 @@ import {
 import { deliveryAPI, uploadAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 import { motion, AnimatePresence } from "framer-motion"
 import io from "socket.io-client"
 import {
@@ -1017,22 +1018,11 @@ export default function MyOrders() {
       galleryInputRefs.current[orderId] = { current: null }
     }
 
-    // Check if Flutter handler is available
-    if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
-      try {
-        const result = await window.flutter_inappwebview.callHandler('openCamera', {
-          source: 'camera',
-          accept: 'image/*',
-          multiple: false,
-          quality: 0.8
-        })
-
-        if (result && result.success && result.file) {
-          await handleBillImageUpload(order, result.file)
-        }
-      } catch (error) {
-        console.error('Error with Flutter camera:', error)
-        // Fallback to menu on mobile, direct on desktop
+    // Try Flutter camera first
+    const file = await openCameraWithFallback(
+      { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+      () => {
+        // Fallback: show menu on mobile, direct on desktop
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
           setShowBillImageSourceMenu(orderId)
           setActiveBillUploadOrder(order)
@@ -1041,15 +1031,11 @@ export default function MyOrders() {
           setTimeout(() => galleryInputRefs.current[orderId]?.current?.click(), 100)
         }
       }
-    } else {
-      // Show menu on mobile, direct on desktop
-      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        setShowBillImageSourceMenu(orderId)
-        setActiveBillUploadOrder(order)
-      } else {
-        setActiveBillUploadOrder(order)
-        setTimeout(() => galleryInputRefs.current[orderId]?.current?.click(), 100)
-      }
+    )
+
+    // If Flutter camera returned a file, process it
+    if (file) {
+      await handleBillImageUpload(order, file)
     }
   }
 
@@ -2431,12 +2417,26 @@ export default function MyOrders() {
                     </div>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const orderId = showBillImageSourceMenu
+                      const order = activeBillUploadOrder
                       setShowBillImageSourceMenu(null)
-                      setTimeout(() => {
-                        galleryInputRefs.current[orderId]?.current?.click()
-                      }, 300)
+                      setActiveBillUploadOrder(null)
+                      
+                      // Try Flutter gallery first
+                      const file = await openGalleryWithFallback(
+                        { accept: 'image/*', multiple: false },
+                        () => {
+                          setTimeout(() => {
+                            galleryInputRefs.current[orderId]?.current?.click()
+                          }, 300)
+                        }
+                      )
+                      
+                      // If Flutter gallery returned a file, process it
+                      if (file && order) {
+                        await handleBillImageUpload(order, file)
+                      }
                     }}
                     className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                   >

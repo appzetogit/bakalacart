@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { deliveryAPI } from "@/lib/api"
 import apiClient from "@/lib/api/axios"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 
 export default function SignupStep2() {
   const navigate = useNavigate()
@@ -208,11 +209,23 @@ export default function SignupStep2() {
             />
             <button
               type="button"
-              onClick={() => {
-                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                  setShowImageSourceMenu(docType)
-                } else {
-                  galleryInputRefs.current[docType].current?.click()
+              onClick={async () => {
+                // Try Flutter camera first
+                const file = await openCameraWithFallback(
+                  { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+                  () => {
+                    // Fallback: show menu on mobile, direct on desktop
+                    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                      setShowImageSourceMenu(docType)
+                    } else {
+                      galleryInputRefs.current[docType].current?.click()
+                    }
+                  }
+                )
+                
+                // If Flutter camera returned a file, process it
+                if (file) {
+                  handleFileSelect(docType, file)
                 }
               }}
               disabled={isUploading}
@@ -305,11 +318,24 @@ export default function SignupStep2() {
                 </h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      const docType = showImageSourceMenu
                       setShowImageSourceMenu(null)
-                      setTimeout(() => {
-                        cameraInputRefs.current[showImageSourceMenu]?.current?.click()
-                      }, 300)
+                      
+                      // Try Flutter camera first
+                      const file = await openCameraWithFallback(
+                        { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+                        () => {
+                          setTimeout(() => {
+                            cameraInputRefs.current[docType]?.current?.click()
+                          }, 300)
+                        }
+                      )
+                      
+                      // If Flutter camera returned a file, process it
+                      if (file) {
+                        handleFileSelect(docType, file)
+                      }
                     }}
                     className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                   >
@@ -322,11 +348,24 @@ export default function SignupStep2() {
                     </div>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      const docType = showImageSourceMenu
                       setShowImageSourceMenu(null)
-                      setTimeout(() => {
-                        galleryInputRefs.current[showImageSourceMenu]?.current?.click()
-                      }, 300)
+                      
+                      // Try Flutter gallery first
+                      const file = await openGalleryWithFallback(
+                        { accept: 'image/*', multiple: false },
+                        () => {
+                          setTimeout(() => {
+                            galleryInputRefs.current[docType]?.current?.click()
+                          }, 300)
+                        }
+                      )
+                      
+                      // If Flutter gallery returned a file, process it
+                      if (file) {
+                        handleFileSelect(docType, file)
+                      }
                     }}
                     className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                   >

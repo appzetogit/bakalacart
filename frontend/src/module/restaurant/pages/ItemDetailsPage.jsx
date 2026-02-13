@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch"
 import api from "@/lib/api"
 import { restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 
 export default function ItemDetailsPage() {
   const navigate = useNavigate()
@@ -67,7 +68,6 @@ export default function ItemDetailsPage() {
   const carouselRef = useRef(null)
   const [isCategoryPopupOpen, setIsCategoryPopupOpen] = useState(false)
   const [showImageSourceMenu, setShowImageSourceMenu] = useState(false)
-  const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const [isServesPopupOpen, setIsServesPopupOpen] = useState(false)
   const [isItemSizePopupOpen, setIsItemSizePopupOpen] = useState(false)
@@ -372,13 +372,7 @@ export default function ItemDetailsPage() {
     setImages([...images, ...newImagePreviews])
     setImageFiles(newImageFilesMap)
     
-    // Clear all file inputs
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-    if (cameraInputRef.current) {
-      cameraInputRef.current.value = ""
-    }
+    // Clear file input
     if (galleryInputRef.current) {
       galleryInputRef.current.value = ""
     }
@@ -939,17 +933,7 @@ export default function ItemDetailsPage() {
 
           {/* Add image button - redesigned */}
           <div className="px-4 py-4 bg-white border-t border-gray-100">
-            {/* Hidden file inputs for camera and gallery */}
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              onChange={handleImageAdd}
-              className="hidden"
-              id="camera-upload"
-            />
+            {/* Hidden file input for gallery */}
             <input
               ref={galleryInputRef}
               type="file"
@@ -960,15 +944,27 @@ export default function ItemDetailsPage() {
               id="gallery-upload"
             />
             
-            {/* Show menu on mobile, direct click on desktop */}
+            {/* Show menu on mobile, direct gallery on desktop */}
             <button
-              onClick={() => {
+              onClick={async () => {
                 // On mobile, show menu with camera and gallery options
                 if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
                   setShowImageSourceMenu(true)
                 } else {
-                  // On desktop, directly open file picker
-                  galleryInputRef.current?.click()
+                  // On desktop, directly open gallery
+                  const files = await openGalleryWithFallback(
+                    { accept: 'image/*', multiple: true },
+                    () => galleryInputRef.current?.click()
+                  )
+                  
+                  // If Flutter gallery returned files, process them
+                  if (files) {
+                    const fileArray = Array.isArray(files) ? files : [files]
+                    const syntheticEvent = {
+                      target: { files: fileArray }
+                    }
+                    handleImageAdd(syntheticEvent)
+                  }
                 }
               }}
               className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl text-sm font-semibold cursor-pointer hover:from-gray-800 hover:to-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95"
@@ -978,89 +974,95 @@ export default function ItemDetailsPage() {
               </div>
               <span>Add Images</span>
             </button>
-          </div>
-          
-          {/* Image Source Menu Modal - Mobile only */}
-          <AnimatePresence>
-            {showImageSourceMenu && (
-              <>
-                {/* Backdrop */}
-                <motion.div
-                  className="fixed inset-0 bg-black/50 z-[9999]"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setShowImageSourceMenu(false)}
-                />
-                
-                {/* Menu */}
-                <motion.div
-                  className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
-                  initial={{ y: "100%" }}
-                  animate={{ y: 0 }}
-                  exit={{ y: "100%" }}
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                >
-                  <div className="p-4">
-                    {/* Handle bar */}
-                    <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
-                    
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                      Select Image Source
-                    </h3>
-                    
-                    <div className="space-y-3">
-                      {/* Camera Option */}
+            
+            {/* Image Source Menu Modal - Mobile only */}
+            <AnimatePresence>
+              {showImageSourceMenu && (
+                <>
+                  <motion.div
+                    className="fixed inset-0 bg-black/50 z-[9999]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShowImageSourceMenu(false)}
+                  />
+                  <motion.div
+                    className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+                    initial={{ y: "100%" }}
+                    animate={{ y: 0 }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  >
+                    <div className="p-4">
+                      <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                        Select Image Source
+                      </h3>
+                      <div className="space-y-3">
+                        {/* Camera Option */}
+                        <button
+                          onClick={async () => {
+                            setShowImageSourceMenu(false)
+                            const file = await openCameraWithFallback(
+                              { source: 'camera', accept: 'image/*', multiple: true, quality: 0.8 },
+                              () => galleryInputRef.current?.click()
+                            )
+                            if (file) {
+                              const syntheticEvent = {
+                                target: { files: [file] }
+                              }
+                              handleImageAdd(syntheticEvent)
+                            }
+                          }}
+                          className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                        >
+                          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                            <Camera className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="font-semibold text-gray-900">Camera</p>
+                            <p className="text-sm text-gray-500">Take a new photo</p>
+                          </div>
+                        </button>
+                        {/* Gallery Option */}
+                        <button
+                          onClick={async () => {
+                            setShowImageSourceMenu(false)
+                            const files = await openGalleryWithFallback(
+                              { accept: 'image/*', multiple: true },
+                              () => galleryInputRef.current?.click()
+                            )
+                            if (files) {
+                              const fileArray = Array.isArray(files) ? files : [files]
+                              const syntheticEvent = {
+                                target: { files: fileArray }
+                              }
+                              handleImageAdd(syntheticEvent)
+                            }
+                          }}
+                          className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                        >
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Plus className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="font-semibold text-gray-900">Gallery</p>
+                            <p className="text-sm text-gray-500">Choose from existing photos</p>
+                          </div>
+                        </button>
+                      </div>
                       <button
-                        onClick={() => {
-                          setShowImageSourceMenu(false)
-                          setTimeout(() => {
-                            cameraInputRef.current?.click()
-                          }, 300)
-                        }}
-                        className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                        onClick={() => setShowImageSourceMenu(false)}
+                        className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                       >
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <Camera className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="font-semibold text-gray-900">Camera</p>
-                          <p className="text-sm text-gray-500">Take a new photo</p>
-                        </div>
-                      </button>
-                      
-                      {/* Gallery Option */}
-                      <button
-                        onClick={() => {
-                          setShowImageSourceMenu(false)
-                          setTimeout(() => {
-                            galleryInputRef.current?.click()
-                          }, 300)
-                        }}
-                        className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
-                      >
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Plus className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="font-semibold text-gray-900">Gallery</p>
-                          <p className="text-sm text-gray-500">Choose from existing photos</p>
-                        </div>
+                        Cancel
                       </button>
                     </div>
-                    
-                    {/* Cancel Button */}
-                    <button
-                      onClick={() => setShowImageSourceMenu(false)}
-                      className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Form Fields */}

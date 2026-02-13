@@ -24,6 +24,7 @@ import BottomNavOrders from "../components/BottomNavOrders"
 import { useNavigate } from "react-router-dom"
 import { restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 
 export default function HubMenu() {
   const navigate = useNavigate()
@@ -2254,11 +2255,28 @@ export default function HubMenu() {
                     id="addon-gallery-upload"
                   />
                   <button
-                    onClick={() => {
-                      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                        setShowAddonImageSourceMenu(true)
-                      } else {
-                        addonGalleryInputRef.current?.click()
+                    onClick={async () => {
+                      // Try Flutter camera first
+                      const file = await openCameraWithFallback(
+                        { source: 'camera', accept: 'image/*', multiple: true, quality: 0.8 },
+                        () => {
+                          // Fallback: show menu on mobile, direct on desktop
+                          if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                            setShowAddonImageSourceMenu(true)
+                          } else {
+                            addonGalleryInputRef.current?.click()
+                          }
+                        }
+                      )
+                      
+                      // If Flutter camera returned a file, process it
+                      if (file) {
+                        const syntheticEvent = {
+                          target: {
+                            files: [file]
+                          }
+                        }
+                        handleAddonImageAdd(syntheticEvent)
                       }
                     }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors"
@@ -2293,11 +2311,27 @@ export default function HubMenu() {
                             </h3>
                             <div className="space-y-3">
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   setShowAddonImageSourceMenu(false)
-                                  setTimeout(() => {
-                                    addonCameraInputRef.current?.click()
-                                  }, 300)
+                                  // Try Flutter camera first
+                                  const file = await openCameraWithFallback(
+                                    { source: 'camera', accept: 'image/*', multiple: true, quality: 0.8 },
+                                    () => {
+                                      setTimeout(() => {
+                                        addonCameraInputRef.current?.click()
+                                      }, 300)
+                                    }
+                                  )
+                                  
+                                  // If Flutter camera returned a file, process it
+                                  if (file) {
+                                    const syntheticEvent = {
+                                      target: {
+                                        files: [file]
+                                      }
+                                    }
+                                    handleAddonImageAdd(syntheticEvent)
+                                  }
                                 }}
                                 className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
                               >
