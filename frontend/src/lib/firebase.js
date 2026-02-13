@@ -4,13 +4,13 @@ import { getMessaging, getToken, onMessage, deleteToken } from 'firebase/messagi
 
 // Firebase configuration - Hardcoded to ensure consistency across all environments
 const firebaseConfig = {
-  apiKey: "AIzaSyDqWg8g4sxwElZ12nxVLjUe7wqCnSuDV3g",
-  authDomain: "bakala-ed61d.firebaseapp.com",
-  projectId: "bakala-ed61d",
-  appId: "1:41650386026:web:495621e0f3e2424332c613",
-  messagingSenderId: "41650386026",
-  storageBucket: "bakala-ed61d.firebasestorage.app",
-  measurementId: "G-S49CP0DW74"
+  apiKey: "AIzaSyDNxKR0YBWxL3HNvUADO4QFWD99spZpzCs",
+  authDomain: "bakalaa-8f5c2.firebaseapp.com",
+  projectId: "bakalaa-8f5c2",
+  appId: "1:411950794141:web:16997299bfa32af55a1b74",
+  messagingSenderId: "411950794141",
+  storageBucket: "bakalaa-8f5c2.firebasestorage.app",
+  measurementId: "G-TQVDSX2Z02"
 };
 
 // Initialize Firebase app only once

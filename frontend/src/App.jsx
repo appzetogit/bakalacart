@@ -20,7 +20,7 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
       error,
       suggestion: 'Try: 1) Stop dev server, 2) Delete node_modules/.vite folder, 3) Restart dev server'
     })
-    
+
     // If fallback path is provided, try it
     if (fallbackPath) {
       console.log('🔄 Trying fallback import path...')
@@ -39,7 +39,7 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
         })
       })
     }
-    
+
     // Retry once after a short delay
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -66,6 +66,9 @@ const PaymentPage = lazy(() => import("@/module/usermain/pages/PaymentPage"))
 const OrdersPage = lazy(() => import("@/module/usermain/pages/OrdersPage"))
 const OrderDetailsPage = lazy(() => import("@/module/usermain/pages/OrderDetailsPage"))
 const WishlistPage = lazy(() => import("@/module/usermain/pages/WishlistPage"))
+const Terms = lazy(() => import("@/module/user/pages/profile/Terms"))
+const Privacy = lazy(() => import("@/module/user/pages/profile/Privacy"))
+const ContentPolicy = lazy(() => import("@/module/user/pages/profile/ContentPolicy"))
 
 const RestaurantOrdersPage = lazy(() => import("@/module/restaurant/pages/OrdersPage"))
 const AllOrdersPage = lazy(() => import("@/module/restaurant/pages/AllOrdersPage"))
@@ -181,6 +184,11 @@ export default function App() {
       <Routes>
         <Route path="/user" element={<Navigate to="/" replace />} />
         <Route path="/user/*" element={<UserPathRedirect />} />
+
+        {/* Public Legal Pages (Root Level) */}
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/content-policy" element={<ContentPolicy />} />
         {/* Removed /routes route - Home should be accessed through UserRouter */}
 
         {/* Restaurant Public Routes */}

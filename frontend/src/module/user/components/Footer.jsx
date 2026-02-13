@@ -34,7 +34,7 @@ export default function Footer() {
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    
+
     return () => {
       window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
     }
@@ -50,8 +50,9 @@ export default function Footer() {
     support: [
       { name: "Help Center", href: "/user/help" },
       { name: "Contact Us", href: "/user/help" },
-      { name: "Privacy Policy", href: "/user/help" },
-      { name: "Terms of Service", href: "/user/help" },
+      { name: "Privacy Policy", href: "/privacy" },
+      { name: "Terms of Service", href: "/terms" },
+      { name: "Content Policy", href: "/content-policy" },
     ],
     user: [
       { name: "My Account", href: "/user/profile" },

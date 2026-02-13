@@ -5,14 +5,14 @@ import { toast } from 'sonner';
 
 const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart }) => {
   const { addToCart } = useCart();
-  
+
   // --- STATE MANAGEMENT ---
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(null);
-  
-  // Get variants from item
-  const variants = Array.isArray(item?.variations) && item.variations.length > 0 
-    ? item.variations 
+
+  // Get variants from item and filter out rejected/invalid ones (where price is null)
+  const variants = Array.isArray(item?.variations) && item.variations.length > 0
+    ? item.variations.filter(v => v && v.price !== null && v.price !== undefined)
     : [];
 
   // Initialize selected variant when modal opens
@@ -35,13 +35,13 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       document.body.style.overflow = 'hidden';
       document.body.style.left = '0';
       document.body.style.right = '0';
-      
+
       // Reset modal content scroll to top when opening
       const modalContent = document.querySelector('[data-modal-content]');
       if (modalContent) {
         modalContent.scrollTop = 0;
       }
-      
+
       return () => {
         // Re-enable body scroll when modal closes
         document.body.style.position = '';
@@ -118,14 +118,14 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
   const isVeg = item.foodType === 'Veg' || item.isVeg === true;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/50 z-50"
       data-modal-backdrop
-      style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
         bottom: 0,
         overflow: 'hidden',
         zIndex: 9999
@@ -138,7 +138,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       }}
     >
       {/* Mobile Container - Perfectly Centered */}
-      <div 
+      <div
         className="bg-white shadow-xl overflow-hidden flex flex-col rounded-xl"
         style={{
           position: 'fixed',
@@ -154,7 +154,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        
+
         {/* --- HEADER --- */}
         <div className="p-4 border-b pb-4 bg-white z-10 sticky top-0">
           <div className="flex justify-between items-start">
@@ -175,18 +175,18 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
         {/* --- SCROLLABLE CONTENT --- */}
         <div className="flex-1 overflow-y-auto pb-24" data-modal-content>
-          
+
           {/* Section 1: Quantity / Variants */}
           {variants.length > 0 && (
             <>
               <div className="p-5">
                 <h3 className="font-bold text-lg text-gray-800">Quantity</h3>
                 <p className="text-sm text-gray-500 mb-4">Required • Select any 1 option</p>
-                
+
                 <div className="flex flex-col gap-4">
                   {variants.map((variant) => (
-                    <div 
-                      key={variant.id} 
+                    <div
+                      key={variant.id}
                       className="flex justify-between items-center cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors"
                       onClick={() => setSelectedVariant(variant.id)}
                     >
@@ -238,10 +238,10 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
         {/* --- STICKY FOOTER --- */}
         <div className="absolute bottom-0 w-full bg-white border-t p-4 shadow-[0_-5px_10px_rgba(0,0,0,0.05)] flex items-center justify-between gap-4">
-          
+
           {/* Stepper (Minus - Plus) */}
           <div className="flex items-center border border-rose-100 bg-rose-50 rounded-lg px-2 py-1.5 gap-3">
-            <button 
+            <button
               onClick={() => quantity > 1 && setQuantity(q => q - 1)}
               className="text-[#ff3f6c] font-bold text-xl px-2 hover:bg-rose-100 rounded transition-colors"
               disabled={quantity <= 1}
@@ -249,7 +249,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
               <Minus size={18} />
             </button>
             <span className="font-bold text-gray-800 min-w-[1.5rem] text-center">{quantity}</span>
-            <button 
+            <button
               onClick={() => setQuantity(q => q + 1)}
               className="text-[#ff3f6c] font-bold text-xl px-2 hover:bg-rose-100 rounded transition-colors"
             >
@@ -258,7 +258,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           </div>
 
           {/* Add Item Button */}
-          <button 
+          <button
             onClick={handleAddToCart}
             className="flex-1 bg-[#ff3f6c] hover:bg-[#e6365f] text-white font-bold py-3 rounded-lg shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={variants.length > 0 && !selectedVariant}

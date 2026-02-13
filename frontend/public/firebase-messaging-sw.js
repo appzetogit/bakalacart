@@ -3,13 +3,13 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDqWg8g4sxwElZ12nxVLjUe7wqCnSuDV3g",
-    authDomain: "bakala-ed61d.firebaseapp.com",
-    projectId: "bakala-ed61d",
-    storageBucket: "bakala-ed61d.firebasestorage.app",
-    messagingSenderId: "41650386026",
-    appId: "1:41650386026:web:495621e0f3e2424332c613",
-    measurementId: "G-S49CP0DW74"
+    apiKey: "AIzaSyDNxKR0YBWxL3HNvUADO4QFWD99spZpzCs",
+    authDomain: "bakalaa-8f5c2.firebaseapp.com",
+    projectId: "bakalaa-8f5c2",
+    storageBucket: "bakalaa-8f5c2.firebasestorage.app",
+    messagingSenderId: "411950794141",
+    appId: "1:411950794141:web:16997299bfa32af55a1b74",
+    measurementId: "G-TQVDSX2Z02"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -21,38 +21,38 @@ async function playNotificationSound() {
     try {
         // Audio file path - must be accessible from service worker
         const audioUrl = '/audio/alert.mp3';
-        
+
         console.log('🔊 [SW] Attempting to play notification sound:', audioUrl);
-        
+
         // Fetch the audio file
         const response = await fetch(audioUrl);
         if (!response.ok) {
             console.warn('[SW] Could not fetch audio file:', response.status);
             return;
         }
-        
+
         const arrayBuffer = await response.arrayBuffer();
-        
+
         // Create AudioContext and decode audio
         const audioContext = new (self.AudioContext || self.webkitAudioContext)();
-        
+
         // Resume AudioContext if suspended (required for some browsers)
         if (audioContext.state === 'suspended') {
             await audioContext.resume();
         }
-        
+
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
+
         // Create source and play
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        
+
         // Play the sound
         source.start(0);
-        
+
         console.log('✅ [SW] Notification sound played successfully');
-        
+
         // Clean up after playback
         source.onended = () => {
             try {
@@ -61,7 +61,7 @@ async function playNotificationSound() {
                 // Ignore errors during cleanup
             }
         };
-        
+
     } catch (error) {
         console.warn('[SW] Could not play notification sound:', error);
         // Fallback: The notification's built-in sound property will handle it

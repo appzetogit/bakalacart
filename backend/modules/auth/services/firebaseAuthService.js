@@ -32,63 +32,67 @@ class FirebaseAuthService {
       let clientEmail = dbCredentials.clientEmail || process.env.FIREBASE_CLIENT_EMAIL;
       let privateKey = dbCredentials.privateKey || process.env.FIREBASE_PRIVATE_KEY;
 
-      // Fallback: read from firebaseconfig.json in backend root or config folder if env vars are not set
+      // Fallback: read from firebaseconfig.json or firebase-service-account.json
       if (!projectId || !clientEmail || !privateKey) {
         try {
-          // Try config folder first (if service account file is there)
-          const configFolderPath = path.resolve(process.cwd(), 'config', 'zomato-607fa-firebase-adminsdk-fbsvc-f5f782c2cc.json');
+          const configFolderPath = path.resolve(process.cwd(), 'config', 'firebase-service-account.json');
+          const oldConfigPath = path.resolve(process.cwd(), 'config', 'zomato-607fa-firebase-adminsdk-fbsvc-f5f782c2cc.json');
           const rootPath = path.resolve(process.cwd(), 'firebaseconfig.json');
-          
+
           let serviceAccountPath = null;
           if (fs.existsSync(configFolderPath)) {
             serviceAccountPath = configFolderPath;
+          } else if (fs.existsSync(oldConfigPath)) {
+            serviceAccountPath = oldConfigPath;
           } else if (fs.existsSync(rootPath)) {
             serviceAccountPath = rootPath;
           }
-          
+
           if (serviceAccountPath) {
             const raw = fs.readFileSync(serviceAccountPath, 'utf-8');
             const json = JSON.parse(raw);
             projectId = projectId || json.project_id;
             clientEmail = clientEmail || json.client_email;
             privateKey = privateKey || json.private_key;
+            logger.info(`Loaded Firebase config from file: ${path.basename(serviceAccountPath)}`);
           }
         } catch (err) {
-          logger.warn(`Failed to read firebaseconfig.json: ${err.message}`);
+          logger.warn(`Failed to read Firebase config file: ${err.message}`);
         }
       }
 
       if (!projectId || !clientEmail || !privateKey) {
         logger.warn(
-          'Firebase Admin not fully configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in ENV Setup or .env or provide firebaseconfig.json in backend root to enable Firebase auth.'
+          'Firebase Admin not fully configured. Google Sign-In and Push Notifications will be disabled.'
         );
         return;
       }
 
       // Handle escaped newlines in private key
-      if (privateKey.includes('\\n')) {
+      if (typeof privateKey === 'string' && privateKey.includes('\\n')) {
         privateKey = privateKey.replace(/\\n/g, '\n');
       }
 
       try {
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey
-          })
-        });
-
-        this.initialized = true;
-        logger.info('Firebase Admin initialized for auth verification');
-      } catch (error) {
-        // If already initialized, ignore the "app exists" error
-        if (error?.code === 'app/duplicate-app') {
-          this.initialized = true;
-          logger.warn('Firebase Admin already initialized, reusing existing instance');
-          return;
+        if (!admin.apps.length) {
+          admin.initializeApp({
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey
+            })
+          });
         }
 
+        this.initialized = true;
+        this.currentProjectId = projectId;
+        logger.info(`Firebase Admin initialized successfully for project: ${projectId}`);
+      } catch (error) {
+        if (error?.code === 'app/duplicate-app') {
+          this.initialized = true;
+          this.currentProjectId = projectId;
+          return;
+        }
         logger.error(`Failed to initialize Firebase Admin: ${error.message}`);
       }
     } catch (error) {
@@ -107,7 +111,10 @@ class FirebaseAuthService {
    */
   async verifyIdToken(idToken) {
     if (!this.initialized) {
-      throw new Error('Firebase Admin is not configured. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in .env');
+      await this.init();
+      if (!this.initialized) {
+        throw new Error('Firebase Admin is not configured. Please verify settings in dashboard or .env');
+      }
     }
 
     if (!idToken) {
@@ -116,10 +123,20 @@ class FirebaseAuthService {
 
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
-      logger.info('Firebase ID token verified', { uid: decoded.uid, email: decoded.email });
+      logger.info('Firebase ID token verified', {
+        uid: decoded.uid,
+        email: decoded.email,
+        project: this.currentProjectId
+      });
       return decoded;
     } catch (error) {
-      logger.error(`Error verifying Firebase ID token: ${error.message}`);
+      logger.error(`Firebase token verification failed (Project: ${this.currentProjectId}): ${error.message}`);
+
+      // Check for project ID mismatch in error (common issue)
+      if (error.message.includes('aud')) {
+        throw new Error(`Firebase project mismatch. Token is not for project "${this.currentProjectId}".`);
+      }
+
       throw new Error('Invalid or expired Firebase ID token');
     }
   }
