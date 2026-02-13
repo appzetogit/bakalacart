@@ -1314,10 +1314,21 @@ export default function DeliveryHome() {
 
   // Play alert sound function - plays until countdown ends (30 seconds)
   const playAlertSound = async () => {
-    // Only play if user has interacted with the page (browser autoplay policy)
-    if (!userInteractedRef.current) {
+    // Check if running in Flutter InAppWebView (mobile APK)
+    const isFlutterWebView = typeof window !== 'undefined' && 
+      (window.flutter_inappwebview || navigator.userAgent.includes('wv'))
+    
+    // In mobile APK, always allow sound (Flutter handles permissions)
+    // In browser, require user interaction due to autoplay policy
+    if (!isFlutterWebView && !userInteractedRef.current) {
       console.log('🔇 Audio playback skipped - user has not interacted with page yet')
       return null
+    }
+    
+    // For mobile APK, mark as interacted to allow sound playback
+    if (isFlutterWebView) {
+      userInteractedRef.current = true
+      console.log('📱 Mobile APK detected - allowing sound playback')
     }
 
     try {
@@ -1368,6 +1379,23 @@ export default function DeliveryHome() {
 
       // Play the sound and wait for it to start
       try {
+        // For mobile APK, try Flutter sound handler first
+        const isFlutterWebView = typeof window !== 'undefined' && 
+          (window.flutter_inappwebview || navigator.userAgent.includes('wv'))
+        
+        if (isFlutterWebView && window.flutter_inappwebview?.callHandler) {
+          try {
+            console.log('📱 Attempting to play sound via Flutter handler')
+            await window.flutter_inappwebview.callHandler('playNotificationSound', {
+              soundType: selectedSound === 'original' ? 'original' : 'alert'
+            })
+            console.log('✅ Sound played via Flutter handler')
+            // Still create audio object for fallback and looping
+          } catch (flutterError) {
+            console.warn('⚠️ Flutter sound handler failed, using fallback:', flutterError)
+          }
+        }
+
         // Wait for audio to be ready
         await new Promise((resolve, reject) => {
           audio.addEventListener('canplaythrough', resolve, { once: true })
@@ -1385,7 +1413,8 @@ export default function DeliveryHome() {
           src: audio.src,
           volume: audio.volume,
           loop: audio.loop,
-          readyState: audio.readyState
+          readyState: audio.readyState,
+          isFlutterWebView: isFlutterWebView
         })
         return audio
       } catch (playError) {
@@ -5016,8 +5045,8 @@ export default function DeliveryHome() {
       }
 
       setSelectedRestaurant(restaurantData)
-      // setShowNewOrderPopup(true) // DISABLED - Popup removed
-      // setCountdownSeconds(300) // Reset countdown to 5 minutes
+      setShowNewOrderPopup(true) // Show popup when new order is assigned
+      setCountdownSeconds(300) // Reset countdown to 5 minutes
     }
   }, [newOrder, calculateTimeAway, riderLocation])
 

@@ -25,6 +25,10 @@ export const useDeliveryNotifications = () => {
   
   const playNotificationSound = useCallback(() => {
     try {
+      // Check if running in Flutter InAppWebView (mobile APK)
+      const isFlutterWebView = typeof window !== 'undefined' && 
+        (window.flutter_inappwebview || navigator.userAgent.includes('wv'))
+      
       // Always get fresh selected sound preference from localStorage
       const selectedSound = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
       const soundFile = selectedSound === 'original' ? originalSound : alertSound;
@@ -32,7 +36,9 @@ export const useDeliveryNotifications = () => {
       console.log('🔊 Playing notification sound:', {
         selectedSound,
         soundType: selectedSound === 'original' ? 'Original' : 'Zomato Tone',
-        soundFile
+        soundFile,
+        isFlutterWebView,
+        userInteracted: userInteractedRef.current
       });
       
       // Always create a new Audio instance to ensure we use the selected sound
@@ -44,25 +50,66 @@ export const useDeliveryNotifications = () => {
       
       // Create new audio with selected sound
       audioRef.current = new Audio(soundFile);
-      audioRef.current.volume = 0.7;
+      audioRef.current.volume = 1.0; // Full volume for notifications
+      audioRef.current.loop = true; // Loop the sound for new order notifications
       
-      // Only play if user has interacted with the page (browser autoplay policy)
-      if (!userInteractedRef.current) {
+      // In mobile APK, always allow sound (Flutter handles permissions)
+      // In browser, require user interaction due to autoplay policy
+      if (!isFlutterWebView && !userInteractedRef.current) {
         console.log('🔇 Audio playback skipped - user has not interacted with page yet');
         return;
       }
       
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(error => {
-        // Don't log autoplay policy errors as they're expected
-        if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
-          console.warn('Error playing notification sound:', error);
+      // For mobile APK, mark as interacted to allow sound playback
+      if (isFlutterWebView) {
+        userInteractedRef.current = true;
+        console.log('📱 Mobile APK detected - allowing sound playback without user interaction');
+      }
+      
+      // Try Flutter sound handler first (if available)
+      if (isFlutterWebView && window.flutter_inappwebview?.callHandler) {
+        try {
+          console.log('📱 Attempting to play sound via Flutter handler');
+          window.flutter_inappwebview.callHandler('playNotificationSound', {
+            soundType: selectedSound === 'original' ? 'original' : 'alert',
+            loop: true
+          }).catch(err => {
+            console.warn('⚠️ Flutter sound handler failed, using fallback:', err);
+          });
+        } catch (flutterError) {
+          console.warn('⚠️ Flutter sound handler error, using fallback:', flutterError);
         }
-      });
+      }
+      
+      audioRef.current.currentTime = 0;
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          console.log('✅ Notification sound started playing successfully');
+        }).catch(error => {
+          // Don't log autoplay policy errors as they're expected in browser
+          if (!error.message?.includes('user didn\'t interact') && 
+              !error.name?.includes('NotAllowedError') &&
+              !isFlutterWebView) {
+            console.warn('Error playing notification sound:', error);
+          } else if (isFlutterWebView) {
+            // In mobile APK, this shouldn't fail, but log if it does
+            console.error('❌ Sound playback failed in mobile APK:', error);
+          }
+        });
+      }
     } catch (error) {
       // Don't log autoplay policy errors
-      if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
+      const isFlutterWebView = typeof window !== 'undefined' && 
+        (window.flutter_inappwebview || navigator.userAgent.includes('wv'))
+      
+      if (!error.message?.includes('user didn\'t interact') && 
+          !error.name?.includes('NotAllowedError') &&
+          !isFlutterWebView) {
         console.warn('Error playing sound:', error);
+      } else if (isFlutterWebView) {
+        console.error('❌ Sound playback error in mobile APK:', error);
       }
     }
   }, []);
@@ -70,15 +117,28 @@ export const useDeliveryNotifications = () => {
   // Step 4: All effects (unconditional hook calls, conditional logic inside)
   // Track user interaction for autoplay policy
   useEffect(() => {
+    // Check if running in Flutter InAppWebView (mobile APK)
+    const isFlutterWebView = typeof window !== 'undefined' && 
+      (window.flutter_inappwebview || navigator.userAgent.includes('wv'))
+    
+    // In mobile APK, mark as interacted immediately (Flutter handles permissions)
+    // This allows sound to play even when app is in foreground
+    if (isFlutterWebView) {
+      userInteractedRef.current = true;
+      console.log('📱 Mobile APK detected - sound playback enabled without user interaction');
+      return; // No need to listen for user interaction in mobile APK
+    }
+    
     const handleUserInteraction = () => {
       userInteractedRef.current = true;
+      console.log('👆 User interaction detected - sound playback enabled');
       // Remove listeners after first interaction
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
     };
     
-    // Listen for user interaction
+    // Listen for user interaction (browser only)
     document.addEventListener('click', handleUserInteraction, { once: true });
     document.addEventListener('touchstart', handleUserInteraction, { once: true });
     document.addEventListener('keydown', handleUserInteraction, { once: true });
@@ -312,17 +372,26 @@ export const useDeliveryNotifications = () => {
 
     socketRef.current.on('new_order', (orderData) => {
       console.log('📦 New order received via socket:', orderData);
+      console.log('🔊 Triggering sound notification for new order');
       setNewOrder(orderData);
-      playNotificationSound();
+      // Play sound immediately when order is assigned (even in foreground)
+      // For mobile APK, this will work without user interaction
+      setTimeout(() => {
+        playNotificationSound();
+      }, 100); // Small delay to ensure state is set
     });
 
     // Listen for priority-based order notifications (new_order_available)
     socketRef.current.on('new_order_available', (orderData) => {
       console.log('📦 New order available (priority notification):', orderData);
       console.log('📦 Notification phase:', orderData.phase || 'unknown');
+      console.log('🔊 Triggering sound notification for new order available');
       // Treat it the same as new_order for now - delivery boy can accept it
       setNewOrder(orderData);
-      playNotificationSound();
+      // Play sound immediately when order is assigned (even in foreground)
+      setTimeout(() => {
+        playNotificationSound();
+      }, 100); // Small delay to ensure state is set
     });
 
     socketRef.current.on('play_notification_sound', (data) => {
