@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { ChevronDown } from "lucide-react"
 import { setAuthData } from "@/lib/utils/auth"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
@@ -42,6 +42,10 @@ const countryCodes = [
 
 export default function RestaurantLogin() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/restaurant"
   const [loginMethod, setLoginMethod] = useState("phone") // "phone" or "email"
   const [formData, setFormData] = useState({
     phone: "",
@@ -314,8 +318,8 @@ export default function RestaurantLogin() {
       // Notify any listeners that auth state has changed
       window.dispatchEvent(new Event("restaurantAuthChanged"))
 
-      // Navigate to restaurant home
-      navigate("/restaurant")
+      // Navigate to the page user was trying to access, or home if no previous page
+      navigate(from !== "/restaurant/login" ? from : "/restaurant", { replace: true })
     } catch (error) {
       console.error("Firebase Google login error [v3]:", error)
       const errorCode = error?.code

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { setAuthData } from "@/lib/utils/auth"
 import { Mail, User, Lock, Eye, EyeOff, ArrowLeft, UtensilsCrossed } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,10 @@ import { restaurantAPI } from "@/lib/api"
 
 export default function RestaurantSignupEmail() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/restaurant"
   const [step, setStep] = useState(1) // 1: signup form, 2: OTP verification
   const [formData, setFormData] = useState({
     name: "",
@@ -145,7 +149,8 @@ export default function RestaurantSignupEmail() {
         
         window.dispatchEvent(new Event("restaurantAuthChanged"))
         
-        navigate("/restaurant", { replace: true })
+        // Navigate to the page user was trying to access, or home if no previous page
+        navigate(from !== "/restaurant/login" ? from : "/restaurant", { replace: true })
       } else {
         throw new Error("Registration failed. Please try again.")
       }

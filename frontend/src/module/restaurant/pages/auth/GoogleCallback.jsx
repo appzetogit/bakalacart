@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom"
 import { CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { setAuthData } from "@/lib/utils/auth"
 
 export default function RestaurantGoogleCallback() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/restaurant"
   const [status, setStatus] = useState("loading") // "loading", "success", "error"
   const [error, setError] = useState("")
   const [provider, setProvider] = useState("google")
@@ -62,9 +66,9 @@ export default function RestaurantGoogleCallback() {
 
         setStatus("success")
 
-        // Redirect to restaurant home after short delay
+        // Redirect to the page user was trying to access, or home if no previous page
         setTimeout(() => {
-          navigate("/restaurant")
+          navigate(from !== "/restaurant/login" ? from : "/restaurant", { replace: true })
         }, 1200)
       } catch (err) {
         console.error("Restaurant Google auth error:", err)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate, useSearchParams, Link } from "react-router-dom"
+import { useNavigate, useSearchParams, Link, useLocation } from "react-router-dom"
 import { Mail, Phone, AlertCircle, Loader2 } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
@@ -44,8 +44,12 @@ const countryCodes = [
 
 export default function SignIn() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const isSignUp = searchParams.get("mode") === "signup"
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/"
 
   const [authMethod, setAuthMethod] = useState("phone") // "phone" or "email"
   const [formData, setFormData] = useState({
@@ -160,7 +164,8 @@ export default function SignIn() {
         }
 
         console.log(`✅ Navigating to user dashboard from ${source}...`)
-        navigate("/user", { replace: true })
+        // Navigate to the page user was trying to access, or home if no previous page
+        navigate(from !== "/user/auth/sign-in" ? from : "/user", { replace: true })
       } else {
         console.error(`❌ Invalid backend response from ${source}`)
         redirectHandledRef.current = false

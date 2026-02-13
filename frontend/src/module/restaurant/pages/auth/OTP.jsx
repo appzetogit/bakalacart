@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,10 @@ import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotif
 
 export default function RestaurantOTP() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/restaurant"
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")

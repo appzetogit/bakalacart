@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import {
   Select,
   SelectContent,
@@ -37,6 +37,10 @@ const countryCodes = [
 
 export default function DeliverySignIn() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/delivery"
   const [formData, setFormData] = useState({
     phone: "",
     countryCode: "+91",

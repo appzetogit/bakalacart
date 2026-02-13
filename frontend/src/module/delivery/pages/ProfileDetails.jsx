@@ -261,15 +261,7 @@ export default function ProfileDetails() {
               <div className="w-full align-center flex content-center justify-between">
                 <p className="text-sm text-gray-900 mb-1">Rating</p>
                 <p className="text-base text-gray-900">
-                  {profile?.metrics?.rating ? `${profile.metrics.rating.toFixed(1)} (${profile.metrics.ratingCount || 0})` : "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Wallet Balance</p>
-                <p className="text-base text-gray-900">
-                  ₹{profile?.wallet?.balance?.toFixed(2) || "0.00"}
+                  {profile?.metrics?.rating ? profile.metrics.rating.toFixed(1) : "-"}
                 </p>
               </div>
             </div>

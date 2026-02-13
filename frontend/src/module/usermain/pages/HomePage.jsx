@@ -628,7 +628,7 @@ export default function HomePage() {
               <div
                 key={`${category.id}-${index}`}
                 className="flex-shrink-0 w-20 flex flex-col items-center gap-1.5 cursor-pointer"
-                onClick={() => navigate(`/usermain/category/${category.name}`)}
+                onClick={() => navigate(`/user/search?q=${encodeURIComponent(category.name)}`)}
               >
                 <div className="w-20 h-20 rounded-full overflow-hidden">
                 <OptimizedImage 

@@ -1817,7 +1817,7 @@ export default function Home() {
                     whileHover={{ scale: 1.1, y: -5 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Link to={`/user/category/${category.slug || category.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <Link to={`/user/search?q=${encodeURIComponent(category.name)}`}>
                       <div className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28">
                         <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-gray-100 dark:bg-gray-800">
                           {category.image && category.image.trim() !== '' && category.image !== 'https://via.placeholder.com/40' ? (
@@ -2200,9 +2200,9 @@ export default function Home() {
             </div>
           </motion.div>
           <div className="relative">
-            {/* Loading Overlay */}
+            {/* Loading Overlay - Only show when no restaurants and loading */}
             <AnimatePresence>
-              {(isLoadingFilterResults || loadingRestaurants) && (
+              {(isLoadingFilterResults || loadingRestaurants) && filteredRestaurants.length === 0 && (
                 <motion.div
                   className="absolute inset-0 bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg min-h-[400px]"
                   initial={{ opacity: 0 }}
@@ -2217,51 +2217,51 @@ export default function Home() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-3 sm:gap-4 lg:gap-5 xl:gap-6 pt-1 sm:pt-1.5 lg:pt-2 items-stretch ${isLoadingFilterResults || loadingRestaurants ? 'opacity-50' : 'opacity-100'} transition-opacity duration-300`}>
-              {/* Skeleton Loading Cards with Shimmer Animation */}
+            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-3 sm:gap-4 lg:gap-5 xl:gap-6 pt-1 sm:pt-1.5 lg:pt-2 items-stretch transition-opacity duration-300`}>
+              {/* Skeleton Loading Cards with Shimmer Animation - Show when loading and no restaurants */}
               {(isLoadingFilterResults || loadingRestaurants) && filteredRestaurants.length === 0 && (
                 Array.from({ length: 6 }).map((_, skeletonIndex) => (
                   <motion.div
                     key={`skeleton-${skeletonIndex}`}
-                    className="h-full bg-white dark:bg-[#1a1a1a] rounded-md overflow-hidden border border-gray-200 dark:border-gray-800 relative"
+                    className="h-full bg-white dark:bg-[#1a1a1a] rounded-md overflow-hidden border border-gray-200 dark:border-gray-800 relative shadow-sm"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: skeletonIndex * 0.1 }}
                   >
                     {/* Shimmer Overlay */}
                     <div
-                      className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent"
+                      className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent z-20 pointer-events-none"
                       style={{
                         animation: 'shimmer 2s infinite'
                       }}
                     ></div>
 
                     {/* Image Skeleton */}
-                    <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
-                      <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                    <div className="w-full h-48 sm:h-52 md:h-56 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                     </div>
                     <div className="p-4 space-y-3">
                       {/* Title Skeleton */}
                       <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                       </div>
                       {/* Rating Skeleton */}
                       <div className="flex items-center gap-2">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                         </div>
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                         </div>
                       </div>
                       {/* Delivery Info Skeleton */}
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                       </div>
                       {/* Offer Skeleton */}
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
                       </div>
                     </div>
                   </motion.div>
@@ -2520,6 +2520,55 @@ export default function Home() {
                   </motion.div>
                 )
               })}
+              {/* Skeleton Loading Cards - Show when loading and restaurants are already displayed (for scroll loading) */}
+              {(isLoadingFilterResults || loadingRestaurants) && filteredRestaurants.length > 0 && (
+                Array.from({ length: 6 }).map((_, skeletonIndex) => (
+                  <motion.div
+                    key={`skeleton-loading-${skeletonIndex}`}
+                    className="h-full bg-white dark:bg-[#1a1a1a] rounded-md overflow-hidden border border-gray-200 dark:border-gray-800 relative shadow-sm"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: skeletonIndex * 0.1 }}
+                  >
+                    {/* Shimmer Overlay */}
+                    <div
+                      className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent z-20 pointer-events-none"
+                      style={{
+                        animation: 'shimmer 2s infinite'
+                      }}
+                    ></div>
+
+                    {/* Image Skeleton */}
+                    <div className="w-full h-48 sm:h-52 md:h-56 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {/* Title Skeleton */}
+                      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                      </div>
+                      {/* Rating Skeleton */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                        </div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                        </div>
+                      </div>
+                      {/* Delivery Info Skeleton */}
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                      </div>
+                      {/* Offer Skeleton */}
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </div>
           <div className="flex justify-center pt-2 sm:pt-3">

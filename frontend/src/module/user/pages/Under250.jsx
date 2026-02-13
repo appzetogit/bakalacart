@@ -211,27 +211,48 @@ export default function Under250() {
   }, [])
 
   // Fetch restaurants with dishes under ₹250 from backend
+  // Start fetching immediately, don't wait for zoneId
   useEffect(() => {
+    let isMounted = true
+    
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
-        const response = await restaurantAPI.getRestaurantsUnder250(zoneId)
+        // Start fetch immediately - zoneId is optional, don't wait for it
+        // This ensures data loads instantly when page opens
+        const response = await restaurantAPI.getRestaurantsUnder250(zoneId || undefined)
+        
+        if (!isMounted) return // Component unmounted, don't update state
+        
         if (response.data.success && response.data.data.restaurants) {
           setUnder250Restaurants(response.data.data.restaurants)
         } else {
           setUnder250Restaurants([])
         }
       } catch (error) {
+        if (!isMounted) return
         console.error('Error fetching restaurants under 250:', error)
         setUnder250Restaurants([])
       } finally {
-        setLoadingRestaurants(false)
+        if (isMounted) {
+          setLoadingRestaurants(false)
+        }
       }
     }
 
+    // Start fetching immediately on mount
     fetchRestaurantsUnder250()
-  }, [zoneId, isOutOfService])
+    
+    // If zoneId changes later, refetch (but don't block initial load)
+    if (zoneId) {
+      // Optional: Refetch with zoneId if it becomes available
+      // But don't block the initial load
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, []) // Remove zoneId dependency to fetch immediately
 
   // Fetch categories from admin API
   useEffect(() => {

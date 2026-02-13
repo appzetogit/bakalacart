@@ -196,16 +196,22 @@ export default function CategoryPage() {
   }
 
   // Fetch restaurants from API
+  // Start fetching immediately, don't wait for zoneId
   useEffect(() => {
+    let isMounted = true
+    
     const fetchRestaurants = async () => {
       try {
         setLoadingRestaurants(true)
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
+        // Start fetch immediately - zoneId is optional, don't wait for it
+        // This ensures data loads instantly when page opens
         const params = {}
         if (zoneId) {
           params.zoneId = zoneId
         }
         const response = await restaurantAPI.getRestaurants(params)
+        
+        if (!isMounted) return // Component unmounted, don't update state
         
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
@@ -297,8 +303,21 @@ export default function CategoryPage() {
               }
             })
           
-          // Fetch menus for all restaurants
-          const menuPromises = restaurantsWithIds.map(async (restaurant) => {
+          // Show restaurants immediately without waiting for menus
+          // Initialize restaurants with default values
+          const initialRestaurants = restaurantsWithIds.map(restaurant => ({
+            ...restaurant,
+            menu: null,
+            hasPaneer: false,
+            categoryMatches: {},
+          }))
+          
+          console.log(`✅ Showing ${initialRestaurants.length} restaurants immediately`)
+          setRestaurantsData(initialRestaurants)
+          
+          // Fetch menus in the background and update restaurants progressively
+          // This allows users to see results instantly while menu data loads
+          restaurantsWithIds.forEach(async (restaurant) => {
             try {
               const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId)
               if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
@@ -325,47 +344,49 @@ export default function CategoryPage() {
                   }
                 }
                 
-                return {
-                  ...restaurant,
-                  menu: menu,
-                  hasPaneer: hasPaneer,
-                  featuredDish: featuredDish || null,
-                  featuredPrice: featuredPrice || null,
-                  categoryMatches: {},
-                }
-              }
-              return {
-                ...restaurant,
-                menu: null,
-                hasPaneer: false,
-                categoryMatches: {},
+                // Update the specific restaurant in the state
+                setRestaurantsData(prev => {
+                  const updated = [...prev]
+                  const restaurantIndex = updated.findIndex(r => r.id === restaurant.id)
+                  if (restaurantIndex !== -1) {
+                    updated[restaurantIndex] = {
+                      ...updated[restaurantIndex],
+                      menu: menu,
+                      hasPaneer: hasPaneer,
+                      featuredDish: featuredDish || updated[restaurantIndex].featuredDish,
+                      featuredPrice: featuredPrice || updated[restaurantIndex].featuredPrice,
+                      categoryMatches: {},
+                    }
+                  }
+                  return updated
+                })
               }
             } catch (error) {
+              // If menu fetch fails, keep restaurant without menu data (already set)
               console.warn(`Failed to fetch menu for restaurant ${restaurant.restaurantId}:`, error)
-              return {
-                ...restaurant,
-                menu: null,
-                hasPaneer: false,
-                categoryMatches: {},
-              }
             }
           })
-          
-          const transformedRestaurants = await Promise.all(menuPromises)
-          setRestaurantsData(transformedRestaurants)
         } else {
           setRestaurantsData([])
         }
       } catch (error) {
+        if (!isMounted) return
         console.error('Error fetching restaurants:', error)
         setRestaurantsData([])
       } finally {
-        setLoadingRestaurants(false)
+        if (isMounted) {
+          setLoadingRestaurants(false)
+        }
       }
     }
 
+    // Start fetching immediately on mount
     fetchRestaurants()
-  }, [zoneId, isOutOfService])
+    
+    return () => {
+      isMounted = false
+    }
+  }, []) // Remove zoneId dependency to fetch immediately
 
   // Update selected category when URL changes
   useEffect(() => {
@@ -882,10 +903,10 @@ export default function CategoryPage() {
                           </div>
                         )}
 
-                        {/* Offer Badge */}
-                        {restaurant.offer && (
+                        {/* Price Badge - Top Left - Show price instead of "Na" */}
+                        {(restaurant.categoryDishPrice || restaurant.featuredPrice) && (
                         <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded">
-                          {restaurant.offer}
+                          ₹{restaurant.categoryDishPrice || restaurant.featuredPrice}
                         </div>
                         )}
 
@@ -982,10 +1003,19 @@ export default function CategoryPage() {
                         )}
                         
                         {/* Category Dish Badge - Top Left (shows category dish if available, otherwise featured dish) */}
-                        {(restaurant.categoryDishName || restaurant.featuredDish) && (
+                        {(restaurant.categoryDishName || restaurant.featuredDish) && (restaurant.categoryDishPrice || restaurant.featuredPrice) && (
                         <div className="absolute top-3 left-3">
-                          <div className="bg-gray-800/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm md:text-base font-medium">
+                          <div className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm md:text-base font-medium">
                               {restaurant.categoryDishName || restaurant.featuredDish} · ₹{restaurant.categoryDishPrice || restaurant.featuredPrice}
+                          </div>
+                        </div>
+                        )}
+                        
+                        {/* Price Badge - Show price if dish name is not available but price exists */}
+                        {!restaurant.categoryDishName && !restaurant.featuredDish && (restaurant.categoryDishPrice || restaurant.featuredPrice) && (
+                        <div className="absolute top-3 left-3">
+                          <div className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm md:text-base font-medium">
+                              ₹{restaurant.categoryDishPrice || restaurant.featuredPrice}
                           </div>
                         </div>
                         )}
@@ -1040,13 +1070,6 @@ export default function CategoryPage() {
                           )}
                         </div>
                         
-                        {/* Offer Badge */}
-                        {restaurant.offer && (
-                          <div className="flex items-center gap-2 text-sm md:text-base lg:text-lg mt-auto">
-                            <BadgePercent className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-blue-600" strokeWidth={2} />
-                            <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
-                          </div>
-                        )}
                         </CardContent>
                       </Card>
                     </Link>

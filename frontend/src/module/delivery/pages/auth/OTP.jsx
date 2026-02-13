@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import AnimatedPage from "../../../user/components/AnimatedPage"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,10 @@ import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotif
 
 export default function DeliveryOTP() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/delivery"
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -36,9 +40,9 @@ export default function DeliveryOTP() {
         if (parts.length === 3) {
           const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
           const now = Math.floor(Date.now() / 1000)
-          // If token is valid and not expired, redirect to home
+          // If token is valid and not expired, redirect to the page user was trying to access
           if (payload.exp && payload.exp > now) {
-            navigate("/delivery", { replace: true })
+            navigate(from !== "/delivery/sign-in" ? from : "/delivery", { replace: true })
             return
           }
         }
@@ -282,9 +286,9 @@ export default function DeliveryOTP() {
         console.log("Verifying token storage:", { hasToken: !!storedToken, authenticated: storedAuth, retryCount })
 
         if (storedToken && storedAuth === "true") {
-          // Token is stored, navigate to delivery home
-          console.log("Token verified, navigating to /delivery")
-          navigate("/delivery", { replace: true })
+          // Token is stored, navigate to the page user was trying to access
+          console.log("Token verified, navigating to", from !== "/delivery/sign-in" ? from : "/delivery")
+          navigate(from !== "/delivery/sign-in" ? from : "/delivery", { replace: true })
         } else if (retryCount < maxRetries) {
           // Token not stored yet, retry after short delay
           retryCount++
@@ -387,9 +391,9 @@ export default function DeliveryOTP() {
         console.log("Verifying token storage (with name):", { hasToken: !!storedToken, authenticated: storedAuth, retryCount })
 
         if (storedToken && storedAuth === "true") {
-          // Token is stored, navigate to delivery home
-          console.log("Token verified, navigating to /delivery")
-          navigate("/delivery", { replace: true })
+          // Token is stored, navigate to the page user was trying to access
+          console.log("Token verified, navigating to", from !== "/delivery/sign-in" ? from : "/delivery")
+          navigate(from !== "/delivery/sign-in" ? from : "/delivery", { replace: true })
         } else if (retryCount < maxRetries) {
           // Token not stored yet, retry after short delay
           retryCount++

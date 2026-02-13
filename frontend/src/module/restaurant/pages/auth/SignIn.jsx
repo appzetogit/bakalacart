@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { restaurantAPI } from "@/lib/api"
 import { setAuthData } from "@/lib/utils/auth"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
@@ -14,6 +14,10 @@ import { API_ENDPOINTS } from "@/lib/api/config"
 
 export default function RestaurantSignIn() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/restaurant"
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
@@ -43,9 +47,10 @@ export default function RestaurantSignIn() {
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("restaurant_authenticated") === "true"
     if (isAuthenticated) {
-      navigate("/restaurant", { replace: true })
+      // Redirect to the page user was trying to access, or home if no previous page
+      navigate(from !== "/restaurant/login" ? from : "/restaurant", { replace: true })
     }
-  }, [navigate])
+  }, [navigate, from])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -75,7 +80,8 @@ export default function RestaurantSignIn() {
           // Register FCM Token (Still call it to ensure sync status is updated in localStorage)
           await registerFCMToken('restaurant', data.accessToken);
           
-          navigate("/restaurant", { replace: true })
+          // Navigate to the page user was trying to access, or home if no previous page
+          navigate(from !== "/restaurant/login" ? from : "/restaurant", { replace: true })
       } else {
         throw new Error("Login failed. Please try again.")
       }

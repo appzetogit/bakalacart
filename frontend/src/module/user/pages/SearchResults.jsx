@@ -304,8 +304,21 @@ export default function SearchResults() {
               }
             })
           
-          // Fetch menus for all restaurants in parallel
-          const menuPromises = restaurantsWithIds.map(async (restaurant) => {
+          // Show restaurants immediately without waiting for menus
+          // Initialize restaurants with default values
+          const initialRestaurants = restaurantsWithIds.map(restaurant => ({
+            ...restaurant,
+            menu: null,
+            hasPaneer: false,
+            categoryMatches: {},
+          }))
+          
+          console.log(`✅ Showing ${initialRestaurants.length} restaurants immediately`)
+          setRestaurantsData(initialRestaurants)
+          
+          // Fetch menus in the background and update restaurants progressively
+          // This allows users to see results instantly while menu data loads
+          restaurantsWithIds.forEach(async (restaurant, index) => {
             try {
               const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId)
               if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
@@ -337,38 +350,28 @@ export default function SearchResults() {
                   }
                 }
                 
-                return {
-                  ...restaurant,
-                  menu: menu,
-                  hasPaneer: hasPaneer,
-                  featuredDish: featuredDish || null,
-                  featuredPrice: featuredPrice || null,
-                  categoryMatches: {},
-                }
-              }
-              return {
-                ...restaurant,
-                menu: null,
-                hasPaneer: false,
-                categoryMatches: {},
+                // Update the specific restaurant in the state
+                setRestaurantsData(prev => {
+                  const updated = [...prev]
+                  const restaurantIndex = updated.findIndex(r => r.id === restaurant.id)
+                  if (restaurantIndex !== -1) {
+                    updated[restaurantIndex] = {
+                      ...updated[restaurantIndex],
+                      menu: menu,
+                      hasPaneer: hasPaneer,
+                      featuredDish: featuredDish || updated[restaurantIndex].featuredDish,
+                      featuredPrice: featuredPrice || updated[restaurantIndex].featuredPrice,
+                      categoryMatches: {},
+                    }
+                  }
+                  return updated
+                })
               }
             } catch (error) {
-              // If menu fetch fails, keep restaurant without menu data
+              // If menu fetch fails, keep restaurant without menu data (already set)
               console.warn(`Failed to fetch menu for restaurant ${restaurant.restaurantId}:`, error)
-              return {
-                ...restaurant,
-                menu: null,
-                hasPaneer: false,
-                categoryMatches: {},
-              }
             }
           })
-          
-          // Wait for all menu fetches to complete
-          const transformedRestaurants = await Promise.all(menuPromises)
-          
-          console.log(`✅ Final transformed restaurants: ${transformedRestaurants.length}`)
-          setRestaurantsData(transformedRestaurants)
         } else {
           console.warn('⚠️ No restaurants in API response. Response structure:', {
             hasData: !!response.data,

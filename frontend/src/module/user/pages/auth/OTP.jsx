@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,10 @@ import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotif
 
 export default function OTP() {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get the page user was trying to access before login
+  const from = location.state?.from || "/"
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -28,7 +32,8 @@ export default function OTP() {
     // Redirect to home if already authenticated
     const isAuthenticated = localStorage.getItem("user_authenticated") === "true"
     if (isAuthenticated) {
-      navigate("/user", { replace: true })
+      // Redirect to the page user was trying to access, or home if no previous page
+      navigate(from !== "/user/auth/otp" ? from : "/user", { replace: true })
       return
     }
 
@@ -228,9 +233,9 @@ export default function OTP() {
 
       setSuccess(true)
 
-      // Redirect to user home after short delay
+      // Redirect to the page user was trying to access, or home if no previous page
       setTimeout(() => {
-        navigate("/user")
+        navigate(from !== "/user/auth/otp" ? from : "/user", { replace: true })
       }, 500)
     } catch (err) {
       const message =
@@ -302,9 +307,9 @@ export default function OTP() {
 
       setSuccess(true)
 
-      // Redirect to user home after short delay
+      // Redirect to the page user was trying to access, or home if no previous page
       setTimeout(() => {
-        navigate("/user")
+        navigate(from !== "/user/auth/otp" ? from : "/user", { replace: true })
       }, 500)
     } catch (err) {
       const message =

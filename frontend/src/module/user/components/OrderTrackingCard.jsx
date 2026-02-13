@@ -180,10 +180,10 @@ export default function OrderTrackingCard() {
     return null;
   }
 
-  // Check if order is delivered or time remaining is 0 - hide card
+  // Check if order is delivered, cancelled, or time remaining is 0 - hide card
   const orderStatus = (activeOrder.status || activeOrder.deliveryState?.status || 'preparing').toLowerCase();
-  if (orderStatus === 'delivered' || orderStatus === 'completed' || timeRemaining === 0) {
-    console.log('❌ OrderTrackingCard - Order delivered or time is 0, hiding card');
+  if (orderStatus === 'delivered' || orderStatus === 'completed' || orderStatus === 'cancelled' || orderStatus === 'canceled' || timeRemaining === 0) {
+    console.log('❌ OrderTrackingCard - Order delivered, cancelled, or time is 0, hiding card');
     return null;
   }
 
