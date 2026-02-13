@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, ChevronDown } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { setAuthData } from "@/lib/utils/auth"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
 import api from "@/lib/api"
@@ -60,6 +60,42 @@ export default function RestaurantLogin() {
   const [apiError, setApiError] = useState("")
   const [companyName, setCompanyName] = useState("Bakala Cart")
 
+  // Prefill phone number from sessionStorage when returning from OTP screen
+  useEffect(() => {
+    const stored = sessionStorage.getItem("restaurantAuthData")
+    if (stored) {
+      try {
+        const authData = JSON.parse(stored)
+        if (authData.method === "phone" && authData.phone) {
+          // Extract country code and phone number from stored data
+          // Format is like "+91 7610416911" or "+91-7610416911"
+          const phoneStr = authData.phone.replace(/\s/g, "").replace(/-/g, "")
+          
+          // Find matching country code (try longest codes first to avoid partial matches)
+          const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length)
+          const matchedCountry = sortedCodes.find(country => 
+            phoneStr.startsWith(country.code)
+          )
+          
+          if (matchedCountry) {
+            // Extract phone number (remove country code)
+            const phoneNumber = phoneStr.slice(matchedCountry.code.length).replace(/\D/g, "").slice(0, 10)
+            
+            if (phoneNumber.length === 10) {
+              setFormData(prev => ({
+                ...prev,
+                phone: phoneNumber,
+                countryCode: matchedCountry.code,
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing stored auth data:", error)
+      }
+    }
+  }, [])
+
   // Fetch business settings for company name
   useEffect(() => {
     const fetchBusinessSettings = async () => {
@@ -89,22 +125,13 @@ export default function RestaurantLogin() {
     // Remove any non-digit characters for validation
     const digitsOnly = phone.replace(/\D/g, "")
 
-    // Minimum length check (at least 7 digits)
-    if (digitsOnly.length < 7) {
-      return "Phone number must be at least 7 digits"
+    // Strict validation: must be exactly 10 digits
+    if (digitsOnly.length !== 10) {
+      return "Mobile number must be exactly 10 digits"
     }
 
-    // Maximum length check (typically 15 digits for international numbers)
-    if (digitsOnly.length > 15) {
-      return "Phone number is too long"
-    }
-
-    // Country-specific validation (India +91)
+    // Country-specific validation for first digit (India +91)
     if (countryCode === "+91") {
-      if (digitsOnly.length !== 10) {
-        return "Indian phone number must be 10 digits"
-      }
-      // Check if it starts with valid Indian mobile prefixes
       const firstDigit = digitsOnly[0]
       if (!["6", "7", "8", "9"].includes(firstDigit)) {
         return "Invalid Indian mobile number"
@@ -311,17 +338,18 @@ export default function RestaurantLogin() {
   }
 
   const handlePhoneChange = (e) => {
-    // Only allow digits
-    const value = e.target.value.replace(/\D/g, "")
+    // Only allow digits and limit to 10 digits
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
     const newFormData = {
       ...formData,
       phone: value,
     }
     setFormData(newFormData)
 
-    // Real-time validation
-    const error = validatePhone(value, formData.countryCode)
-    setErrors({ ...errors, phone: error })
+    // Clear error when user starts typing
+    if (errors.phone) {
+      setErrors({ ...errors, phone: "" })
+    }
 
     // Mark as touched when user starts typing
     if (!touched.phone && value.length > 0) {
@@ -358,16 +386,8 @@ export default function RestaurantLogin() {
 
   return (
     <div className="max-h-screen h-screen bg-white flex flex-col">
-      {/* Header with Back Button */}
+      {/* Header */}
       <div className="relative flex items-center justify-center py-4 px-4 mt-2">
-
-        <button
-          onClick={() => navigate("/restaurant/welcome")}
-          className="absolute left-4 top-4"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5 text-black" />
-        </button>
       </div>
 
       {/* Top Section - Logo and Badge */}
@@ -402,7 +422,7 @@ export default function RestaurantLogin() {
             <p className="text-base text-gray-700 leading-relaxed">
               {loginMethod === "email"
                 ? "Enter your registered email and we will send an OTP to continue"
-                : "Enter your registered phone number and we will send an OTP to continue"
+                : "Enter your phone number and we will send an OTP to continue"
               }
             </p>
           </div>
@@ -446,6 +466,7 @@ export default function RestaurantLogin() {
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     onBlur={handlePhoneBlur}
+                    maxLength={10}
                     className={`w-full px-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 text-base border rounded-lg min-w-0 bg-white ${errors.phone && formData.phone.length > 0
                       ? "border-red-500 focus:ring-red-500 focus:border-red-500"
                       : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
@@ -521,17 +542,6 @@ export default function RestaurantLogin() {
         </div>
       </div>
 
-      {/* Bottom Section - Terms and Conditions */}
-      <div className="px-6 pb-8 pt-4">
-        <div className="w-full max-w-md mx-auto">
-          <p className="text-xs text-center text-gray-600 leading-relaxed">
-            By continuing, you agree to our
-          </p>
-          <p className="text-xs text-center text-gray-600 underline mt-1">
-            Terms of Service | Privacy Policy | Code of Conduct
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

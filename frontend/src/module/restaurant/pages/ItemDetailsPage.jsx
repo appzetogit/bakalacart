@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Edit as EditIcon,
   Plus,
+  Minus,
   X,
   Camera,
   ThumbsUp,
@@ -54,6 +55,8 @@ export default function ItemDetailsPage() {
   const [allergens, setAllergens] = useState("")
   const [showMoreNutrition, setShowMoreNutrition] = useState(false)
   const [selectedTags, setSelectedTags] = useState([])
+  const [variations, setVariations] = useState([])
+  const [hasVariants, setHasVariants] = useState(false)
   const [images, setImages] = useState([])
   const [imageFiles, setImageFiles] = useState(new Map()) // Track File objects by preview URL
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -77,6 +80,22 @@ export default function ItemDetailsPage() {
   const minDescriptionLength =  5
   const nameLength = itemName.length
 
+  // Handler to scroll input into view when focused (for mobile keyboard)
+  const handleInputFocus = (e) => {
+    // Small delay to ensure keyboard has appeared
+    setTimeout(() => {
+      const input = e.target
+      if (input) {
+        // Scroll the input into view with some offset
+        input.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        })
+      }
+    }, 300) // Delay to account for keyboard animation
+  }
+
   // Fetch item data from menu API when editing
   useEffect(() => {
     const fetchItemData = async () => {
@@ -93,13 +112,16 @@ export default function ItemDetailsPage() {
         setItemSizeQuantity(item.itemSizeQuantity || "")
         setItemSizeUnit(item.itemSizeUnit || "piece")
         setItemDescription(item.description || "")
-        setFoodType(item.foodType === "Veg" ? "Veg" : (item.foodType === "Egg" ? "Egg" : "Non-Veg"))
+        setFoodType(item.foodType === "Veg" ? "Veg" : "Non-Veg")
         setBasePrice(item.price?.toString() || "0")
         setPreparationTime(item.preparationTime || "")
         setGst(item.gst?.toString() || "5.0")
         setIsRecommended(item.isRecommended || false)
         setIsInStock(item.isAvailable !== false)
         setSelectedTags(item.tags || [])
+        const itemVariations = item.variations || []
+        setVariations(itemVariations)
+        setHasVariants(itemVariations.length > 0)
         setImages(item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []))
         
         // Parse nutrition data
@@ -184,13 +206,16 @@ export default function ItemDetailsPage() {
             setItemSizeQuantity(foundItem.itemSizeQuantity || "")
             setItemSizeUnit(foundItem.itemSizeUnit || "piece")
             setItemDescription(foundItem.description || "")
-            setFoodType(foundItem.foodType === "Veg" ? "Veg" : (foundItem.foodType === "Egg" ? "Egg" : "Non-Veg"))
+            setFoodType(foundItem.foodType === "Veg" ? "Veg" : "Non-Veg")
             setBasePrice(foundItem.price?.toString() || "0")
             setPreparationTime(foundItem.preparationTime || "")
             setGst(foundItem.gst?.toString() || "5.0")
             setIsRecommended(foundItem.isRecommended || false)
             setIsInStock(foundItem.isAvailable !== false)
             setSelectedTags(foundItem.tags || [])
+            const foundVariations = foundItem.variations || []
+            setVariations(foundVariations)
+            setHasVariants(foundVariations.length > 0)
             setImages(foundItem.images && foundItem.images.length > 0 ? foundItem.images : (foundItem.image ? [foundItem.image] : []))
             
             // Parse nutrition data
@@ -465,6 +490,32 @@ export default function ItemDetailsPage() {
     )
   }
 
+  // Variant management functions
+  const handleAddVariant = () => {
+    const newVariant = {
+      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: "",
+      price: 0,
+      stock: "Unlimited",
+    }
+    setVariations([...variations, newVariant])
+    setHasVariants(true)
+  }
+
+  const handleRemoveVariant = (variantId) => {
+    const updatedVariations = variations.filter((v) => v.id !== variantId)
+    setVariations(updatedVariations)
+    if (updatedVariations.length === 0) {
+      setHasVariants(false)
+    }
+  }
+
+  const handleUpdateVariant = (variantId, field, value) => {
+    setVariations(variations.map((v) =>
+      v.id === variantId ? { ...v, [field]: value } : v
+    ))
+  }
+
   const handleSave = async () => {
     if (!itemName.trim()) {
       toast.error("Please enter an item name")
@@ -652,7 +703,7 @@ export default function ItemDetailsPage() {
         stock: "Unlimited",
         discount: null,
         originalPrice: null,
-        foodType: foodType === "Egg" ? "Non-Veg" : foodType, // Menu model only supports Veg/Non-Veg
+        foodType: foodType, // Menu model supports Veg/Non-Veg
         availabilityTimeStart: "12:01 AM",
         availabilityTimeEnd: "11:57 PM",
         description: itemDescription.trim(),
@@ -660,7 +711,7 @@ export default function ItemDetailsPage() {
         discountAmount: 0.0,
         isAvailable: isInStock,
         isRecommended: isRecommended,
-        variations: [],
+        variations: variations || [],
         tags: [],
         nutrition: nutritionStrings,
         allergies: [],
@@ -883,6 +934,7 @@ export default function ItemDetailsPage() {
               type="file"
               accept="image/*"
               multiple
+              capture="environment"
               onChange={handleImageAdd}
               className="hidden"
               id="image-upload"
@@ -927,6 +979,7 @@ export default function ItemDetailsPage() {
                 type="text"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
+                onFocus={handleInputFocus}
                 maxLength={maxNameLength}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter item name"
@@ -952,6 +1005,7 @@ export default function ItemDetailsPage() {
               <textarea
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
+                onFocus={handleInputFocus}
                 maxLength={maxDescriptionLength}
                 rows={4}
                 placeholder="Eg: Yummy veg paneer burger with a soft patty, veggies, cheese, and special sauce"
@@ -993,17 +1047,6 @@ export default function ItemDetailsPage() {
                 {foodType === "Non-Veg" && <Check className="w-4 h-4" />}
                 <span>Non-Veg</span>
               </button>
-              <button
-                onClick={() => setFoodType("Egg")}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  foodType === "Egg"
-                    ? "border-yellow-600 border-2 text-yellow-600"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {foodType === "Egg" && <Check className="w-4 h-4" />}
-                <span>Egg</span>
-              </button>
             </div>
           </div>
 
@@ -1030,6 +1073,7 @@ export default function ItemDetailsPage() {
                       setBasePrice(cleanedValue)
                     }}
                     onFocus={(e) => {
+                      handleInputFocus(e)
                       // Remove rupee symbol when focused for easier editing
                       if (e.target.value.startsWith('₹')) {
                         e.target.value = e.target.value.replace(/₹\s*/g, '')
@@ -1076,6 +1120,119 @@ export default function ItemDetailsPage() {
             </div>
             
           </div>
+
+          {/* Variants Toggle */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div>
+                <span className="text-sm font-medium text-gray-700">Enable Variants</span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Add multiple sizes/prices (e.g., Small, Medium, Large)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (hasVariants) {
+                    // Disabling variants - clear variants array
+                    setHasVariants(false)
+                    setVariations([])
+                  } else {
+                    // Enabling variants - add first variant
+                    setHasVariants(true)
+                    setVariations([{
+                      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                      name: "",
+                      price: 0,
+                      stock: "Unlimited",
+                    }])
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${hasVariants ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${hasVariants ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Variants Section */}
+          {hasVariants && (
+            <div className="border-t border-gray-200 pt-4">
+              <label className="block text-sm font-medium text-gray-900 mb-4">
+                Variants
+              </label>
+              <div className="space-y-4">
+                {variations.map((variant, index) => (
+                  <div
+                    key={variant.id || index}
+                    className="p-4 border border-gray-200 rounded-lg bg-gray-50"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-700">
+                        Variant {index + 1}
+                      </span>
+                      {variations.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(variant.id)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Remove variant"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Size/Name * (e.g., Small, Medium, Large)
+                        </label>
+                        <input
+                          type="text"
+                          value={variant.name || ""}
+                          onChange={(e) =>
+                            handleUpdateVariant(variant.id, "name", e.target.value)
+                          }
+                          onFocus={handleInputFocus}
+                          placeholder="e.g., Small, Medium, Large"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Price (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={variant.price || 0}
+                          onChange={(e) =>
+                            handleUpdateVariant(variant.id, "price", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={handleInputFocus}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleAddVariant}
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-gray-600 hover:text-blue-600"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Another Variant
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Recommend and In Stock */}
           <div className="flex items-center justify-between py-3 border-t border-gray-200">

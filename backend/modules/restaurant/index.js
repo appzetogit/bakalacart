@@ -8,7 +8,7 @@ import { getRestaurants, getRestaurantById, getRestaurantByOwner, getRestaurants
 import { getRestaurantFinance } from './controllers/restaurantFinanceController.js';
 import { getWallet, getWalletTransactions, getWalletStats } from './controllers/restaurantWalletController.js';
 import { createWithdrawalRequest, getRestaurantWithdrawalRequests } from './controllers/withdrawalController.js';
-import { getMenu, updateMenu, getMenuByRestaurantId, addSection, addItemToSection, addSubsectionToSection, addItemToSubsection, addAddon, getAddons, getAddonsByRestaurantId, updateAddon, deleteAddon } from './controllers/menuController.js';
+import { getMenu, updateMenu, getMenuByRestaurantId, addSection, addItemToSection, addSubsectionToSection, addItemToSubsection, addAddon, getAddons, getAddonsByRestaurantId, updateAddon, deleteAddon, resendApprovalRequest } from './controllers/menuController.js';
 import { scheduleItemAvailability, cancelScheduledAvailability, getItemSchedule } from './controllers/menuScheduleController.js';
 import { getInventory, updateInventory, getInventoryByRestaurantId } from './controllers/inventoryController.js';
 import { addStaff, getStaff, getStaffById, updateStaff, deleteStaff } from './controllers/staffManagementController.js';
@@ -42,6 +42,9 @@ router.post('/menu/addon', authenticate, addAddon);
 router.get('/menu/addons', authenticate, getAddons);
 router.put('/menu/addon/:id', authenticate, updateAddon);
 router.delete('/menu/addon/:id', authenticate, deleteAddon);
+
+// Resend approval request
+router.post('/menu/resend-approval', authenticate, resendApprovalRequest);
 
 // Menu item scheduling routes
 router.post('/menu/item/schedule', authenticate, scheduleItemAvailability);

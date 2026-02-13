@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Upload, X, Check } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
@@ -7,6 +7,11 @@ import { toast } from "sonner"
 
 export default function SignupStep2() {
   const navigate = useNavigate()
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
   const [documents, setDocuments] = useState({
     profilePhoto: null,
     aadharPhoto: null,
@@ -132,7 +137,7 @@ export default function SignupStep2() {
     const isUploading = uploading[docType]
 
     return (
-      <div className="bg-white rounded-lg p-4 border border-gray-200">
+      <div className="bg-white rounded-lg p-3 border border-gray-200">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
@@ -142,7 +147,7 @@ export default function SignupStep2() {
             <img
               src={uploaded.url}
               alt={label}
-              className="w-full h-48 object-cover rounded-lg"
+              className="w-full h-32 object-cover rounded-lg"
             />
             <button
               type="button"
@@ -157,8 +162,8 @@ export default function SignupStep2() {
             </div>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
+            <div className="flex flex-col items-center justify-center pt-3 pb-3">
               {isUploading ? (
                 <>
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
@@ -176,6 +181,7 @@ export default function SignupStep2() {
               type="file"
               className="hidden"
               accept="image/*"
+              capture="environment"
               onChange={(e) => {
                 const selectedFile = e.target.files[0]
                 if (selectedFile) {
@@ -195,7 +201,7 @@ export default function SignupStep2() {
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center gap-4 border-b border-gray-200">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/delivery/signup/details")}
           className="p-2 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -204,9 +210,9 @@ export default function SignupStep2() {
       </div>
 
       {/* Content */}
-      <div className="px-4 py-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Document Verification</h2>
+      <div className="px-4 pt-3 pb-6">
+        <div className="mb-3">
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Document Verification</h2>
           <p className="text-sm text-gray-600">Please upload clear photos of your documents</p>
         </div>
 

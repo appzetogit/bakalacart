@@ -564,6 +564,9 @@ export const restaurantAPI = {
   getAddonsByRestaurantId: (restaurantId) => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.ADDONS_BY_RESTAURANT_ID.replace(':id', restaurantId));
   },
+  resendApprovalRequest: (id, type) => {
+    return apiClient.post(API_ENDPOINTS.RESTAURANT.RESEND_APPROVAL, { id, type });
+  },
 
   getMenuByRestaurantId: (restaurantId) => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.MENU_BY_RESTAURANT_ID.replace(':id', restaurantId));

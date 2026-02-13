@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
@@ -20,12 +20,54 @@ export default function SignupStep1() {
   })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch existing profile data to prefill form
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        const response = await deliveryAPI.getProfile()
+        if (response?.data?.success && response?.data?.data?.profile) {
+          const profile = response.data.data.profile
+          
+          // Prefill form with existing data
+          setFormData({
+            name: profile.name || "",
+            email: profile.email || "",
+            address: profile.location?.addressLine1 || "",
+            city: profile.location?.city || "",
+            state: profile.location?.state || "",
+            vehicleType: profile.vehicle?.type || "bike",
+            vehicleName: profile.vehicle?.model || profile.vehicle?.brand || "",
+            vehicleNumber: profile.vehicle?.number || "",
+            panNumber: profile.documents?.pan?.number || "",
+            aadharNumber: profile.documents?.aadhar?.number || ""
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching profile data:", error)
+        // Don't show error toast - it's okay if profile doesn't exist yet
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProfileData()
+  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
+    let processedValue = value
+    
+    // Auto-uppercase for vehicle number
+    if (name === "vehicleNumber") {
+      // Remove spaces and convert to uppercase
+      processedValue = value.replace(/\s/g, "").toUpperCase()
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: processedValue
     }))
     // Clear error for this field
     if (errors[name]) {
@@ -61,6 +103,15 @@ export default function SignupStep1() {
 
     if (!formData.vehicleNumber.trim()) {
       newErrors.vehicleNumber = "Vehicle number is required"
+    } else {
+      // Validate Indian vehicle number format: XX##XX#### (e.g., MH12AB1234)
+      // Format: 2 letters (state) + 2 digits (district) + 2 letters (series) + 4 digits (number)
+      const vehicleNumberPattern = /^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/
+      const cleanedVehicleNumber = formData.vehicleNumber.replace(/\s/g, "").toUpperCase()
+      
+      if (!vehicleNumberPattern.test(cleanedVehicleNumber)) {
+        newErrors.vehicleNumber = "Invalid vehicle number format (e.g., MH12AB1234)"
+      }
     }
 
     if (!formData.panNumber.trim()) {
@@ -98,7 +149,7 @@ export default function SignupStep1() {
         state: formData.state.trim(),
         vehicleType: formData.vehicleType,
         vehicleName: formData.vehicleName.trim() || null,
-        vehicleNumber: formData.vehicleNumber.trim(),
+        vehicleNumber: formData.vehicleNumber.replace(/\s/g, "").toUpperCase().trim(),
         panNumber: formData.panNumber.trim().toUpperCase(),
         aadharNumber: formData.aadharNumber.replace(/\s/g, "")
       })
@@ -114,6 +165,17 @@ export default function SignupStep1() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -270,7 +332,8 @@ export default function SignupStep1() {
               name="vehicleNumber"
               value={formData.vehicleNumber}
               onChange={handleChange}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              maxLength={10}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${
                 errors.vehicleNumber ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="e.g., MH12AB1234"

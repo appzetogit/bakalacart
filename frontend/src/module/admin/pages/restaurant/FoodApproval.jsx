@@ -52,8 +52,7 @@ export default function FoodApproval() {
       request.itemName?.toLowerCase().includes(query) ||
       request.category?.toLowerCase().includes(query) ||
       request.restaurantName?.toLowerCase().includes(query) ||
-      request.restaurantId?.toLowerCase().includes(query) ||
-      request.sectionName?.toLowerCase().includes(query)
+      request.restaurantId?.toLowerCase().includes(query)
     )
   }, [foodRequests, searchQuery])
 
@@ -186,9 +185,6 @@ export default function FoodApproval() {
                         Food Name
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Section
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Price
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -202,7 +198,7 @@ export default function FoodApproval() {
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="px-3 py-8 text-center text-sm text-gray-500">
+                        <td colSpan="7" className="px-3 py-8 text-center text-sm text-gray-500">
                           {loading ? "Loading..." : "No pending food approval requests found."}
                         </td>
                       </tr>
@@ -223,9 +219,6 @@ export default function FoodApproval() {
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700 font-semibold">
                             {request.itemName || '-'}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700">
-                            {request.sectionName || '-'}
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700 font-semibold">
                             ₹{request.price || '0.00'}
@@ -303,10 +296,6 @@ export default function FoodApproval() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <p className="text-sm text-gray-900">{selectedRequest.category || selectedRequest.item?.category || '-'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                  <p className="text-sm text-gray-900">{selectedRequest.sectionName || '-'}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>

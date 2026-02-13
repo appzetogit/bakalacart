@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { uploadAPI, api } from "@/lib/api"
+import { uploadAPI, api, restaurantAPI } from "@/lib/api"
 import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker"
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns"
@@ -175,8 +175,63 @@ export default function RestaurantOnboarding() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
+  // Handler to scroll input into view when focused (for mobile keyboard)
+  const handleInputFocus = (e) => {
+    // Small delay to ensure keyboard has appeared
+    setTimeout(() => {
+      const input = e.target
+      if (input) {
+        // Scroll the input into view with some offset
+        input.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        })
+      }
+    }, 300) // Delay to account for keyboard animation
+  }
+
+  // Handler for PAN number input with validation and auto-uppercase
+  const handlePanNumberChange = (e) => {
+    let value = e.target.value
+    
+    // Remove any spaces and convert to uppercase
+    value = value.replace(/\s/g, '').toUpperCase()
+    
+    // Only allow alphanumeric characters
+    value = value.replace(/[^A-Z0-9]/g, '')
+    
+    // Enforce PAN format: 5 letters, 4 digits, 1 letter (max 10 characters)
+    if (value.length <= 10) {
+      // Allow typing but enforce pattern as user types
+      let formattedValue = ''
+      
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i]
+        
+        if (i < 5) {
+          // First 5 characters must be letters
+          if (/[A-Z]/.test(char)) {
+            formattedValue += char
+          }
+        } else if (i < 9) {
+          // Next 4 characters must be digits
+          if (/[0-9]/.test(char)) {
+            formattedValue += char
+          }
+        } else if (i === 9) {
+          // Last character must be a letter
+          if (/[A-Z]/.test(char)) {
+            formattedValue += char
+          }
+        }
+      }
+      
+      setStep3({ ...step3, panNumber: formattedValue })
+    }
+  }
+
   const [step1, setStep1] = useState({
-    restaurantName: "",
     ownerName: "",
     ownerEmail: "",
     ownerPhone: "",
@@ -189,6 +244,7 @@ export default function RestaurantOnboarding() {
       landmark: "",
     },
   })
+  const [restaurantName, setRestaurantName] = useState("")
 
   const [step2, setStep2] = useState({
     menuImages: [],
@@ -237,14 +293,77 @@ export default function RestaurantOnboarding() {
       }
     }
 
+    // Get restaurant data from authenticated restaurant data
+    let verifiedPhone = ""
+    const getRestaurantData = () => {
+      try {
+        const restaurantUser = localStorage.getItem("restaurant_user")
+        if (restaurantUser) {
+          const restaurant = JSON.parse(restaurantUser)
+          if (restaurant.name) {
+            setRestaurantName(restaurant.name)
+          }
+          // Get verified phone number from restaurant data
+          if (restaurant.phone || restaurant.ownerPhone) {
+            verifiedPhone = restaurant.phone || restaurant.ownerPhone
+          }
+          return restaurant
+        }
+      } catch (error) {
+        console.error("Error getting restaurant data from localStorage:", error)
+      }
+      return null
+    }
+
+    // Fetch restaurant data from API if not in localStorage
+    const fetchRestaurantData = async () => {
+      try {
+        const response = await restaurantAPI.getCurrentRestaurant()
+        const data = response?.data?.data?.restaurant || response?.data?.restaurant
+        if (data) {
+          if (data.name) {
+            setRestaurantName(data.name)
+          }
+          // Get verified phone number from restaurant data
+          if (data.phone || data.ownerPhone) {
+            verifiedPhone = data.phone || data.ownerPhone
+            // Prefill phone number
+            setStep1((prev) => ({
+              ...prev,
+              ownerPhone: verifiedPhone,
+            }))
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching restaurant data:", error)
+        // Fallback to localStorage
+        getRestaurantData()
+      }
+    }
+
+    // Try to get from localStorage first, then fetch from API
+    const restaurant = getRestaurantData()
+    if (restaurant) {
+      // Prefill phone if we got it from localStorage
+      if (verifiedPhone) {
+        setStep1((prev) => ({
+          ...prev,
+          ownerPhone: verifiedPhone,
+        }))
+      }
+    } else {
+      fetchRestaurantData()
+    }
+
     const localData = loadOnboardingFromLocalStorage()
     if (localData) {
       if (localData.step1) {
-        setStep1({
-          restaurantName: localData.step1.restaurantName || "",
+        // Use verified phone (priority) or saved data, but always prefer verified phone
+        setStep1((prev) => ({
+          ...prev,
           ownerName: localData.step1.ownerName || "",
           ownerEmail: localData.step1.ownerEmail || "",
-          ownerPhone: localData.step1.ownerPhone || "",
+          ownerPhone: verifiedPhone || prev.ownerPhone || localData.step1.ownerPhone || "",
           primaryContactNumber: localData.step1.primaryContactNumber || "",
           location: {
             addressLine1: localData.step1.location?.addressLine1 || "",
@@ -253,7 +372,7 @@ export default function RestaurantOnboarding() {
             city: localData.step1.location?.city || "",
             landmark: localData.step1.location?.landmark || "",
           },
-        })
+        }))
       }
       if (localData.step2) {
         setStep2({
@@ -312,12 +431,18 @@ export default function RestaurantOnboarding() {
         const res = await api.get("/restaurant/onboarding")
         const data = res?.data?.data?.onboarding
         if (data) {
+          // Get verified phone from restaurant data first (priority)
+          let verifiedPhoneFromAPI = ""
+          if (data.restaurant?.phone || data.restaurant?.ownerPhone) {
+            verifiedPhoneFromAPI = data.restaurant.phone || data.restaurant.ownerPhone
+          }
+          
           if (data.step1) {
             setStep1((prev) => ({
-              restaurantName: data.step1.restaurantName || "",
               ownerName: data.step1.ownerName || "",
               ownerEmail: data.step1.ownerEmail || "",
-              ownerPhone: data.step1.ownerPhone || "",
+              // Always use verified phone from restaurant data if available, otherwise use saved data
+              ownerPhone: verifiedPhoneFromAPI || prev.ownerPhone || data.step1.ownerPhone || "",
               primaryContactNumber: data.step1.primaryContactNumber || "",
               location: {
                 addressLine1: data.step1.location?.addressLine1 || "",
@@ -327,6 +452,17 @@ export default function RestaurantOnboarding() {
                 landmark: data.step1.location?.landmark || "",
               },
             }))
+          } else if (verifiedPhoneFromAPI) {
+            // If no step1 data but we have verified phone, set it
+            setStep1((prev) => ({
+              ...prev,
+              ownerPhone: verifiedPhoneFromAPI,
+            }))
+          }
+          
+          // Get restaurant name from restaurant data if available
+          if (data.restaurant?.name) {
+            setRestaurantName(data.restaurant.name)
           }
           if (data.step2) {
             setStep2({
@@ -410,8 +546,10 @@ export default function RestaurantOnboarding() {
   const validateStep1 = () => {
     const errors = []
     
-    if (!step1.restaurantName?.trim()) {
-      errors.push("Restaurant name is required")
+    // Restaurant name is now collected during OTP verification, so we don't validate it here
+    // But we should check if we have it from authenticated data
+    if (!restaurantName?.trim()) {
+      errors.push("Restaurant name is missing. Please contact support.")
     }
     if (!step1.ownerName?.trim()) {
       errors.push("Owner name is required")
@@ -509,6 +647,14 @@ export default function RestaurantOnboarding() {
     
     if (!step3.panNumber?.trim()) {
       errors.push("PAN number is required")
+    } else {
+      // Validate PAN format: AAAAA9999A (5 letters, 4 digits, 1 letter)
+      const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/
+      const panNumber = step3.panNumber.trim().toUpperCase()
+      
+      if (!panPattern.test(panNumber)) {
+        errors.push("Invalid PAN format. Must be 5 letters, 4 digits, 1 letter (e.g., ABCDE1234F)")
+      }
     }
     if (!step3.nameOnPan?.trim()) {
       errors.push("Name on PAN is required")
@@ -595,8 +741,8 @@ export default function RestaurantOnboarding() {
   // Fill dummy data for testing (development mode only)
   const fillDummyData = () => {
     if (step === 1) {
+      // Don't set restaurantName in dummy data - it comes from authenticated restaurant
       setStep1({
-        restaurantName: "Test Restaurant",
         ownerName: "John Doe",
         ownerEmail: "john.doe@example.com",
         ownerPhone: "+91 9876543210",
@@ -696,7 +842,10 @@ export default function RestaurantOnboarding() {
     try {
       if (step === 1) {
         const payload = {
-          step1,
+          step1: {
+            ...step1,
+            restaurantName: restaurantName, // Use restaurant name from authenticated data
+          },
           completedSteps: 1,
         }
         await api.put("/restaurant/onboarding", payload)
@@ -986,22 +1135,6 @@ export default function RestaurantOnboarding() {
   const renderStep1 = () => (
     <div className="space-y-6">
       <section className="bg-white p-4 sm:p-6 rounded-md">
-        <h2 className="text-lg font-semibold text-black mb-4">Restaurant information</h2>
-        <p className="text-sm text-gray-600 mb-4">Restaurant name</p>
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs text-gray-700">Restaurant name*</Label>
-            <Input
-              value={step1.restaurantName || ""}
-              onChange={(e) => setStep1({ ...step1, restaurantName: e.target.value })}
-              className="mt-1 bg-white text-sm text-black placeholder-black"
-              placeholder="Customers will see this name"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white p-4 sm:p-6 rounded-md">
         <h2 className="text-lg font-semibold text-black mb-4">Owner details</h2>
         <p className="text-sm text-gray-600 mb-4">
           These details will be used for all business communications and updates.
@@ -1012,6 +1145,7 @@ export default function RestaurantOnboarding() {
             <Input
               value={step1.ownerName || ""}
               onChange={(e) => setStep1({ ...step1, ownerName: e.target.value })}
+              onFocus={handleInputFocus}
               className="mt-1 bg-white text-sm text-black placeholder-black"
               placeholder="Owner full name"
             />
@@ -1022,6 +1156,7 @@ export default function RestaurantOnboarding() {
               type="email"
               value={step1.ownerEmail || ""}
               onChange={(e) => setStep1({ ...step1, ownerEmail: e.target.value })}
+              onFocus={handleInputFocus}
               className="mt-1 bg-white text-sm text-black placeholder-black"
               placeholder="owner@example.com"
             />
@@ -1030,9 +1165,11 @@ export default function RestaurantOnboarding() {
             <Label className="text-xs text-gray-700">Phone number*</Label>
             <Input
               value={step1.ownerPhone || ""}
-              onChange={(e) => setStep1({ ...step1, ownerPhone: e.target.value })}
-              className="mt-1 bg-white text-sm text-black placeholder-black"
+              readOnly
+              disabled
+              className="mt-1 bg-gray-50 text-sm text-gray-600 cursor-not-allowed"
               placeholder="+91 98XXXXXX"
+              title="Phone number is verified and cannot be changed"
             />
           </div>
         </div>
@@ -1047,6 +1184,7 @@ export default function RestaurantOnboarding() {
             onChange={(e) =>
               setStep1({ ...step1, primaryContactNumber: e.target.value })
             }
+            onFocus={handleInputFocus}
             className="mt-1 bg-white text-sm text-black placeholder-black"
             placeholder="Restaurant's primary contact number"
           />
@@ -1067,6 +1205,7 @@ export default function RestaurantOnboarding() {
                 location: { ...step1.location, area: e.target.value },
               })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Area / Sector / Locality*"
           />
@@ -1078,6 +1217,7 @@ export default function RestaurantOnboarding() {
                 location: { ...step1.location, city: e.target.value },
               })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="City"
           />
@@ -1089,6 +1229,7 @@ export default function RestaurantOnboarding() {
                 location: { ...step1.location, addressLine1: e.target.value },
               })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Shop no. / building no. (optional)"
           />
@@ -1100,6 +1241,7 @@ export default function RestaurantOnboarding() {
                 location: { ...step1.location, addressLine2: e.target.value },
               })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Floor / tower (optional)"
           />
@@ -1111,6 +1253,7 @@ export default function RestaurantOnboarding() {
                 location: { ...step1.location, landmark: e.target.value },
               })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Nearby landmark (optional)"
           />
@@ -1159,6 +1302,7 @@ export default function RestaurantOnboarding() {
               type="file"
               multiple
               accept="image/*"
+              capture="environment"
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.target.files || [])
@@ -1277,6 +1421,7 @@ export default function RestaurantOnboarding() {
                 id="profileImageInput"
                 type="file"
                 accept="image/*"
+                capture="user"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null
@@ -1375,15 +1520,22 @@ export default function RestaurantOnboarding() {
             <Label className="text-xs text-gray-700">PAN number</Label>
             <Input
               value={step3.panNumber || ""}
-              onChange={(e) => setStep3({ ...step3, panNumber: e.target.value })}
-              className="mt-1 bg-white text-sm text-black placeholder-black"
+              onChange={handlePanNumberChange}
+              onFocus={handleInputFocus}
+              maxLength={10}
+              className="mt-1 bg-white text-sm text-black placeholder-black uppercase"
+              placeholder="ABCDE1234F"
             />
+            {step3.panNumber && step3.panNumber.length === 10 && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(step3.panNumber) && (
+              <p className="text-xs text-red-600 mt-1">Invalid PAN format. Must be 5 letters, 4 digits, 1 letter</p>
+            )}
           </div>
           <div>
             <Label className="text-xs text-gray-700">Name on PAN</Label>
             <Input
               value={step3.nameOnPan || ""}
               onChange={(e) => setStep3({ ...step3, nameOnPan: e.target.value })}
+              onFocus={handleInputFocus}
               className="mt-1 bg-white text-sm text-black placeholder-black"
             />
           </div>
@@ -1393,6 +1545,7 @@ export default function RestaurantOnboarding() {
           <Input
             type="file"
             accept="image/*"
+            capture="environment"
             onChange={(e) =>
               setStep3({ ...step3, panImage: e.target.files?.[0] || null })
             }
@@ -1429,24 +1582,28 @@ export default function RestaurantOnboarding() {
             <Input
               value={step3.gstNumber || ""}
               onChange={(e) => setStep3({ ...step3, gstNumber: e.target.value })}
+              onFocus={handleInputFocus}
               className="bg-white text-sm"
               placeholder="GST number"
             />
             <Input
               value={step3.gstLegalName || ""}
               onChange={(e) => setStep3({ ...step3, gstLegalName: e.target.value })}
+              onFocus={handleInputFocus}
               className="bg-white text-sm"
               placeholder="Legal name"
             />
             <Input
               value={step3.gstAddress || ""}
               onChange={(e) => setStep3({ ...step3, gstAddress: e.target.value })}
+              onFocus={handleInputFocus}
               className="bg-white text-sm"
               placeholder="Registered address"
             />
             <Input
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={(e) =>
                 setStep3({ ...step3, gstImage: e.target.files?.[0] || null })
               }
@@ -1462,6 +1619,7 @@ export default function RestaurantOnboarding() {
           <Input
             value={step3.fssaiNumber || ""}
             onChange={(e) => setStep3({ ...step3, fssaiNumber: e.target.value })}
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="FSSAI number"
           />
@@ -1488,10 +1646,14 @@ export default function RestaurantOnboarding() {
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={step3.fssaiExpiry ? new Date(step3.fssaiExpiry) : undefined}
+                  selected={step3.fssaiExpiry ? new Date(step3.fssaiExpiry + "T00:00:00") : undefined}
                   onSelect={(date) => {
                     if (date) {
-                      const formattedDate = date.toISOString().split("T")[0]
+                      // Format date in local timezone to avoid timezone shift issues
+                      const year = date.getFullYear()
+                      const month = String(date.getMonth() + 1).padStart(2, "0")
+                      const day = String(date.getDate()).padStart(2, "0")
+                      const formattedDate = `${year}-${month}-${day}`
                       setStep3({ ...step3, fssaiExpiry: formattedDate })
                     }
                   }}
@@ -1505,6 +1667,7 @@ export default function RestaurantOnboarding() {
         <Input
           type="file"
           accept="image/*"
+          capture="environment"
           onChange={(e) =>
             setStep3({ ...step3, fssaiImage: e.target.files?.[0] || null })
           }
@@ -1520,6 +1683,7 @@ export default function RestaurantOnboarding() {
             onChange={(e) =>
               setStep3({ ...step3, accountNumber: e.target.value.trim() })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Account number"
           />
@@ -1528,6 +1692,7 @@ export default function RestaurantOnboarding() {
             onChange={(e) =>
               setStep3({ ...step3, confirmAccountNumber: e.target.value.trim() })
             }
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Re-enter account number"
           />
@@ -1536,12 +1701,14 @@ export default function RestaurantOnboarding() {
           <Input
             value={step3.ifscCode || ""}
             onChange={(e) => setStep3({ ...step3, ifscCode: e.target.value })}
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="IFSC code"
           />
           <Input
             value={step3.accountType || ""}
             onChange={(e) => setStep3({ ...step3, accountType: e.target.value })}
+            onFocus={handleInputFocus}
             className="bg-white text-sm"
             placeholder="Account type (savings / current)"
           />
@@ -1551,6 +1718,7 @@ export default function RestaurantOnboarding() {
           onChange={(e) =>
             setStep3({ ...step3, accountHolderName: e.target.value })
           }
+          onFocus={handleInputFocus}
           className="bg-white text-sm"
           placeholder="Account holder name"
         />
@@ -1571,6 +1739,7 @@ export default function RestaurantOnboarding() {
           <Input
             value={step4.estimatedDeliveryTime || ""}
             onChange={(e) => setStep4({ ...step4, estimatedDeliveryTime: e.target.value })}
+            onFocus={handleInputFocus}
             className="mt-1 bg-white text-sm"
             placeholder="e.g., 25-30 mins"
           />
@@ -1581,6 +1750,7 @@ export default function RestaurantOnboarding() {
           <Input
             value={step4.featuredDish || ""}
             onChange={(e) => setStep4({ ...step4, featuredDish: e.target.value })}
+            onFocus={handleInputFocus}
             className="mt-1 bg-white text-sm"
             placeholder="e.g., Butter Chicken Special"
           />
@@ -1592,6 +1762,7 @@ export default function RestaurantOnboarding() {
             type="number"
             value={step4.featuredPrice || ""}
             onChange={(e) => setStep4({ ...step4, featuredPrice: e.target.value })}
+            onFocus={handleInputFocus}
             className="mt-1 bg-white text-sm"
             placeholder="e.g., 249"
             min="0"
@@ -1603,6 +1774,7 @@ export default function RestaurantOnboarding() {
           <Input
             value={step4.offer || ""}
             onChange={(e) => setStep4({ ...step4, offer: e.target.value })}
+            onFocus={handleInputFocus}
             className="mt-1 bg-white text-sm"
             placeholder="e.g., Flat ₹50 OFF above ₹199"
           />

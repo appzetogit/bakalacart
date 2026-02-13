@@ -32,9 +32,10 @@ class ETACalculationService {
   /**
    * Calculate initial ETA when order is created
    * @param {Object} orderData - Order data with restaurant, user location, etc.
+   * @param {Number} actualPreparationTime - Actual preparation time from order items (in minutes)
    * @returns {Promise<Object>} - { minETA, maxETA, breakdown }
    */
-  async calculateInitialETA(orderData) {
+  async calculateInitialETA(orderData, actualPreparationTime = null) {
     const {
       restaurantId,
       restaurantLocation,
@@ -56,8 +57,10 @@ class ETACalculationService {
         throw new Error('Restaurant not found');
       }
 
-      // 2. Calculate restaurant preparation time
-      const restaurantPrepTime = await this.getRestaurantPrepTime(restaurantId);
+      // 2. Use actual preparation time from items if provided, otherwise use restaurant default
+      const restaurantPrepTime = actualPreparationTime !== null && actualPreparationTime > 0
+        ? actualPreparationTime
+        : await this.getRestaurantPrepTime(restaurantId);
 
       // 3. Calculate restaurant load delay (pending orders)
       const restaurantLoadDelay = await this.getRestaurantLoadDelay(restaurantId);
@@ -252,6 +255,8 @@ class ETACalculationService {
 
         default:
           // Default: recalculate from scratch
+          // Use order's preparation time if available
+          const orderPrepTime = order.preparationTime || null;
           newETA = await this.calculateInitialETA({
             restaurantId: order.restaurantId,
             restaurantLocation: await this.getRestaurantLocation(order.restaurantId),
@@ -265,7 +270,7 @@ class ETACalculationService {
                 longitude: order.deliveryPartnerId.availability.currentLocation.coordinates[0]
               }
               : null
-          });
+          }, orderPrepTime);
           reason = 'MANUAL_UPDATE';
       }
 
@@ -316,6 +321,9 @@ class ETACalculationService {
         }
         : null);
 
+    // Use order's preparation time if available
+    const orderPrepTime = order.preparationTime || null;
+
     if (!riderLocation) {
       return await this.calculateInitialETA({
         restaurantId: order.restaurantId,
@@ -324,7 +332,7 @@ class ETACalculationService {
           latitude: order.address.location.coordinates[1],
           longitude: order.address.location.coordinates[0]
         }
-      });
+      }, orderPrepTime);
     }
 
     const restaurantLocation = await this.getRestaurantLocation(order.restaurantId);
@@ -338,7 +346,7 @@ class ETACalculationService {
       restaurantLocation,
       userLocation,
       riderLocation
-    });
+    }, orderPrepTime);
   }
 
   /**

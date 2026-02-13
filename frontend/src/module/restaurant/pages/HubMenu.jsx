@@ -364,9 +364,8 @@ export default function HubMenu() {
       if (showLoading) setLoadingAddons(true)
       const response = await restaurantAPI.getAddons()
       const data = response?.data?.data?.addons || response?.data?.addons || []
-      // Filter to show only approved add-ons
-      const approvedAddons = data.filter(addon => addon.approvalStatus === 'approved')
-      setAddons(approvedAddons)
+      // Show all add-ons to restaurant (including rejected) so they can see rejection reason and resend
+      setAddons(data)
     } catch (error) {
       console.error('Error fetching add-ons:', error)
       toast.error('Failed to load add-ons')
@@ -561,6 +560,18 @@ export default function HubMenu() {
     }
   }
 
+  // Handle resend approval request for rejected add-on
+  const handleResendAddonRequest = async (addon) => {
+    try {
+      await restaurantAPI.resendApprovalRequest(addon.id, 'addon')
+      toast.success('Add-on approval request resent successfully')
+      fetchAddons(true)
+    } catch (error) {
+      console.error('Error resending add-on approval request:', error)
+      toast.error(error?.response?.data?.message || 'Failed to resend approval request')
+    }
+  }
+
   // Reset add-on form when modal closes
   useEffect(() => {
     if (!isAddAddonModalOpen) {
@@ -612,6 +623,30 @@ export default function HubMenu() {
   // Filter menu based on active filter and search query
   const filteredMenuGroups = useMemo(() => {
     let filtered = menuData
+
+    // First, filter out rejected items (they should not be visible to restaurant)
+    filtered = filtered.map(group => {
+      // Filter out rejected items from main items
+      const nonRejectedItems = (group.items || []).filter(item => 
+        item.approvalStatus !== 'rejected'
+      )
+      
+      // Filter out rejected items from subsections
+      const filteredSubsections = (group.subsections || []).map(subsection => ({
+        ...subsection,
+        items: (subsection.items || []).filter(item => 
+          item.approvalStatus !== 'rejected'
+        )
+      })).filter(subsection => (subsection.items || []).length > 0)
+      
+      return {
+        ...group,
+        items: nonRejectedItems,
+        subsections: filteredSubsections
+      }
+    }).filter(group => 
+      (group.items || []).length > 0 || (group.subsections || []).length > 0
+    )
 
     // Apply filter-based filtering
     if (activeFilter) {
@@ -1135,6 +1170,15 @@ export default function HubMenu() {
                           />
                         )}
                         <div className="flex flex-col gap-2">
+                          {addon.approvalStatus === 'rejected' && (
+                            <button
+                              onClick={() => handleResendAddonRequest(addon)}
+                              className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+                              title="Resend approval request"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEditAddon(addon)}
                             className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
@@ -1255,7 +1299,24 @@ export default function HubMenu() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm font-medium text-gray-700 mb-3">₹{item.price}</p>
+                            <p className="text-sm font-medium text-gray-700 mb-2">₹{item.price}</p>
+                            {/* Variations Display */}
+                            {item.variations && item.variations.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs text-gray-500 font-medium">Variations ({item.variations.length}):</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.variations.map((variation, vIndex) => (
+                                    <span
+                                      key={variation.id || vIndex}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded border border-gray-200"
+                                    >
+                                      <span className="font-medium">{variation.name}</span>
+                                      <span className="text-gray-500">₹{variation.price || 0}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Right: Image */}
@@ -2168,6 +2229,7 @@ export default function HubMenu() {
                     type="file"
                     accept="image/*"
                     multiple
+                    capture="environment"
                     onChange={handleAddonImageAdd}
                     className="hidden"
                     id="addon-image-upload"

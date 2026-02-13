@@ -45,6 +45,41 @@ export default function DeliverySignIn() {
   const [isSending, setIsSending] = useState(false)
   const [companyName, setCompanyName] = useState("Bakala Cart")
 
+  // Prefill phone number from sessionStorage when returning from OTP screen
+  useEffect(() => {
+    const stored = sessionStorage.getItem("deliveryAuthData")
+    if (stored) {
+      try {
+        const authData = JSON.parse(stored)
+        if (authData.method === "phone" && authData.phone) {
+          // Extract country code and phone number from stored data
+          // Format is like "+91 7610416911" or "+91-7610416911" or "+917610416911"
+          const phoneStr = authData.phone.replace(/\s/g, "").replace(/-/g, "")
+          
+          // Find matching country code (try longest codes first to avoid partial matches)
+          const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length)
+          const matchedCountry = sortedCodes.find(country => 
+            phoneStr.startsWith(country.code)
+          )
+          
+          if (matchedCountry) {
+            // Extract phone number (remove country code)
+            const phoneNumber = phoneStr.slice(matchedCountry.code.length).replace(/\D/g, "").slice(0, 10)
+            
+            if (phoneNumber.length === 10) {
+              setFormData({
+                phone: phoneNumber,
+                countryCode: matchedCountry.code,
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing stored auth data:", error)
+      }
+    }
+  }, [])
+
   // Fetch business settings for company name
   useEffect(() => {
     const fetchBusinessSettings = async () => {
@@ -72,15 +107,13 @@ export default function DeliverySignIn() {
 
     const digitsOnly = phone.replace(/\D/g, "")
 
-    if (digitsOnly.length < 7) {
-      return "Phone number must be at least 7 digits"
+    // Strict validation: must be exactly 10 digits
+    if (digitsOnly.length !== 10) {
+      return "Mobile number must be exactly 10 digits"
     }
 
-    // India-specific validation
+    // India-specific validation for first digit
     if (countryCode === "+91") {
-      if (digitsOnly.length !== 10) {
-        return "Indian phone number must be 10 digits"
-      }
       const firstDigit = digitsOnly[0]
       if (!["6", "7", "8", "9"].includes(firstDigit)) {
         return "Invalid Indian mobile number"
@@ -131,12 +164,16 @@ export default function DeliverySignIn() {
   }
 
   const handlePhoneChange = (e) => {
-    // Only allow digits
-    const value = e.target.value.replace(/\D/g, "")
+    // Only allow digits and limit to 10 digits
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
     setFormData({
       ...formData,
       phone: value,
     })
+    // Clear error when user starts typing
+    if (error) {
+      setError("")
+    }
   }
 
   const handleCountryCodeChange = (value) => {
@@ -252,9 +289,12 @@ export default function DeliverySignIn() {
           {/* Terms and Conditions */}
           <p className="text-xs text-center text-gray-600 px-4">
             By continuing, you agree to our{" "}
-            <a href="#" className="text-blue-600 hover:underline">
+            <button
+              onClick={() => navigate("/delivery/terms")}
+              className="text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer"
+            >
               Terms and Conditions
-            </a>
+            </button>
           </p>
         </div>
       </div>

@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { restaurantAPI } from "@/lib/api"
 import { setAuthData as setRestaurantAuthData } from "@/lib/utils/auth"
-import { checkOnboardingStatus } from "../../utils/onboardingUtils"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
 
 export default function RestaurantOTP() {
@@ -17,9 +17,10 @@ export default function RestaurantOTP() {
   const [contactInfo, setContactInfo] = useState("") // Can be phone or email
   const [contactType, setContactType] = useState("phone") // "phone" or "email"
   const [focusedIndex, setFocusedIndex] = useState(null)
+  const [showNameInput, setShowNameInput] = useState(false)
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState("")
-  const [showNameInput, setShowNameInput] = useState(false)
+  const [verifiedOtp, setVerifiedOtp] = useState("")
   const inputRefs = useRef([])
 
   useEffect(() => {
@@ -66,11 +67,11 @@ export default function RestaurantOTP() {
   }, [navigate])
 
   useEffect(() => {
-    // Focus first input on mount
-    if (inputRefs.current[0]) {
+    // Focus first input on mount (only if not showing name input)
+    if (inputRefs.current[0] && !showNameInput) {
       inputRefs.current[0].focus()
     }
-  }, [])
+  }, [showNameInput])
 
   const handleChange = (index, value) => {
     // Only allow digits
@@ -155,26 +156,6 @@ export default function RestaurantOTP() {
       return
     }
 
-    // For email-based signup, use a two-step UX:
-    // 1) First validate OTP format and show name input
-    // 2) Then, once name is provided, call the backend
-    // For email-based login, skip name input and go directly to verification
-    if (contactType === "email" && authData?.isSignUp && !showNameInput) {
-      // First step: show name input, don't hit backend yet (only for signups)
-      setShowNameInput(true)
-      setError("")
-      return
-    }
-
-    // If we are on step 2 for email signup (or any flow where name input is visible), require name
-    if (showNameInput) {
-      if (!name.trim()) {
-        setNameError("Please enter your name to continue")
-        return
-      }
-      setNameError("")
-    }
-
     setIsLoading(true)
     setError("")
 
@@ -188,18 +169,6 @@ export default function RestaurantOTP() {
       const email = authData.method === "email" ? authData.email : null
       const purpose = authData.isSignUp ? "register" : "login"
 
-      // Decide which name to send:
-      // - If we're currently showing the name input (either because backend returned needsName
-      //   or because this is an email/phone signup flow), always send the typed name.
-      // - Otherwise, for explicit signup flows where a name was already collected earlier,
-      //   send that stored name.
-      let nameToSend = null
-      if (showNameInput) {
-        nameToSend = name.trim()
-      } else if (authData.isSignUp && authData.name) {
-        nameToSend = authData.name
-      }
-
       // Get FCM Token before login
       let fcmToken = null;
       try {
@@ -208,81 +177,55 @@ export default function RestaurantOTP() {
         console.error("❌ Error getting FCM token during login:", fcmError);
       }
 
+      // For registration, send a temporary name (will be updated during onboarding)
+      // For login, send null as name is not required
+      const nameToSend = purpose === "register" ? "Restaurant" : null
+
       const response = await restaurantAPI.verifyOTP(phone, code, purpose, nameToSend, email, null, fcmToken, getPlatform())
 
-      // Extract restaurant and token or special flags (like needsName) from backend response
+      // Extract restaurant and token from backend response
       const data = response?.data?.data || response?.data
 
-      // If backend says we need a name (restaurant not found on login), treat this as a new signup:
-      // - flip authData.isSignUp -> true so subsequent verify calls use "register"
-      // - persist this updated state back to sessionStorage
-      // - show the name input instead of erroring
-      if (data?.needsName) {
-        setAuthData((prev) => {
-          const updated = {
-            ...prev,
-            isSignUp: true,
-            // Preserve any existing name, but prefer the typed one if present
-            name: name?.trim() || prev?.name,
-          }
-          try {
-            sessionStorage.setItem("restaurantAuthData", JSON.stringify(updated))
-          } catch {
-            // Ignore storage errors; state is enough for this flow
-          }
-          return updated
-        })
+      // If backend tells us this is a new restaurant, ask for name
+      if (data.needsName) {
         setShowNameInput(true)
-        setError("")
-        setNameError("")
+        setVerifiedOtp(code)
+        setOtp(["", "", "", "", "", ""])
+        setIsLoading(false)
         return
       }
 
       const accessToken = data?.accessToken
       const restaurant = data?.restaurant
 
-      if (accessToken && restaurant) {
-        // Store auth data using utility function to ensure proper module-specific token storage
-        setRestaurantAuthData("restaurant", accessToken, restaurant)
-
-        // Dispatch custom event for same-tab updates
-        window.dispatchEvent(new Event("restaurantAuthChanged"))
-
-        // Register FCM Token
-        console.log("🔔 [Restaurant OTP] Attempting to register FCM token...");
-        try {
-          await registerFCMToken('restaurant', accessToken);
-          console.log("✅ [Restaurant OTP] FCM token registration called successfully");
-        } catch (fcmError) {
-          console.error("❌ [Restaurant OTP] Failed to register FCM token:", fcmError);
-        }
-
-        sessionStorage.removeItem("restaurantAuthData")
-
-        setTimeout(async () => {
-          console.log({ authData })
-          // After signup, send to onboarding
-          if (authData?.isSignUp) {
-            navigate("/restaurant/onboarding", { replace: true })
-          } else {
-            // After login, check if onboarding is incomplete
-            try {
-              const incompleteStep = await checkOnboardingStatus()
-              if (incompleteStep) {
-                // Navigate to onboarding with the incomplete step
-                navigate(`/restaurant/onboarding?step=${incompleteStep}`, { replace: true })
-              } else {
-                // Onboarding is complete, go to restaurant home
-                navigate("/restaurant", { replace: true })
-              }
-            } catch (err) {
-              console.error("Failed to check onboarding status:", err)
-              // Fallback to restaurant home
-              navigate("/restaurant", { replace: true })
-            }
-          }
-        }, 500)
+      if (!accessToken || !restaurant) {
+        console.error("❌ [Restaurant OTP] Missing accessToken or restaurant in response:", {
+          hasAccessToken: !!accessToken,
+          hasRestaurant: !!restaurant,
+          responseData: data
+        })
+        throw new Error("Invalid response from server. Please try again.")
       }
+
+      // Store auth data using utility function to ensure proper module-specific token storage
+      setRestaurantAuthData("restaurant", accessToken, restaurant)
+
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new Event("restaurantAuthChanged"))
+
+      // Register FCM Token (non-blocking)
+      console.log("🔔 [Restaurant OTP] Attempting to register FCM token...");
+      registerFCMToken('restaurant', accessToken).then(() => {
+        console.log("✅ [Restaurant OTP] FCM token registration called successfully");
+      }).catch((fcmError) => {
+        console.error("❌ [Restaurant OTP] Failed to register FCM token:", fcmError);
+      })
+
+      sessionStorage.removeItem("restaurantAuthData")
+
+      // Navigate immediately to onboarding after OTP verification
+      console.log("✅ [Restaurant OTP] OTP verified successfully, redirecting to onboarding...")
+      navigate("/restaurant/onboarding", { replace: true })
     } catch (err) {
       const message =
         err?.response?.data?.message ||
@@ -338,6 +281,91 @@ export default function RestaurantOTP() {
     inputRefs.current[0]?.focus()
   }
 
+  const handleSubmitName = async () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setNameError("Restaurant name is required")
+      return
+    }
+
+    if (trimmedName.length < 2) {
+      setNameError("Restaurant name must be at least 2 characters")
+      return
+    }
+
+    if (!verifiedOtp) {
+      setError("OTP verification step missing. Please request a new OTP.")
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+    setNameError("")
+
+    try {
+      if (!authData) {
+        throw new Error("Session expired. Please try logging in again.")
+      }
+
+      const phone = authData.method === "phone" ? authData.phone : null
+      const email = authData.method === "email" ? authData.email : null
+      const purpose = authData.isSignUp ? "register" : "login"
+
+      // Get FCM Token before login
+      let fcmToken = null;
+      try {
+        fcmToken = await getFCMToken();
+      } catch (fcmError) {
+        console.error("❌ Error getting FCM token during registration:", fcmError);
+      }
+
+      // Second call with name to auto-register and login
+      const response = await restaurantAPI.verifyOTP(phone, verifiedOtp, purpose, trimmedName, email, null, fcmToken, getPlatform())
+      const data = response?.data?.data || response?.data
+
+      const accessToken = data?.accessToken
+      const restaurant = data?.restaurant
+
+      if (!accessToken || !restaurant) {
+        console.error("❌ [Restaurant OTP] Missing accessToken or restaurant in response:", {
+          hasAccessToken: !!accessToken,
+          hasRestaurant: !!restaurant,
+          responseData: data
+        })
+        throw new Error("Invalid response from server. Please try again.")
+      }
+
+      // Store auth data using utility function to ensure proper module-specific token storage
+      setRestaurantAuthData("restaurant", accessToken, restaurant)
+
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new Event("restaurantAuthChanged"))
+
+      // Register FCM Token (non-blocking)
+      console.log("🔔 [Restaurant OTP] Attempting to register FCM token...");
+      registerFCMToken('restaurant', accessToken).then(() => {
+        console.log("✅ [Restaurant OTP] FCM token registration called successfully");
+      }).catch((fcmError) => {
+        console.error("❌ [Restaurant OTP] Failed to register FCM token:", fcmError);
+      })
+
+      sessionStorage.removeItem("restaurantAuthData")
+
+      // Navigate immediately to onboarding after OTP verification
+      console.log("✅ [Restaurant OTP] OTP verified successfully, redirecting to onboarding...")
+      navigate("/restaurant/onboarding", { replace: true })
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to complete registration. Please try again."
+      setError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const isOtpComplete = otp.every((digit) => digit !== "")
 
   if (!authData) {
@@ -361,22 +389,58 @@ export default function RestaurantOTP() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col px-6 overflow-y-auto">
         <div className="w-full max-w-md mx-auto space-y-8 py-8">
-          {/* Instruction Text */}
-          <div className="text-center">
-            <p className="text-base text-gray-900 leading-relaxed">
-              Enter OTP sent on <span className="font-semibold">{contactInfo}</span>. Do not share OTP with anyone.
-            </p>
-          </div>
+          {showNameInput ? (
+            <>
+              {/* Name Input Section */}
+              <div className="text-center">
+                <p className="text-base text-gray-900 leading-relaxed mb-6">
+                  Please enter your restaurant name to complete registration.
+                </p>
+              </div>
 
-          {/* OTP Input Fields - Horizontal Lines */}
-          <div className="flex justify-center gap-4">
+              <div className="space-y-4">
+                <div>
+                  <Input
+                    type="text"
+                    placeholder="Restaurant Name"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setNameError("")
+                      setError("")
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && name.trim().length >= 2) {
+                        handleSubmitName()
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="w-full h-12 text-base border-gray-300 focus:border-blue-600 focus:ring-blue-600"
+                    autoFocus
+                  />
+                  {nameError && (
+                    <p className="text-sm text-red-600 mt-2">{nameError}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Instruction Text */}
+              <div className="text-center">
+                <p className="text-base text-gray-900 leading-relaxed">
+                  Enter OTP sent on <span className="font-semibold">{contactInfo}</span>. Do not share OTP with anyone.
+                </p>
+              </div>
+
+              {/* OTP Input Fields - Square Borders */}
+              <div className="flex justify-center gap-3">
             {otp.map((digit, index) => {
               const hasValue = digit !== ""
               const isFocused = focusedIndex === index
 
               return (
-                <div key={index} className="relative flex flex-col items-center min-w-[48px] py-2" style={{ minHeight: '60px' }}>
-                  {/* Clickable Input Area - Large clickable zone */}
+                <div key={index} className="relative">
                   <input
                     ref={(el) => (inputRefs.current[index] = el)}
                     type="text"
@@ -389,105 +453,75 @@ export default function RestaurantOTP() {
                     onFocus={() => setFocusedIndex(index)}
                     onBlur={() => setFocusedIndex(null)}
                     disabled={isLoading}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20"
-                    style={{ minHeight: '60px' }}
+                    className={`w-12 h-12 text-center text-2xl font-semibold border-2 rounded-md transition-colors ${
+                      isFocused
+                        ? "border-blue-600 bg-blue-50"
+                        : hasValue
+                        ? "border-blue-600 bg-white"
+                        : "border-gray-300 bg-white"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                     aria-label={`OTP digit ${index + 1}`}
                   />
-                  {/* Digit Display Above Line */}
-                  {hasValue && (
-                    <div className="absolute top-0 text-2xl font-semibold text-gray-900 pointer-events-none z-10">
-                      {digit}
-                    </div>
-                  )}
-                  {/* Visual Line Indicator */}
-                  <div className="w-12 relative mt-8">
-                    {hasValue ? (
-                      <div className="absolute inset-0 bg-blue-600 h-0.5" />
-                    ) : isFocused ? (
-                      <div className="absolute inset-0 bg-blue-600 h-0.5" />
-                    ) : (
-                      <div className="absolute inset-0 h-0.5 border-b border-dashed border-gray-400" />
-                    )}
-                  </div>
                 </div>
               )
             })}
-          </div>
+              </div>
 
-          {/* Name input:
-              - Email-based signup (existing behavior)
-              - Phone-based login when backend returns needsName=true (auto-registration)
-          */}
-          {showNameInput && (
-            <div className="mt-6 max-w-sm mx-auto text-left">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {authData?.method === "phone" ? "Restaurant name" : "Your name"}
-              </label>
-              <input
-                type="text"
-                value={name || ""}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  if (nameError) setNameError("")
-                }}
-                placeholder="Enter your full name"
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${nameError
-                  ? "border-red-500 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-blue-500"
-                  }`}
-                disabled={isLoading}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                If you&apos;re new, we&apos;ll use this to create your restaurant account.
-              </p>
-              {nameError && (
-                <p className="mt-1 text-xs text-red-600">
-                  {nameError}
-                </p>
+              {/* Error Message */}
+              {error && (
+                <div className="text-center">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               )}
-            </div>
-          )}
 
-          {/* Error Message */}
-          {error && (
-            <div className="text-center">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+              {/* Resend OTP Timer */}
+              <div className="text-center">
+                {resendTimer > 0 ? (
+                  <p className="text-sm text-gray-900">
+                    Resend OTP in <span className="font-semibold">{resendTimer} secs</span>
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={isLoading}
+                    className="text-sm text-blue-600 hover:underline font-medium disabled:opacity-50"
+                  >
+                    Resend OTP
+                  </button>
+                )}
+              </div>
+            </>
           )}
-
-          {/* Resend OTP Timer */}
-          <div className="text-center">
-            {resendTimer > 0 ? (
-              <p className="text-sm text-gray-900">
-                Resend OTP in <span className="font-semibold">{resendTimer} secs</span>
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={handleResend}
-                disabled={isLoading}
-                className="text-sm text-blue-600 hover:underline font-medium disabled:opacity-50"
-              >
-                Resend OTP
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
       {/* Bottom Section - Continue Button */}
       <div className="px-6 pb-8 pt-4">
         <div className="w-full max-w-md mx-auto">
-          <Button
-            onClick={() => handleVerify()}
-            disabled={isLoading || !isOtpComplete}
-            className={`w-full h-12 rounded-lg font-bold text-base transition-colors ${!isLoading && isOtpComplete
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-          >
-            {isLoading ? "Verifying..." : "Continue"}
-          </Button>
+          {showNameInput ? (
+            <Button
+              onClick={handleSubmitName}
+              disabled={isLoading || !name.trim() || name.trim().length < 2}
+              className={`w-full h-12 rounded-lg font-bold text-base transition-colors ${!isLoading && name.trim().length >= 2
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+            >
+              {isLoading ? "Registering..." : "Continue"}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleVerify()}
+              disabled={isLoading || !isOtpComplete}
+              className={`w-full h-12 rounded-lg font-bold text-base transition-colors ${!isLoading && isOtpComplete
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+            >
+              {isLoading ? "Verifying..." : "Continue"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

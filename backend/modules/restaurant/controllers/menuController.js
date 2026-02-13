@@ -109,12 +109,14 @@ export const updateMenu = asyncHandler(async (req, res) => {
       discountAmount: item.discountAmount ?? 0.0,
       isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
       isRecommended: item.isRecommended || false,
-      variations: Array.isArray(item.variations) ? item.variations.map(v => ({
-        id: String(v.id || Date.now() + Math.random()),
-        name: v.name || "",
-        price: v.price || 0,
-        stock: v.stock || "Unlimited",
-      })) : [],
+      variations: Array.isArray(item.variations) && item.variations.length > 0
+        ? item.variations.map(v => ({
+            id: String(v.id || Date.now() + Math.random()),
+            name: v.name || "",
+            price: v.price || 0,
+            stock: v.stock || "Unlimited",
+          }))
+        : (existingItem?.variations || []),
       tags: Array.isArray(item.tags) ? item.tags : [],
       nutrition: Array.isArray(item.nutrition) ? item.nutrition : [],
       allergies: Array.isArray(item.allergies) ? item.allergies : [],
@@ -196,15 +198,17 @@ export const updateMenu = asyncHandler(async (req, res) => {
         description: item.description || "",
         discountType: item.discountType || "Percent",
         discountAmount: item.discountAmount ?? 0.0,
-        isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
-        isRecommended: item.isRecommended || false,
-        variations: Array.isArray(item.variations) ? item.variations.map(v => ({
-          id: String(v.id || Date.now() + Math.random()),
-          name: v.name || "",
-          price: v.price || 0,
-          stock: v.stock || "Unlimited",
-        })) : [],
-        tags: Array.isArray(item.tags) ? item.tags : [],
+      isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+      isRecommended: item.isRecommended || false,
+      variations: Array.isArray(item.variations) && item.variations.length > 0
+        ? item.variations.map(v => ({
+            id: String(v.id || Date.now() + Math.random()),
+            name: v.name || "",
+            price: v.price || 0,
+            stock: v.stock || "Unlimited",
+          }))
+        : (existingItem?.variations || []),
+      tags: Array.isArray(item.tags) ? item.tags : [],
         nutrition: Array.isArray(item.nutrition) ? item.nutrition : [],
         allergies: Array.isArray(item.allergies) ? item.allergies : [],
         photoCount: item.photoCount ?? 1,
@@ -855,13 +859,27 @@ export const getAddonsByRestaurantId = async (req, res) => {
     console.log(`[ADDONS] Menu isActive: ${menu.isActive}`);
     console.log(`[ADDONS] Total addons in menu: ${(menu.addons || []).length}`);
 
-    // Show all addons - no filtering (as per user request to show addons "kaise bhi")
+    // Filter addons for user side: only show available AND approved addons
+    // Similar to how menu items are filtered in getMenuByRestaurantId
     const allAddons = menu.addons || [];
+    const approvedAddons = allAddons.filter(addon => {
+      const isAvailable = addon.isAvailable !== false;
+      // Include approved addons or legacy addons without approvalStatus
+      const isApproved = addon.approvalStatus === 'approved' || !addon.approvalStatus;
+      const shouldShow = isAvailable && isApproved;
+      
+      // Debug logging for filtered addons
+      if (!shouldShow) {
+        console.log(`[ADDONS] Filtering out addon "${addon.name}": isAvailable=${addon.isAvailable}, approvalStatus=${addon.approvalStatus}`);
+      }
+      
+      return shouldShow;
+    });
     
-    // Log all addons for debugging
-    console.log(`[ADDONS] Returning all addons: ${allAddons.length}`);
-    if (allAddons.length > 0) {
-      console.log(`[ADDONS] Addon details:`, allAddons.map(a => ({
+    // Log filtered addons for debugging
+    console.log(`[ADDONS] Total addons: ${allAddons.length}, Approved addons: ${approvedAddons.length}`);
+    if (approvedAddons.length > 0) {
+      console.log(`[ADDONS] Approved addon details:`, approvedAddons.map(a => ({
         id: a.id,
         name: a.name,
         isAvailable: a.isAvailable,
@@ -869,11 +887,11 @@ export const getAddonsByRestaurantId = async (req, res) => {
         price: a.price
       })));
     } else {
-      console.log(`[ADDONS] Menu.addons is:`, menu.addons);
+      console.log(`[ADDONS] No approved addons found. Total addons: ${allAddons.length}`);
     }
 
     return successResponse(res, 200, 'Add-ons retrieved successfully', {
-      addons: allAddons,
+      addons: approvedAddons,
     });
   } catch (error) {
     console.error('Error fetching addons by restaurant ID:', error);
@@ -993,3 +1011,92 @@ export const deleteAddon = asyncHandler(async (req, res) => {
   });
 });
 
+// Resend approval request for rejected item or addon
+export const resendApprovalRequest = asyncHandler(async (req, res) => {
+  const restaurantId = req.restaurant._id;
+  const { id, type } = req.body; // type: 'item' or 'addon'
+
+  if (!id) {
+    return errorResponse(res, 400, 'Item or add-on ID is required');
+  }
+
+  if (!type || !['item', 'addon'].includes(type)) {
+    return errorResponse(res, 400, 'Type must be either "item" or "addon"');
+  }
+
+  const menu = await Menu.findOne({ restaurant: restaurantId, isActive: true });
+
+  if (!menu) {
+    return errorResponse(res, 404, 'Menu not found');
+  }
+
+  let foundItem = null;
+  let itemPath = '';
+
+  if (type === 'addon') {
+    const addonIndex = menu.addons.findIndex(a => String(a.id) === String(id));
+    if (addonIndex === -1) {
+      return errorResponse(res, 404, 'Add-on not found');
+    }
+    foundItem = menu.addons[addonIndex];
+    itemPath = `addons.${addonIndex}`;
+  } else {
+    // Search for item in sections and subsections
+    for (let sectionIndex = 0; sectionIndex < menu.sections.length; sectionIndex++) {
+      const section = menu.sections[sectionIndex];
+      
+      // Check items in section
+      const itemIndex = section.items.findIndex(i => String(i.id) === String(id));
+      if (itemIndex !== -1) {
+        foundItem = section.items[itemIndex];
+        itemPath = `sections.${sectionIndex}.items.${itemIndex}`;
+        break;
+      }
+
+      // Check items in subsections
+      if (section.subsections && Array.isArray(section.subsections)) {
+        for (let subIndex = 0; subIndex < section.subsections.length; subIndex++) {
+          const subsection = section.subsections[subIndex];
+          const itemIndex = subsection.items.findIndex(i => String(i.id) === String(id));
+          if (itemIndex !== -1) {
+            foundItem = subsection.items[itemIndex];
+            itemPath = `sections.${sectionIndex}.subsections.${subIndex}.items.${itemIndex}`;
+            break;
+          }
+        }
+        if (foundItem) break;
+      }
+    }
+  }
+
+  if (!foundItem) {
+    return errorResponse(res, 404, `${type === 'addon' ? 'Add-on' : 'Item'} not found`);
+  }
+
+  if (foundItem.approvalStatus !== 'rejected') {
+    return errorResponse(res, 400, `Only rejected ${type === 'addon' ? 'add-ons' : 'items'} can be resent for approval`);
+  }
+
+  // Resend approval request: change status to pending, clear rejection reason
+  foundItem.approvalStatus = 'pending';
+  foundItem.rejectionReason = '';
+  foundItem.rejectedAt = undefined;
+  foundItem.requestedAt = new Date();
+
+  // Mark the path as modified
+  menu.markModified(itemPath);
+  if (type === 'addon') {
+    menu.markModified('addons');
+  } else {
+    menu.markModified('sections');
+  }
+
+  await menu.save();
+
+  return successResponse(res, 200, `${type === 'addon' ? 'Add-on' : 'Item'} approval request resent successfully`, {
+    itemId: id,
+    itemName: foundItem.name,
+    approvalStatus: foundItem.approvalStatus,
+    requestedAt: foundItem.requestedAt,
+  });
+});

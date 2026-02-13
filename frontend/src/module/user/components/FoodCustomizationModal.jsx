@@ -128,7 +128,11 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         right: 0, 
         bottom: 0,
         overflow: 'hidden',
-        zIndex: 9999
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem'
       }}
       onClick={(e) => {
         // Close modal when clicking on backdrop
@@ -140,29 +144,42 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       {/* Mobile Container - Perfectly Centered */}
       <div 
         className="bg-white shadow-xl overflow-hidden flex flex-col rounded-xl"
+        data-modal-container
         style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'calc(100% - 2rem)',
+          position: 'relative',
+          width: '100%',
           maxWidth: '400px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 10000
+          zIndex: 10000,
+          margin: '0 auto',
+          alignSelf: 'center',
+          flexShrink: 0
         }}
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* --- HEADER --- */}
         <div className="p-4 border-b pb-4 bg-white z-10 sticky top-0">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start mb-3">
             <div className="flex gap-3 flex-1 min-w-0">
-              {isVeg ? <VegIcon /> : <NonVegIcon />}
-              <h2 className="text-lg font-bold text-gray-800 leading-tight flex-1">
-                {item.name}
-              </h2>
+              {/* Item Image */}
+              {item.image && (
+                <img 
+                  src={item.image} 
+                  alt={item.name}
+                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {isVeg ? <VegIcon /> : <NonVegIcon />}
+                  <h2 className="text-lg font-bold text-gray-800 leading-tight flex-1">
+                    {item.name}
+                  </h2>
+                </div>
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -180,40 +197,46 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           {variants.length > 0 && (
             <>
               <div className="p-5">
-                <h3 className="font-bold text-lg text-gray-800">Quantity</h3>
+                <h3 className="font-bold text-lg text-gray-800 mb-1">Quantity</h3>
                 <p className="text-sm text-gray-500 mb-4">Required • Select any 1 option</p>
                 
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {variants.map((variant) => (
                     <div 
                       key={variant.id} 
-                      className="flex justify-between items-center cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                      className={`flex justify-between items-center cursor-pointer p-4 rounded-lg border-2 transition-all
+                        ${selectedVariant === variant.id 
+                          ? 'border-[#ff3f6c] bg-rose-50' 
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
                       onClick={() => setSelectedVariant(variant.id)}
                     >
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-gray-800 font-medium">{variant.name}</span>
-                        {variant.stock && variant.stock !== 'Unlimited' && (
-                          <span className="text-xs text-gray-500 mt-1">
-                            Stock: {variant.stock}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 flex-shrink-0">
-                        <span className="text-gray-700 text-sm font-semibold">₹{variant.price}</span>
-                        {/* Custom Radio Button */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Radio Button */}
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
-                          ${selectedVariant === variant.id ? 'border-[#ff3f6c]' : 'border-gray-300'}`}>
+                          ${selectedVariant === variant.id ? 'border-[#ff3f6c]' : 'border-gray-400'}`}>
                           {selectedVariant === variant.id && (
                             <div className="w-2.5 h-2.5 bg-[#ff3f6c] rounded-full" />
                           )}
                         </div>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-gray-800 font-semibold text-base">{variant.name}</span>
+                          {variant.stock && variant.stock !== 'Unlimited' && (
+                            <span className="text-xs text-gray-500 mt-0.5">
+                              Stock: {variant.stock}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                        <span className="text-gray-800 text-base font-bold">₹{variant.price}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <hr className="border-gray-100 border-2" />
+              <hr className="border-gray-200" />
             </>
           )}
 
@@ -221,12 +244,21 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           {item.description && (
             <div className="p-5">
               <h3 className="font-bold text-lg text-gray-800 mb-2">Description</h3>
-              <p className="text-sm text-gray-600">{item.description}</p>
+              <p className="text-sm text-gray-600 leading-relaxed">{item.description}</p>
+              {/* Preparation Time */}
+              {item.preparationTime && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span className="font-medium">Preparation Time:</span>
+                    <span>{item.preparationTime}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Preparation Time */}
-          {item.preparationTime && (
+          {/* Preparation Time (if no description) */}
+          {!item.description && item.preparationTime && (
             <div className="px-5 pb-5">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="font-medium">Preparation Time:</span>

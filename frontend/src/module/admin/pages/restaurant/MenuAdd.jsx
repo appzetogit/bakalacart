@@ -661,6 +661,23 @@ export default function MenuAdd() {
                                   <div className="text-sm text-gray-600">
                                     ₹{item.price} • {item.foodType}
                                   </div>
+                                  {/* Variations Display */}
+                                  {item.variations && item.variations.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      <p className="text-xs text-gray-500 font-medium">Variations ({item.variations.length}):</p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {item.variations.map((variation, vIndex) => (
+                                          <span
+                                            key={variation.id || vIndex}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded border border-blue-200"
+                                          >
+                                            <span className="font-medium">{variation.name}</span>
+                                            <span className="text-blue-600">₹{variation.price || 0}</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="text-sm font-semibold text-gray-900">

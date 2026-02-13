@@ -157,6 +157,7 @@ export const API_ENDPOINTS = {
     ADDONS: '/restaurant/menu/addons',
     ADDON: '/restaurant/menu/addon',
     ADDON_BY_ID: '/restaurant/menu/addon/:id',
+    RESEND_APPROVAL: '/restaurant/menu/resend-approval',
     CATEGORIES: '/restaurant/categories',
     CATEGORIES_ALL: '/restaurant/categories/all',
     CATEGORY_BY_ID: '/restaurant/categories/:id',

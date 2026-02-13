@@ -164,6 +164,7 @@ const DeliveryOTP = lazy(() => import("@/module/delivery/pages/auth/OTP"))
 const DeliverySignupStep1 = lazy(() => import("@/module/delivery/pages/auth/SignupStep1"))
 const DeliverySignupStep2 = lazy(() => import("@/module/delivery/pages/auth/SignupStep2"))
 const DeliveryWelcome = lazy(() => import("@/module/delivery/pages/auth/Welcome"))
+const DeliveryTermsAndConditionsPublic = lazy(() => import("@/module/delivery/pages/auth/TermsAndConditionsPublic"))
 
 function UserPathRedirect() {
   const location = useLocation()
@@ -835,6 +836,7 @@ export default function App() {
         <Route path="/delivery/signup" element={<DeliverySignup />} />
         <Route path="/delivery/otp" element={<DeliveryOTP />} />
         <Route path="/delivery/welcome" element={<AuthRedirect module="delivery"><DeliveryWelcome /></AuthRedirect>} />
+        <Route path="/delivery/terms" element={<DeliveryTermsAndConditionsPublic />} />
 
         {/* Delivery Signup Routes (Protected - require authentication) */}
         <Route

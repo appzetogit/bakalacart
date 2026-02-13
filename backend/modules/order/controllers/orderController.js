@@ -362,15 +362,16 @@ export const createOrder = async (req, res) => {
         : null;
 
       if (restaurantLocation && userLocation) {
+        // Pass actual preparation time to ETA service (it will use this instead of restaurant default)
         const etaResult = await etaCalculationService.calculateInitialETA({
           restaurantId: assignedRestaurantId,
           restaurantLocation,
           userLocation
-        });
+        }, maxPreparationTime);
 
-        // Add preparation time to ETA (use max preparation time)
-        const finalMinETA = etaResult.minETA + maxPreparationTime;
-        const finalMaxETA = etaResult.maxETA + maxPreparationTime;
+        // ETA already includes preparation time, so use it directly
+        const finalMinETA = etaResult.minETA;
+        const finalMaxETA = etaResult.maxETA;
 
         // Update order with ETA (including preparation time)
         order.eta = {
