@@ -24,6 +24,7 @@ import BottomNavOrders from "../components/BottomNavOrders"
 import { useNavigate } from "react-router-dom"
 import { restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 
 export default function HubMenu() {
   const navigate = useNavigate()
@@ -69,6 +70,9 @@ export default function HubMenu() {
   const [uploadingAddonImages, setUploadingAddonImages] = useState(false)
   const [editingAddon, setEditingAddon] = useState(null) // Store addon being edited
   const addonFileInputRef = useRef(null)
+  const addonCameraInputRef = useRef(null)
+  const addonGalleryInputRef = useRef(null)
+  const [showAddonImageSourceMenu, setShowAddonImageSourceMenu] = useState(false)
 
   // Restaurant info - fetch from backend
   const restaurantName = restaurantData?.name || ""
@@ -413,8 +417,15 @@ export default function HubMenu() {
     setAddonImages([...addonImages, ...newImagePreviews])
     setAddonImageFiles(newImageFilesMap)
     
+    // Clear all file inputs
     if (addonFileInputRef.current) {
       addonFileInputRef.current.value = ""
+    }
+    if (addonCameraInputRef.current) {
+      addonCameraInputRef.current.value = ""
+    }
+    if (addonGalleryInputRef.current) {
+      addonGalleryInputRef.current.value = ""
     }
   }
 
@@ -2225,23 +2236,142 @@ export default function HubMenu() {
 
                   {/* Add Image Button */}
                   <input
-                    ref={addonFileInputRef}
+                    ref={addonCameraInputRef}
                     type="file"
                     accept="image/*"
                     multiple
                     capture="environment"
                     onChange={handleAddonImageAdd}
                     className="hidden"
-                    id="addon-image-upload"
+                    id="addon-camera-upload"
                   />
-                  <label
-                    htmlFor="addon-image-upload"
-                    className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors"
+                  <input
+                    ref={addonGalleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleAddonImageAdd}
+                    className="hidden"
+                    id="addon-gallery-upload"
+                  />
+                  <button
+                    onClick={async () => {
+                      // Try Flutter camera first
+                      const file = await openCameraWithFallback(
+                        { source: 'camera', accept: 'image/*', multiple: true, quality: 0.8 },
+                        () => {
+                          // Fallback: show menu on mobile, direct on desktop
+                          if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                            setShowAddonImageSourceMenu(true)
+                          } else {
+                            addonGalleryInputRef.current?.click()
+                          }
+                        }
+                      )
+                      
+                      // If Flutter camera returned a file, process it
+                      if (file) {
+                        const syntheticEvent = {
+                          target: {
+                            files: [file]
+                          }
+                        }
+                        handleAddonImageAdd(syntheticEvent)
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors"
                   >
                     <Camera className="h-5 w-5 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Add Images</span>
-                  </label>
+                  </button>
                   <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
+                  
+                  {/* Image Source Menu Modal - Mobile only */}
+                  <AnimatePresence>
+                    {showAddonImageSourceMenu && (
+                      <>
+                        <motion.div
+                          className="fixed inset-0 bg-black/50 z-[9999]"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setShowAddonImageSourceMenu(false)}
+                        />
+                        <motion.div
+                          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+                          initial={{ y: "100%" }}
+                          animate={{ y: 0 }}
+                          exit={{ y: "100%" }}
+                          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                        >
+                          <div className="p-4">
+                            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                              Select Image Source
+                            </h3>
+                            <div className="space-y-3">
+                              <button
+                                onClick={async () => {
+                                  setShowAddonImageSourceMenu(false)
+                                  // Try Flutter camera first
+                                  const file = await openCameraWithFallback(
+                                    { source: 'camera', accept: 'image/*', multiple: true, quality: 0.8 },
+                                    () => {
+                                      setTimeout(() => {
+                                        addonCameraInputRef.current?.click()
+                                      }, 300)
+                                    }
+                                  )
+                                  
+                                  // If Flutter camera returned a file, process it
+                                  if (file) {
+                                    const syntheticEvent = {
+                                      target: {
+                                        files: [file]
+                                      }
+                                    }
+                                    handleAddonImageAdd(syntheticEvent)
+                                  }
+                                }}
+                                className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                              >
+                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                  <Camera className="w-6 h-6 text-green-600" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                  <p className="font-semibold text-gray-900">Camera</p>
+                                  <p className="text-sm text-gray-500">Take a new photo</p>
+                                </div>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowAddonImageSourceMenu(false)
+                                  setTimeout(() => {
+                                    addonGalleryInputRef.current?.click()
+                                  }, 300)
+                                }}
+                                className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                              >
+                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <Plus className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                  <p className="font-semibold text-gray-900">Gallery</p>
+                                  <p className="text-sm text-gray-500">Choose from existing photos</p>
+                                </div>
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => setShowAddonImageSourceMenu(false)}
+                              className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 

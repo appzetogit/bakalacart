@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useProfile } from "../../context/ProfileContext"
 import { userAPI } from "@/lib/api"
 import { toast } from "sonner"
+import { openCameraWithFallback } from "@/lib/utils/flutterCamera"
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
@@ -310,7 +311,23 @@ export default function EditProfile() {
             </Avatar>
             {/* Edit Icon */}
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={async () => {
+                // Try Flutter camera first, fallback to file input
+                const file = await openCameraWithFallback(
+                  { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+                  () => fileInputRef.current?.click()
+                )
+                
+                // If Flutter camera returned a file, process it
+                if (file) {
+                  const syntheticEvent = {
+                    target: {
+                      files: [file]
+                    }
+                  }
+                  handleImageSelect(syntheticEvent)
+                }
+              }}
               disabled={isUploadingImage}
               className="absolute bottom-0 right-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -326,7 +343,6 @@ export default function EditProfile() {
               accept="image/*"
               onChange={handleImageSelect}
               className="hidden"
-            // Remove camera suggestions if any, relying on OS defaults for better compatibility
             />
           </div>
         </div>

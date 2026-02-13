@@ -18,10 +18,19 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
   // Initialize selected variant when modal opens
   useEffect(() => {
     if (isOpen && variants.length > 0) {
-      // Select first variant by default
-      setSelectedVariant(variants[0]?.id || null);
+      // Select first variant by default only if no variant is selected
+      if (!selectedVariant) {
+        const firstVariant = variants[0]
+        const firstVariantId = String(firstVariant?.id || firstVariant?._id || `variant-0`)
+        console.log('Initializing selected variant:', firstVariantId, 'from variant:', firstVariant)
+        setSelectedVariant(firstVariantId);
+      }
+    } else if (!isOpen) {
+      // Reset selection when modal closes
+      setSelectedVariant(null);
     }
-  }, [isOpen, variants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Prevent body scroll when modal is open and ensure consistent positioning
   useEffect(() => {
@@ -57,7 +66,11 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
   }, [isOpen]);
 
   // --- PRICE CALCULATION ---
-  const selectedVariantData = variants.find(v => v.id === selectedVariant);
+  const selectedVariantData = variants.find(v => {
+    const vId = String(v.id || v._id || '')
+    const selectedId = String(selectedVariant || '')
+    return vId === selectedId
+  });
   const variantPrice = selectedVariantData?.price || item?.price || 0;
   const totalItemPrice = variantPrice * quantity;
 
@@ -80,15 +93,26 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       return;
     }
 
+    // Create unique ID for cart item that includes variant
+    // This ensures different variants are treated as separate items in cart
+    const variantId = selectedVariantData ? String(selectedVariantData.id || selectedVariantData._id || '') : ''
+    const uniqueCartItemId = variantId ? `${item.id}-variant-${variantId}` : item.id
+
     // Prepare cart item with variant information
     const cartItem = {
       ...item,
+      id: uniqueCartItemId, // Use unique ID that includes variant
+      originalItemId: item.id, // Keep original item ID for reference
       price: variantPrice,
       selectedVariant: selectedVariantData ? {
         id: selectedVariantData.id,
         name: selectedVariantData.name,
         price: selectedVariantData.price,
       } : null,
+      // Update item name to include variant name for clarity in cart
+      name: selectedVariantData 
+        ? `${item.name} (${selectedVariantData.name})` 
+        : item.name,
       quantity: quantity,
       restaurant: restaurant?.name || item.restaurant,
       restaurantId: restaurant?.restaurantId || restaurant?._id || restaurant?.id || item.restaurantId,
@@ -102,7 +126,10 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       for (let i = 0; i < quantity; i++) {
         addToCart(cartItem);
       }
-      toast.success(`${quantity} ${item.name} added to cart`);
+      const displayName = selectedVariantData 
+        ? `${item.name} (${selectedVariantData.name})` 
+        : item.name
+      toast.success(`${quantity} ${displayName} added to cart`);
     }
 
     onClose();
@@ -201,38 +228,71 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
                  <p className="text-sm text-gray-500 mb-4">Required • Select any 1 option</p>
                  
                  <div className="flex flex-col gap-3">
-                   {variants.map((variant) => (
-                     <div 
-                       key={variant.id} 
-                       className={`flex justify-between items-center cursor-pointer p-4 rounded-lg border-2 transition-all
-                         ${selectedVariant === variant.id 
-                           ? 'border-[#ff3f6c] bg-rose-50' 
-                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                         }`}
-                       onClick={() => setSelectedVariant(variant.id)}
-                     >
-                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                         {/* Radio Button */}
-                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
-                           ${selectedVariant === variant.id ? 'border-[#ff3f6c]' : 'border-gray-400'}`}>
-                           {selectedVariant === variant.id && (
-                             <div className="w-2.5 h-2.5 bg-[#ff3f6c] rounded-full" />
-                           )}
+                   {variants.map((variant, index) => {
+                     // Use string comparison to handle both string and number IDs
+                     const variantId = String(variant.id || variant._id || `variant-${index}`)
+                     const currentSelected = String(selectedVariant || '')
+                     const isSelected = currentSelected === variantId
+                     
+                     return (
+                       <button
+                         key={variantId}
+                         type="button"
+                         className={`w-full flex justify-between items-center cursor-pointer p-4 rounded-lg border-2 transition-all select-none text-left relative z-10
+                           ${isSelected
+                             ? 'border-[#ff3f6c] bg-rose-50 active:bg-rose-100' 
+                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100'
+                           }`}
+                         onClick={(e) => {
+                           e.preventDefault()
+                           e.stopPropagation()
+                           console.log('Variant clicked:', { 
+                             variantId, 
+                             variantName: variant.name, 
+                             currentSelected,
+                             variant: variant,
+                             allVariants: variants.map(v => ({ id: v.id, _id: v._id, name: v.name }))
+                           })
+                           // Force state update with the exact variant ID
+                           const idToSet = String(variant.id || variant._id || `variant-${index}`)
+                           setSelectedVariant(idToSet)
+                           console.log('Setting selected variant to:', idToSet)
+                         }}
+                         onMouseDown={(e) => {
+                           // Ensure click works on mobile
+                           e.stopPropagation()
+                         }}
+                         onTouchEnd={(e) => {
+                           // Handle touch end for mobile
+                           e.preventDefault()
+                           e.stopPropagation()
+                           const idToSet = String(variant.id || variant._id || `variant-${index}`)
+                           setSelectedVariant(idToSet)
+                         }}
+                       >
+                         <div className="flex items-center gap-3 flex-1 min-w-0">
+                           {/* Radio Button */}
+                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                             ${isSelected ? 'border-[#ff3f6c]' : 'border-gray-400'}`}>
+                             {isSelected && (
+                               <div className="w-2.5 h-2.5 bg-[#ff3f6c] rounded-full" />
+                             )}
+                           </div>
+                           <div className="flex flex-col flex-1 min-w-0">
+                             <span className="text-gray-800 font-semibold text-base">{variant.name}</span>
+                             {variant.stock && variant.stock !== 'Unlimited' && (
+                               <span className="text-xs text-gray-500 mt-0.5">
+                                 Stock: {variant.stock}
+                               </span>
+                             )}
+                           </div>
                          </div>
-                         <div className="flex flex-col flex-1 min-w-0">
-                           <span className="text-gray-800 font-semibold text-base">{variant.name}</span>
-                           {variant.stock && variant.stock !== 'Unlimited' && (
-                             <span className="text-xs text-gray-500 mt-0.5">
-                               Stock: {variant.stock}
-                             </span>
-                           )}
+                         <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                           <span className="text-gray-800 text-base font-bold">₹{variant.price}</span>
                          </div>
-                       </div>
-                       <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                         <span className="text-gray-800 text-base font-bold">₹{variant.price}</span>
-                       </div>
-                     </div>
-                   ))}
+                       </button>
+                     )
+                   })}
                  </div>
               </div>
 

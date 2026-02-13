@@ -22,11 +22,13 @@ import {
   IndianRupee,
   Eye,
   MessageSquare,
-  Send
+  Send,
+  Plus
 } from "lucide-react"
 import { deliveryAPI, uploadAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { toast } from "sonner"
+import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 import { motion, AnimatePresence } from "framer-motion"
 import io from "socket.io-client"
 import {
@@ -45,6 +47,7 @@ export default function MyOrders() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
   const [activeBillUploadOrder, setActiveBillUploadOrder] = useState(null)
+  const [showBillImageSourceMenu, setShowBillImageSourceMenu] = useState(null) // orderId or null
 
   // Rating & Review State
   const [showRatingPopup, setShowRatingPopup] = useState(false)
@@ -969,6 +972,8 @@ export default function MyOrders() {
   const [billImages, setBillImages] = useState({}) // { orderId: imageUrl }
   const [uploadingBills, setUploadingBills] = useState({}) // { orderId: true/false }
   const fileInputRefs = useRef(null)
+  const cameraInputRefs = useRef({})
+  const galleryInputRefs = useRef({})
 
   // Handle reached pickup
   const handleReachedPickup = async (order) => {
@@ -1005,29 +1010,32 @@ export default function MyOrders() {
     e.stopPropagation()
     const orderId = order.orderId || order._id
 
-    // Check if Flutter handler is available
-    if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
-      try {
-        const result = await window.flutter_inappwebview.callHandler('openCamera', {
-          source: 'camera',
-          accept: 'image/*',
-          multiple: false,
-          quality: 0.8
-        })
+    // Initialize refs if not exists
+    if (!cameraInputRefs.current[orderId]) {
+      cameraInputRefs.current[orderId] = { current: null }
+    }
+    if (!galleryInputRefs.current[orderId]) {
+      galleryInputRefs.current[orderId] = { current: null }
+    }
 
-        if (result && result.success && result.file) {
-          await handleBillImageUpload(order, result.file)
+    // Try Flutter camera first
+    const file = await openCameraWithFallback(
+      { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
+      () => {
+        // Fallback: show menu on mobile, direct on desktop
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+          setShowBillImageSourceMenu(orderId)
+          setActiveBillUploadOrder(order)
+        } else {
+          setActiveBillUploadOrder(order)
+          setTimeout(() => galleryInputRefs.current[orderId]?.current?.click(), 100)
         }
-      } catch (error) {
-        console.error('Error with Flutter camera:', error)
-        // Fallback to file input
-        setActiveBillUploadOrder(order)
-        setTimeout(() => fileInputRefs.current?.click(), 100)
       }
-    } else {
-      // Fallback to file input
-      setActiveBillUploadOrder(order)
-      setTimeout(() => fileInputRefs.current?.click(), 100)
+    )
+
+    // If Flutter camera returned a file, process it
+    if (file) {
+      await handleBillImageUpload(order, file)
     }
   }
 
@@ -1047,6 +1055,18 @@ export default function MyOrders() {
     }
 
     await handleBillImageUpload(order, file)
+    
+    // Clear inputs
+    const orderId = order.orderId || order._id
+    if (cameraInputRefs.current[orderId]?.current) {
+      cameraInputRefs.current[orderId].current.value = ''
+    }
+    if (galleryInputRefs.current[orderId]?.current) {
+      galleryInputRefs.current[orderId].current.value = ''
+    }
+    if (fileInputRefs.current) {
+      fileInputRefs.current.value = ''
+    }
   }
 
   // Upload bill image
@@ -2307,20 +2327,142 @@ export default function MyOrders() {
         )}
       </AnimatePresence>
 
-      {/* Input File Ref for Bill (Hidden) */}
-      <input
-        ref={fileInputRefs}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => {
-          if (activeBillUploadOrder) {
-            handleBillImageSelect(activeBillUploadOrder, e)
-            setActiveBillUploadOrder(null)
-          }
-        }}
-        className="hidden"
-      />
+      {/* Input File Refs for Bill (Hidden) - Camera and Gallery */}
+      {orders.map((order) => {
+        const orderId = order.orderId || order._id
+        // Initialize refs if not exists
+        if (!cameraInputRefs.current[orderId]) {
+          cameraInputRefs.current[orderId] = { current: null }
+        }
+        if (!galleryInputRefs.current[orderId]) {
+          galleryInputRefs.current[orderId] = { current: null }
+        }
+        
+        return (
+          <div key={orderId}>
+            <input
+              ref={cameraInputRefs.current[orderId]}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => {
+                if (activeBillUploadOrder && (activeBillUploadOrder.orderId || activeBillUploadOrder._id) === orderId) {
+                  handleBillImageSelect(activeBillUploadOrder, e)
+                  setActiveBillUploadOrder(null)
+                }
+              }}
+              className="hidden"
+              id={`bill-camera-${orderId}`}
+            />
+            <input
+              ref={galleryInputRefs.current[orderId]}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                if (activeBillUploadOrder && (activeBillUploadOrder.orderId || activeBillUploadOrder._id) === orderId) {
+                  handleBillImageSelect(activeBillUploadOrder, e)
+                  setActiveBillUploadOrder(null)
+                }
+              }}
+              className="hidden"
+              id={`bill-gallery-${orderId}`}
+            />
+          </div>
+        )
+      })}
+      
+      {/* Image Source Menu Modal - Mobile only */}
+      <AnimatePresence>
+        {showBillImageSourceMenu && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/50 z-[9999]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowBillImageSourceMenu(null)
+                setActiveBillUploadOrder(null)
+              }}
+            />
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            >
+              <div className="p-4">
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                  Select Image Source
+                </h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      const orderId = showBillImageSourceMenu
+                      setShowBillImageSourceMenu(null)
+                      setTimeout(() => {
+                        cameraInputRefs.current[orderId]?.current?.click()
+                      }, 300)
+                    }}
+                    className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900">Camera</p>
+                      <p className="text-sm text-gray-500">Take a new photo</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const orderId = showBillImageSourceMenu
+                      const order = activeBillUploadOrder
+                      setShowBillImageSourceMenu(null)
+                      setActiveBillUploadOrder(null)
+                      
+                      // Try Flutter gallery first
+                      const file = await openGalleryWithFallback(
+                        { accept: 'image/*', multiple: false },
+                        () => {
+                          setTimeout(() => {
+                            galleryInputRefs.current[orderId]?.current?.click()
+                          }, 300)
+                        }
+                      )
+                      
+                      // If Flutter gallery returned a file, process it
+                      if (file && order) {
+                        await handleBillImageUpload(order, file)
+                      }
+                    }}
+                    className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Plus className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900">Gallery</p>
+                      <p className="text-sm text-gray-500">Choose from existing photos</p>
+                    </div>
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBillImageSourceMenu(null)
+                    setActiveBillUploadOrder(null)
+                  }}
+                  className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Chat Modal */}
       <Dialog open={chatOpen} onOpenChange={(open) => {
