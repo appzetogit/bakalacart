@@ -48,10 +48,77 @@ export const useDeliveryNotifications = () => {
         audioRef.current = null;
       }
       
+      // For mobile APK, use public path (more reliable than import path)
+      // Public path: /audio/alert.mp3 (original.mp3 might not be in public, use alert as fallback)
+      const publicPath = '/audio/alert.mp3'; // Always use alert.mp3 from public folder for mobile APK
+      // For browser, try import path first, fallback to public
+      let audioSrc = isFlutterWebView ? publicPath : soundFile;
+      
+      // If import path is a blob URL or data URL, use it directly
+      // Otherwise, for mobile APK, always use public path
+      if (isFlutterWebView) {
+        // Use absolute URL for mobile APK to ensure it resolves correctly
+        const baseUrl = window.location.origin;
+        audioSrc = `${baseUrl}${publicPath}`;
+        console.log('📱 Mobile APK - using absolute URL:', audioSrc);
+      }
+      
+      console.log('🔊 Creating audio with source:', {
+        audioSrc,
+        isFlutterWebView,
+        selectedSound,
+        importPath: soundFile,
+        publicPath: publicPath
+      });
+      
       // Create new audio with selected sound
-      audioRef.current = new Audio(soundFile);
+      audioRef.current = new Audio(audioSrc);
       audioRef.current.volume = 1.0; // Full volume for notifications
       audioRef.current.loop = true; // Loop the sound for new order notifications
+      audioRef.current.preload = 'auto'; // Preload for faster playback
+      
+      // Add comprehensive error handling
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('❌ Audio load error:', {
+          code: audioRef.current?.error?.code,
+          message: audioRef.current?.error?.message,
+          src: audioRef.current?.src,
+          readyState: audioRef.current?.readyState
+        });
+        
+        // Try fallback public path if import path failed (for browser)
+        if (!isFlutterWebView && audioSrc === soundFile) {
+          console.log('🔄 Trying fallback public path:', publicPath);
+          const fallbackAudio = new Audio(publicPath);
+          fallbackAudio.volume = 1.0;
+          fallbackAudio.loop = true;
+          fallbackAudio.preload = 'auto';
+          
+          fallbackAudio.addEventListener('canplaythrough', () => {
+            console.log('✅ Fallback audio ready, playing...');
+            fallbackAudio.currentTime = 0;
+            fallbackAudio.play().catch(err => {
+              console.error('❌ Fallback audio play failed:', err);
+            });
+          });
+          
+          fallbackAudio.addEventListener('error', (err) => {
+            console.error('❌ Fallback audio also failed:', err);
+          });
+          
+          fallbackAudio.load();
+          audioRef.current = fallbackAudio;
+        }
+      });
+      
+      // Add success handlers
+      audioRef.current.addEventListener('loadeddata', () => {
+        console.log('✅ Audio file loaded successfully');
+      });
+      
+      audioRef.current.addEventListener('canplay', () => {
+        console.log('✅ Audio can play');
+      });
       
       // In mobile APK, always allow sound (Flutter handles permissions)
       // In browser, require user interaction due to autoplay policy
@@ -81,23 +148,107 @@ export const useDeliveryNotifications = () => {
         }
       }
       
-      audioRef.current.currentTime = 0;
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          console.log('✅ Notification sound started playing successfully');
-        }).catch(error => {
-          // Don't log autoplay policy errors as they're expected in browser
-          if (!error.message?.includes('user didn\'t interact') && 
-              !error.name?.includes('NotAllowedError') &&
-              !isFlutterWebView) {
-            console.warn('Error playing notification sound:', error);
-          } else if (isFlutterWebView) {
-            // In mobile APK, this shouldn't fail, but log if it does
-            console.error('❌ Sound playback failed in mobile APK:', error);
-          }
+      // Function to play audio
+      const playAudio = () => {
+        if (!audioRef.current) {
+          console.warn('⚠️ Audio ref is null, cannot play');
+          return;
+        }
+        
+        console.log('🎵 Attempting to play audio...', {
+          readyState: audioRef.current.readyState,
+          src: audioRef.current.src,
+          volume: audioRef.current.volume,
+          loop: audioRef.current.loop,
+          paused: audioRef.current.paused
         });
+        
+        try {
+          audioRef.current.currentTime = 0;
+          const playPromise = audioRef.current.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              console.log('✅ Notification sound started playing successfully');
+              // Verify it's actually playing
+              setTimeout(() => {
+                if (audioRef.current) {
+                  console.log('🔊 Audio playback status:', {
+                    paused: audioRef.current.paused,
+                    currentTime: audioRef.current.currentTime,
+                    duration: audioRef.current.duration,
+                    volume: audioRef.current.volume
+                  });
+                }
+              }, 500);
+            }).catch(error => {
+              // Don't log autoplay policy errors as they're expected in browser
+              if (!error.message?.includes('user didn\'t interact') && 
+                  !error.name?.includes('NotAllowedError') &&
+                  !isFlutterWebView) {
+                console.warn('Error playing notification sound:', error);
+              } else if (isFlutterWebView) {
+                // In mobile APK, this shouldn't fail, but log if it does
+                console.error('❌ Sound playback failed in mobile APK:', error);
+                console.error('❌ Error details:', {
+                  name: error.name,
+                  message: error.message,
+                  stack: error.stack
+                });
+              }
+            });
+          }
+        } catch (err) {
+          console.error('❌ Exception while playing audio:', err);
+        }
+      };
+      
+      // Try to play when audio is ready
+      if (audioRef.current.readyState >= 2) {
+        // Audio already loaded
+        console.log('✅ Audio already loaded, playing immediately');
+        playAudio();
+      } else {
+        // Wait for audio to load
+        console.log('⏳ Waiting for audio to load...');
+        
+        const onCanPlay = () => {
+          console.log('✅ Audio can play, starting playback');
+          playAudio();
+        };
+        
+        audioRef.current.addEventListener('canplaythrough', onCanPlay, { once: true });
+        audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
+        audioRef.current.addEventListener('loadeddata', () => {
+          console.log('✅ Audio data loaded');
+          // Try to play if ready
+          if (audioRef.current.readyState >= 2) {
+            playAudio();
+          }
+        }, { once: true });
+        
+        // Load the audio
+        audioRef.current.load();
+        
+        // Fallback: try to play after delays (for mobile APK)
+        setTimeout(() => {
+          if (audioRef.current && audioRef.current.readyState >= 2) {
+            console.log('🔄 Fallback: Audio ready after delay, playing...');
+            playAudio();
+          } else if (audioRef.current) {
+            console.warn('⚠️ Audio not ready after 500ms, readyState:', audioRef.current.readyState);
+          }
+        }, 500);
+        
+        // Second fallback for mobile APK
+        if (isFlutterWebView) {
+          setTimeout(() => {
+            if (audioRef.current && !audioRef.current.paused === false) {
+              console.log('🔄 Mobile APK fallback: Force playing audio...');
+              playAudio();
+            }
+          }, 1000);
+        }
       }
     } catch (error) {
       // Don't log autoplay policy errors
