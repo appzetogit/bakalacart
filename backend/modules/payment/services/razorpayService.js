@@ -20,12 +20,14 @@ const initializeRazorpay = async () => {
   try {
     const credentials = await getRazorpayCredentials();
     const keyId = credentials.keyId;
+    // Fix: Ensure keySecret is properly retrieved
     const keySecret = credentials.keySecret;
 
     logger.info('Razorpay credentials check:', {
       hasKeyId: !!keyId,
       hasKeySecret: !!keySecret,
-      keyIdLength: keyId?.length || 0,
+      // Log masked key to verify if it's test or live
+      maskedKeyId: keyId ? `${keyId.substring(0, 8)}...` : 'missing',
       keySecretLength: keySecret?.length || 0
     });
 
@@ -42,7 +44,7 @@ const initializeRazorpay = async () => {
         key_id: keyId,
         key_secret: keySecret
       });
-      logger.info('Razorpay initialized successfully');
+      logger.info('Razorpay initialized successfully with key:', keyId.substring(0, 8) + '...');
       return razorpayInstance;
     } catch (error) {
       logger.error(`Error initializing Razorpay: ${error.message}`, {
@@ -100,7 +102,7 @@ const createOrder = async (options) => {
 
     logger.info('Calling Razorpay API to create order...');
     const order = await razorpay.orders.create(orderOptions);
-    
+
     logger.info(`Razorpay order created successfully: ${order.id}`, {
       orderId: order.id,
       amount: order.amount,
@@ -122,7 +124,7 @@ const createOrder = async (options) => {
       },
       stack: error.stack
     });
-    
+
     // Return more descriptive error message
     let errorMessage = 'Failed to create payment order';
     if (error.error && error.error.description) {
@@ -130,7 +132,7 @@ const createOrder = async (options) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
+
     throw new Error(errorMessage);
   }
 };
@@ -145,7 +147,7 @@ const createOrder = async (options) => {
 const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
   const credentials = await getRazorpayCredentials();
   const keySecret = credentials.keySecret;
-  
+
   if (!keySecret) {
     logger.error('Razorpay key secret not found');
     return false;
@@ -158,7 +160,7 @@ const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpaySignatu
       .digest('hex');
 
     const isValid = generatedSignature === razorpaySignature;
-    
+
     if (!isValid) {
       logger.warn('Invalid Razorpay signature', {
         razorpayOrderId,

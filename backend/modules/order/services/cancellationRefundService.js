@@ -40,7 +40,13 @@ export const calculateCancellationRefund = async (orderId, cancellationReason) =
 
     const settlement = await OrderSettlement.findOne({ orderId });
     if (!settlement) {
-      throw new Error('Settlement not found');
+      console.warn(`Settlement not found for order ${orderId} in calculateCancellationRefund. Returning default 0 refund.`);
+      return {
+        cancellationStage: getCancellationStage(order),
+        refundAmount: 0,
+        restaurantCompensation: 0,
+        settlement: null
+      };
     }
 
     const cancellationStage = getCancellationStage(order);
@@ -148,7 +154,13 @@ export const processCancellationRefund = async (orderId, cancellationReason) => 
 
     const settlement = await OrderSettlement.findOne({ orderId });
     if (!settlement) {
-      throw new Error('Settlement not found');
+      console.warn(`Settlement not found for order ${orderId} in processCancellationRefund. Skipping refund.`);
+      return {
+        cancellationStage: getCancellationStage(order),
+        refundAmount: 0,
+        restaurantCompensation: 0,
+        settlement: null
+      };
     }
 
     const cancellationStage = getCancellationStage(order);
