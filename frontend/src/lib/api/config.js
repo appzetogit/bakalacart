@@ -380,6 +380,7 @@ export const API_ENDPOINTS = {
     VERIFY_PAYMENT: '/order/verify-payment',
     CALCULATE: '/order/calculate',
     CANCEL: '/order/:id/cancel',
+    REVIEW: '/order/:id/review',
   },
   // Payment endpoints
   PAYMENT: {

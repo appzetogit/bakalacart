@@ -1449,9 +1449,9 @@ export default function RestaurantDetails() {
             <div className="flex flex-col items-end">
               <Badge className="bg-green-500 text-white mb-1 flex items-center gap-1 px-2 py-1">
                 <Star className="h-3 w-3 fill-white" />
-                {restaurant?.rating ?? 4.5}
+                {restaurant?.rating || 0}
               </Badge>
-              <span className="text-xs text-gray-500">By {(restaurant.reviews || 0).toLocaleString()}+</span>
+              <span className="text-xs text-gray-500">By {(restaurant.totalRatings || restaurant.reviews || 0).toLocaleString()}+</span>
             </div>
           </div>
 

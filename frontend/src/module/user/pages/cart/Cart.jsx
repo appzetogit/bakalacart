@@ -11,6 +11,7 @@ import { useProfile } from "../../context/ProfileContext"
 import { useOrders } from "../../context/OrdersContext"
 import { useLocation as useUserLocation } from "../../hooks/useLocation"
 import { useZone } from "../../hooks/useZone"
+import { useLocationSelector } from "../../components/UserLayout"
 import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
@@ -85,6 +86,7 @@ export default function Cart() {
   const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
   const { createOrder } = useOrders()
   const { location: currentLocation } = useUserLocation() // Get live location address
+  const { openLocationSelector } = useLocationSelector()
   const { zoneId } = useZone(currentLocation) // Get user's zone
 
   const [showCoupons, setShowCoupons] = useState(false)
@@ -604,8 +606,11 @@ export default function Cart() {
   // Handler to select address by label (Home, Office, Other)
   const handleSelectAddressByLabel = async (label) => {
     try {
-      // Find address with matching label
-      const address = addresses.find(addr => addr.label === label)
+      // Find address with matching label (handle Office/Work interchangeably)
+      const address = addresses.find(addr =>
+        addr.label === label ||
+        (label === "Office" && addr.label === "Work")
+      )
 
       if (!address) {
         toast.error(`No ${label} address found. Please add an address first.`)
@@ -622,31 +627,41 @@ export default function Cart() {
         return
       }
 
+      // Format location data with comma before zipCode to ensure > 4 parts for useLocation hook compatibility
+      const street = address.street || ""
+      const city = address.city || ""
+      const state = address.state || ""
+      const area = address.additionalDetails || ""
+      const zipCode = address.zipCode || ""
+
+      const formattedAddr = area
+        ? `${area}, ${street}, ${city}, ${state}, ${zipCode}`
+        : `${street}, ${city}, ${state}, ${zipCode}`
+
       // Update location in backend
       await userAPI.updateLocation({
         latitude,
         longitude,
-        address: `${address.street}, ${address.city}`,
-        city: address.city,
-        state: address.state,
-        area: address.additionalDetails || "",
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        address: `${street}, ${city}`,
+        city,
+        state,
+        area,
+        zipCode,
+        formattedAddress: formattedAddr
       })
 
       // Update the location in localStorage
       const locationData = {
-        city: address.city,
-        state: address.state,
-        address: `${address.street}, ${address.city}`,
-        area: address.additionalDetails || "",
-        zipCode: address.zipCode,
+        city,
+        state,
+        address: `${street}, ${city}`,
+        area,
+        zipCode,
         latitude,
         longitude,
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        formattedAddress: formattedAddr,
+        isManual: true, // Mark as manual selection to prevent GPS overwrite
+        timestamp: Date.now()
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
 
@@ -1163,6 +1178,64 @@ export default function Cart() {
     navigate(`/user/orders/${placedOrderId}?confirmed=true`)
   }
 
+  // Handle share click
+  const handleShare = async () => {
+    // Determine share URL - prefer restaurant detail page if restaurant data is available
+    const shareUrl = restaurantData?.slug
+      ? `${window.location.origin}/user/restaurants/${restaurantData.slug}`
+      : window.location.origin
+
+    const shareText = restaurantName
+      ? `Check out ${restaurantName} on Bakala Cart! ${shareUrl}`
+      : `Check out Bakala Cart for amazing food! ${shareUrl}`
+
+    const shareData = {
+      title: 'Bakala Cart',
+      text: shareText,
+      url: shareUrl,
+    }
+
+    // Try Web Share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+        toast.success("Shared successfully")
+      } catch (error) {
+        // User cancelled or error occurred
+        if (error.name !== "AbortError") {
+          // Fallback to copy to clipboard for genuine errors
+          await copyToClipboard(shareUrl)
+        }
+      }
+    } else {
+      // Fallback to copy to clipboard for unsupported browsers
+      await copyToClipboard(shareUrl)
+    }
+  }
+
+  // Copy to clipboard helper
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Link copied to clipboard!")
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = text
+      textArea.style.position = "fixed"
+      textArea.style.opacity = "0"
+      document.body.appendChild(textArea)
+      textArea.select()
+      try {
+        document.execCommand("copy")
+        toast.success("Link copied to clipboard!")
+      } catch (err) {
+        toast.error("Failed to copy link")
+      }
+      document.body.removeChild(textArea)
+    }
+  }
+
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
     return (
@@ -1211,7 +1284,12 @@ export default function Cart() {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0"
+              onClick={handleShare}
+            >
               <Share2 className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </div>
@@ -1219,7 +1297,7 @@ export default function Cart() {
       </div>
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-40 md:pb-48">
         {/* Savings Banner */}
         {savings > 0 && (
           <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
@@ -1247,7 +1325,17 @@ export default function Cart() {
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">{item.name}</p>
-                        <button className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5 mt-0.5">
+                        <button
+                          onClick={() => {
+                            if (restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId) {
+                              const slug = restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId;
+                              navigate(`/user/restaurants/${slug}`);
+                            } else {
+                              toast.error("Restaurant details not found");
+                            }
+                          }}
+                          className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5 mt-0.5"
+                        >
                           Edit <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
                         </button>
                       </div>
@@ -1495,11 +1583,14 @@ export default function Cart() {
 
               {/* Delivery Address */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link className="flex items-center justify-between">
+                <div
+                  className="flex items-center justify-between cursor-pointer group"
+                  onClick={openLocationSelector}
+                >
                   <div className="flex items-center gap-3 md:gap-4">
-                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
+                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-orange transition-colors" />
                     <div className="flex-1">
-                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
+                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 group-hover:text-primary-orange transition-colors">
                         Delivery at <span className="font-semibold">Location</span>
                       </p>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -1508,7 +1599,10 @@ export default function Cart() {
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
                         {["Home", "Office", "Other"].map((label) => {
-                          const addressExists = addresses.some(addr => addr.label === label)
+                          const addressExists = addresses.some(addr =>
+                            addr.label === label ||
+                            (label === "Office" && addr.label === "Work")
+                          )
                           return (
                             <button
                               key={label}
@@ -1530,13 +1624,13 @@ export default function Cart() {
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                </Link>
+                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-primary-orange transition-colors" />
+                </div>
               </div>
 
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link to="/user/profile" className="flex items-center justify-between">
+                <Link to="/user/profile/edit" className="flex items-center justify-between">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
@@ -1577,7 +1671,7 @@ export default function Cart() {
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">Shipping Charges</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
                         {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>
@@ -1618,7 +1712,7 @@ export default function Cart() {
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">Shipping Charges</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
                         {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>

@@ -403,7 +403,7 @@ export default function FeeSettings() {
                   </p>
                 </div>
               </div>
-          </>
+            </>
           )}
         </div>
       </div>

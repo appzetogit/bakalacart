@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'sonner';
@@ -11,9 +11,11 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
   const [selectedVariant, setSelectedVariant] = useState(null);
 
   // Get variants from item and filter out rejected/invalid ones (where price is null)
-  const variants = Array.isArray(item?.variations) && item.variations.length > 0
-    ? item.variations.filter(v => v && v.price !== null && v.price !== undefined)
-    : [];
+  const variants = useMemo(() => {
+    return Array.isArray(item?.variations) && item.variations.length > 0
+      ? item.variations.filter(v => v && v.price !== null && v.price !== undefined)
+      : [];
+  }, [item?.variations]);
 
   // Initialize selected variant when modal opens
   useEffect(() => {
@@ -22,15 +24,13 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       if (!selectedVariant) {
         const firstVariant = variants[0]
         const firstVariantId = String(firstVariant?.id || firstVariant?._id || `variant-0`)
-        console.log('Initializing selected variant:', firstVariantId, 'from variant:', firstVariant)
         setSelectedVariant(firstVariantId);
       }
     } else if (!isOpen) {
       // Reset selection when modal closes
       setSelectedVariant(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, variants, selectedVariant]);
 
   // Prevent body scroll when modal is open and ensure consistent positioning
   useEffect(() => {
@@ -66,11 +66,13 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
   }, [isOpen]);
 
   // --- PRICE CALCULATION ---
-  const selectedVariantData = variants.find(v => {
-    const vId = String(v.id || v._id || '')
-    const selectedId = String(selectedVariant || '')
-    return vId === selectedId
-  });
+  const selectedVariantData = useMemo(() => {
+    return variants.find((v, index) => {
+      const vId = String(v.id || v._id || `variant-${index}`)
+      const selectedId = String(selectedVariant || '')
+      return vId === selectedId
+    });
+  }, [variants, selectedVariant]);
   const variantPrice = selectedVariantData?.price || item?.price || 0;
   const totalItemPrice = variantPrice * quantity;
 
@@ -110,8 +112,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         price: selectedVariantData.price,
       } : null,
       // Update item name to include variant name for clarity in cart
-      name: selectedVariantData 
-        ? `${item.name} (${selectedVariantData.name})` 
+      name: selectedVariantData
+        ? `${item.name} (${selectedVariantData.name})`
         : item.name,
       quantity: quantity,
       restaurant: restaurant?.name || item.restaurant,
@@ -126,8 +128,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       for (let i = 0; i < quantity; i++) {
         addToCart(cartItem);
       }
-      const displayName = selectedVariantData 
-        ? `${item.name} (${selectedVariantData.name})` 
+      const displayName = selectedVariantData
+        ? `${item.name} (${selectedVariantData.name})`
         : item.name
       toast.success(`${quantity} ${displayName} added to cart`);
     }
@@ -193,8 +195,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
             <div className="flex gap-3 flex-1 min-w-0">
               {/* Item Image */}
               {item.image && (
-                <img 
-                  src={item.image} 
+                <img
+                  src={item.image}
                   alt={item.name}
                   className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                 />
@@ -223,77 +225,57 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           {/* Section 1: Quantity / Variants */}
           {variants.length > 0 && (
             <>
-               <div className="p-5">
-                 <h3 className="font-bold text-lg text-gray-800 mb-1">Quantity</h3>
-                 <p className="text-sm text-gray-500 mb-4">Required • Select any 1 option</p>
-                 
-                 <div className="flex flex-col gap-3">
-                   {variants.map((variant, index) => {
-                     // Use string comparison to handle both string and number IDs
-                     const variantId = String(variant.id || variant._id || `variant-${index}`)
-                     const currentSelected = String(selectedVariant || '')
-                     const isSelected = currentSelected === variantId
-                     
-                     return (
-                       <button
-                         key={variantId}
-                         type="button"
-                         className={`w-full flex justify-between items-center cursor-pointer p-4 rounded-lg border-2 transition-all select-none text-left relative z-10
+              <div className="p-5">
+                <h3 className="font-bold text-lg text-gray-800 mb-1">Quantity</h3>
+                <p className="text-sm text-gray-500 mb-4">Required • Select any 1 option</p>
+
+                <div className="flex flex-col gap-3">
+                  {variants.map((variant, index) => {
+                    // Use string comparison to handle both string and number IDs
+                    const variantId = String(variant.id || variant._id || `variant-${index}`)
+                    const currentSelected = String(selectedVariant || '')
+                    const isSelected = currentSelected === variantId
+
+                    return (
+                      <button
+                        key={variantId}
+                        type="button"
+                        className={`w-full flex justify-between items-center cursor-pointer p-4 rounded-lg border-2 transition-all select-none text-left relative z-10
                            ${isSelected
-                             ? 'border-[#ff3f6c] bg-rose-50 active:bg-rose-100' 
-                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100'
-                           }`}
-                         onClick={(e) => {
-                           e.preventDefault()
-                           e.stopPropagation()
-                           console.log('Variant clicked:', { 
-                             variantId, 
-                             variantName: variant.name, 
-                             currentSelected,
-                             variant: variant,
-                             allVariants: variants.map(v => ({ id: v.id, _id: v._id, name: v.name }))
-                           })
-                           // Force state update with the exact variant ID
-                           const idToSet = String(variant.id || variant._id || `variant-${index}`)
-                           setSelectedVariant(idToSet)
-                           console.log('Setting selected variant to:', idToSet)
-                         }}
-                         onMouseDown={(e) => {
-                           // Ensure click works on mobile
-                           e.stopPropagation()
-                         }}
-                         onTouchEnd={(e) => {
-                           // Handle touch end for mobile
-                           e.preventDefault()
-                           e.stopPropagation()
-                           const idToSet = String(variant.id || variant._id || `variant-${index}`)
-                           setSelectedVariant(idToSet)
-                         }}
-                       >
-                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                           {/* Radio Button */}
-                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                            ? 'border-[#ff3f6c] bg-rose-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          // Force state update with the exact variant ID
+                          setSelectedVariant(variantId)
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Radio Button */}
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
                              ${isSelected ? 'border-[#ff3f6c]' : 'border-gray-400'}`}>
-                             {isSelected && (
-                               <div className="w-2.5 h-2.5 bg-[#ff3f6c] rounded-full" />
-                             )}
-                           </div>
-                           <div className="flex flex-col flex-1 min-w-0">
-                             <span className="text-gray-800 font-semibold text-base">{variant.name}</span>
-                             {variant.stock && variant.stock !== 'Unlimited' && (
-                               <span className="text-xs text-gray-500 mt-0.5">
-                                 Stock: {variant.stock}
-                               </span>
-                             )}
-                           </div>
-                         </div>
-                         <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                           <span className="text-gray-800 text-base font-bold">₹{variant.price}</span>
-                         </div>
-                       </button>
-                     )
-                   })}
-                 </div>
+                            {isSelected && (
+                              <div className="w-2.5 h-2.5 bg-[#ff3f6c] rounded-full" />
+                            )}
+                          </div>
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="text-gray-800 font-semibold text-base">{variant.name}</span>
+                            {variant.stock && variant.stock !== 'Unlimited' && (
+                              <span className="text-xs text-gray-500 mt-0.5">
+                                Stock: {variant.stock}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                          <span className="text-gray-800 text-base font-bold">₹{variant.price}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               <hr className="border-gray-200" />

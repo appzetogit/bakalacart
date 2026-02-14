@@ -47,7 +47,7 @@ export default function SignIn() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const isSignUp = searchParams.get("mode") === "signup"
-  
+
   // Get the page user was trying to access before login
   const from = location.state?.from || "/"
 
@@ -69,21 +69,23 @@ export default function SignIn() {
   const redirectHandledRef = useRef(false)
 
   // Prefill form data from sessionStorage if available (when coming back from OTP)
+  // Or from localStorage if "Remember Me" was previously used
   useEffect(() => {
-    const stored = sessionStorage.getItem("userAuthData")
-    if (stored) {
+    // Priority 1: sessionStorage (transient state like coming back from OTP)
+    const storedSession = sessionStorage.getItem("userAuthData")
+    if (storedSession) {
       try {
-        const data = JSON.parse(stored)
+        const data = JSON.parse(storedSession)
         if (data.method === "phone" && data.phone) {
           setAuthMethod("phone")
-          // Split country code and number
           const phoneParts = data.phone.split(" ")
           if (phoneParts.length >= 2) {
             setFormData(prev => ({
               ...prev,
               countryCode: phoneParts[0],
               phone: phoneParts[1],
-              name: data.name || prev.name
+              name: data.name || prev.name,
+              rememberMe: data.rememberMe || false
             }))
           }
         } else if (data.method === "email" && data.email) {
@@ -91,11 +93,39 @@ export default function SignIn() {
           setFormData(prev => ({
             ...prev,
             email: data.email,
-            name: data.name || prev.name
+            name: data.name || prev.name,
+            rememberMe: data.rememberMe || false
+          }))
+        }
+        return // Skip localStorage if we have session data
+      } catch (e) {
+        console.error("Error parsing session auth data:", e)
+      }
+    }
+
+    // Priority 2: localStorage (persistent "Remember Me" state)
+    const remembered = localStorage.getItem("rememberedUser")
+    if (remembered) {
+      try {
+        const data = JSON.parse(remembered)
+        if (data.method === "phone" && data.phone) {
+          setAuthMethod("phone")
+          setFormData(prev => ({
+            ...prev,
+            countryCode: data.countryCode || "+91",
+            phone: data.phone,
+            rememberMe: true
+          }))
+        } else if (data.method === "email" && data.email) {
+          setAuthMethod("email")
+          setFormData(prev => ({
+            ...prev,
+            email: data.email,
+            rememberMe: true
           }))
         }
       } catch (e) {
-        console.error("Error parsing stored auth data:", e)
+        console.error("Error parsing remembered auth data:", e)
       }
     }
   }, [])
@@ -623,6 +653,8 @@ export default function SignIn() {
         name: isSignUp ? formData.name.trim() : null,
         isSignUp,
         module: "user",
+        rememberMe: formData.rememberMe,
+        countryCode: formData.countryCode // Keep for remembering correctly
       }
       sessionStorage.setItem("userAuthData", JSON.stringify(authData))
 

@@ -11,7 +11,7 @@ import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotif
 export default function OTP() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Get the page user was trying to access before login
   const from = location.state?.from || "/"
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
@@ -217,6 +217,20 @@ export default function OTP() {
       // Clear auth data from sessionStorage
       sessionStorage.removeItem("userAuthData")
 
+      // Handle "Remember Me"
+      if (authData?.rememberMe) {
+        const rememberedData = {
+          method: authData.method,
+          phone: authData.method === "phone" ? (authData.phone?.split(" ")[1] || authData.phone) : null,
+          email: authData.email,
+          countryCode: authData.countryCode,
+          timestamp: Date.now()
+        }
+        localStorage.setItem("rememberedUser", JSON.stringify(rememberedData))
+      } else {
+        localStorage.removeItem("rememberedUser")
+      }
+
       // Replace old token with new one (handles cross-module login)
       setUserAuthData("user", accessToken, user)
 
@@ -296,6 +310,20 @@ export default function OTP() {
 
       // Clear auth data from sessionStorage
       sessionStorage.removeItem("userAuthData")
+
+      // Handle "Remember Me"
+      if (authData?.rememberMe) {
+        const rememberedData = {
+          method: authData.method,
+          phone: authData.method === "phone" ? (authData.phone?.split(" ")[1] || authData.phone) : null,
+          email: authData.email,
+          countryCode: authData.countryCode,
+          timestamp: Date.now()
+        }
+        localStorage.setItem("rememberedUser", JSON.stringify(rememberedData))
+      } else {
+        localStorage.removeItem("rememberedUser")
+      }
 
       // Replace old token with new one (handles cross-module login)
       setUserAuthData("user", accessToken, user)

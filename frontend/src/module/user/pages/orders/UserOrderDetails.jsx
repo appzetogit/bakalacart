@@ -12,6 +12,8 @@ import {
   MapPin,
   RotateCcw,
   FileText,
+  Star,
+  AlertCircle,
 } from "lucide-react"
 import { orderAPI, restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -36,6 +38,10 @@ export default function UserOrderDetails() {
   const [showNoteDialog, setShowNoteDialog] = useState(false)
   const [orderNote, setOrderNote] = useState("")
   const [isUpdatingNote, setIsUpdatingNote] = useState(false)
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [selectedRating, setSelectedRating] = useState(null)
+  const [feedbackText, setFeedbackText] = useState("")
+  const [submittingRating, setSubmittingRating] = useState(false)
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -105,6 +111,40 @@ export default function UserOrderDetails() {
       toast.error(err.response?.data?.message || "Failed to update instructions")
     } finally {
       setIsUpdatingNote(false)
+    }
+  }
+
+  const handleSubmitRating = async () => {
+    if (!order || selectedRating === null) {
+      toast.error("Please select a rating first")
+      return
+    }
+
+    try {
+      setSubmittingRating(true)
+      const orderIdToRate = order._id || order.orderId || orderId
+
+      await orderAPI.submitReview(orderIdToRate, {
+        rating: selectedRating,
+        comment: feedbackText || ""
+      })
+
+      setOrder(prev => ({
+        ...prev,
+        review: {
+          rating: selectedRating,
+          comment: feedbackText || "",
+          submittedAt: new Date().toISOString()
+        }
+      }))
+
+      toast.success("Thanks for rating your order! 🎉")
+      setShowRatingModal(false)
+    } catch (error) {
+      console.error("Error submitting rating:", error)
+      toast.error(error?.response?.data?.message || "Failed to submit rating")
+    } finally {
+      setSubmittingRating(false)
     }
   }
 
@@ -369,6 +409,29 @@ export default function UserOrderDetails() {
                 ? "Order was delivered"
                 : "Order status: " + (order.status || "Processing")}
             </h2>
+            {order.status === "delivered" && (
+              <div className="mt-1">
+                {order.review?.rating ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">You rated</span>
+                    <div className="flex bg-yellow-400 text-white px-1.5 py-0.5 rounded text-[10px] items-center gap-0.5 font-bold">
+                      {order.review.rating}<Star className="w-2.5 h-2.5 fill-current" />
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSelectedRating(null)
+                      setFeedbackText("")
+                      setShowRatingModal(true)
+                    }}
+                    className="text-xs text-[#E23744] font-semibold flex items-center gap-0.5 hover:underline"
+                  >
+                    Rate order <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -497,7 +560,7 @@ export default function UserOrderDetails() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Delivery partner fee</span>
+              <span className="text-gray-500">Shipping Charges</span>
               <div>
                 {pricing.originalDeliveryFee && (
                   <span className="text-gray-400 line-through mr-1">
@@ -704,6 +767,83 @@ export default function UserOrderDetails() {
                 Update Instructions
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rating & Feedback Modal */}
+      <Dialog open={showRatingModal} onOpenChange={setShowRatingModal}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
+          <div className="bg-gradient-to-r from-[#E23744] to-red-600 px-6 py-5">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Star className="w-5 h-5 fill-white" />
+              Rate Your Order
+            </h2>
+            <p className="text-sm text-white/90 mt-1">
+              {restaurantName} • Order #{orderIdDisplay}
+            </p>
+          </div>
+
+          <div className="px-6 py-6 space-y-6">
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-900 mb-4">
+                How was your overall experience?
+              </p>
+              <div className="flex items-center justify-center gap-1">
+                {[1, 2, 3, 4, 5].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setSelectedRating(num)}
+                    className="p-1.5 transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star
+                      className={`w-10 h-10 transition-all ${(selectedRating || 0) >= num
+                        ? "text-yellow-400 fill-yellow-400 drop-shadow-md"
+                        : "text-gray-200"
+                        }`}
+                    />
+                  </button>
+                ))}
+              </div>
+              {selectedRating && (
+                <p className="mt-3 text-sm font-medium text-[#E23744]">
+                  {selectedRating === 5 && "Excellent! ⭐⭐⭐⭐⭐"}
+                  {selectedRating === 4 && "Great! ⭐⭐⭐⭐"}
+                  {selectedRating === 3 && "Good ⭐⭐⭐"}
+                  {selectedRating === 2 && "Fair ⭐⭐"}
+                  {selectedRating === 1 && "Poor ⭐"}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-900">
+                Share your feedback <span className="text-gray-400 font-normal">(Optional)</span>
+              </label>
+              <Textarea
+                rows={3}
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                className="rounded-xl border-gray-200 focus:ring-[#E23744] focus:border-[#E23744] resize-none"
+                placeholder="What did you like or dislike?..."
+              />
+            </div>
+
+            <Button
+              onClick={handleSubmitRating}
+              disabled={submittingRating || selectedRating === null}
+              className="w-full h-12 rounded-xl bg-[#E23744] hover:bg-red-700 text-white font-bold text-base shadow-lg shadow-red-200"
+            >
+              {submittingRating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Rating"
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
