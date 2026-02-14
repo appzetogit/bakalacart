@@ -431,18 +431,49 @@ export default function MenuAdd() {
       let updatedSections = []
 
       if (editingDish) {
-        // Editing existing dish - replace it
+        // Editing existing dish - remove from original section and add to new section (if category changed)
+        const originalSectionId = editingDish.section.id
+        const originalSectionName = editingDish.section.name
+        const newCategory = formData.category
+        
+        // Step 1: Remove dish from original section
         updatedSections = currentMenu.sections.map(section => {
-          if (section.id === editingDish.section.id || section.name === editingDish.section.name) {
+          if (section.id === originalSectionId || section.name === originalSectionName) {
             return {
               ...section,
-              items: (section.items || []).map(item =>
-                String(item.id) === String(editingDish.dish.id) ? dishData : item
+              items: (section.items || []).filter(item =>
+                String(item.id) !== String(editingDish.dish.id)
               )
             }
           }
           return section
         })
+        
+        // Step 2: Add dish to the correct section (new category or same category)
+        let sectionFound = false
+        updatedSections = updatedSections.map(section => {
+          if (section.name === newCategory || section.id === selectedSection?.id) {
+            sectionFound = true
+            return {
+              ...section,
+              items: [...(section.items || []), dishData]
+            }
+          }
+          return section
+        })
+        
+        // If target section doesn't exist, create it
+        if (!sectionFound) {
+          const newSection = {
+            id: `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: newCategory,
+            items: [dishData],
+            subsections: [],
+            isEnabled: true,
+            order: updatedSections.length,
+          }
+          updatedSections.push(newSection)
+        }
       } else {
         // Adding new dish
         // Find section by name (category) and add item

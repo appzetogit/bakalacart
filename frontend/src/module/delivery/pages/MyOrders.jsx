@@ -69,6 +69,8 @@ export default function MyOrders() {
   const [newMessage, setNewMessage] = useState("")
   const [chatSocket, setChatSocket] = useState(null)
   const chatMessagesEndRef = useRef(null)
+  const chatInputRef = useRef(null)
+  const chatInputContainerRef = useRef(null)
 
   // Socket URL for delivery namespace
   const SOCKET_URL = API_BASE_URL.replace('/api', '')
@@ -139,6 +141,21 @@ export default function MyOrders() {
           // Join delivery room with current delivery partner's ID
           socket.emit('join-delivery', deliveryPartnerId.toString())
           console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
+          
+          // CRITICAL: Also join order room to receive messages from user
+          // Join with both orderId formats (ORD-xxx and MongoDB _id) for compatibility
+          const orderIdString = selectedOrderForChat.orderId || orderId
+          const orderMongoId = selectedOrderForChat._id || orderId
+          
+          if (orderIdString) {
+            socket.emit('join-order-room', orderIdString)
+            console.log('✅ Joined order room with orderId string:', orderIdString)
+          }
+          
+          if (orderMongoId && orderMongoId !== orderIdString) {
+            socket.emit('join-order-room', orderMongoId)
+            console.log('✅ Also joined order room with MongoDB _id:', orderMongoId)
+          }
         })
 
         // Single message handler to avoid duplicates
@@ -340,22 +357,40 @@ export default function MyOrders() {
 
   // Handle sending message
   const handleSendMessage = () => {
-    if (!newMessage.trim() || !chatSocket || !selectedOrderForChat) return
+    if (!newMessage.trim() || !chatSocket || !selectedOrderForChat) {
+      console.warn('⚠️ Cannot send message:', { 
+        hasMessage: !!newMessage.trim(), 
+        hasSocket: !!chatSocket, 
+        hasOrder: !!selectedOrderForChat 
+      });
+      return;
+    }
 
     const orderId = selectedOrderForChat.orderId || selectedOrderForChat._id
-    if (!orderId) return
+    if (!orderId) {
+      console.error('❌ No orderId available to send message');
+      toast.error('Unable to send message. Order ID not found.');
+      return;
+    }
+
+    // Check if socket is connected
+    if (!chatSocket.connected) {
+      console.error('❌ Socket not connected, attempting to reconnect...');
+      chatSocket.connect();
+      toast.error('Reconnecting to chat...');
+      return;
+    }
 
     const messageText = newMessage.trim()
     const messageTimestamp = Date.now()
 
-    // Create message object
-    const messageData = {
-      message: messageText,
-      sender: 'delivery',
-      timestamp: messageTimestamp,
+    console.log('💬 Sending delivery message:', {
       orderId: orderId,
-      orderMongoId: selectedOrderForChat._id || orderId
-    }
+      message: messageText,
+      socketConnected: chatSocket.connected,
+      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
+                         selectedOrderForChat.assignmentInfo?.deliveryPartnerId
+    });
 
     // Send message to server
     chatSocket.emit('send-chat-message', {
@@ -364,7 +399,9 @@ export default function MyOrders() {
       deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
                          selectedOrderForChat.assignmentInfo?.deliveryPartnerId,
       timestamp: messageTimestamp
-    })
+    });
+
+    console.log('✅ Message sent to server');
 
     // Don't add message optimistically - wait for server echo to avoid duplicates
     // The server will echo the message back through socket, and it will be added via handleIncomingMessage
@@ -1941,70 +1978,87 @@ export default function MyOrders() {
                                 </div>
                               )}
                               
-                              {/* Action Icons: Call, Chat, Location */}
-                              <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-200">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    // Try multiple possible fields for customer phone number
-                                    const userPhone = order.userId?.phone || 
-                                                    order.userId?.phoneNumber ||
-                                                    order.userPhone || 
-                                                    order.address?.phone ||
-                                                    order.customerPhone ||
-                                                    order.user?.phone
-                                    
-                                    if (userPhone) {
-                                      // Remove any spaces, dashes, or special characters except +
-                                      const cleanPhone = userPhone.replace(/[\s\-\(\)]/g, '')
-                                      // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                                      let phoneToCall = cleanPhone
-                                      if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                        phoneToCall = `+91${cleanPhone}`
-                                      } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                        phoneToCall = `+${cleanPhone}`
-                                      } else if (!cleanPhone.startsWith('+')) {
-                                        phoneToCall = cleanPhone
-                                      }
+                              {/* Action Icons: Call, Chat, Location - Hide when REACHED PICKUP button is visible */}
+                              {/* REACHED PICKUP button shows when: isAcceptedByDeliveryBoy(order) && !isReachedPickup(order) && !isCancelled */}
+                              {/* So we hide icons when that same condition is true */}
+                              {(() => {
+                                // Check if REACHED PICKUP button would be showing (same condition as button)
+                                const isShowingReachedPickupButton = isAcceptedByDeliveryBoy(order) && 
+                                                                      !isReachedPickup(order) && 
+                                                                      !isCancelled &&
+                                                                      isActive &&
+                                                                      activeTab === "pending"
+                                
+                                // Only show icons if order is accepted but REACHED PICKUP button is NOT showing
+                                return isAcceptedByDeliveryBoy(order) && 
+                                       !isReachedPickup(order) && 
+                                       !isOrderPickedUp(order) && 
+                                       !isShowingReachedPickupButton
+                              })() && (
+                                <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      // Try multiple possible fields for customer phone number
+                                      const userPhone = order.userId?.phone || 
+                                                      order.userId?.phoneNumber ||
+                                                      order.userPhone || 
+                                                      order.address?.phone ||
+                                                      order.customerPhone ||
+                                                      order.user?.phone
                                       
-                                      console.log('📞 Calling customer:', phoneToCall)
-                                      window.location.href = `tel:${phoneToCall}`
-                                    } else {
-                                      console.error('❌ Customer phone number not found in order:', {
-                                        orderId: order.orderId || order._id,
-                                        userId: order.userId,
-                                        userPhone: order.userPhone,
-                                        address: order.address
-                                      })
-                                      toast.error('Customer phone number not available')
-                                    }
-                                  }}
-                                  className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors"
-                                  title="Call customer"
-                                >
-                                  <Phone className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleOpenChat(order)
-                                  }}
-                                  className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors"
-                                  title="Chat with customer"
-                                >
-                                  <MessageSquare className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleCustomerLocationClick(order, e)
-                                  }}
-                                  className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
-                                  title="View customer location"
-                                >
-                                  <MapPin className="w-5 h-5" />
-                                </button>
-                              </div>
+                                      if (userPhone) {
+                                        // Remove any spaces, dashes, or special characters except +
+                                        const cleanPhone = userPhone.replace(/[\s\-\(\)]/g, '')
+                                        // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                        let phoneToCall = cleanPhone
+                                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                          phoneToCall = `+91${cleanPhone}`
+                                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                          phoneToCall = `+${cleanPhone}`
+                                        } else if (!cleanPhone.startsWith('+')) {
+                                          phoneToCall = cleanPhone
+                                        }
+                                        
+                                        console.log('📞 Calling customer:', phoneToCall)
+                                        window.location.href = `tel:${phoneToCall}`
+                                      } else {
+                                        console.error('❌ Customer phone number not found in order:', {
+                                          orderId: order.orderId || order._id,
+                                          userId: order.userId,
+                                          userPhone: order.userPhone,
+                                          address: order.address
+                                        })
+                                        toast.error('Customer phone number not available')
+                                      }
+                                    }}
+                                    className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors"
+                                    title="Call customer"
+                                  >
+                                    <Phone className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleOpenChat(order)
+                                    }}
+                                    className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors"
+                                    title="Chat with customer"
+                                  >
+                                    <MessageSquare className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleCustomerLocationClick(order, e)
+                                    }}
+                                    className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
+                                    title="View customer location"
+                                  >
+                                    <MapPin className="w-5 h-5" />
+                                  </button>
+                                </div>
+                              )}
                             </>
                           ) : (
                             <div className="flex items-center justify-between">
@@ -2669,12 +2723,34 @@ export default function MyOrders() {
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Input Area */}
-              <div className="p-3 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800">
+              {/* Input Area - Always visible when focused */}
+              <div 
+                ref={chatInputContainerRef}
+                className="p-3 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800 sticky bottom-0 z-10"
+              >
                 <div className="flex items-end gap-2">
                   <Textarea
+                    ref={chatInputRef}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    onFocus={(e) => {
+                      // Ensure input is visible when keyboard appears
+                      setTimeout(() => {
+                        if (chatInputContainerRef.current) {
+                          chatInputContainerRef.current.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'end',
+                            inline: 'nearest'
+                          });
+                        }
+                        // Also scroll the input itself into view
+                        e.target.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'center',
+                          inline: 'nearest'
+                        });
+                      }, 300); // Delay to account for keyboard animation
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
@@ -2682,7 +2758,7 @@ export default function MyOrders() {
                       }
                     }}
                     placeholder="Type your message..."
-                    className="flex-1 min-h-[60px] max-h-[120px] resize-none bg-gray-50 dark:bg-[#0a0a0a] border-gray-200 dark:border-gray-800 focus:border-purple-500 dark:focus:border-purple-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="flex-1 min-h-[60px] max-h-[120px] resize-none bg-gray-50 dark:bg-[#0a0a0a] border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg"
                     rows={2}
                   />
                   <button

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
+import { X, ChevronDown } from "lucide-react"
 
 /**
  * BottomPopup Component
@@ -317,6 +317,28 @@ export default function BottomPopup({
               touchAction: 'none'
             }}
           >
+            {/* Swipe Handle with Down Arrow */}
+            {showHandle && (
+              <div
+                ref={handleRef}
+                onClick={handleCollapseToggle}
+                className="flex flex-col items-center pt-3 pb-2 cursor-pointer touch-none"
+                style={{ touchAction: 'none' }}
+              >
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-2" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleClose()
+                  }}
+                  className="flex items-center justify-center p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                  aria-label="Slide down"
+                >
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            )}
+            
             {/* Header */}
             {(title || showCloseButton) && (
               <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100">

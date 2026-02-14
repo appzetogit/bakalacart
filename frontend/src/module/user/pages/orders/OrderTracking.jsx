@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { io } from "socket.io-client" // Import io
@@ -117,6 +117,8 @@ export default function OrderTracking() {
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState(null);
+  const chatInputRef = useRef(null);
+  const chatInputContainerRef = useRef(null);
 
   const defaultAddress = getDefaultAddress()
 
@@ -162,8 +164,37 @@ export default function OrderTracking() {
     newSocket.on('connect', () => {
       console.log('✅ Connected to chat socket');
       // Join order room to listen for messages and tracking
+      // Join with orderId from params (could be ORD-xxx or MongoDB _id)
       newSocket.emit('join-order-tracking', orderId);
       console.log('✅ Joined order room with orderId:', orderId);
+      
+      // Also join with order._id if available and different from orderId
+      // This ensures we receive messages sent to either format
+      if (order?._id && order._id !== orderId) {
+        newSocket.emit('join-order-tracking', order._id);
+        console.log('✅ Also joined order room with MongoDB _id:', order._id);
+      }
+      
+      // Also join with order.orderId if available and different
+      if (order?.orderId && order.orderId !== orderId && order.orderId !== order._id) {
+        newSocket.emit('join-order-tracking', order.orderId);
+        console.log('✅ Also joined order room with orderId string:', order.orderId);
+      }
+    });
+    
+    // Handle connection errors
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      toast.error('Failed to connect to chat. Please try again.');
+    });
+    
+    // Handle disconnection
+    newSocket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Server disconnected the socket, try to reconnect
+        newSocket.connect();
+      }
     });
 
     newSocket.on('receive-chat-message', (data) => {
@@ -207,27 +238,53 @@ export default function OrderTracking() {
 
   // Join additional order room when order is loaded (for MongoDB _id format)
   useEffect(() => {
-    if (!socket || !order?._id) return;
+    if (!socket || !order) return;
 
-    // If order._id is different from orderId, join that room too
-    if (order._id !== orderId) {
-      socket.emit('join-order-tracking', order._id);
-      console.log('✅ Also joined order room with MongoDB _id:', order._id);
-    }
-  }, [socket, order?._id, orderId]);
+    // Join with all possible orderId formats to ensure we receive all messages
+    const orderIds = [
+      order._id,
+      order.orderId,
+      orderId
+    ].filter(Boolean).filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+
+    orderIds.forEach(id => {
+      if (id && id !== orderId) {
+        socket.emit('join-order-tracking', id);
+        console.log('✅ Also joined order room with:', id);
+      }
+    });
+  }, [socket, order?._id, order?.orderId, orderId]);
 
   const handleSendMessage = () => {
-    if (!newMessage.trim() || !socket) return;
+    if (!newMessage.trim() || !socket) {
+      console.warn('⚠️ Cannot send message:', { hasMessage: !!newMessage.trim(), hasSocket: !!socket });
+      return;
+    }
 
-    // Get orderId - prefer MongoDB _id if available, otherwise use orderId from params
+    // Get orderId - try multiple formats to ensure message is delivered
     const orderIdToSend = order?._id || order?.orderId || orderId;
+
+    if (!orderIdToSend) {
+      console.error('❌ No orderId available to send message');
+      toast.error('Unable to send message. Order ID not found.');
+      return;
+    }
 
     console.log('💬 Sending message:', {
       orderId: orderIdToSend,
       orderFromState: order?._id || order?.orderId,
       orderIdFromParams: orderId,
-      message: newMessage
+      message: newMessage.trim(),
+      socketConnected: socket.connected
     });
+
+    // Check if socket is connected
+    if (!socket.connected) {
+      console.error('❌ Socket not connected, attempting to reconnect...');
+      socket.connect();
+      toast.error('Reconnecting to chat...');
+      return;
+    }
 
     // Send message to server
     // Server will broadcast receiving-chat-message back to us
@@ -237,6 +294,8 @@ export default function OrderTracking() {
       sender: 'user',
       timestamp: Date.now()
     });
+
+    console.log('✅ Message sent to server');
 
     // Note: Message will be saved to history when received via socket
     setNewMessage("");
@@ -1357,8 +1416,11 @@ export default function OrderTracking() {
             )}
           </div>
 
-          {/* Input Area */}
-          <div className="p-3 bg-white border-t border-gray-100 sticky bottom-0">
+          {/* Input Area - Always visible when focused */}
+          <div 
+            ref={chatInputContainerRef}
+            className="p-3 bg-white border-t border-gray-100 sticky bottom-0 z-10"
+          >
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1367,11 +1429,30 @@ export default function OrderTracking() {
               className="flex items-center gap-2"
             >
               <input
+                ref={chatInputRef}
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                onFocus={(e) => {
+                  // Ensure input is visible when keyboard appears
+                  setTimeout(() => {
+                    if (chatInputContainerRef.current) {
+                      chatInputContainerRef.current.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'end',
+                        inline: 'nearest'
+                      });
+                    }
+                    // Also scroll the input itself into view
+                    e.target.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+                  }, 300); // Delay to account for keyboard animation
+                }}
                 placeholder="Type a message..."
-                className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none"
+                className="flex-1 bg-gray-100 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all outline-none"
               />
               <button
                 type="submit"

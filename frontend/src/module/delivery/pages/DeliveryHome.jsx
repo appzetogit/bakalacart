@@ -240,6 +240,96 @@ function animateMarkerSmoothly(marker, newPosition, duration = 1500, animationRe
   if (animationRef) animationRef.current = requestAnimationFrame(animate)
 }
 
+/**
+ * Animate marker smoothly with rotation based on bearing
+ * @param {Object} marker - Google Maps Marker instance
+ * @param {Object} newPosition - {lat, lng} new position
+ * @param {number} targetBearing - Target bearing/heading in degrees (0-360)
+ * @param {number} duration - Animation duration in milliseconds (default 1500ms)
+ * @param {React.RefObject} animationRef - Ref to store animation frame ID
+ */
+function animateMarkerSmoothlyWithRotation(marker, newPosition, targetBearing, duration = 1500, animationRef) {
+  if (!marker || !newPosition) return
+
+  const currentPosition = marker.getPosition()
+  if (!currentPosition) {
+    // If no current position, set directly
+    marker.setPosition(newPosition)
+    return
+  }
+
+  const startLat = currentPosition.lat()
+  const startLng = currentPosition.lng()
+  const endLat = newPosition.lat
+  const endLng = newPosition.lng
+
+  // Cancel any ongoing animation
+  if (animationRef?.current) {
+    cancelAnimationFrame(animationRef.current)
+  }
+
+  const startTime = Date.now()
+  const startPos = { lat: startLat, lng: startLng }
+  const endPos = { lat: endLat, lng: endLng }
+
+  // Store reference to getRotatedBikeIcon function (will be set by component)
+  let getRotatedBikeIconFn = null
+  if (window.getRotatedBikeIcon) {
+    getRotatedBikeIconFn = window.getRotatedBikeIcon
+  }
+
+  function animate() {
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+
+    // Linear easing for position
+    const currentLat = startPos.lat + (endPos.lat - startPos.lat) * progress
+    const currentLng = startPos.lng + (endPos.lng - startPos.lng) * progress
+
+    // Update marker position
+    marker.setPosition({ lat: currentLat, lng: currentLng })
+
+    // CRITICAL: Ensure NO animation is set (no blinking) - stability is key
+    if (marker) {
+      marker.setAnimation(null);
+    }
+
+    // Update rotation smoothly if bearing is provided
+    // Bike should face the direction of travel (mub/mouth in travel direction)
+    if (targetBearing !== null && targetBearing !== undefined && getRotatedBikeIconFn) {
+      // Update rotation every 20% progress for smooth rotation
+      if (progress > 0 && (Math.floor(progress * 10) % 2 === 0 || progress >= 1)) {
+        getRotatedBikeIconFn(targetBearing).then(rotatedIconUrl => {
+          if (marker) {
+            const currentIcon = marker.getIcon()
+            marker.setIcon({
+              url: rotatedIconUrl,
+              scaledSize: currentIcon?.scaledSize || new window.google.maps.Size(60, 60),
+              anchor: currentIcon?.anchor || new window.google.maps.Point(30, 30)
+            })
+            // CRITICAL: Ensure NO animation after icon update
+            marker.setAnimation(null);
+          }
+        }).catch(err => {
+          console.warn('⚠️ Error updating marker rotation:', err)
+        })
+      }
+    }
+
+    if (progress < 1) {
+      if (animationRef) animationRef.current = requestAnimationFrame(animate)
+    } else {
+      if (animationRef) animationRef.current = null
+      // Final check: ensure no animation is set
+      if (marker) {
+        marker.setAnimation(null);
+      }
+    }
+  }
+
+  if (animationRef) animationRef.current = requestAnimationFrame(animate)
+}
+
 export default function DeliveryHome() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -556,6 +646,8 @@ export default function DeliveryHome() {
   const [newMessage, setNewMessage] = useState("")
   const [chatSocket, setChatSocket] = useState(null)
   const chatMessagesEndRef = useRef(null)
+  const chatInputRef = useRef(null)
+  const chatInputContainerRef = useRef(null)
 
   // Socket URL for delivery namespace
   const SOCKET_URL = API_BASE_URL.replace('/api', '')
@@ -621,13 +713,40 @@ export default function DeliveryHome() {
 
   // Handle sending message
   const handleSendMessage = () => {
-    if (!newMessage.trim() || !chatSocket || !selectedRestaurant) return
+    if (!newMessage.trim() || !chatSocket || !selectedRestaurant) {
+      console.warn('⚠️ Cannot send message:', { 
+        hasMessage: !!newMessage.trim(), 
+        hasSocket: !!chatSocket, 
+        hasRestaurant: !!selectedRestaurant 
+      });
+      return;
+    }
 
     const orderId = selectedRestaurant.orderId || selectedRestaurant._id
-    if (!orderId) return
+    if (!orderId) {
+      console.error('❌ No orderId available to send message');
+      toast.error('Unable to send message. Order ID not found.');
+      return;
+    }
+
+    // Check if socket is connected
+    if (!chatSocket.connected) {
+      console.error('❌ Socket not connected, attempting to reconnect...');
+      chatSocket.connect();
+      toast.error('Reconnecting to chat...');
+      return;
+    }
 
     const messageText = newMessage.trim()
     const messageTimestamp = Date.now()
+
+    console.log('💬 Sending delivery message:', {
+      orderId: orderId,
+      message: messageText,
+      socketConnected: chatSocket.connected,
+      deliveryPartnerId: selectedRestaurant.deliveryPartnerId ||
+        selectedRestaurant.assignmentInfo?.deliveryPartnerId
+    });
 
     // Send message to server
     chatSocket.emit('send-chat-message', {
@@ -636,7 +755,9 @@ export default function DeliveryHome() {
       deliveryPartnerId: selectedRestaurant.deliveryPartnerId ||
         selectedRestaurant.assignmentInfo?.deliveryPartnerId,
       timestamp: messageTimestamp
-    })
+    });
+
+    console.log('✅ Message sent to server');
 
     setNewMessage("")
   }
@@ -677,6 +798,21 @@ export default function DeliveryHome() {
           // Join delivery room with current delivery partner's ID
           socket.emit('join-delivery', deliveryPartnerId.toString())
           console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
+          
+          // CRITICAL: Also join order room to receive messages from user
+          // Join with both orderId formats (ORD-xxx and MongoDB _id) for compatibility
+          const orderIdString = selectedRestaurant.orderId || orderId
+          const orderMongoId = selectedRestaurant._id || orderId
+          
+          if (orderIdString) {
+            socket.emit('join-order-room', orderIdString)
+            console.log('✅ Joined order room with orderId string:', orderIdString)
+          }
+          
+          if (orderMongoId && orderMongoId !== orderIdString) {
+            socket.emit('join-order-room', orderMongoId)
+            console.log('✅ Also joined order room with MongoDB _id:', orderMongoId)
+          }
         })
 
         // Single message handler to avoid duplicates
@@ -2227,15 +2363,45 @@ export default function DeliveryHome() {
 
         // Always update bike marker with latest smoothed location
         // CRITICAL: Only update marker position, don't move map if user is panning (production stability)
+        // CRITICAL: NO BLINKING - stability is key, bike should face direction of travel
         if (window.deliveryMapInstance) {
           if (bikeMarkerRef.current) {
-            // Marker exists - animate smoothly to new position
-            // Don't center map if user is panning
-            animateMarkerSmoothly(bikeMarkerRef.current, newSmoothedLocation, 1500, markerAnimationRef)
+            // Marker exists - animate smoothly to new position with rotation
+            // Calculate bearing for marker rotation - bike should face direction of travel (mub/mouth in travel direction)
+            const currentPos = bikeMarkerRef.current.getPosition();
+            if (currentPos) {
+              const prevLat = currentPos.lat();
+              const prevLng = currentPos.lng();
+              
+              // CRITICAL: Calculate bearing from previous to current position
+              // This ensures bike faces the direction user is moving (mub/mouth in travel direction)
+              const calculatedBearing = calculateBearing(prevLat, prevLng, smoothedLat, smoothedLng);
+              
+              // CRITICAL: Ensure NO animation is set (no blinking) - stability is key
+              bikeMarkerRef.current.setAnimation(null);
+              
+              // Animate marker with rotation update
+              // Make getRotatedBikeIcon available globally for animation function
+              if (!window.getRotatedBikeIcon && typeof getRotatedBikeIcon === 'function') {
+                window.getRotatedBikeIcon = getRotatedBikeIcon;
+              }
+              
+              animateMarkerSmoothlyWithRotation(
+                bikeMarkerRef.current, 
+                newSmoothedLocation, 
+                calculatedBearing,
+                1500, 
+                markerAnimationRef
+              );
+            } else {
+              // No previous position, just animate to new position
+              bikeMarkerRef.current.setAnimation(null); // Ensure no animation
+              animateMarkerSmoothly(bikeMarkerRef.current, newSmoothedLocation, 1500, markerAnimationRef);
+            }
           } else {
-            // Marker doesn't exist yet, create it immediately with correct location
+            // Marker doesn't exist yet, create it immediately with correct location and heading
             // Only center map if user is not panning
-            console.log('📍 Creating bike marker with smoothed location:', { lat: smoothedLat, lng: smoothedLng })
+            console.log('📍 Creating bike marker with smoothed location:', { lat: smoothedLat, lng: smoothedLng, heading })
             createOrUpdateBikeMarker(smoothedLat, smoothedLng, heading, !isUserPanningRef.current)
           }
         }
@@ -4220,6 +4386,66 @@ export default function DeliveryHome() {
                       if (liveTrackingPolylineShadowRef.current) {
                         liveTrackingPolylineShadowRef.current.setMap(null);
                         liveTrackingPolylineShadowRef.current = null;
+                      }
+
+                      // ============================================
+                      // SMOOTH CAMERA TRANSITION: Restaurant → Customer
+                      // ============================================
+                      // When order is picked up, smoothly transition camera and marker towards customer
+                      if (window.deliveryMapInstance && customerLat && customerLng && bikeMarkerRef.current) {
+                        const customerPosition = new window.google.maps.LatLng(customerLat, customerLng);
+                        const currentMarkerPos = bikeMarkerRef.current.getPosition();
+                        
+                        if (currentMarkerPos) {
+                          // Calculate bearing from current position to customer
+                          const bearingToCustomer = calculateBearing(
+                            currentMarkerPos.lat(),
+                            currentMarkerPos.lng(),
+                            customerLat,
+                            customerLng
+                          );
+
+                          // Smoothly pan camera to show route to customer
+                          // Use panTo for smooth animation (Google Maps native animation)
+                          window.deliveryMapInstance.panTo(customerPosition);
+                          
+                          // Update marker rotation to face customer direction
+                          // CRITICAL: Bike should face the direction of travel (mub/mouth in travel direction)
+                          // Ensure NO animation (no blinking) - stability is key
+                          if (bikeMarkerRef.current) {
+                            bikeMarkerRef.current.setAnimation(null); // Remove any animation
+                          }
+                          
+                          getRotatedBikeIcon(bearingToCustomer).then(rotatedIconUrl => {
+                            if (bikeMarkerRef.current) {
+                              const currentIcon = bikeMarkerRef.current.getIcon();
+                              bikeMarkerRef.current.setIcon({
+                                url: rotatedIconUrl,
+                                scaledSize: currentIcon?.scaledSize || new window.google.maps.Size(60, 60),
+                                anchor: currentIcon?.anchor || new window.google.maps.Point(30, 30)
+                              });
+                              // Ensure NO animation is set after icon update
+                              bikeMarkerRef.current.setAnimation(null);
+                              console.log('🔄 Marker rotated to face customer direction (stable, no blinking):', { bearing: bearingToCustomer });
+                            }
+                          }).catch(err => {
+                            console.warn('⚠️ Error rotating marker to customer:', err);
+                          });
+
+                          // Fit bounds to show both driver and customer with padding
+                          const bounds = new window.google.maps.LatLngBounds();
+                          bounds.extend(currentMarkerPos);
+                          bounds.extend(customerPosition);
+                          window.deliveryMapInstance.fitBounds(bounds, {
+                            padding: { top: 100, right: 100, bottom: 100, left: 100 }
+                          });
+
+                          console.log('📹 Camera smoothly transitioned to customer route:', {
+                            from: { lat: currentMarkerPos.lat(), lng: currentMarkerPos.lng() },
+                            to: { lat: customerLat, lng: customerLng },
+                            bearing: bearingToCustomer
+                          });
+                        }
                       }
 
                       // Clear old DirectionsRenderer if it exists
@@ -6649,8 +6875,11 @@ export default function DeliveryHome() {
   }, [showOrderDeliveredAnimation]);
 
   /**
-   * Update live tracking polyline - Shows full route from delivery boy to restaurant/customer
-   * Only shows when location icon is clicked (shouldShowPolyline flag)
+   * Update live tracking polyline with dynamic trimming and pickup state management
+   * Features:
+   * 1. Dynamic Polyline Trimming - Removes points driver has already crossed
+   * 2. State Management - Handles ACCEPTED vs PICKED_UP to switch routes
+   * 3. Marker Rotation - Updates based on bearing calculation
    * @param {Object} directionsResult - Google Maps DirectionsResult
    * @param {Array} riderPosition - [lat, lng] Current rider position
    */
@@ -6670,8 +6899,31 @@ export default function DeliveryHome() {
       }
     }
 
+    // ============================================
+    // STATE MANAGEMENT: Pickup Logic
+    // ============================================
+    // Determine order status: ACCEPTED vs PICKED_UP
+    const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
+    const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
+    const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
+    
+    // Check if order is picked up
+    const isPickedUp = orderStatus === 'picked_up' ||
+      orderStatus === 'out_for_delivery' ||
+      deliveryPhase === 'picked_up' ||
+      deliveryPhase === 'en_route_to_delivery' ||
+      deliveryPhase === 'at_delivery' ||
+      deliveryStateStatus === 'picked_up' ||
+      deliveryStateStatus === 'en_route_to_delivery';
+    
+    // Check if order is accepted (but not picked up yet)
+    const isAccepted = (orderStatus === 'accepted' ||
+      deliveryStateStatus === 'accepted' ||
+      deliveryPhase === 'en_route_to_pickup' ||
+      deliveryPhase === 'at_pickup' ||
+      (selectedRestaurant?.acceptedAt)) && !isPickedUp;
+
     // Also check if order is in delivery phase (en_route_to_delivery) - show polyline automatically
-    // Check both state and localStorage for delivery phase
     const isEnRouteToDelivery = selectedRestaurant?.deliveryPhase === 'en_route_to_delivery' ||
       selectedRestaurant?.deliveryState?.currentPhase === 'en_route_to_delivery' ||
       selectedRestaurant?.orderStatus === 'out_for_delivery' ||
@@ -6679,7 +6931,6 @@ export default function DeliveryHome() {
       deliveryPhaseFromStorage === 'en_route_to_delivery';
 
     // Show polyline if location icon was clicked OR order is en_route_to_delivery
-    // Also show if we have a valid directions result (for customer route after pickup)
     const hasValidDirections = directionsResult && directionsResult.routes && directionsResult.routes.length > 0;
     let navigationMode = 'restaurant';
     if (activeOrderData) {
@@ -6692,11 +6943,7 @@ export default function DeliveryHome() {
     }
 
     // CRITICAL: Show polyline if ANY of these conditions are met:
-    // 1. Location icon was clicked (shouldShowPolyline)
-    // 2. Order is en_route_to_delivery (after pickup)
-    // 3. Navigation mode is customer (route to customer)
-    // 4. Valid directions result exists (route calculated)
-    const shouldShow = (shouldShowPolyline || isEnRouteToDelivery || navigationMode === 'customer') && hasValidDirections;
+    const shouldShow = (shouldShowPolyline || isEnRouteToDelivery || navigationMode === 'customer' || isAccepted || isPickedUp) && hasValidDirections;
 
     if (shouldShow) {
       if (shouldShowPolyline) {
@@ -6705,6 +6952,10 @@ export default function DeliveryHome() {
         console.log('✅ Showing polyline automatically - order is en_route_to_delivery (AFTER PICKUP)');
       } else if (navigationMode === 'customer') {
         console.log('✅ Showing polyline - valid customer route detected');
+      } else if (isPickedUp) {
+        console.log('✅ Showing polyline - order picked up (Restaurant → Customer)');
+      } else if (isAccepted) {
+        console.log('✅ Showing polyline - order accepted (Driver → Restaurant)');
       }
     } else {
       console.log('🚫 Polyline not shown - conditions not met', {
@@ -6712,6 +6963,8 @@ export default function DeliveryHome() {
         isEnRouteToDelivery,
         hasValidDirections,
         navigationMode,
+        isAccepted,
+        isPickedUp,
         deliveryPhase: selectedRestaurant?.deliveryPhase,
         deliveryPhaseFromStorage,
         orderStatus: selectedRestaurant?.orderStatus,
@@ -6721,9 +6974,6 @@ export default function DeliveryHome() {
     }
 
     // Check if order is delivered - don't show polyline for delivered orders
-    // BUT: Only check if we're actually trying to show a polyline (not just clearing)
-    const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
-    const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
     const isDelivered = orderStatus === 'delivered' || orderStatus === 'completed' ||
       deliveryPhase === 'delivered' || deliveryPhase === 'completed';
 
@@ -6775,12 +7025,60 @@ export default function DeliveryHome() {
         return;
       }
 
-      // Convert to Google Maps LatLng array
-      // CRITICAL: Show full route end-to-end from delivery boy to destination (restaurant or customer)
-      const path = polylinePoints.map(point => ({
+      // Store full polyline for reference
+      fullRoutePolylineRef.current = polylinePoints;
+
+      // ============================================
+      // DYNAMIC POLYLINE TRIMMING
+      // ============================================
+      // Get driver's current location
+      let driverLocation = null;
+      if (riderPosition && Array.isArray(riderPosition) && riderPosition.length >= 2) {
+        driverLocation = { lat: riderPosition[0], lng: riderPosition[1] };
+      } else if (riderLocation && Array.isArray(riderLocation) && riderLocation.length >= 2) {
+        driverLocation = { lat: riderLocation[0], lng: riderLocation[1] };
+      } else if (smoothedLocationRef.current && Array.isArray(smoothedLocationRef.current) && smoothedLocationRef.current.length >= 2) {
+        driverLocation = { lat: smoothedLocationRef.current[0], lng: smoothedLocationRef.current[1] };
+      }
+
+      let trimmedPath = polylinePoints.map(point => ({
         lat: point.lat,
         lng: point.lng
       }));
+
+      // If driver location is available, trim polyline to remove points behind driver
+      if (driverLocation && trimmedPath.length > 1) {
+        try {
+          // Find nearest point on polyline to driver's current location
+          const nearestPointResult = findNearestPointOnPolyline(trimmedPath, driverLocation);
+          const { segmentIndex, nearestPoint } = nearestPointResult;
+
+          console.log('📍 Nearest point on polyline:', {
+            segmentIndex,
+            nearestPoint,
+            distance: nearestPointResult.distance,
+            driverLocation
+          });
+
+          // Trim polyline: keep only from nearest point onwards
+          // This removes all points that driver has already crossed
+          const trimmedPolyline = trimPolylineBehindRider(trimmedPath, nearestPoint, segmentIndex);
+          
+          if (trimmedPolyline && trimmedPolyline.length > 0) {
+            trimmedPath = trimmedPolyline;
+            console.log('✂️ Polyline trimmed:', {
+              originalPoints: polylinePoints.length,
+              trimmedPoints: trimmedPath.length,
+              removedPoints: polylinePoints.length - trimmedPath.length
+            });
+          } else {
+            console.warn('⚠️ Trimmed polyline is empty, using full path');
+          }
+        } catch (trimError) {
+          console.error('❌ Error trimming polyline:', trimError);
+          // Fallback to full path if trimming fails
+        }
+      }
 
       // Get navigation mode for logging
       let navMode = 'unknown';
@@ -6793,12 +7091,12 @@ export default function DeliveryHome() {
         }
       }
 
-      console.log('📍 Polyline path created (end-to-end):', {
-        totalPoints: path.length,
-        startPoint: path[0],
-        endPoint: path[path.length - 1],
+      console.log('📍 Polyline path (with trimming):', {
+        totalPoints: trimmedPath.length,
+        startPoint: trimmedPath[0],
+        endPoint: trimmedPath[trimmedPath.length - 1],
         navigationMode: navMode,
-        routeType: navMode === 'customer' ? 'Delivery Boy → Customer' : 'Delivery Boy → Restaurant',
+        orderStatus: isPickedUp ? 'PICKED_UP (Restaurant → Customer)' : isAccepted ? 'ACCEPTED (Driver → Restaurant)' : 'Unknown',
         mapReady: !!window.deliveryMapInstance
       });
 
@@ -6815,7 +7113,7 @@ export default function DeliveryHome() {
       // Create shadow polyline (outline) for better visibility (Zomato/Rapido style)
       try {
         liveTrackingPolylineShadowRef.current = new window.google.maps.Polyline({
-          path: path,
+          path: trimmedPath,
           geodesic: true,
           strokeColor: '#FFFFFF', // White shadow
           strokeOpacity: 0.8,
@@ -6837,10 +7135,10 @@ export default function DeliveryHome() {
         console.error('❌ Error creating shadow polyline:', shadowError);
       }
 
-      // Create main polyline (colored route)
+      // Create main polyline (colored route) with trimmed path
       try {
         liveTrackingPolylineRef.current = new window.google.maps.Polyline({
-          path: path,
+          path: trimmedPath,
           geodesic: true,
           strokeColor: '#10b981', // Green color for route
           strokeOpacity: 0.9,
@@ -6853,11 +7151,11 @@ export default function DeliveryHome() {
         // Verify polyline is on map
         const polylineMap = liveTrackingPolylineRef.current.getMap();
         if (polylineMap) {
-          console.log('✅ Main polyline created and displayed on map');
+          console.log('✅ Main polyline created and displayed on map (trimmed)');
           console.log('📍 Polyline details:', {
-            pathLength: path.length,
-            firstPoint: path[0],
-            lastPoint: path[path.length - 1],
+            pathLength: trimmedPath.length,
+            firstPoint: trimmedPath[0],
+            lastPoint: trimmedPath[trimmedPath.length - 1],
             strokeColor: '#10b981',
             strokeWeight: 5,
             zIndex: window.google.maps.Marker.MAX_ZINDEX + 10,
@@ -6887,7 +7185,7 @@ export default function DeliveryHome() {
                 selectedRestaurant?.orderStatus === 'out_for_delivery';
 
               // Only re-add if polyline should be visible AND it was actually removed (not just not created yet)
-              if ((shouldShowPolyline || isEnRouteToDelivery) && liveTrackingPolylineRef.current && window.deliveryMapInstance) {
+              if ((shouldShowPolyline || isEnRouteToDelivery || isAccepted || isPickedUp) && liveTrackingPolylineRef.current && window.deliveryMapInstance) {
                 console.warn('⚠️ Polyline was removed from map! Re-adding...');
                 liveTrackingPolylineRef.current.setMap(window.deliveryMapInstance);
                 if (liveTrackingPolylineShadowRef.current) {
@@ -6928,17 +7226,17 @@ export default function DeliveryHome() {
         }
       }
 
-      console.log('✅ Polyline updated - showing FULL end-to-end route from delivery boy to destination');
-      console.log('📍 Full route displayed:', {
-        totalPoints: path.length,
-        from: path[0],
-        to: path[path.length - 1]
+      console.log('✅ Polyline updated with dynamic trimming:', {
+        totalPoints: trimmedPath.length,
+        from: trimmedPath[0],
+        to: trimmedPath[trimmedPath.length - 1],
+        orderStatus: isPickedUp ? 'PICKED_UP' : isAccepted ? 'ACCEPTED' : 'Unknown'
       });
       setShowRoutePath(true);
     } catch (error) {
       console.error('❌ Error updating live tracking polyline:', error);
     }
-  }, [selectedRestaurant, isOrderDelivered]);
+  }, [selectedRestaurant, isOrderDelivered, riderLocation]);
 
   /**
    * Smoothly animate rider marker to new position with rotation
@@ -9986,14 +10284,15 @@ export default function DeliveryHome() {
         map: map,
         icon: bikeIcon,
         optimized: false, // Disable optimization for exact positioning
-        animation: window.google.maps.Animation.DROP, // Drop animation on first appearance
+        animation: null, // NO ANIMATION - stability is key, no blinking
         zIndex: 1000 // High z-index to ensure it's above other markers
       });
 
-      console.log('✅ Bike marker created:', {
+      console.log('✅ Bike marker created (stable, no animation):', {
         position: { lat: latitude, lng: longitude },
         map: map,
         iconUrl: rotatedIconUrl,
+        heading: heading || 0,
         marker: bikeMarkerRef.current
       });
 
@@ -10031,13 +10330,6 @@ export default function DeliveryHome() {
         }
         // Otherwise preserve user's zoom level
       }
-
-      // Remove animation after drop completes
-      setTimeout(() => {
-        if (bikeMarkerRef.current) {
-          bikeMarkerRef.current.setAnimation(null);
-        }
-      }, 2000);
     } else {
       // ALWAYS ensure marker is on the map (prevent it from disappearing)
       const currentMap = bikeMarkerRef.current.getMap();
@@ -10072,6 +10364,7 @@ export default function DeliveryHome() {
       }
 
       // Update icon with rotation for smooth movement
+      // CRITICAL: Bike should face the direction of travel (mub/mouth in direction user is going)
       const currentHeading = heading !== null && heading !== undefined ? heading : 0;
       const rotatedIconUrl = await getRotatedBikeIcon(currentHeading);
       const bikeIcon = {
@@ -10080,6 +10373,9 @@ export default function DeliveryHome() {
         anchor: new window.google.maps.Point(30, 30)
       };
       bikeMarkerRef.current.setIcon(bikeIcon);
+
+      // CRITICAL: Ensure NO animation is set (stability - no blinking)
+      bikeMarkerRef.current.setAnimation(null);
 
       // Ensure z-index is high
       bikeMarkerRef.current.setZIndex(1000);
@@ -10148,7 +10444,7 @@ export default function DeliveryHome() {
       deliveryPhase === 'at_pickup' ||
       deliveryPhase === 'en_route_to_delivery' ||
       deliveryPhase === 'picked_up' ||
-      selectedRestaurant.acceptedAt // If acceptedAt timestamp exists
+      selectedRestaurant?.acceptedAt // If acceptedAt timestamp exists
 
     if (!isOrderAccepted) {
       console.log('🚫 Order not accepted yet, clearing route polyline')
@@ -12988,12 +13284,34 @@ export default function DeliveryHome() {
             <div ref={chatMessagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0a0a]">
+          {/* Input Area - Always visible when focused */}
+          <div 
+            ref={chatInputContainerRef}
+            className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0a0a] sticky bottom-0 z-10"
+          >
             <div className="flex items-end gap-2">
               <Textarea
+                ref={chatInputRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                onFocus={(e) => {
+                  // Ensure input is visible when keyboard appears
+                  setTimeout(() => {
+                    if (chatInputContainerRef.current) {
+                      chatInputContainerRef.current.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'end',
+                        inline: 'nearest'
+                      });
+                    }
+                    // Also scroll the input itself into view
+                    e.target.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+                  }, 300); // Delay to account for keyboard animation
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -13001,7 +13319,7 @@ export default function DeliveryHome() {
                   }
                 }}
                 placeholder="Type a message..."
-                className="flex-1 min-h-[44px] max-h-32 resize-none border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500"
+                className="flex-1 min-h-[44px] max-h-32 resize-none border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 rounded-lg"
                 rows={1}
               />
               <button

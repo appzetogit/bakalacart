@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'sonner';
 
 const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart }) => {
   const { addToCart } = useCart();
+  const modalContainerRef = useRef(null);
 
   // --- STATE MANAGEMENT ---
   const [quantity, setQuantity] = useState(1);
@@ -37,13 +38,16 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
     if (isOpen) {
       // Save current scroll position
       const scrollY = window.scrollY;
-      // Disable body scroll
+      // Disable body scroll and prevent any movement
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
       document.body.style.left = '0';
       document.body.style.right = '0';
+      document.body.style.height = '100vh';
+      // Prevent any touch scrolling
+      document.body.style.touchAction = 'none';
 
       // Reset modal content scroll to top when opening
       const modalContent = document.querySelector('[data-modal-content]');
@@ -51,7 +55,53 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         modalContent.scrollTop = 0;
       }
 
+      // Ensure modal container stays centered but slightly lower (45% from top instead of 50%)
+      const maintainPosition = () => {
+        if (modalContainerRef.current) {
+          modalContainerRef.current.style.position = 'fixed';
+          modalContainerRef.current.style.top = '45%';
+          modalContainerRef.current.style.left = '50%';
+          modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
+          modalContainerRef.current.style.margin = '0';
+        }
+      };
+      
+      // Set position immediately
+      maintainPosition();
+      
+      // Set up interval to maintain position (in case something tries to move it)
+      // Use shorter interval for more responsive position locking
+      const positionCheckInterval = setInterval(() => {
+        maintainPosition();
+        // Also check if position changed and force it back
+        if (modalContainerRef.current) {
+          const rect = modalContainerRef.current.getBoundingClientRect();
+          const viewportCenterX = window.innerWidth / 2;
+          const viewportCenterY = window.innerHeight / 2;
+          const currentCenterX = rect.left + rect.width / 2;
+          const currentCenterY = rect.top + rect.height / 2;
+          
+          // If modal is more than 10px off center, force it back
+          if (Math.abs(currentCenterX - viewportCenterX) > 10 || 
+              Math.abs(currentCenterY - viewportCenterY) > 10) {
+            maintainPosition();
+          }
+        }
+      }, 50); // Check every 50ms for more responsive locking
+      
+      // Also maintain position on scroll/resize/touch events
+      const handleScroll = () => maintainPosition();
+      const handleResize = () => maintainPosition();
+      const handleTouchMove = () => maintainPosition();
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('touchmove', handleTouchMove, { passive: true });
+      
       return () => {
+        clearInterval(positionCheckInterval);
+        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('touchmove', handleTouchMove);
         // Re-enable body scroll when modal closes
         document.body.style.position = '';
         document.body.style.top = '';
@@ -59,6 +109,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         document.body.style.overflow = '';
         document.body.style.left = '';
         document.body.style.right = '';
+        document.body.style.height = '';
+        document.body.style.touchAction = '';
         // Restore scroll position
         window.scrollTo(0, scrollY);
       };
@@ -93,6 +145,14 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
     if (!selectedVariant && variants.length > 0) {
       toast.error('Please select a variant');
       return;
+    }
+
+    // Ensure modal stays centered before adding to cart
+    if (modalContainerRef.current) {
+      modalContainerRef.current.style.position = 'fixed';
+      modalContainerRef.current.style.top = '45%';
+      modalContainerRef.current.style.left = '50%';
+      modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
     }
 
     // Create unique ID for cart item that includes variant
@@ -134,6 +194,14 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       toast.success(`${quantity} ${displayName} added to cart`);
     }
 
+    // Ensure modal stays centered (slightly lower) before closing
+    if (modalContainerRef.current) {
+      modalContainerRef.current.style.position = 'fixed';
+      modalContainerRef.current.style.top = '45%';
+      modalContainerRef.current.style.left = '50%';
+      modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
+    }
+
     onClose();
   };
 
@@ -161,7 +229,10 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem'
+        padding: '1rem',
+        // Ensure backdrop stays in place
+        transform: 'translateZ(0)',
+        willChange: 'auto'
       }}
       onClick={(e) => {
         // Close modal when clicking on backdrop
@@ -170,23 +241,44 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         }
       }}
     >
-      {/* Mobile Container - Perfectly Centered */}
+      {/* Mobile Container - Perfectly Centered and Sticky */}
       <div
+        ref={modalContainerRef}
         className="bg-white shadow-xl overflow-hidden flex flex-col rounded-xl"
         data-modal-container
         style={{
-          position: 'relative',
-          width: '100%',
+          position: 'fixed',
+          top: '45%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'calc(100% - 2rem)',
           maxWidth: '400px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 10000,
-          margin: '0 auto',
-          alignSelf: 'center',
-          flexShrink: 0
+          margin: 0,
+          flexShrink: 0,
+          // Ensure modal stays centered and doesn't move
+          willChange: 'auto',
+          // Prevent any position changes
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          // Lock position
+          pointerEvents: 'auto',
+          // Prevent any transforms from other sources
+          isolation: 'isolate'
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          // Ensure position is maintained on any click
+          if (modalContainerRef.current) {
+            modalContainerRef.current.style.position = 'fixed';
+            modalContainerRef.current.style.top = '45%';
+            modalContainerRef.current.style.left = '50%';
+            modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
+          }
+        }}
       >
 
         {/* --- HEADER --- */}
@@ -220,7 +312,24 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto pb-24" data-modal-content>
+        <div 
+          className="flex-1 overflow-y-auto pb-24" 
+          data-modal-content
+          style={{
+            // Prevent scroll from affecting modal position
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch'
+          }}
+          onScroll={(e) => {
+            // Ensure modal container stays centered even during scroll
+            const modalContainer = document.querySelector('[data-modal-container]');
+            if (modalContainer) {
+              modalContainer.style.top = '45%';
+              modalContainer.style.left = '50%';
+              modalContainer.style.transform = 'translate(-50%, -50%)';
+            }
+          }}
+        >
 
           {/* Section 1: Quantity / Variants */}
           {variants.length > 0 && (

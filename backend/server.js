@@ -301,6 +301,16 @@ deliveryNamespace.on('connection', (socket) => {
     }
   });
 
+  // Delivery boy joins order room to receive messages from user
+  socket.on('join-order-room', (orderId) => {
+    if (orderId) {
+      const room = `order:${orderId}`;
+      socket.join(room);
+      console.log(`🚴 Delivery partner joined order room: ${room}`);
+      console.log(`🚴 Total sockets in order room ${room}:`, deliveryNamespace.adapter.rooms.get(room)?.size || 0);
+    }
+  });
+
   // Handle chat messages from Delivery Partner
   socket.on('send-chat-message', async (data) => {
     // data: { orderId, message }
@@ -352,22 +362,34 @@ deliveryNamespace.on('connection', (socket) => {
         originalOrderId: orderId
       });
 
-      // Emit to orderId string room (ORD-xxx format)
+      // Emit to orderId string room (ORD-xxx format) - User will receive here
       if (orderIdString) {
         io.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
-        console.log(`✅ Emitted to order:${orderIdString} room`);
+        console.log(`✅ Emitted to order:${orderIdString} room (user namespace)`);
+        
+        // Also emit to delivery namespace order room (delivery boy might be in this room)
+        deliveryNamespace.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderIdString} room (delivery namespace)`);
       }
 
       // Also emit to MongoDB _id room if different
       if (orderMongoId && orderMongoId !== orderIdString) {
         io.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
-        console.log(`✅ Also emitted to order:${orderMongoId} room`);
+        console.log(`✅ Also emitted to order:${orderMongoId} room (user namespace)`);
+        
+        // Also emit to delivery namespace order room
+        deliveryNamespace.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderMongoId} room (delivery namespace)`);
       }
 
       // Also emit to original orderId room (in case it's different from both)
       if (orderId && orderId !== orderIdString && orderId !== orderMongoId) {
         io.to(`order:${orderId}`).emit('receive-chat-message', messageData);
-        console.log(`✅ Also emitted to order:${orderId} room (original)`);
+        console.log(`✅ Also emitted to order:${orderId} room (original, user namespace)`);
+        
+        // Also emit to delivery namespace order room
+        deliveryNamespace.to(`order:${orderId}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderId} room (original, delivery namespace)`);
       }
 
       // 2. Emit back to Delivery Partner (in case they have multiple devices or just for confirmation)
@@ -811,12 +833,27 @@ io.on('connection', (socket) => {
       const roomSize = deliveryNamespace.adapter.rooms.get(room)?.size || 0;
       console.log(`📊 Room ${room} has ${roomSize} socket(s) before emitting`);
 
+      // Emit to delivery partner's personal room
       deliveryNamespace.to(room).emit('chat-message', messageData);
       console.log(`✅ Emitted 'chat-message' to room ${room}:`, messageData);
 
       // Also emit to receive-chat-message event for compatibility
       deliveryNamespace.to(room).emit('receive-chat-message', messageData);
       console.log(`✅ Emitted 'receive-chat-message' to room ${room}`);
+
+      // CRITICAL: Also emit to order room (delivery boy might be listening there)
+      const orderIdString = order.orderId || orderId;
+      const orderMongoId = order._id ? order._id.toString() : (orderId && mongoose.Types.ObjectId.isValid(orderId) ? orderId : null);
+      
+      if (orderIdString) {
+        deliveryNamespace.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderIdString} room (delivery namespace)`);
+      }
+      
+      if (orderMongoId && orderMongoId !== orderIdString) {
+        deliveryNamespace.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
+        console.log(`✅ Also emitted to order:${orderMongoId} room (delivery namespace)`);
+      }
 
       // Also try ObjectId format if different (for compatibility)
       if (mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {

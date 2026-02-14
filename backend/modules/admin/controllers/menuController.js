@@ -81,6 +81,28 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
         // Find existing item to preserve approval status and other fields
         const existingItem = existingSection?.items?.find(i => String(i.id) === String(item.id));
         
+        // Check if variations is explicitly provided (even if empty array)
+        // If item.variations is explicitly provided (not undefined), use it (even if empty)
+        // Otherwise, preserve existing variations
+        let variations = [];
+        if (item.variations !== undefined) {
+          // Variations field is explicitly provided - use it (even if empty array)
+          if (Array.isArray(item.variations) && item.variations.length > 0) {
+            variations = item.variations.map(v => ({
+              id: String(v.id || Date.now() + Math.random()),
+              name: v.name || "",
+              price: v.price || 0,
+              stock: v.stock || "Unlimited",
+            }));
+          } else {
+            // Explicitly empty array - clear variations
+            variations = [];
+          }
+        } else {
+          // Variations not provided - preserve existing
+          variations = existingItem?.variations || [];
+        }
+        
         return {
           id: String(item.id || Date.now() + Math.random()),
           name: item.name || "Unnamed Item",
@@ -101,14 +123,7 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
           discountAmount: item.discountAmount ?? existingItem?.discountAmount ?? 0.0,
           isAvailable: item.isAvailable !== undefined ? item.isAvailable : (existingItem?.isAvailable !== undefined ? existingItem.isAvailable : true),
           isRecommended: item.isRecommended !== undefined ? item.isRecommended : (existingItem?.isRecommended || false),
-          variations: Array.isArray(item.variations) && item.variations.length > 0 
-            ? item.variations.map(v => ({
-                id: String(v.id || Date.now() + Math.random()),
-                name: v.name || "",
-                price: v.price || 0,
-                stock: v.stock || "Unlimited",
-              }))
-            : (existingItem?.variations || []),
+          variations: variations,
           tags: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : (existingItem?.tags || []),
           nutrition: Array.isArray(item.nutrition) && item.nutrition.length > 0 ? item.nutrition : (existingItem?.nutrition || []),
           allergies: Array.isArray(item.allergies) && item.allergies.length > 0 ? item.allergies : (existingItem?.allergies || []),
@@ -155,6 +170,28 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
             // Find existing item
             const existingItem = existingSubsection?.items?.find(i => String(i.id) === String(item.id));
             
+            // Check if variations is explicitly provided (even if empty array)
+            // If item.variations is explicitly provided (not undefined), use it (even if empty)
+            // Otherwise, preserve existing variations
+            let variations = [];
+            if (item.variations !== undefined) {
+              // Variations field is explicitly provided - use it (even if empty array)
+              if (Array.isArray(item.variations) && item.variations.length > 0) {
+                variations = item.variations.map(v => ({
+                  id: String(v.id || Date.now() + Math.random()),
+                  name: v.name || "",
+                  price: v.price || 0,
+                  stock: v.stock || "Unlimited",
+                }));
+              } else {
+                // Explicitly empty array - clear variations
+                variations = [];
+              }
+            } else {
+              // Variations not provided - preserve existing
+              variations = existingItem?.variations || [];
+            }
+            
             return {
               id: String(item.id || Date.now() + Math.random()),
               name: item.name || "Unnamed Item",
@@ -175,14 +212,7 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
               discountAmount: item.discountAmount ?? existingItem?.discountAmount ?? 0.0,
               isAvailable: item.isAvailable !== undefined ? item.isAvailable : (existingItem?.isAvailable !== undefined ? existingItem.isAvailable : true),
               isRecommended: item.isRecommended !== undefined ? item.isRecommended : (existingItem?.isRecommended || false),
-              variations: Array.isArray(item.variations) && item.variations.length > 0 
-                ? item.variations.map(v => ({
-                    id: String(v.id || Date.now() + Math.random()),
-                    name: v.name || "",
-                    price: v.price || 0,
-                    stock: v.stock || "Unlimited",
-                  }))
-                : (existingItem?.variations || []),
+              variations: variations,
               tags: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : (existingItem?.tags || []),
               nutrition: Array.isArray(item.nutrition) && item.nutrition.length > 0 ? item.nutrition : (existingItem?.nutrition || []),
               allergies: Array.isArray(item.allergies) && item.allergies.length > 0 ? item.allergies : (existingItem?.allergies || []),
