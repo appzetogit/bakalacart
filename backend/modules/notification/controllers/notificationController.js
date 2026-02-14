@@ -15,6 +15,15 @@ import { cloudinary } from '../../../config/cloudinary.js';
 export const sendAdminNotification = asyncHandler(async (req, res) => {
     try {
         const { title, description, sendTo, zone, image } = req.body;
+        console.log(`🔔 [Admin Notification] Request:`, { title, sendTo, zone });
+
+        // Debug: Check total counts visible to this controller
+        try {
+            const count = await Delivery.countDocuments();
+            console.log(`🔍 [Admin Notification] Total Delivery docs in DB: ${count}`);
+        } catch (e) {
+            console.error(`❌ [Admin Notification] Error counting docs:`, e);
+        }
 
         if (!title || !description || !sendTo) {
             return errorResponse(res, 400, 'Title, description and target (sendTo) are required');
@@ -113,6 +122,13 @@ export const sendAdminNotification = asyncHandler(async (req, res) => {
                         }
                     }
                 }).select('name fcmTokens fcmTokenMobile');
+
+                // Fallback: If no delivery partners found in zone (common in testing if location is missing), fetch ALL
+                if (deliveryPartners.length === 0 && deliveryUsers.length === 0) {
+                    console.log(`⚠️ [Admin Notification] No delivery partners found in zone '${zoneModel.name}'. Falling back to ALL delivery partners.`);
+                    deliveryPartners = await Delivery.find({}).select('name fcmTokens fcmTokenMobile');
+                    deliveryUsers = await User.find({ role: 'delivery' }).select('name fcmTokens fcmTokenMobile');
+                }
             } else {
                 deliveryPartners = await Delivery.find({}).select('name fcmTokens fcmTokenMobile');
                 deliveryUsers = await User.find({ role: 'delivery' }).select('name fcmTokens fcmTokenMobile');

@@ -1178,6 +1178,64 @@ export default function Cart() {
     navigate(`/user/orders/${placedOrderId}?confirmed=true`)
   }
 
+  // Handle share click
+  const handleShare = async () => {
+    // Determine share URL - prefer restaurant detail page if restaurant data is available
+    const shareUrl = restaurantData?.slug
+      ? `${window.location.origin}/user/restaurants/${restaurantData.slug}`
+      : window.location.origin
+
+    const shareText = restaurantName
+      ? `Check out ${restaurantName} on Bakala Cart! ${shareUrl}`
+      : `Check out Bakala Cart for amazing food! ${shareUrl}`
+
+    const shareData = {
+      title: 'Bakala Cart',
+      text: shareText,
+      url: shareUrl,
+    }
+
+    // Try Web Share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+        toast.success("Shared successfully")
+      } catch (error) {
+        // User cancelled or error occurred
+        if (error.name !== "AbortError") {
+          // Fallback to copy to clipboard for genuine errors
+          await copyToClipboard(shareUrl)
+        }
+      }
+    } else {
+      // Fallback to copy to clipboard for unsupported browsers
+      await copyToClipboard(shareUrl)
+    }
+  }
+
+  // Copy to clipboard helper
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Link copied to clipboard!")
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = text
+      textArea.style.position = "fixed"
+      textArea.style.opacity = "0"
+      document.body.appendChild(textArea)
+      textArea.select()
+      try {
+        document.execCommand("copy")
+        toast.success("Link copied to clipboard!")
+      } catch (err) {
+        toast.error("Failed to copy link")
+      }
+      document.body.removeChild(textArea)
+    }
+  }
+
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
     return (
@@ -1226,7 +1284,12 @@ export default function Cart() {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0"
+              onClick={handleShare}
+            >
               <Share2 className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </div>
@@ -1234,7 +1297,7 @@ export default function Cart() {
       </div>
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-40 md:pb-48">
         {/* Savings Banner */}
         {savings > 0 && (
           <div className="bg-blue-100 dark:bg-blue-900/20 px-4 md:px-6 py-2 md:py-3 flex-shrink-0">
@@ -1262,7 +1325,17 @@ export default function Cart() {
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">{item.name}</p>
-                        <button className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5 mt-0.5">
+                        <button
+                          onClick={() => {
+                            if (restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId) {
+                              const slug = restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId;
+                              navigate(`/user/restaurants/${slug}`);
+                            } else {
+                              toast.error("Restaurant details not found");
+                            }
+                          }}
+                          className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5 mt-0.5"
+                        >
                           Edit <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
                         </button>
                       </div>
@@ -1557,7 +1630,7 @@ export default function Cart() {
 
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link to="/user/profile" className="flex items-center justify-between">
+                <Link to="/user/profile/edit" className="flex items-center justify-between">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
@@ -1598,7 +1671,7 @@ export default function Cart() {
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">Shipping Charges</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
                         {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>
@@ -1639,7 +1712,7 @@ export default function Cart() {
                       <span className="text-gray-800 dark:text-gray-200">₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                      <span className="text-gray-600 dark:text-gray-400">Shipping Charges</span>
                       <span className={deliveryFee === 0 ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}>
                         {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
                       </span>

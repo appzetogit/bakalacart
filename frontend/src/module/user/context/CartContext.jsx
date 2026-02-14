@@ -59,6 +59,23 @@ export function CartProvider({ children }) {
     }
   }, [cart])
 
+  // Listen for auth changes to sync cart (especially on logout)
+  useEffect(() => {
+    const handleAuthChange = () => {
+      console.log('🔄 Auth changed, syncing cart data...')
+      try {
+        const saved = localStorage.getItem("cart")
+        setCart(saved ? JSON.parse(saved) : [])
+      } catch (error) {
+        console.error('❌ Error syncing cart after auth change:', error)
+        setCart([])
+      }
+    }
+
+    window.addEventListener("userAuthChanged", handleAuthChange)
+    return () => window.removeEventListener("userAuthChanged", handleAuthChange)
+  }, [])
+
   const addToCart = (item, sourcePosition = null) => {
     try {
       setCart((prev) => {

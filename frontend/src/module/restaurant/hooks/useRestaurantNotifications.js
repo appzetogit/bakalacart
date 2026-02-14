@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 import { API_BASE_URL } from '@/lib/api/config';
 import { restaurantAPI } from '@/lib/api';
-import alertSound from '@/assets/audio/alert.mp3';
+import alertSound from '@/assets/audio/restaurant aacept ringtone.mp3';
 
 /**
  * Hook for restaurant to receive real-time order notifications with sound

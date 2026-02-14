@@ -42,6 +42,7 @@ export default function Logout() {
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
+      localStorage.removeItem("cart")
 
       // Clear sessionStorage
       sessionStorage.removeItem("userAuthData")
@@ -61,6 +62,7 @@ export default function Logout() {
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
+      localStorage.removeItem("cart")
       sessionStorage.removeItem("userAuthData")
       window.dispatchEvent(new Event("userAuthChanged"))
 
@@ -113,7 +115,7 @@ export default function Logout() {
                       Before you go
                     </h3>
                     <p className="text-sm md:text-base text-yellow-700 dark:text-yellow-300">
-                      Make sure you've saved any important information. Your cart and preferences will be saved for next time.
+                      For your security, your cart and current session data will be cleared after you log out.
                     </p>
                   </div>
                 </div>

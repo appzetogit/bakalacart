@@ -560,7 +560,7 @@ export default function UserOrderDetails() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Delivery partner fee</span>
+              <span className="text-gray-500">Shipping Charges</span>
               <div>
                 {pricing.originalDeliveryFee && (
                   <span className="text-gray-400 line-through mr-1">
@@ -799,8 +799,8 @@ export default function UserOrderDetails() {
                   >
                     <Star
                       className={`w-10 h-10 transition-all ${(selectedRating || 0) >= num
-                          ? "text-yellow-400 fill-yellow-400 drop-shadow-md"
-                          : "text-gray-200"
+                        ? "text-yellow-400 fill-yellow-400 drop-shadow-md"
+                        : "text-gray-200"
                         }`}
                     />
                   </button>
