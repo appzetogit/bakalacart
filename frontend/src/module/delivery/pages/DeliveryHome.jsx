@@ -59,6 +59,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { getGoogleMapsApiKey } from "@/lib/utils/googleMapsApiKey"
 import { Loader } from "@googlemaps/js-api-loader"
+import { getCachedDirections, cacheDirections, shouldThrottleDirections } from "@/lib/utils/googleMapsCache"
 import {
   decodePolyline,
   extractPolylineFromDirections,
@@ -6782,6 +6783,34 @@ export default function DeliveryHome() {
       return null;
     }
 
+    // Convert origin array to object if needed
+    const originObj = Array.isArray(origin) ? { lat: origin[0], lng: origin[1] } : origin;
+    const destObj = destination;
+
+    // Check global cache first (prevents duplicate API calls across all components)
+    const cachedResult = getCachedDirections(originObj, destObj, 'TWO_WHEELER');
+    if (cachedResult) {
+      console.log('✅ Using cached Directions API result from global cache');
+      setDirectionsResponse(cachedResult);
+      directionsResponseRef.current = cachedResult;
+      return cachedResult;
+    }
+
+    // Check DRIVING mode cache as fallback
+    const cachedDrivingResult = getCachedDirections(originObj, destObj, 'DRIVING');
+    if (cachedDrivingResult) {
+      console.log('✅ Using cached Directions API result (DRIVING mode) from global cache');
+      setDirectionsResponse(cachedDrivingResult);
+      directionsResponseRef.current = cachedDrivingResult;
+      return cachedDrivingResult;
+    }
+
+    // Check global throttle (prevents duplicate requests across all components)
+    if (shouldThrottleDirections(originObj, destObj)) {
+      console.log('⏭️ Skipping Directions API call (throttled by global cache)');
+      return null;
+    }
+
     try {
       // Initialize Directions Service if not already created
       if (!directionsServiceRef.current) {
@@ -6810,6 +6839,10 @@ export default function DeliveryHome() {
                   steps: result.routes[0].legs[0].steps?.length,
                   travelMode: modeName
                 });
+                
+                // Cache result in global cache (shared across all components)
+                cacheDirections(originObj, destObj, result, modeName);
+                
                 setDirectionsResponse(result);
                 directionsResponseRef.current = result; // Store in ref for callbacks
                 resolve(result);
@@ -7641,9 +7674,9 @@ export default function DeliveryHome() {
           newPosition.lng
         );
 
-        // Only recalculate if moved >50 meters AND last recalculation was >30 seconds ago
+        // Only recalculate if moved >100 meters AND last recalculation was >60 seconds ago (increased to reduce API calls)
         const timeSinceLastRecalc = Date.now() - (lastRouteRecalculationRef.current || 0);
-        if (distance > 50 && timeSinceLastRecalc > 30000 && selectedRestaurant) {
+        if (distance > 100 && timeSinceLastRecalc > 60000 && selectedRestaurant) {
           console.log('🔄 Significant deviation detected, recalculating route...');
           lastRouteRecalculationRef.current = Date.now();
           calculateRouteWithDirectionsAPI(

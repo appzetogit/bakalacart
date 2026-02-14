@@ -61,8 +61,9 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           modalContainerRef.current.style.position = 'fixed';
           modalContainerRef.current.style.top = '45%';
           modalContainerRef.current.style.left = '50%';
-          modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
+          modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
           modalContainerRef.current.style.margin = '0';
+          modalContainerRef.current.style.willChange = 'transform';
         }
       };
       
@@ -147,13 +148,30 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       return;
     }
 
-    // Ensure modal stays centered before adding to cart
-    if (modalContainerRef.current) {
-      modalContainerRef.current.style.position = 'fixed';
-      modalContainerRef.current.style.top = '45%';
-      modalContainerRef.current.style.left = '50%';
-      modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
-    }
+    // Aggressively lock modal position before and during add to cart
+    const lockPosition = () => {
+      if (modalContainerRef.current) {
+        modalContainerRef.current.style.position = 'fixed';
+        modalContainerRef.current.style.top = '45%';
+        modalContainerRef.current.style.left = '50%';
+        modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
+        modalContainerRef.current.style.margin = '0';
+        modalContainerRef.current.style.willChange = 'transform';
+      }
+    };
+
+    // Lock position immediately
+    lockPosition();
+    
+    // Use requestAnimationFrame to ensure position is locked before any re-renders
+    requestAnimationFrame(() => {
+      lockPosition();
+      
+      // Lock again after a microtask to catch any async updates
+      setTimeout(() => {
+        lockPosition();
+      }, 0);
+    });
 
     // Create unique ID for cart item that includes variant
     // This ensures different variants are treated as separate items in cart
@@ -180,6 +198,9 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       restaurantId: restaurant?.restaurantId || restaurant?._id || restaurant?.id || item.restaurantId,
     };
 
+    // Lock position before adding to cart
+    lockPosition();
+
     // Add to cart via callback or direct context
     if (onAddToCart) {
       onAddToCart(cartItem, quantity);
@@ -187,6 +208,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       // Add multiple times if quantity > 1
       for (let i = 0; i < quantity; i++) {
         addToCart(cartItem);
+        // Lock position after each add to prevent any shifts
+        lockPosition();
       }
       const displayName = selectedVariantData
         ? `${item.name} (${selectedVariantData.name})`
@@ -194,15 +217,16 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       toast.success(`${quantity} ${displayName} added to cart`);
     }
 
-    // Ensure modal stays centered (slightly lower) before closing
-    if (modalContainerRef.current) {
-      modalContainerRef.current.style.position = 'fixed';
-      modalContainerRef.current.style.top = '45%';
-      modalContainerRef.current.style.left = '50%';
-      modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
-    }
-
-    onClose();
+    // Lock position after cart operations
+    requestAnimationFrame(() => {
+      lockPosition();
+      
+      // Final lock before closing
+      setTimeout(() => {
+        lockPosition();
+        onClose();
+      }, 50); // Small delay to ensure position is stable
+    });
   };
 
   if (!isOpen || !item) return null;
@@ -250,7 +274,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           position: 'fixed',
           top: '45%',
           left: '50%',
-          transform: 'translate(-50%, -50%)',
+          transform: 'translate(-50%, -50%) translateZ(0)',
           width: 'calc(100% - 2rem)',
           maxWidth: '400px',
           maxHeight: '90vh',
@@ -260,14 +284,16 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           margin: 0,
           flexShrink: 0,
           // Ensure modal stays centered and doesn't move
-          willChange: 'auto',
+          willChange: 'transform',
           // Prevent any position changes
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
           // Lock position
           pointerEvents: 'auto',
           // Prevent any transforms from other sources
-          isolation: 'isolate'
+          isolation: 'isolate',
+          // Hardware acceleration for smooth positioning
+          transformOrigin: 'center center'
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -276,7 +302,9 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
             modalContainerRef.current.style.position = 'fixed';
             modalContainerRef.current.style.top = '45%';
             modalContainerRef.current.style.left = '50%';
-            modalContainerRef.current.style.transform = 'translate(-50%, -50%)';
+            modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
+            modalContainerRef.current.style.margin = '0';
+            modalContainerRef.current.style.willChange = 'transform';
           }
         }}
       >
@@ -326,7 +354,9 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
             if (modalContainer) {
               modalContainer.style.top = '45%';
               modalContainer.style.left = '50%';
-              modalContainer.style.transform = 'translate(-50%, -50%)';
+              modalContainer.style.transform = 'translate(-50%, -50%) translateZ(0)';
+              modalContainer.style.margin = '0';
+              modalContainer.style.willChange = 'transform';
             }
           }}
         >

@@ -10,6 +10,7 @@ import { useProfile } from "../context/ProfileContext"
 import { toast } from "sonner"
 import { locationAPI, userAPI } from "@/lib/api"
 import { Loader } from '@googlemaps/js-api-loader'
+import { getCachedGeocoding, cacheGeocoding, shouldThrottleGeocoding } from "@/lib/utils/googleMapsCache"
 
 // Google Maps implementation - Leaflet components removed
 
@@ -1500,12 +1501,39 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       }
     }
     
+    // Check global geocoding cache first (prevents duplicate API calls across all components)
+    const cachedGeocoding = getCachedGeocoding(roundedLat, roundedLng);
+    if (cachedGeocoding) {
+      console.log("✅ Using cached geocoding result from global cache");
+      lastReverseGeocodeCoordsRef.current = { lat: roundedLat, lng: roundedLng };
+      
+      // Use cached data
+      const cachedData = cachedGeocoding;
+      setFormattedAddress(cachedData.formattedAddress || "");
+      setCity(cachedData.city || "");
+      setState(cachedData.state || "");
+      setArea(cachedData.area || "");
+      setStreet(cachedData.street || "");
+      setStreetNumber(cachedData.streetNumber || "");
+      setPostalCode(cachedData.postalCode || "");
+      setPointOfInterest(cachedData.pointOfInterest || "");
+      setPremise(cachedData.premise || "");
+      setLoadingAddress(false);
+      return;
+    }
+    
+    // Check global throttle (prevents duplicate requests across all components)
+    if (shouldThrottleGeocoding(roundedLat, roundedLng)) {
+      console.log("⏭️ Skipping geocoding API call (throttled by global cache)");
+      return;
+    }
+    
     // Clear any pending timeout
     if (reverseGeocodeTimeoutRef.current) {
       clearTimeout(reverseGeocodeTimeoutRef.current)
     }
     
-    // Debounce: Wait 300ms before making the API call
+    // Debounce: Wait 500ms before making the API call (increased from 300ms)
     reverseGeocodeTimeoutRef.current = setTimeout(async () => {
       // Update last coordinates
       lastReverseGeocodeCoordsRef.current = { lat: roundedLat, lng: roundedLng }
@@ -1729,6 +1757,19 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
           zipCode: postalCode || prev.zipCode,
           additionalDetails: fullAddressForField || prev.additionalDetails, // Store FULL address in Address details field
         }))
+        
+        // Cache the geocoding result in global cache (shared across all components)
+        cacheGeocoding(roundedLat, roundedLng, {
+          formattedAddress,
+          city,
+          state,
+          area,
+          street,
+          streetNumber,
+          postalCode,
+          pointOfInterest,
+          premise
+        });
       } else {
         console.warn("⚠️ No address data found from Google Maps or backend")
         setCurrentAddress(`${roundedLat.toFixed(6)}, ${roundedLng.toFixed(6)}`)

@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/lib/api/config';
 import bikeLogo from '@/assets/bikelogo.png';
 import { RouteBasedAnimationController } from '@/module/user/utils/routeBasedAnimation';
 import { extractPolylineFromDirections, findNearestPointOnPolyline } from '@/module/delivery/utils/liveTrackingPolyline';
+import { getCachedDirections, cacheDirections, shouldThrottleDirections } from '@/lib/utils/googleMapsCache';
 import './DeliveryTrackingMap.css';
 
 // Helper function to calculate Haversine distance
@@ -47,7 +48,7 @@ const DeliveryTrackingMap = ({
   const userHasInteractedRef = useRef(false);
   const isProgrammaticChangeRef = useRef(false);
   const mapInitializedRef = useRef(false);
-  const directionsCacheRef = useRef(new Map()); // Cache for Directions API calls
+  // Note: Using global cache from googleMapsCache.js instead of local cache
   const lastRouteRequestRef = useRef({ start: null, end: null, timestamp: 0 });
 
   const backendUrl = API_BASE_URL.replace('/api', '');
@@ -97,21 +98,21 @@ const DeliveryTrackingMap = ({
       return;
     }
 
-    // Round coordinates to 4 decimal places (~11 meters) for cache key
-    const roundCoord = (coord) => Math.round(coord * 10000) / 10000;
-    const cacheKey = `${roundCoord(startLat)},${roundCoord(startLng)}|${roundCoord(endLat)},${roundCoord(endLng)}`;
+    // Check global cache first (15 minutes cache, shared across all components)
+    const cachedResult = getCachedDirections(
+      { lat: startLat, lng: startLng },
+      { lat: endLat, lng: endLng },
+      'DRIVING'
+    );
     
-    // Check cache first (cache valid for 5 minutes)
-    const cached = directionsCacheRef.current.get(cacheKey);
-    const now = Date.now();
-    if (cached && (now - cached.timestamp) < 300000) { // 5 minutes cache
-      console.log('✅ Using cached route');
+    if (cachedResult) {
+      console.log('✅ Using cached route from global cache');
       // Use cached result
-      if (cached.result && cached.result.routes && cached.result.routes[0]) {
+      if (cachedResult.routes && cachedResult.routes[0]) {
         directionsRendererRef.current.setOptions({ preserveViewport: true });
-        directionsRendererRef.current.setDirections(cached.result);
+        directionsRendererRef.current.setDirections(cachedResult);
         
-        const polylinePoints = extractPolylineFromDirections(cached.result);
+        const polylinePoints = extractPolylineFromDirections(cachedResult);
         if (polylinePoints && polylinePoints.length > 0) {
           routePolylinePointsRef.current = polylinePoints;
           
@@ -122,49 +123,20 @@ const DeliveryTrackingMap = ({
             );
           }
         }
-        
-        // TEMPORARILY DISABLED: Polyline removed as requested
-        // if (cached.result.routes && cached.result.routes[0] && cached.result.routes[0].overview_path) {
-        //   if (routePolylineRef.current) {
-        //     routePolylineRef.current.setMap(null);
-        //   }
-        //   
-        //   routePolylineRef.current = new window.google.maps.Polyline({
-        //     path: cached.result.routes[0].overview_path,
-        //     geodesic: true,
-        //     strokeColor: '#10b981',
-        //     strokeOpacity: 0.8,
-        //     strokeWeight: 4,
-        //     icons: [{
-        //       icon: {
-        //         path: 'M 0,-1 0,1',
-        //         strokeOpacity: 1,
-        //         strokeWeight: 2,
-        //         strokeColor: '#10b981',
-        //         scale: 4
-        //       },
-        //       offset: '0%',
-        //       repeat: '15px'
-        //     }],
-        //     map: mapInstance.current,
-        //     zIndex: 1
-        //   });
-        // }
       }
       return;
     }
 
-    // Throttle: Don't make API call if same route was requested within last 2 seconds
-    const lastRequest = lastRouteRequestRef.current;
-    if (lastRequest.start && lastRequest.end && 
-        Math.abs(lastRequest.start.lat - startLat) < 0.0001 &&
-        Math.abs(lastRequest.start.lng - startLng) < 0.0001 &&
-        Math.abs(lastRequest.end.lat - endLat) < 0.0001 &&
-        Math.abs(lastRequest.end.lng - endLng) < 0.0001 &&
-        (now - lastRequest.timestamp) < 2000) {
-      console.log('⏭️ Skipping duplicate route request (throttled)');
+    // Check global throttle (prevents duplicate requests across all components)
+    if (shouldThrottleDirections(
+      { lat: startLat, lng: startLng },
+      { lat: endLat, lng: endLng }
+    )) {
+      console.log('⏭️ Skipping duplicate route request (throttled by global cache)');
       return;
     }
+    
+    const now = Date.now();
 
     lastRouteRequestRef.current = {
       start: { lat: startLat, lng: startLng },
@@ -179,19 +151,13 @@ const DeliveryTrackingMap = ({
         travelMode: window.google.maps.TravelMode.DRIVING
       }, (result, status) => {
         if (status === 'OK' && result) {
-          // Cache the result
-          directionsCacheRef.current.set(cacheKey, {
-            result: result,
-            timestamp: now
-          });
-          
-          // Clean old cache entries (older than 10 minutes)
-          const tenMinutesAgo = now - 600000;
-          for (const [key, value] of directionsCacheRef.current.entries()) {
-            if (value.timestamp < tenMinutesAgo) {
-              directionsCacheRef.current.delete(key);
-            }
-          }
+          // Cache the result in global cache (shared across all components)
+          cacheDirections(
+            { lat: startLat, lng: startLng },
+            { lat: endLat, lng: endLng },
+            result,
+            'DRIVING'
+          );
           
           // Ensure viewport doesn't change when route is set
           directionsRendererRef.current.setOptions({ preserveViewport: true });
@@ -1068,10 +1034,10 @@ const DeliveryTrackingMap = ({
       // }
     }
     
-    // Throttle route updates to avoid too many API calls
+    // Throttle route updates to avoid too many API calls (increased to 30 seconds)
     const now = Date.now();
-    if (lastRouteUpdateRef.current && (now - lastRouteUpdateRef.current) < 10000) {
-      return; // Skip if updated less than 10 seconds ago
+    if (lastRouteUpdateRef.current && (now - lastRouteUpdateRef.current) < 30000) {
+      return; // Skip if updated less than 30 seconds ago (increased from 10 seconds)
     }
     
     // Only draw route if delivery partner is assigned
