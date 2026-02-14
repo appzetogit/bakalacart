@@ -166,6 +166,14 @@ import {
   updatePrivacy
 } from '../controllers/privacyPolicyController.js';
 import {
+  getDeliveryBoyAgreement,
+  updateDeliveryBoyAgreement
+} from '../controllers/deliveryBoyAgreementController.js';
+import {
+  getDeliveryBoyTerms,
+  updateDeliveryBoyTerms
+} from '../controllers/deliveryBoyTermsController.js';
+import {
   getRefund,
   updateRefund
 } from '../controllers/refundPolicyController.js';
@@ -417,6 +425,14 @@ router.put('/terms', updateTerms);
 // Privacy Policy Management
 router.get('/privacy', getPrivacy);
 router.put('/privacy', updatePrivacy);
+
+// Delivery Boy Agreement Management
+router.get('/delivery-boy-agreement', getDeliveryBoyAgreement);
+router.put('/delivery-boy-agreement', updateDeliveryBoyAgreement);
+
+// Delivery Boy Terms & Conditions Management
+router.get('/delivery-boy-terms', getDeliveryBoyTerms);
+router.put('/delivery-boy-terms', updateDeliveryBoyTerms);
 
 // Refund Policy Management
 router.get('/refund', getRefund);

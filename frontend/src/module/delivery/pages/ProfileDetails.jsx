@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Plus, Edit2, ChevronRight, FileText, CheckCircle, XCircle, Eye, X } from "lucide-react"
+import { ArrowLeft, Plus, Edit2, ChevronRight, FileText, CheckCircle, XCircle, Eye, X, User } from "lucide-react"
 import BottomPopup from "../components/BottomPopup"
 import { toast } from "sonner"
 import { deliveryAPI } from "@/lib/api"
@@ -82,26 +82,50 @@ export default function ProfileDetails() {
       </div>
 
       {/* Profile Picture Area */}
-      <div className="relative w-full bg-gray-200 overflow-hidden flex items-center justify-center">
-        <img
-          src={profile?.profileImage?.url || profile?.documents?.photo || "https://i.pravatar.cc/400?img=12"}
-          alt="Profile"
-          className="w-full h-auto max-h-96 object-contain"
-          style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-        />
-      </div>
+      {!loading && profile && (
+        <div className="relative w-full bg-gray-200 overflow-hidden flex items-center justify-center">
+          {profile?.profileImage?.url || profile?.documents?.photo ? (
+            <img
+              src={profile.profileImage?.url || profile.documents?.photo}
+              alt="Profile"
+              className="w-full h-auto max-h-96 object-contain"
+              style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+            />
+          ) : (
+            <div className="w-full h-64 bg-gray-300 flex items-center justify-center">
+              <User className="w-24 h-24 text-gray-500" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="relative w-full bg-gray-200 overflow-hidden flex items-center justify-center h-64">
+          <div className="animate-pulse bg-gray-300 w-full h-64"></div>
+        </div>
+      )}
 
       {/* Content */}
-      <div className="px-4 py-6 space-y-6">
-        {/* Rider Details Section */}
-        <div>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Rider details</h2>
-          <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
-            <div className="p-2 px-3 flex items-center justify-between">
-              <p className="text-base text-gray-900">
-                {loading ? "Loading..." : `${profile?.name || "N/A"} (${profile?.deliveryId || "N/A"})`}
-              </p>
+      {loading ? (
+        <div className="px-4 py-6 space-y-6">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading profile...</p>
             </div>
+          </div>
+        </div>
+      ) : profile ? (
+        <div className="px-4 py-6 space-y-6">
+          {/* Rider Details Section */}
+          <div>
+            <h2 className="text-base font-bold text-gray-900 mb-3">Rider details</h2>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              <div className="p-2 px-3 flex items-center justify-between">
+                <p className="text-base text-gray-900">
+                  {profile?.name || "N/A"} ({profile?.deliveryId || "N/A"})
+                </p>
+              </div>
             <div className="divide-y divide-gray-200">
             <div className="p-2 px-3 flex items-center justify-between">
                 <p className="text-sm text-gray-900">Zone</p>
@@ -162,7 +186,11 @@ export default function ProfileDetails() {
               <div className="flex-1">
                 <p className="text-base font-medium text-gray-900">Aadhar Card</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {profile?.documents?.aadhar?.verified ? "Verified" : profile?.documents?.aadhar?.document ? "Not verified" : "Not uploaded"}
+                  {profile?.status === "approved" || profile?.documents?.aadhar?.verified 
+                    ? "Verified" 
+                    : profile?.documents?.aadhar?.document 
+                      ? "Not verified" 
+                      : "Not uploaded"}
                 </p>
               </div>
               {profile?.documents?.aadhar?.document && (
@@ -186,7 +214,11 @@ export default function ProfileDetails() {
               <div className="flex-1">
                 <p className="text-base font-medium text-gray-900">PAN Card</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {profile?.documents?.pan?.verified ? "Verified" : profile?.documents?.pan?.document ? "Not verified" : "Not uploaded"}
+                  {profile?.status === "approved" || profile?.documents?.pan?.verified 
+                    ? "Verified" 
+                    : profile?.documents?.pan?.document 
+                      ? "Not verified" 
+                      : "Not uploaded"}
                 </p>
               </div>
               {profile?.documents?.pan?.document && (
@@ -210,7 +242,11 @@ export default function ProfileDetails() {
               <div className="flex-1">
                 <p className="text-base font-medium text-gray-900">Driving License</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {profile?.documents?.drivingLicense?.verified ? "Verified" : profile?.documents?.drivingLicense?.document ? "Not verified" : "Not uploaded"}
+                  {profile?.status === "approved" || profile?.documents?.drivingLicense?.verified 
+                    ? "Verified" 
+                    : profile?.documents?.drivingLicense?.document 
+                      ? "Not verified" 
+                      : "Not uploaded"}
                 </p>
               </div>
               {profile?.documents?.drivingLicense?.document && (
@@ -342,7 +378,8 @@ export default function ProfileDetails() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      ) : null}
 
       {/* Vehicle Number Popup */}
       <BottomPopup

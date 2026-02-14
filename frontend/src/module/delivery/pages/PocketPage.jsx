@@ -16,7 +16,8 @@ import {
   FileText as FileTextIcon,
   Wallet as WalletIcon,
   Sparkles,
-  IndianRupee
+  IndianRupee,
+  Package
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -180,6 +181,20 @@ export default function PocketPage() {
   }
 
   const weeklyOrders = calculateWeeklyOrders()
+
+  // Calculate total orders count from all completed payment transactions
+  const calculateTotalOrders = () => {
+    if (!walletState || !walletState.transactions || !Array.isArray(walletState.transactions)) {
+      return 0
+    }
+
+    return walletState.transactions.filter(t => {
+      // Count all completed payment transactions (all time)
+      return t.type === 'payment' && t.status === 'Completed'
+    }).length
+  }
+
+  const totalOrders = calculateTotalOrders()
 
   // Fetch active earning addon offers
   useEffect(() => {
@@ -689,6 +704,8 @@ export default function PocketPage() {
         onHelpClick={() => { }}
         className=""
       />
+      {/* Spacer for fixed navbar */}
+      <div className="h-[56px]"></div>
 
 {carouselSlides.length > 0 && (
       <div
@@ -783,7 +800,7 @@ export default function PocketPage() {
             {/* Top text */}
             <div className="flex justify-center mb-2">
               <span className="text-black text-sm">
-                Earnings: {getCurrentWeekRange()} →
+                Earnings: {getCurrentWeekRange()}
               </span>
             </div>
 
@@ -1007,16 +1024,16 @@ export default function PocketPage() {
               </CardContent>
             </Card>
 
-            {/* Deduction Statement */}
+            {/* Total Order Count */}
             <Card
               className=" py-0  bg-white border-0 shadow-none cursor-pointer hover:bg-gray-200 transition-colors"
-              onClick={() => navigate("/delivery/deduction-statement")}
             >
               <CardContent className="p-4 flex flex-col items-start text-start">
                 <div className="w-12 h-12 flex items-center justify-center mb-3">
-                  <FileTextIcon className="w-8 h-8 text-black" />
+                  <Package className="w-8 h-8 text-black" />
                 </div>
-                <div className="text-black text-sm font-medium">Deduction statement</div>
+                <div className="text-black text-2xl font-bold mb-1">{totalOrders}</div>
+                <div className="text-black text-sm font-medium">Total Order count</div>
               </CardContent>
             </Card>
 
@@ -1045,6 +1062,7 @@ export default function PocketPage() {
         showCloseButton={true}
         closeOnBackdropClick={true}
         maxHeight="60vh"
+        disableScroll={true}
       >
      <AvailableCashLimit
           onClose={() => setShowCashLimitPopup(false)}

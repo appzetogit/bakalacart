@@ -101,6 +101,8 @@ import RefundPolicy from "../pages/settings/RefundPolicy";
 import ShippingPolicy from "../pages/settings/ShippingPolicy";
 import CancellationPolicy from "../pages/settings/CancellationPolicy";
 import ReactRegistration from "../pages/settings/ReactRegistration";
+import DeliveryBoyAgreement from "../pages/settings/DeliveryBoyAgreement";
+import DeliveryBoyTerms from "../pages/settings/DeliveryBoyTerms";
 // System Settings
 import ThirdParty from "../pages/system/ThirdParty";
 import FirebaseNotification from "../pages/system/FirebaseNotification";
@@ -285,6 +287,8 @@ export default function AdminRouter() {
         <Route path="pages-social-media/shipping" element={<ShippingPolicy />} />
         <Route path="pages-social-media/cancellation" element={<CancellationPolicy />} />
         <Route path="pages-social-media/react-registration" element={<ReactRegistration />} />
+        <Route path="pages-social-media/delivery-boy-agreement" element={<DeliveryBoyAgreement />} />
+        <Route path="pages-social-media/delivery-boy-terms" element={<DeliveryBoyTerms />} />
 
         {/* SYSTEM SETTINGS */}
         {/* 3rd Party & Configurations */}

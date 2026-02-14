@@ -9,7 +9,7 @@ export default function AvailableCashLimit({ onClose, walletData = {} }) {
   const availableCashLimit = Math.max(0, totalCashLimit - cashInHand - deductions)
 
   return (
-    <div className="min-h-screen bg-white text-black flex flex-col">
+    <div className="bg-white text-black flex flex-col">
       <div className="">
         <div className="py-3 flex justify-between border-b border-gray-200 items-start">
           <div>

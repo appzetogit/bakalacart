@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ChevronDown } from "lucide-react"
+import { X } from "lucide-react"
 
 /**
  * BottomPopup Component
@@ -17,6 +17,7 @@ import { X, ChevronDown } from "lucide-react"
  * @param {boolean} disableSwipeToClose - Disable swipe-to-close functionality (default: false)
  * @param {boolean} showBackdrop - Show backdrop overlay (default: true)
  * @param {boolean} backdropBlocksInteraction - Whether backdrop blocks pointer events (default: true)
+ * @param {boolean} disableScroll - Disable scrolling in content area (default: false)
  */
 export default function BottomPopup({
   isOpen,
@@ -30,7 +31,8 @@ export default function BottomPopup({
   disableSwipeToClose = false,
   collapsedContent = null, // Content to show when collapsed (e.g., Reached pickup button)
   showBackdrop = true, // Show backdrop overlay
-  backdropBlocksInteraction = true // Whether backdrop blocks pointer events
+  backdropBlocksInteraction = true, // Whether backdrop blocks pointer events
+  disableScroll = false // Disable scrolling in content area
 }) {
   const popupRef = useRef(null)
   const handleRef = useRef(null)
@@ -195,16 +197,37 @@ export default function BottomPopup({
     swipeStartY.current = 0
   }
 
-  // Prevent body scroll when popup is open
+  // Prevent body scroll when popup is open (especially for mobile)
   useEffect(() => {
     if (isOpen) {
+      // Store current scroll position
+      const scrollY = window.scrollY
+      
+      // Prevent scrolling by setting overflow hidden and position fixed
       document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+      
+      // Also prevent touch scrolling on iOS
+      document.body.style.touchAction = 'none'
+      
+      return () => {
+        // Restore scroll position and styles
+        document.body.style.overflow = ''
+        document.body.style.position = ''
+        document.body.style.top = ''
+        document.body.style.width = ''
+        document.body.style.touchAction = ''
+        window.scrollTo(0, scrollY)
+      }
     } else {
+      // Ensure styles are reset when closed
       document.body.style.overflow = ''
-    }
-    
-    return () => {
-      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.touchAction = ''
     }
   }, [isOpen])
 
@@ -246,7 +269,13 @@ export default function BottomPopup({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={handleBackdropClick}
+            onTouchMove={(e) => {
+              // Prevent background scroll when touching backdrop
+              e.preventDefault()
+              e.stopPropagation()
+            }}
             className="fixed inset-0 bg-black/50 z-[100]"
+            style={{ touchAction: 'none' }}
           />
           )}
 
@@ -288,50 +317,6 @@ export default function BottomPopup({
               touchAction: 'none'
             }}
           >
-            {/* Top Drag Handle Bar - Always visible for dragging */}
-            {showHandle && (
-              <button
-                ref={handleRef}
-                type="button"
-                className="flex flex-col items-center pt-3 pb-2 cursor-pointer select-none bg-white sticky top-0 z-10 w-full border-0 outline-none p-0"
-                onClick={(e) => {
-                  console.log('🖱️ Handle clicked, current collapsed:', isCollapsed)
-                  e.stopPropagation()
-                  e.preventDefault()
-                  handleCollapseToggle(e)
-                }}
-                onTouchStart={(e) => {
-                  // Store touch start for click detection
-                  e.stopPropagation()
-                }}
-                onTouchEnd={(e) => {
-                  // Handle touch end for mobile collapse toggle
-                  console.log('👆 Handle touched, current collapsed:', isCollapsed)
-                  e.stopPropagation()
-                  e.preventDefault()
-                  handleCollapseToggle(e)
-                }}
-                onMouseDown={(e) => {
-                  // Prevent drag when clicking handle
-                  e.stopPropagation()
-                }}
-                style={{ 
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  pointerEvents: 'auto',
-                  userSelect: 'none',
-                  background: 'transparent'
-                }}
-              >
-                <ChevronDown 
-                  className="w-6 h-6 text-gray-400 mb-1 pointer-events-none"
-                />
-                <div 
-                  className="w-12 h-1.5 bg-gray-300 rounded-full pointer-events-none"
-                />
-              </button>
-            )}
-
             {/* Header */}
             {(title || showCloseButton) && (
               <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100">
@@ -354,7 +339,7 @@ export default function BottomPopup({
 
             {/* Content */}
             {!isCollapsed ? (
-              <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className={`flex-1 px-4 py-4 ${disableScroll ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                 {children}
               </div>
             ) : (

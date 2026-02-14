@@ -365,7 +365,7 @@ export default function FeedNavbar({ className = "" }) {
 
   return (
     <>
-    <div className={`bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 border-b border-gray-200 ${className}`}>
+    <div className={`bg-white px-4 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 border-b border-gray-200 ${className}`}>
         {/* Online/Offline Toggle */}
       <div className="relative" style={{ zIndex: 100 }}>
         <button

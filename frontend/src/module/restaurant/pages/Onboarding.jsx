@@ -431,6 +431,12 @@ export default function RestaurantOnboarding() {
         const res = await api.get("/restaurant/onboarding")
         const data = res?.data?.data?.onboarding
         if (data) {
+          // Check if onboarding is already complete
+          if (data.completedSteps === 4) {
+            console.log("✅ Onboarding already complete, redirecting to restaurant home...")
+            navigate("/restaurant", { replace: true })
+            return
+          }
           // Get verified phone from restaurant data first (priority)
           let verifiedPhoneFromAPI = ""
           if (data.restaurant?.phone || data.restaurant?.ownerPhone) {

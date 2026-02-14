@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { restaurantAPI } from "@/lib/api"
 import { setAuthData as setRestaurantAuthData } from "@/lib/utils/auth"
 import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotificationService"
+import { checkOnboardingStatus } from "../../utils/onboardingUtils"
 
 export default function RestaurantOTP() {
   const navigate = useNavigate()
@@ -227,9 +228,25 @@ export default function RestaurantOTP() {
 
       sessionStorage.removeItem("restaurantAuthData")
 
-      // Navigate immediately to onboarding after OTP verification
-      console.log("✅ [Restaurant OTP] OTP verified successfully, redirecting to onboarding...")
-      navigate("/restaurant/onboarding", { replace: true })
+      // Check onboarding status before navigating
+      try {
+        const onboardingStep = await checkOnboardingStatus()
+        console.log("✅ [Restaurant OTP] Onboarding status check:", onboardingStep)
+        
+        if (onboardingStep === null) {
+          // Onboarding is complete, navigate to restaurant home
+          console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
+          navigate("/restaurant", { replace: true })
+        } else {
+          // Onboarding not complete, navigate to onboarding with appropriate step
+          console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
+          navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
+        }
+      } catch (error) {
+        console.error("❌ [Restaurant OTP] Error checking onboarding status:", error)
+        // Default to onboarding if check fails (for new registrations)
+        navigate("/restaurant/onboarding", { replace: true })
+      }
     } catch (err) {
       const message =
         err?.response?.data?.message ||
@@ -355,9 +372,25 @@ export default function RestaurantOTP() {
 
       sessionStorage.removeItem("restaurantAuthData")
 
-      // Navigate immediately to onboarding after OTP verification
-      console.log("✅ [Restaurant OTP] OTP verified successfully, redirecting to onboarding...")
-      navigate("/restaurant/onboarding", { replace: true })
+      // Check onboarding status before navigating
+      try {
+        const onboardingStep = await checkOnboardingStatus()
+        console.log("✅ [Restaurant OTP] Onboarding status check:", onboardingStep)
+        
+        if (onboardingStep === null) {
+          // Onboarding is complete, navigate to restaurant home
+          console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
+          navigate("/restaurant", { replace: true })
+        } else {
+          // Onboarding not complete, navigate to onboarding with appropriate step
+          console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
+          navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
+        }
+      } catch (error) {
+        console.error("❌ [Restaurant OTP] Error checking onboarding status:", error)
+        // Default to onboarding if check fails (for new registrations)
+        navigate("/restaurant/onboarding", { replace: true })
+      }
     } catch (err) {
       const message =
         err?.response?.data?.message ||
