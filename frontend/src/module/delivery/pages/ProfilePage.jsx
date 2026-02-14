@@ -7,7 +7,6 @@ import {
   FileText,
   UtensilsCrossed,
   User,
-  ArrowLeft,
   ArrowRight,
   Star,
   Briefcase,
@@ -224,20 +223,40 @@ export default function ProfilePage() {
     }, 100)
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 text-gray-900 font-poppins overflow-x-hidden">
+        <div className="bg-white p-4 w-full shadow-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-48 bg-gray-200 animate-pulse rounded"></div>
+              </div>
+              <div className="h-4 w-32 bg-gray-200 animate-pulse rounded mb-3"></div>
+            </div>
+            <div className="relative shrink-0 ml-4">
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-200 animate-pulse border-2 border-gray-200"></div>
+            </div>
+          </div>
+        </div>
+        <div className="px-4 py-6 pb-24 md:pb-6">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading profile...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 font-poppins overflow-x-hidden">
       {/* Main Content */}
         {/* Back Button and Profile Section */}
         <div ref={profileRef} className="mb-0">
           <div className="bg-white p-4 w-full shadow-sm">
-            {/* Back Button */}
-            <button
-              onClick={() => navigate(-1)}
-              className="mb-6"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-
             {/* Profile Information */}
             <div
               onClick={() => navigate("/delivery/profile/details")}
@@ -246,7 +265,7 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h2 className="text-2xl md:text-3xl font-bold">
-                    {loading ? "Loading..." : profile?.name || "Delivery Partner"}
+                    {profile?.name || "Delivery Partner"}
                   </h2>
                   <ChevronRight className="w-5 h-5" />
                 </div>
@@ -336,6 +355,30 @@ export default function ProfilePage() {
           {/* Partner options Section */}
           <div>
             <h3 className="text-base font-medium mb-3 px-1">Partner options</h3>
+            <Card 
+              onClick={() => navigate("/delivery/agreement")}
+              className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors mb-3"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5" />
+                  <span className="text-sm font-medium">Agreement</span>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400" />
+              </CardContent>
+            </Card>
+            <Card 
+              onClick={() => navigate("/delivery/terms")}
+              className="bg-white py-0 border-0 shadow-none rounded-lg cursor-pointer hover:bg-gray-200 transition-colors mb-3"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5" />
+                  <span className="text-sm font-medium">Terms and Conditions</span>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400" />
+              </CardContent>
+            </Card>
             <Card 
               onClick={() => {
                 // Initialize temp selection with current selection when opening popup

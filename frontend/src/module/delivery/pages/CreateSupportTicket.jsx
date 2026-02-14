@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 export default function CreateSupportTicket() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [creating, setCreating] = useState(false)
   const [formData, setFormData] = useState({
     subject: "",
@@ -73,6 +74,10 @@ export default function CreateSupportTicket() {
 
       if (response?.data?.success) {
         toast.success("Ticket created successfully!")
+        // Replace current entry (create ticket) with profile, then navigate to tickets
+        // This ensures back gesture from tickets goes to profile, not create ticket screen
+        navigate("/delivery/profile", { replace: true })
+        // Navigate to tickets page (profile is now in history before tickets)
         navigate("/delivery/help/tickets")
       } else {
         toast.error(response?.data?.message || "Failed to create ticket")
@@ -185,7 +190,7 @@ export default function CreateSupportTicket() {
               placeholder="Describe your issue in detail (minimum 10 characters)"
               rows={8}
               maxLength={2000}
-              className={`w-full resize-none ${errors.description ? "border-red-500" : ""}`}
+              className={`w-full resize-none border border-gray-300 ${errors.description ? "border-red-500" : ""}`}
             />
             {errors.description && (
               <p className="text-xs text-red-500 mt-1">{errors.description}</p>

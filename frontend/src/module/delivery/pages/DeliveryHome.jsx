@@ -10803,6 +10803,8 @@ export default function DeliveryHome() {
         onEmergencyClick={() => setShowEmergencyPopup(true)}
         onHelpClick={() => setShowHelpPopup(true)}
       />
+      {/* Spacer for fixed navbar */}
+      <div className="h-[56px] flex-shrink-0"></div>
 
       {/* Carousel - Only show if there are slides */}
       {carouselSlides.length > 0 && (

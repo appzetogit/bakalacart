@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom"
+import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import DeliveryLayout from "./DeliveryLayout"
 import ProtectedRoute from "./ProtectedRoute"
 
@@ -43,6 +43,8 @@ import PocketBalancePage from "../pages/PocketBalance"
 import CustomerTipsBalancePage from "../pages/CustomerTips"
 import PocketDetails from "../pages/PocketDetails"
 import OrderCompleted from "../pages/OrderCompleted"
+import DeliveryAgreement from "../pages/DeliveryAgreement"
+import DeliveryTerms from "../pages/DeliveryTerms"
 
 export default function DeliveryRouter() {
   return (
@@ -444,7 +446,41 @@ export default function DeliveryRouter() {
         }
         path="/order-completed"
       />
+      <Route
+        element={
+          <ProtectedRoute>
+            <DeliveryLayout>
+              <DeliveryAgreement />
+            </DeliveryLayout>
+          </ProtectedRoute>
+        }
+        path="/agreement"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <DeliveryLayout>
+              <DeliveryTerms />
+            </DeliveryLayout>
+          </ProtectedRoute>
+        }
+        path="/terms"
+      />
+      {/* Catch-all route - preserve current location on refresh instead of redirecting */}
+      <Route
+        path="*"
+        element={<PreserveLocation />}
+      />
     </Routes>
   )
 }
 
+// Component to preserve current location on refresh
+function PreserveLocation() {
+  const location = useLocation()
+  // If we're on a valid delivery route, just show nothing (or a 404)
+  // This prevents redirect to home on refresh
+  // The route should have been matched above, so this should rarely be hit
+  // But if it is, we'll just show the home page as fallback
+  return <Navigate to="/delivery" replace />
+}
