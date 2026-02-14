@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'sonner';
@@ -55,54 +56,45 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         modalContent.scrollTop = 0;
       }
 
-      // Ensure modal container stays centered but slightly lower (45% from top instead of 50%)
+      // Ensure modal container stays perfectly centered using viewport units
+      // Since modal is now in a portal, we can use viewport-based positioning
       const maintainPosition = () => {
         if (modalContainerRef.current) {
+          // Use viewport units for absolute centering
+          const viewportHeight = window.innerHeight;
+          const viewportWidth = window.innerWidth;
+          
           modalContainerRef.current.style.position = 'fixed';
-          modalContainerRef.current.style.top = '45%';
-          modalContainerRef.current.style.left = '50%';
+          modalContainerRef.current.style.top = '50vh'; // Use viewport height units
+          modalContainerRef.current.style.left = '50vw'; // Use viewport width units
           modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
           modalContainerRef.current.style.margin = '0';
           modalContainerRef.current.style.willChange = 'transform';
+          // Ensure it's not affected by any parent transforms
+          modalContainerRef.current.style.isolation = 'isolate';
         }
       };
       
-      // Set position immediately
+      // Set position immediately and after a small delay to ensure DOM is ready
       maintainPosition();
+      setTimeout(maintainPosition, 0);
+      requestAnimationFrame(maintainPosition);
       
-      // Set up interval to maintain position (in case something tries to move it)
-      // Use shorter interval for more responsive position locking
-      const positionCheckInterval = setInterval(() => {
+      // Maintain position on window resize
+      const handleResize = () => {
         maintainPosition();
-        // Also check if position changed and force it back
-        if (modalContainerRef.current) {
-          const rect = modalContainerRef.current.getBoundingClientRect();
-          const viewportCenterX = window.innerWidth / 2;
-          const viewportCenterY = window.innerHeight / 2;
-          const currentCenterX = rect.left + rect.width / 2;
-          const currentCenterY = rect.top + rect.height / 2;
-          
-          // If modal is more than 10px off center, force it back
-          if (Math.abs(currentCenterX - viewportCenterX) > 10 || 
-              Math.abs(currentCenterY - viewportCenterY) > 10) {
-            maintainPosition();
-          }
-        }
-      }, 50); // Check every 50ms for more responsive locking
-      
-      // Also maintain position on scroll/resize/touch events
-      const handleScroll = () => maintainPosition();
-      const handleResize = () => maintainPosition();
-      const handleTouchMove = () => maintainPosition();
-      window.addEventListener('scroll', handleScroll, true);
+      };
       window.addEventListener('resize', handleResize);
-      window.addEventListener('touchmove', handleTouchMove, { passive: true });
+      
+      // Also maintain position on scroll (in case body scroll is somehow enabled)
+      const handleScroll = () => {
+        maintainPosition();
+      };
+      window.addEventListener('scroll', handleScroll, true);
       
       return () => {
-        clearInterval(positionCheckInterval);
-        window.removeEventListener('scroll', handleScroll, true);
         window.removeEventListener('resize', handleResize);
-        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('scroll', handleScroll, true);
         // Re-enable body scroll when modal closes
         document.body.style.position = '';
         document.body.style.top = '';
@@ -148,15 +140,16 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       return;
     }
 
-    // Aggressively lock modal position before and during add to cart
+    // Lock modal position to center before and during add to cart
     const lockPosition = () => {
       if (modalContainerRef.current) {
         modalContainerRef.current.style.position = 'fixed';
-        modalContainerRef.current.style.top = '45%';
-        modalContainerRef.current.style.left = '50%';
+        modalContainerRef.current.style.top = '50vh'; // Use viewport height
+        modalContainerRef.current.style.left = '50vw'; // Use viewport width
         modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
         modalContainerRef.current.style.margin = '0';
         modalContainerRef.current.style.willChange = 'transform';
+        modalContainerRef.current.style.isolation = 'isolate';
       }
     };
 
@@ -238,7 +231,9 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
   const isVeg = item.foodType === 'Veg' || item.isVeg === true;
 
-  return (
+  // Render modal using React Portal to ensure it's always at document.body level
+  // This prevents parent element positioning from affecting the modal
+  const modalContent = (
     <div
       className="fixed inset-0 bg-black/50 z-50"
       data-modal-backdrop
@@ -254,7 +249,11 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1rem',
-        // Ensure backdrop stays in place
+        // Ensure backdrop stays in place - use viewport units for absolute positioning
+        margin: 0,
+        // Force new stacking context
+        isolation: 'isolate',
+        // Hardware acceleration
         transform: 'translateZ(0)',
         willChange: 'auto'
       }}
@@ -272,8 +271,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         data-modal-container
         style={{
           position: 'fixed',
-          top: '45%',
-          left: '50%',
+          top: '50vh', // Use viewport height for true centering
+          left: '50vw', // Use viewport width for true centering
           transform: 'translate(-50%, -50%) translateZ(0)',
           width: 'calc(100% - 2rem)',
           maxWidth: '400px',
@@ -288,23 +287,24 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           // Prevent any position changes
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
-          // Lock position
-          pointerEvents: 'auto',
-          // Prevent any transforms from other sources
+          // Lock position - create new stacking context
           isolation: 'isolate',
           // Hardware acceleration for smooth positioning
-          transformOrigin: 'center center'
+          transformOrigin: 'center center',
+          // Ensure it's not affected by parent positioning context
+          contain: 'layout style paint'
         }}
         onClick={(e) => {
           e.stopPropagation();
           // Ensure position is maintained on any click
           if (modalContainerRef.current) {
             modalContainerRef.current.style.position = 'fixed';
-            modalContainerRef.current.style.top = '45%';
-            modalContainerRef.current.style.left = '50%';
+            modalContainerRef.current.style.top = '50vh';
+            modalContainerRef.current.style.left = '50vw';
             modalContainerRef.current.style.transform = 'translate(-50%, -50%) translateZ(0)';
             modalContainerRef.current.style.margin = '0';
             modalContainerRef.current.style.willChange = 'transform';
+            modalContainerRef.current.style.isolation = 'isolate';
           }
         }}
       >
@@ -352,11 +352,12 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
             // Ensure modal container stays centered even during scroll
             const modalContainer = document.querySelector('[data-modal-container]');
             if (modalContainer) {
-              modalContainer.style.top = '45%';
-              modalContainer.style.left = '50%';
+              modalContainer.style.top = '50vh';
+              modalContainer.style.left = '50vw';
               modalContainer.style.transform = 'translate(-50%, -50%) translateZ(0)';
               modalContainer.style.margin = '0';
               modalContainer.style.willChange = 'transform';
+              modalContainer.style.isolation = 'isolate';
             }
           }}
         >
@@ -483,6 +484,12 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
       </div>
     </div>
   );
+
+  // Use React Portal to render modal at document.body level
+  // This ensures modal is always centered regardless of parent element position
+  return typeof document !== 'undefined' 
+    ? createPortal(modalContent, document.body)
+    : null;
 };
 
 export default FoodCustomizationModal;
