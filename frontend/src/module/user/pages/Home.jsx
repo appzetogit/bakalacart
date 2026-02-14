@@ -59,6 +59,8 @@ const placeholders = [
 // Restaurant Image Carousel Component
 function RestaurantImageCarousel({ images, restaurantName, restaurantId, priority = false }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [imageLoading, setImageLoading] = useState(true) // Track image loading state for fast scroll
+  const imageRef = useRef(null)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const isSwiping = useRef(false)
@@ -98,6 +100,15 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
     ? validImages
     : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"]
 
+  // Reset loading state when image changes (for carousel swipe or new image)
+  useEffect(() => {
+    setImageLoading(true)
+    // Check if image is already loaded (cached)
+    if (imageRef.current && imageRef.current.complete && imageRef.current.naturalHeight !== 0) {
+      setImageLoading(false)
+    }
+  }, [currentIndex, displayImages[currentIndex]])
+
   // Debug log for all restaurants (only first 3 to avoid spam)
   if (restaurantId && (restaurantName === "Sagar restaurant" || restaurantName?.includes("Sagar"))) {
     console.log(`🔍🔍🔍 RestaurantImageCarousel Debug for "${restaurantName}":`, {
@@ -122,14 +133,31 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   }
 
   if (displayImages.length === 0 || !displayImages[0]) {
+    const fallbackImageRef = useRef(null)
+    const [fallbackLoading, setFallbackLoading] = useState(true)
+    
+    useEffect(() => {
+      if (fallbackImageRef.current && fallbackImageRef.current.complete && fallbackImageRef.current.naturalHeight !== 0) {
+        setFallbackLoading(false)
+      }
+    }, [])
+    
     return (
-      <div className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200">
+      <div className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
+        {fallbackLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 z-10">
+            <Loader2 className="h-8 w-8 text-green-600 dark:text-green-500 animate-spin" strokeWidth={2.5} />
+          </div>
+        )}
         <img
+          ref={fallbackImageRef}
           src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"
           alt={restaurantName}
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover transition-opacity duration-300 ${fallbackLoading ? 'opacity-0' : 'opacity-100'}`}
           style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
           loading={priority ? 'eager' : 'lazy'}
+          onLoad={() => setFallbackLoading(false)}
+          onError={() => setFallbackLoading(false)}
         />
       </div>
     )
@@ -198,17 +226,26 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
             }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
+            {/* Loading Spinner - Show while image is loading (especially during fast scroll) */}
+            {imageLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 z-10">
+                <Loader2 className="h-8 w-8 text-green-600 dark:text-green-500 animate-spin" strokeWidth={2.5} />
+              </div>
+            )}
+            
             {displayImages[currentIndex] ? (
               <>
                 {/* Use regular img tag directly for Cloudinary URLs - OptimizedImage is causing issues */}
                 <img
+                  ref={imageRef}
                   src={displayImages[currentIndex]}
                   alt={`${restaurantName} - Image ${currentIndex + 1}`}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
                   style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                   loading={priority && currentIndex === 0 ? 'eager' : 'lazy'}
                   onError={(e) => {
                     console.error(`❌ Image failed to load for "${restaurantName}":`, displayImages[currentIndex])
+                    setImageLoading(false)
                     e.target.style.display = 'none'
                     const placeholder = e.target.parentElement?.querySelector('.image-placeholder')
                     if (placeholder) {
@@ -216,18 +253,19 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                     }
                   }}
                   onLoad={() => {
+                    setImageLoading(false)
                     if (restaurantName === "Sagar Restaurant" || restaurantName?.includes("Sagar")) {
                       console.log(`✅ Image loaded successfully for "${restaurantName}":`, displayImages[currentIndex])
                     }
                   }}
                 />
                 {/* Placeholder if image fails */}
-                <div className="image-placeholder absolute inset-0 hidden items-center justify-center bg-gray-200">
+                <div className="image-placeholder absolute inset-0 hidden items-center justify-center bg-gray-200 dark:bg-gray-800">
                   <span className="text-4xl">🍽️</span>
                 </div>
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-200">
+              <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800">
                 <span className="text-4xl">🍽️</span>
               </div>
             )}
@@ -2520,54 +2558,21 @@ export default function Home() {
                   </motion.div>
                 )
               })}
-              {/* Skeleton Loading Cards - Show when loading and restaurants are already displayed (for scroll loading) */}
+              {/* Circular Loading Spinner - Show when loading and restaurants are already displayed (for scroll loading) */}
               {(isLoadingFilterResults || loadingRestaurants) && filteredRestaurants.length > 0 && (
-                Array.from({ length: 6 }).map((_, skeletonIndex) => (
-                  <motion.div
-                    key={`skeleton-loading-${skeletonIndex}`}
-                    className="h-full bg-white dark:bg-[#1a1a1a] rounded-md overflow-hidden border border-gray-200 dark:border-gray-800 relative shadow-sm"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: skeletonIndex * 0.1 }}
-                  >
-                    {/* Shimmer Overlay */}
-                    <div
-                      className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent z-20 pointer-events-none"
-                      style={{
-                        animation: 'shimmer 2s infinite'
-                      }}
-                    ></div>
-
-                    {/* Image Skeleton */}
-                    <div className="w-full h-48 sm:h-52 md:h-56 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
-                      <div className="absolute top-2 right-2 w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      {/* Title Skeleton */}
-                      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                      </div>
-                      {/* Rating Skeleton */}
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                        </div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                        </div>
-                      </div>
-                      {/* Delivery Info Skeleton */}
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                      </div>
-                      {/* Offer Skeleton */}
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"></div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
+                <motion.div
+                  key="loading-spinner"
+                  className="col-span-full flex items-center justify-center py-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 text-green-600 dark:text-green-500 animate-spin" strokeWidth={2.5} />
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Loading more restaurants...</span>
+                  </div>
+                </motion.div>
               )}
             </div>
           </div>
