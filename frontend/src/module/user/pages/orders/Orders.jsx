@@ -521,7 +521,17 @@ Order again from this restaurant in the Bakala Cart app.`
             type="text" 
             placeholder="Search by restaurant or dish" 
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              // Remove spaces from input
+              const value = e.target.value.replace(/\s/g, '')
+              setSearchQuery(value)
+            }}
+            onKeyDown={(e) => {
+              // Prevent space key from being entered
+              if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault()
+              }
+            }}
             className="flex-1 ml-3 outline-none text-gray-600 placeholder-gray-400"
           />
         </div>

@@ -398,35 +398,49 @@ export default function PocketPage() {
     ?.filter(t => t.type === 'payment' && t.description?.toLowerCase().includes('tip'))
     .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
 
-  // Payout data - calculate from completed withdrawals in previous week
-  const calculatePayoutAmount = () => {
-    const now = new Date()
-    const lastWeekStart = new Date(now)
-    lastWeekStart.setDate(now.getDate() - now.getDay() - 7) // Previous week start
-    lastWeekStart.setHours(0, 0, 0, 0)
-    const lastWeekEnd = new Date(lastWeekStart)
-    lastWeekEnd.setDate(lastWeekStart.getDate() + 6)
-    lastWeekEnd.setHours(23, 59, 59, 999)
+  // Payout data - calculate from ALL completed withdrawals (not filtered by date)
+  // Use useMemo to ensure it recalculates when walletState.transactions changes
+  const payoutAmount = useMemo(() => {
+    if (!walletState?.transactions || !Array.isArray(walletState.transactions)) {
+      console.log('📊 Payout: No transactions available')
+      return 0
+    }
 
-    return walletState.transactions
-      ?.filter(t => {
-        if (t.type !== 'withdrawal' || t.status !== 'Completed') return false
-        const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null)
-        if (!transactionDate) return false
-        return transactionDate >= lastWeekStart && transactionDate <= lastWeekEnd
-      })
-      .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
-  }
+    // Get all completed withdrawal transactions (no date filter)
+    const withdrawalTransactions = walletState.transactions.filter(t => {
+      return t.type === 'withdrawal' && t.status === 'Completed'
+    })
 
-  const payoutAmount = calculatePayoutAmount()
+    const totalPayout = withdrawalTransactions.reduce((sum, t) => sum + (Math.abs(t.amount) || 0), 0)
+
+    console.log('📊 Payout Calculation (All Completed Withdrawals):', {
+      totalTransactions: walletState.transactions.length,
+      withdrawalTransactions: withdrawalTransactions.length,
+      payoutAmount: totalPayout,
+      transactions: withdrawalTransactions.map(t => ({
+        amount: t.amount,
+        date: t.date || t.createdAt,
+        status: t.status,
+        type: t.type
+      })),
+      allWithdrawals: walletState.transactions.filter(t => t.type === 'withdrawal').map(t => ({
+        amount: t.amount,
+        date: t.date || t.createdAt,
+        status: t.status
+      }))
+    })
+
+    return totalPayout
+  }, [walletState.transactions])
   
-  // Payout period - previous week
-  const getPayoutPeriod = () => {
+  // Payout period - show "Total" or current week range
+  const payoutPeriod = useMemo(() => {
+    // Show current week range for reference
     const now = new Date()
-    const lastWeekStart = new Date(now)
-    lastWeekStart.setDate(now.getDate() - now.getDay() - 7)
-    const lastWeekEnd = new Date(lastWeekStart)
-    lastWeekEnd.setDate(lastWeekStart.getDate() + 6)
+    const currentWeekStart = new Date(now)
+    currentWeekStart.setDate(now.getDate() - now.getDay())
+    const currentWeekEnd = new Date(currentWeekStart)
+    currentWeekEnd.setDate(currentWeekStart.getDate() + 6)
 
     const formatDate = (date) => {
       const day = date.getDate()
@@ -434,10 +448,13 @@ export default function PocketPage() {
       return `${day} ${month}`
     }
 
-    return `${formatDate(lastWeekStart)} - ${formatDate(lastWeekEnd)}`
-  }
+    return `${formatDate(currentWeekStart)} - ${formatDate(currentWeekEnd)}`
+  }, [])
 
-  const payoutPeriod = getPayoutPeriod()
+  // Debug: Log payout amount changes
+  useEffect(() => {
+    console.log('📊 Payout Amount Updated:', payoutAmount, 'for period:', payoutPeriod)
+  }, [payoutAmount, payoutPeriod])
 
   // Fetch wallet data from API
   useEffect(() => {

@@ -23,7 +23,8 @@ import {
   Eye,
   MessageSquare,
   Send,
-  Plus
+  Plus,
+  Phone
 } from "lucide-react"
 import { deliveryAPI, uploadAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
@@ -1939,6 +1940,71 @@ export default function MyOrders() {
                                   </span>
                                 </div>
                               )}
+                              
+                              {/* Action Icons: Call, Chat, Location */}
+                              <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // Try multiple possible fields for customer phone number
+                                    const userPhone = order.userId?.phone || 
+                                                    order.userId?.phoneNumber ||
+                                                    order.userPhone || 
+                                                    order.address?.phone ||
+                                                    order.customerPhone ||
+                                                    order.user?.phone
+                                    
+                                    if (userPhone) {
+                                      // Remove any spaces, dashes, or special characters except +
+                                      const cleanPhone = userPhone.replace(/[\s\-\(\)]/g, '')
+                                      // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                      let phoneToCall = cleanPhone
+                                      if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                        phoneToCall = `+91${cleanPhone}`
+                                      } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                        phoneToCall = `+${cleanPhone}`
+                                      } else if (!cleanPhone.startsWith('+')) {
+                                        phoneToCall = cleanPhone
+                                      }
+                                      
+                                      console.log('📞 Calling customer:', phoneToCall)
+                                      window.location.href = `tel:${phoneToCall}`
+                                    } else {
+                                      console.error('❌ Customer phone number not found in order:', {
+                                        orderId: order.orderId || order._id,
+                                        userId: order.userId,
+                                        userPhone: order.userPhone,
+                                        address: order.address
+                                      })
+                                      toast.error('Customer phone number not available')
+                                    }
+                                  }}
+                                  className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors"
+                                  title="Call customer"
+                                >
+                                  <Phone className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenChat(order)
+                                  }}
+                                  className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors"
+                                  title="Chat with customer"
+                                >
+                                  <MessageSquare className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCustomerLocationClick(order, e)
+                                  }}
+                                  className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
+                                  title="View customer location"
+                                >
+                                  <MapPin className="w-5 h-5" />
+                                </button>
+                              </div>
                             </>
                           ) : (
                             <div className="flex items-center justify-between">
@@ -1993,34 +2059,13 @@ export default function MyOrders() {
                               isUploading={uploadingBills[order.orderId || order._id]}
                               onCameraClick={handleBillImageCapture}
                             />
-                          ) : // Phase 4: Picked up but not reached drop - show Reached Drop button with Location Icon and Chat Icon
-                            !isReachedDrop(order) && !isCancelled ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1">
-                                  <ReachedDropButton
-                                    order={order}
-                                    onReachedDrop={handleReachedDrop}
-                                  />
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleOpenChat(order)
-                                  }}
-                                  className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 shadow-sm border border-purple-100 hover:bg-purple-100 transition-colors"
-                                  title="Chat with customer"
-                                >
-                                  <MessageSquare className="w-6 h-6" />
-                                </button>
-                                <button
-                                  onClick={(e) => handleCustomerLocationClick(order, e)}
-                                  className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100"
-                                  title="View customer location"
-                                >
-                                  <MapPin className="w-6 h-6" />
-                                </button>
-                              </div>
-                            ) : // Phase 5: Reached drop but not delivered - show Order Delivered
+                            ) : // Phase 4: Picked up but not reached drop - show Reached Drop button
+                             !isReachedDrop(order) && !isCancelled ? (
+                               <ReachedDropButton
+                                 order={order}
+                                 onReachedDrop={handleReachedDrop}
+                               />
+                             ) : // Phase 5: Reached drop but not delivered - show Order Delivered
                               !isOrderDelivered(order) ? (
                                 <OrderDeliveredButton
                                   order={order}

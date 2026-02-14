@@ -191,24 +191,98 @@ export default function OrderDetailsPage() {
   const isCOD = paymentMethod === 'cash' || paymentMethod === 'cod'
   const earnings = orderData.pricing?.deliveryFee || orderData.estimatedEarnings || 0
   
-  // Calculate distance and time
+  // Calculate distance from restaurant to user's delivery location
   const getDistance = () => {
+    console.log('📏 Calculating distance - Order data:', {
+      hasSettlement: !!orderData.settlement,
+      hasDeliveryState: !!orderData.deliveryState,
+      hasAssignmentInfo: !!orderData.assignmentInfo,
+      hasEstimatedEarnings: !!orderData.estimatedEarnings,
+      hasRestaurantId: !!orderData.restaurantId,
+      hasAddress: !!orderData.address,
+      restaurantLocation: orderData.restaurantId?.location,
+      addressLocation: orderData.address?.location
+    })
+
     // Priority 1: From settlement (most accurate for delivered orders)
-    if (orderData.settlement?.deliveryPartnerEarning?.distance) {
+    if (orderData.settlement?.deliveryPartnerEarning?.distance != null && Number(orderData.settlement.deliveryPartnerEarning.distance) > 0) {
+      console.log('✅ Using distance from settlement:', orderData.settlement.deliveryPartnerEarning.distance)
       return Number(orderData.settlement.deliveryPartnerEarning.distance).toFixed(2)
     }
     // Priority 2: From routeToDelivery
-    if (orderData.deliveryState?.routeToDelivery?.distance) {
+    if (orderData.deliveryState?.routeToDelivery?.distance != null && Number(orderData.deliveryState.routeToDelivery.distance) > 0) {
+      console.log('✅ Using distance from routeToDelivery:', orderData.deliveryState.routeToDelivery.distance)
       return Number(orderData.deliveryState.routeToDelivery.distance).toFixed(2)
     }
     // Priority 3: From assignmentInfo
-    if (orderData.assignmentInfo?.distance) {
+    if (orderData.assignmentInfo?.distance != null && Number(orderData.assignmentInfo.distance) > 0) {
+      console.log('✅ Using distance from assignmentInfo:', orderData.assignmentInfo.distance)
       return Number(orderData.assignmentInfo.distance).toFixed(2)
     }
     // Priority 4: From estimatedEarnings
-    if (orderData.estimatedEarnings?.distance) {
+    if (orderData.estimatedEarnings?.distance != null && Number(orderData.estimatedEarnings.distance) > 0) {
+      console.log('✅ Using distance from estimatedEarnings:', orderData.estimatedEarnings.distance)
       return Number(orderData.estimatedEarnings.distance).toFixed(2)
     }
+    
+    // Priority 5: Calculate from restaurant to customer delivery address coordinates
+    // This is the main calculation - restaurant location to user's delivery location
+    let restaurantLat = null
+    let restaurantLng = null
+    let customerLat = null
+    let customerLng = null
+
+    // Extract restaurant coordinates
+    if (orderData.restaurantId?.location?.coordinates && Array.isArray(orderData.restaurantId.location.coordinates) && orderData.restaurantId.location.coordinates.length >= 2) {
+      // GeoJSON format: [longitude, latitude]
+      restaurantLng = orderData.restaurantId.location.coordinates[0]
+      restaurantLat = orderData.restaurantId.location.coordinates[1]
+      console.log('📍 Restaurant coordinates from array:', { lat: restaurantLat, lng: restaurantLng })
+    } else if (orderData.restaurantId?.location?.latitude && orderData.restaurantId?.location?.longitude) {
+      restaurantLat = orderData.restaurantId.location.latitude
+      restaurantLng = orderData.restaurantId.location.longitude
+      console.log('📍 Restaurant coordinates from lat/lng fields:', { lat: restaurantLat, lng: restaurantLng })
+    }
+
+    // Extract customer delivery address coordinates
+    if (orderData.address?.location?.coordinates && Array.isArray(orderData.address.location.coordinates) && orderData.address.location.coordinates.length >= 2) {
+      // GeoJSON format: [longitude, latitude]
+      customerLng = orderData.address.location.coordinates[0]
+      customerLat = orderData.address.location.coordinates[1]
+      console.log('📍 Customer coordinates from array:', { lat: customerLat, lng: customerLng })
+    } else if (orderData.address?.location?.latitude && orderData.address?.location?.longitude) {
+      customerLat = orderData.address.location.latitude
+      customerLng = orderData.address.location.longitude
+      console.log('📍 Customer coordinates from lat/lng fields:', { lat: customerLat, lng: customerLng })
+    }
+
+    // Calculate distance if we have both coordinates
+    if (restaurantLat != null && restaurantLng != null && customerLat != null && customerLng != null) {
+      try {
+        // Haversine formula to calculate distance in km
+        const R = 6371 // Earth radius in km
+        const dLat = (customerLat - restaurantLat) * Math.PI / 180
+        const dLng = (customerLng - restaurantLng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(restaurantLat * Math.PI / 180) * Math.cos(customerLat * Math.PI / 180) *
+          Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        const distance = R * c
+        
+        console.log('✅ Calculated distance (Restaurant → Customer):', distance.toFixed(2), 'km')
+        if (distance > 0) {
+          return distance.toFixed(2)
+        }
+      } catch (e) {
+        console.error('❌ Error calculating distance from coordinates:', e)
+      }
+    } else {
+      console.warn('⚠️ Missing coordinates for distance calculation:', {
+        hasRestaurantCoords: !!(restaurantLat && restaurantLng),
+        hasCustomerCoords: !!(customerLat && customerLng)
+      })
+    }
+    
     return null
   }
   
@@ -450,30 +524,77 @@ export default function OrderDetailsPage() {
               <h2 className="text-lg font-semibold text-gray-900">Price Breakdown</h2>
             </div>
             <div className="space-y-2">
-              {orderData.pricing.subtotal != null && Number(orderData.pricing.subtotal) > 0 && (
+              {/* Subtotal - Always show if exists */}
+              {orderData.pricing.subtotal != null && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm text-gray-600">Subtotal</span>
-                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.subtotal).toFixed(2)}</span>
+                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.subtotal || 0).toFixed(2)}</span>
                 </div>
               )}
-              {orderData.pricing.deliveryFee != null && Number(orderData.pricing.deliveryFee) > 0 && (
+              
+              {/* Packaging Fee */}
+              {orderData.pricing.packagingFee != null && Number(orderData.pricing.packagingFee) > 0 && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600">Packaging Fee</span>
+                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.packagingFee).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Platform Fee */}
+              {orderData.pricing.platformFee != null && Number(orderData.pricing.platformFee) > 0 && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600">Platform Fee</span>
+                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.platformFee).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Delivery Fee */}
+              {orderData.pricing.deliveryFee != null && (
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm text-gray-600">Delivery Fee</span>
-                  <span className="text-sm font-medium text-green-600">₹{Number(orderData.pricing.deliveryFee).toFixed(2)}</span>
+                  <span className="text-sm font-medium text-green-600">₹{Number(orderData.pricing.deliveryFee || 0).toFixed(2)}</span>
                 </div>
               )}
-              {orderData.pricing.tax != null && Number(orderData.pricing.tax) > 0 && (
+              
+              {/* Tax / GST */}
+              {(orderData.pricing.tax != null || orderData.pricing.gst != null) && (
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600">Tax</span>
-                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.tax).toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">Tax (GST)</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    ₹{Number(orderData.pricing.tax || orderData.pricing.gst || 0).toFixed(2)}
+                  </span>
                 </div>
               )}
-              {orderData.pricing.discount != null && Number(orderData.pricing.discount) > 0 && (
+              
+              {/* Discount / Coupon Discount */}
+              {(orderData.pricing.discount != null || orderData.pricing.couponDiscount != null) && (
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600">Discount</span>
-                  <span className="text-sm font-medium text-red-600">-₹{Number(orderData.pricing.discount).toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">
+                    Discount{orderData.pricing.couponCode ? ` (${orderData.pricing.couponCode})` : ''}
+                  </span>
+                  <span className="text-sm font-medium text-red-600">
+                    -₹{Number(orderData.pricing.discount || orderData.pricing.couponDiscount || 0).toFixed(2)}
+                  </span>
                 </div>
               )}
+              
+              {/* Service Charge */}
+              {orderData.pricing.serviceCharge != null && Number(orderData.pricing.serviceCharge) > 0 && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600">Service Charge</span>
+                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.serviceCharge).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Convenience Fee */}
+              {orderData.pricing.convenienceFee != null && Number(orderData.pricing.convenienceFee) > 0 && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600">Convenience Fee</span>
+                  <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.convenienceFee).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Total - Always show */}
               <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-2">
                 <span className="text-base font-bold text-gray-900">Total</span>
                 <span className="text-lg font-bold text-[#ff8100]">₹{(orderData.pricing.total || 0).toFixed(2)}</span>

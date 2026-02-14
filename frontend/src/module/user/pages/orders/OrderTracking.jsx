@@ -111,9 +111,6 @@ export default function OrderTracking() {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
-  const [showNoteDialog, setShowNoteDialog] = useState(false)
-  const [orderNote, setOrderNote] = useState("")
-  const [isUpdatingNote, setIsUpdatingNote] = useState(false)
 
   // Chat State
   const [chatOpen, setChatOpen] = useState(false);
@@ -153,28 +150,6 @@ export default function OrderTracking() {
     }
   }
 
-  // Sync orderNote with order.note
-  useEffect(() => {
-    if (order?.note) {
-      setOrderNote(order.note)
-    }
-  }, [order?.note])
-
-  const handleUpdateNote = async () => {
-    try {
-      setIsUpdatingNote(true)
-      const res = await orderAPI.updateOrderNote(order._id || order.orderId || orderId, orderNote)
-      if (res.data.success) {
-        toast.success("Delivery instructions updated")
-        setOrder(prev => ({ ...prev, note: orderNote }))
-        setShowNoteDialog(false)
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to update instructions")
-    } finally {
-      setIsUpdatingNote(false)
-    }
-  }
 
   // Initialize Socket for Chat
   useEffect(() => {
@@ -472,6 +447,18 @@ export default function OrderTracking() {
             apiOrder.restaurantId?.ownerPhone ||
             apiOrder.restaurantPhone ||
             '';
+          
+          // Debug logging for restaurant phone
+          if (!restaurantPhone) {
+            console.warn('⚠️ Restaurant phone not found:', {
+              hasRestaurantId: !!apiOrder.restaurantId,
+              restaurantIdType: typeof apiOrder.restaurantId,
+              restaurantIdKeys: apiOrder.restaurantId ? Object.keys(apiOrder.restaurantId) : [],
+              restaurantIdPhone: apiOrder.restaurantId?.phone,
+              restaurantIdOwnerPhone: apiOrder.restaurantId?.ownerPhone,
+              restaurantPhone: apiOrder.restaurantPhone
+            });
+          }
 
           // Transform API order to match component structure
           const transformedOrder = {
@@ -504,14 +491,16 @@ export default function OrderTracking() {
             })) || [],
             total: apiOrder.pricing?.total || 0,
             status: apiOrder.status || 'pending',
-            deliveryPartner: apiOrder.deliveryPartnerId ? {
-              name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
-              avatar: null
-            } : null,
+          deliveryPartner: apiOrder.deliveryPartnerId ? {
+            name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
+            phone: apiOrder.deliveryPartnerId.phone || apiOrder.deliveryPartnerId.phoneNumber || null,
+            avatar: null
+          } : null,
             deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
             assignmentInfo: apiOrder.assignmentInfo || null,
             tracking: apiOrder.tracking || {},
-            deliveryState: apiOrder.deliveryState || null
+            deliveryState: apiOrder.deliveryState || null,
+            billImageUrl: apiOrder.billImageUrl || null
           }
 
           setOrder(transformedOrder)
@@ -694,6 +683,18 @@ export default function OrderTracking() {
           apiOrder.restaurantId?.ownerPhone ||
           apiOrder.restaurantPhone ||
           '';
+        
+        // Debug logging for restaurant phone
+        if (!restaurantPhone) {
+          console.warn('⚠️ Restaurant phone not found:', {
+            hasRestaurantId: !!apiOrder.restaurantId,
+            restaurantIdType: typeof apiOrder.restaurantId,
+            restaurantIdKeys: apiOrder.restaurantId ? Object.keys(apiOrder.restaurantId) : [],
+            restaurantIdPhone: apiOrder.restaurantId?.phone,
+            restaurantIdOwnerPhone: apiOrder.restaurantId?.ownerPhone,
+            restaurantPhone: apiOrder.restaurantPhone
+          });
+        }
 
         const transformedOrder = {
           id: apiOrder.orderId || apiOrder._id,
@@ -727,9 +728,14 @@ export default function OrderTracking() {
           status: apiOrder.status || 'pending',
           deliveryPartner: apiOrder.deliveryPartnerId ? {
             name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
+            phone: apiOrder.deliveryPartnerId.phone || apiOrder.deliveryPartnerId.phoneNumber || null,
             avatar: null
           } : null,
-          tracking: apiOrder.tracking || {}
+          deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
+          assignmentInfo: apiOrder.assignmentInfo || null,
+          tracking: apiOrder.tracking || {},
+          deliveryState: apiOrder.deliveryState || null,
+          billImageUrl: apiOrder.billImageUrl || null
         }
         setOrder(transformedOrder)
 
@@ -754,14 +760,23 @@ export default function OrderTracking() {
   }
 
   const handleCallRestaurant = () => {
-    const phone = order?.restaurantPhone
+    const phone = order?.restaurantPhone || 
+                  order?.restaurantId?.phone || 
+                  order?.restaurantId?.ownerPhone
     if (!phone) {
       toast.error("Restaurant phone number not available")
       return
     }
     // Clean the phone number (remove spaces, dashes, etc. but keep +)
-    const cleanedPhone = String(phone).replace(/[^\d+]/g, "")
-    window.location.href = `tel:${cleanedPhone}`
+    let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
+    // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+    if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+      cleanPhone = `+91${cleanPhone}`
+    } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+      cleanPhone = `+${cleanPhone}`
+    }
+    console.log('📞 Calling restaurant:', cleanPhone)
+    window.location.href = `tel:${cleanPhone}`
   }
 
   // Loading state
@@ -926,41 +941,6 @@ export default function OrderTracking() {
         </div>
       </motion.div>
 
-      {/* Delivery Instructions Dialog */}
-      <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delivery Instructions</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Textarea
-              placeholder="e.g. Leave it at the gate, building name, landmark, etc."
-              value={orderNote}
-              onChange={(e) => setOrderNote(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowNoteDialog(false)}
-                disabled={isUpdatingNote}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateNote}
-                disabled={isUpdatingNote}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isUpdatingNote ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                Update Instructions
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
@@ -1097,15 +1077,6 @@ export default function OrderTracking() {
             })()}
             showArrow={false}
           />
-          <SectionItem
-            icon={MessageSquare}
-            title={order?.note ? "Delivery instructions" : "Add delivery instructions"}
-            subtitle={order?.note || "Add directions, building details, etc."}
-            onClick={() => {
-              setOrderNote(order?.note || "")
-              setShowNoteDialog(true)
-            }}
-          />
         </motion.div>
 
         {/* Chat with Delivery Partner */}
@@ -1115,30 +1086,110 @@ export default function OrderTracking() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.72 }}
         >
-          <SectionItem
-            icon={MessageSquare}
-            title="Chat with Delivery Partner"
-            subtitle={order?.deliveryPartnerId ? "Chat with your delivery partner" : "Available when delivery partner is assigned"}
-            onClick={() => {
-              if (order?.deliveryPartnerId) {
-                setChatOpen(true);
-              } else {
-                toast.error("Chat will be available once a delivery partner is assigned", { icon: "🔒" });
-              }
-            }}
-            rightContent={
-              order?.deliveryPartnerId ? (
-                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                  Open Chat
-                </div>
-              ) : (
-                <div className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> Locked
-                </div>
-              )
-            }
-          />
+          {(() => {
+            // Check if delivery partner is assigned
+            const hasDeliveryPartner = !!order?.deliveryPartnerId;
+            
+            // Check if bill is uploaded and pickup is confirmed
+            const isPickupConfirmed = 
+              order?.billImageUrl && 
+              (order?.deliveryState?.status === 'picked_up' || 
+               order?.status === 'out_for_delivery' ||
+               order?.deliveryState?.currentPhase === 'en_route_to_delivery');
+            
+            // Chat is only available if delivery partner is assigned AND pickup is confirmed
+            const isChatEnabled = hasDeliveryPartner && isPickupConfirmed;
+            
+            return (
+              <SectionItem
+                icon={MessageSquare}
+                title="Chat with Delivery Partner"
+                subtitle={
+                  !hasDeliveryPartner 
+                    ? "Available when delivery partner is assigned"
+                    : !isPickupConfirmed
+                    ? "Chat will be available after delivery partner confirms pickup"
+                    : "Chat with your delivery partner"
+                }
+                onClick={() => {
+                  if (isChatEnabled) {
+                    setChatOpen(true);
+                  } else if (!hasDeliveryPartner) {
+                    toast.error("Chat will be available once a delivery partner is assigned", { icon: "🔒" });
+                  } else {
+                    toast.error("Chat will be available after delivery partner uploads bill and confirms pickup", { icon: "🔒" });
+                  }
+                }}
+                rightContent={
+                  isChatEnabled ? (
+                    <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                      Open Chat
+                    </div>
+                  ) : (
+                    <div className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <Shield className="w-3 h-3" /> Locked
+                    </div>
+                  )
+                }
+              />
+            );
+          })()}
         </motion.div>
+
+        {/* Delivery Partner Contact - Show name and call icon */}
+        {order?.deliveryPartner && order?.deliveryPartnerId && (
+          <motion.div
+            className="bg-white rounded-xl shadow-sm overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.73 }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Phone className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">
+                      {order.deliveryPartner.name || 'Delivery Partner'}
+                    </p>
+                    {order.deliveryPartner.phone && (
+                      <p className="text-sm text-gray-500">
+                        {order.deliveryPartner.phone}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {order.deliveryPartner.phone && (
+                  <button
+                    onClick={() => {
+                      const deliveryPhone = order.deliveryPartner.phone
+                      if (deliveryPhone) {
+                        // Clean the phone number (remove spaces, dashes, etc. but keep +)
+                        let cleanPhone = String(deliveryPhone).replace(/[\s\-\(\)]/g, '')
+                        // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                          cleanPhone = `+91${cleanPhone}`
+                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                          cleanPhone = `+${cleanPhone}`
+                        }
+                        console.log('📞 Calling delivery partner:', cleanPhone)
+                        window.location.href = `tel:${cleanPhone}`
+                      } else {
+                        toast.error('Delivery partner phone number not available')
+                      }
+                    }}
+                    className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors shrink-0"
+                    title="Call delivery partner"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Restaurant Section */}
         <motion.div
