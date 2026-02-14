@@ -1659,6 +1659,11 @@ export const orderAPI = {
   updateOrderNote: (orderId, note) => {
     return apiClient.patch(`/order/${orderId}/note`, { note });
   },
+
+  // Submit order review
+  submitReview: (orderId, reviewData) => {
+    return apiClient.post(API_ENDPOINTS.ORDER.REVIEW.replace(':id', orderId), reviewData);
+  },
 };
 
 // Export hero banner API helper functions

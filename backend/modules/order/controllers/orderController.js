@@ -1355,3 +1355,143 @@ export const updateOrderNote = async (req, res) => {
   }
 };
 
+/**
+ * Submit order review and rating
+ * POST /api/order/:id/review
+ */
+export const submitOrderReview = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be between 1 and 5'
+      });
+    }
+
+    // Find order by MongoDB _id or orderId
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
+      order = await Order.findOne({
+        _id: id,
+        userId
+      });
+    }
+
+    if (!order) {
+      order = await Order.findOne({
+        orderId: id,
+        userId
+      });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Check if order is delivered
+    const isDelivered = order.status === 'delivered' ||
+      (order.tracking && order.tracking.delivered && order.tracking.delivered.status === true);
+
+    if (!isDelivered) {
+      return res.status(400).json({
+        success: false,
+        message: 'You can only review delivered orders'
+      });
+    }
+
+    // Update order review
+    order.review = {
+      rating: parseInt(rating),
+      comment: comment || '',
+      submittedAt: new Date(),
+      reviewedBy: userId
+    };
+
+    await order.save();
+
+    // Update Restaurant average rating
+    try {
+      const restaurantId = order.restaurantId;
+      if (restaurantId) {
+        // Calculate new average rating for the restaurant
+        // Match both string and ObjectId restaurantId to be safe
+        const matchQuery = {
+          $or: [
+            { restaurantId: restaurantId },
+            { restaurantId: restaurantId.toString() }
+          ],
+          'review.rating': { $exists: true, $ne: null }
+        };
+
+        // If it's a valid ObjectId, add it to the match query
+        if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+          matchQuery.$or.push({ restaurantId: new mongoose.Types.ObjectId(restaurantId) });
+        }
+
+        const stats = await Order.aggregate([
+          { $match: matchQuery },
+          {
+            $group: {
+              _id: null,
+              avgRating: { $avg: '$review.rating' },
+              totalRatings: { $sum: 1 }
+            }
+          }
+        ]);
+
+        if (stats.length > 0) {
+          const { avgRating, totalRatings } = stats[0];
+
+          // Update the restaurant document
+          const restaurantQuery = {
+            $or: [
+              { restaurantId: restaurantId },
+              { restaurantId: restaurantId.toString() }
+            ]
+          };
+
+          if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+            restaurantQuery.$or.push({ _id: new mongoose.Types.ObjectId(restaurantId) });
+          }
+
+          await Restaurant.findOneAndUpdate(
+            restaurantQuery,
+            {
+              $set: {
+                rating: Math.round(avgRating * 10) / 10,
+                totalRatings: totalRatings
+              }
+            }
+          );
+
+          logger.info(`✅ Updated restaurant ${restaurantId} rating to ${Math.round(avgRating * 10) / 10} based on ${totalRatings} reviews`);
+        }
+      }
+    } catch (restErr) {
+      logger.error('❌ Error updating restaurant rating:', restErr);
+    }
+
+    res.json({
+      success: true,
+      message: 'Review submitted successfully',
+      data: {
+        orderId: order.orderId,
+        review: order.review
+      }
+    });
+  } catch (error) {
+    logger.error(`Error submitting order review: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit review'
+    });
+  }
+};
+

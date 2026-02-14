@@ -11,6 +11,7 @@ import { useProfile } from "../../context/ProfileContext"
 import { useOrders } from "../../context/OrdersContext"
 import { useLocation as useUserLocation } from "../../hooks/useLocation"
 import { useZone } from "../../hooks/useZone"
+import { useLocationSelector } from "../../components/UserLayout"
 import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
@@ -85,6 +86,7 @@ export default function Cart() {
   const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
   const { createOrder } = useOrders()
   const { location: currentLocation } = useUserLocation() // Get live location address
+  const { openLocationSelector } = useLocationSelector()
   const { zoneId } = useZone(currentLocation) // Get user's zone
 
   const [showCoupons, setShowCoupons] = useState(false)
@@ -604,8 +606,11 @@ export default function Cart() {
   // Handler to select address by label (Home, Office, Other)
   const handleSelectAddressByLabel = async (label) => {
     try {
-      // Find address with matching label
-      const address = addresses.find(addr => addr.label === label)
+      // Find address with matching label (handle Office/Work interchangeably)
+      const address = addresses.find(addr =>
+        addr.label === label ||
+        (label === "Office" && addr.label === "Work")
+      )
 
       if (!address) {
         toast.error(`No ${label} address found. Please add an address first.`)
@@ -622,31 +627,41 @@ export default function Cart() {
         return
       }
 
+      // Format location data with comma before zipCode to ensure > 4 parts for useLocation hook compatibility
+      const street = address.street || ""
+      const city = address.city || ""
+      const state = address.state || ""
+      const area = address.additionalDetails || ""
+      const zipCode = address.zipCode || ""
+
+      const formattedAddr = area
+        ? `${area}, ${street}, ${city}, ${state}, ${zipCode}`
+        : `${street}, ${city}, ${state}, ${zipCode}`
+
       // Update location in backend
       await userAPI.updateLocation({
         latitude,
         longitude,
-        address: `${address.street}, ${address.city}`,
-        city: address.city,
-        state: address.state,
-        area: address.additionalDetails || "",
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        address: `${street}, ${city}`,
+        city,
+        state,
+        area,
+        zipCode,
+        formattedAddress: formattedAddr
       })
 
       // Update the location in localStorage
       const locationData = {
-        city: address.city,
-        state: address.state,
-        address: `${address.street}, ${address.city}`,
-        area: address.additionalDetails || "",
-        zipCode: address.zipCode,
+        city,
+        state,
+        address: `${street}, ${city}`,
+        area,
+        zipCode,
         latitude,
         longitude,
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        formattedAddress: formattedAddr,
+        isManual: true, // Mark as manual selection to prevent GPS overwrite
+        timestamp: Date.now()
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
 
@@ -1495,11 +1510,14 @@ export default function Cart() {
 
               {/* Delivery Address */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link className="flex items-center justify-between">
+                <div
+                  className="flex items-center justify-between cursor-pointer group"
+                  onClick={openLocationSelector}
+                >
                   <div className="flex items-center gap-3 md:gap-4">
-                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
+                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-orange transition-colors" />
                     <div className="flex-1">
-                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
+                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 group-hover:text-primary-orange transition-colors">
                         Delivery at <span className="font-semibold">Location</span>
                       </p>
                       <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -1508,7 +1526,10 @@ export default function Cart() {
                       {/* Address Selection Buttons */}
                       <div className="flex gap-2 mt-2">
                         {["Home", "Office", "Other"].map((label) => {
-                          const addressExists = addresses.some(addr => addr.label === label)
+                          const addressExists = addresses.some(addr =>
+                            addr.label === label ||
+                            (label === "Office" && addr.label === "Work")
+                          )
                           return (
                             <button
                               key={label}
@@ -1530,8 +1551,8 @@ export default function Cart() {
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                </Link>
+                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-primary-orange transition-colors" />
+                </div>
               </div>
 
               {/* Contact */}

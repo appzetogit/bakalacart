@@ -6,7 +6,8 @@ import {
   getOrderDetails,
   calculateOrder,
   cancelOrder,
-  updateOrderNote
+  updateOrderNote,
+  submitOrderReview
 } from '../controllers/orderController.js';
 import { authenticate } from '../../auth/middleware/auth.js';
 
@@ -36,6 +37,9 @@ router.patch('/:id/cancel', cancelOrder);
 
 // Update order note (delivery instructions)
 router.patch('/:id/note', updateOrderNote);
+
+// Submit order review and rating
+router.post('/:id/review', submitOrderReview);
 
 export default router;
 
