@@ -36,6 +36,40 @@ export const loadRazorpayScript = () => {
 };
 
 /**
+ * Detect if running in APK/WebView context
+ */
+export const isMobileContext = () => {
+  try {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') {
+      return false;
+    }
+
+    const userAgent = navigator.userAgent || '';
+
+    // Check for webview indicators
+    const isWebView = /wv|WebView/i.test(userAgent);
+
+    // Check for standalone mode (PWA)
+    const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+
+    // Check for iOS standalone
+    const isIOSStandalone = window.navigator.standalone === true;
+
+    // Check for mobile device
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+    // Check for Flutter bridge or Android bridge
+    const hasNativeBridge = typeof window.flutter_inappwebview !== 'undefined' ||
+      typeof window.Android !== 'undefined';
+
+    return isWebView || isStandalone || isIOSStandalone || (isMobileDevice && hasNativeBridge) || (window.self !== window.top);
+  } catch (error) {
+    console.error('Error detecting mobile context:', error);
+    return false;
+  }
+};
+
+/**
  * Initialize Razorpay payment
  * @param {Object} options - Payment options
  * @param {String} options.key - Razorpay key ID
@@ -61,6 +95,9 @@ export const initRazorpayPayment = async (options) => {
       throw new Error('Razorpay SDK not available');
     }
 
+    const isMobile = isMobileContext();
+    const isInIframe = window.self !== window.top;
+
     const razorpayOptions = {
       key: options.key,
       amount: options.amount,
@@ -78,13 +115,13 @@ export const initRazorpayPayment = async (options) => {
       theme: {
         color: '#E23744'
       },
-      handler: function(response) {
+      handler: function (response) {
         if (options.handler) {
           options.handler(response);
         }
       },
       modal: {
-        ondismiss: function() {
+        ondismiss: function () {
           if (options.onClose) {
             options.onClose();
           }
@@ -93,7 +130,48 @@ export const initRazorpayPayment = async (options) => {
         escape: true,
         animation: true
       },
-      // Ensure proper z-index
+      // Essential for WebView / Mobile App UPI intent
+      webview_intent: true,
+      // Enhanced configuration to show UPI icons (GPay, PhonePe, Paytm)
+      // Matches the configuration from RentYatra project
+      config: isMobile || isInIframe ? undefined : {
+        display: {
+          blocks: {
+            upi: {
+              name: "UPI",
+              instruments: [
+                {
+                  method: "upi",
+                  flows: ["qr", "intent"],
+                },
+              ],
+            },
+            banks: {
+              name: "Other Payment Methods",
+              instruments: [
+                {
+                  method: "upi",
+                  flows: ["collect"],
+                },
+                {
+                  method: "card",
+                },
+                {
+                  method: "netbanking",
+                },
+                {
+                  method: "wallet",
+                },
+              ],
+            },
+          },
+          sequence: ["block.upi", "block.banks"],
+          preferences: {
+            show_default_blocks: false,
+          },
+        },
+      },
+      // Ensure proper retry logic
       retry: {
         enabled: true,
         max_count: 3
@@ -101,9 +179,9 @@ export const initRazorpayPayment = async (options) => {
     };
 
     const razorpay = new window.Razorpay(razorpayOptions);
-    
+
     // Handle payment failures
-    razorpay.on('payment.failed', function(response) {
+    razorpay.on('payment.failed', function (response) {
       console.error('Razorpay payment failed:', response);
       if (options.onError) {
         options.onError(response.error || { description: 'Payment failed. Please try again.' });
@@ -111,7 +189,7 @@ export const initRazorpayPayment = async (options) => {
     });
 
     // Handle payment method selection failures
-    razorpay.on('payment.method_selection_failed', function(response) {
+    razorpay.on('payment.method_selection_failed', function (response) {
       console.error('Razorpay payment method selection failed:', response);
       if (options.onError) {
         options.onError(response.error || { description: 'Please select another payment method.' });
@@ -120,12 +198,14 @@ export const initRazorpayPayment = async (options) => {
 
     // Open Razorpay modal
     razorpay.open();
-    
+
     console.log('✅ Razorpay checkout opened successfully');
     console.log('Razorpay options:', {
       key: razorpayOptions.key ? 'Present' : 'Missing',
       amount: razorpayOptions.amount,
-      order_id: razorpayOptions.order_id
+      order_id: razorpayOptions.order_id,
+      isMobile,
+      hasConfig: !!razorpayOptions.config
     });
 
     return razorpay;
@@ -146,4 +226,5 @@ export const initRazorpayPayment = async (options) => {
 export const formatAmount = (amount) => {
   return `₹${(amount / 100).toFixed(2)}`;
 };
+
 
