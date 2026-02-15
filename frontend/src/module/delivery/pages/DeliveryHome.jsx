@@ -6126,21 +6126,22 @@ export default function DeliveryHome() {
         try {
           map = new window.google.maps.Map(mapContainerRef.current, {
             center: initialCenter,
-            zoom: 14, // Reduced from 18 to prevent excessive zoom
-            minZoom: 10, // Minimum zoom level (city/area view)
-            maxZoom: 21, // Maximum zoom level - allow full zoom
+            zoom: 14,
+            minZoom: 10,
+            maxZoom: 21,
             mapTypeId: mapTypeId,
             tilt: 45,
             heading: 0,
-            disableDefaultUI: true,
+            gestureHandling: "greedy",
+            rotateControl: true,
             zoomControl: false,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
-            rotateControl: true,
-            gestureHandling: "greedy",
-            heading: 0,
-            tilt: 45
+            scaleControl: false,
+            panControl: false,
+            clickableIcons: false,
+            isFractionalZoomEnabled: true
           });
         } catch (mapError) {
           console.error('❌ Error creating Google Map:', mapError);
@@ -6450,21 +6451,22 @@ export default function DeliveryHome() {
 
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: initialCenter,
-          zoom: 14, // Reduced from 18 to prevent excessive zoom
+          zoom: 14,
           minZoom: 10,
           maxZoom: 21,
           mapTypeId: window.google.maps.MapTypeId?.ROADMAP || 'roadmap',
           tilt: 45,
           heading: 0,
-          disableDefaultUI: true,
+          gestureHandling: "greedy",
+          rotateControl: true,
           zoomControl: false,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
-          rotateControl: true,
-          gestureHandling: "greedy",
-          heading: 0,
-          tilt: 45
+          scaleControl: false,
+          panControl: false,
+          clickableIcons: false,
+          isFractionalZoomEnabled: true
         })
 
         window.deliveryMapInstance = map
@@ -11282,6 +11284,7 @@ export default function DeliveryHome() {
                 right: 0,
                 bottom: 0,
                 pointerEvents: 'auto',
+                touchAction: 'none',
                 zIndex: 0
               }}
             />
