@@ -114,23 +114,23 @@ export default function OrderTracking() {
   const defaultAddress = getDefaultAddress()
 
 
-  // Initialize Socket for Chat
+  // Initialize Socket for Order Tracking
   useEffect(() => {
     if (!orderId) return;
 
-    // Connect to socket
+    // Connect to socket for order tracking
     const newSocket = io(SOCKET_URL);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('✅ Connected to chat socket');
-      // Join order room to listen for messages and tracking
+      console.log('✅ Connected to order tracking socket');
+      // Join order room to listen for order status updates
       // Join with orderId from params (could be ORD-xxx or MongoDB _id)
       newSocket.emit('join-order-tracking', orderId);
       console.log('✅ Joined order room with orderId:', orderId);
       
       // Also join with order._id if available and different from orderId
-      // This ensures we receive messages sent to either format
+      // This ensures we receive updates sent to either format
       if (order?._id && order._id !== orderId) {
         newSocket.emit('join-order-tracking', order._id);
         console.log('✅ Also joined order room with MongoDB _id:', order._id);
@@ -143,17 +143,18 @@ export default function OrderTracking() {
       }
     });
     
-    // Handle connection errors
+    // Handle connection errors - silently handle, don't show error to user
     newSocket.on('connect_error', (error) => {
       console.error('❌ Socket connection error:', error);
-      toast.error('Failed to connect to chat. Please try again.');
+      // Don't show error toast - socket connection is optional for order tracking
+      // Order status will still update via polling if socket fails
     });
     
     // Handle disconnection
     newSocket.on('disconnect', (reason) => {
       console.warn('⚠️ Socket disconnected:', reason);
       if (reason === 'io server disconnect') {
-        // Server disconnected the socket, try to reconnect
+        // Server disconnected the socket, try to reconnect silently
         newSocket.connect();
       }
     });
@@ -168,7 +169,7 @@ export default function OrderTracking() {
   useEffect(() => {
     if (!socket || !order) return;
 
-    // Join with all possible orderId formats to ensure we receive all messages
+    // Join with all possible orderId formats to ensure we receive all order updates
     const orderIds = [
       order._id,
       order.orderId,

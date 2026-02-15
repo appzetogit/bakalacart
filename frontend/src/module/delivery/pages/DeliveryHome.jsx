@@ -5909,10 +5909,24 @@ export default function DeliveryHome() {
           attempts++;
         }
 
-        if (window.google && window.google.maps) {
+        if (window.google && window.google.maps && typeof window.google.maps.Map === 'function') {
           console.log('✅ Google Maps loaded via script tag');
           await initializeGoogleMap();
           return;
+        } else if (window.google && window.google.maps) {
+          console.log('⚠️ Google Maps API loaded but Map constructor not ready, waiting...');
+          // Wait for Map constructor to be available
+          let attempts = 0;
+          const maxAttempts = 30; // 3 seconds
+          while (attempts < maxAttempts && typeof window.google?.maps?.Map !== 'function') {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+          }
+          if (typeof window.google?.maps?.Map === 'function') {
+            console.log('✅ Google Maps Map constructor now available');
+            await initializeGoogleMap();
+            return;
+          }
         }
       }
 
@@ -5954,9 +5968,25 @@ export default function DeliveryHome() {
           attempts++;
         }
 
-        if (window.google && window.google.maps) {
+        if (window.google && window.google.maps && typeof window.google.maps.Map === 'function') {
           console.log('✅ Google Maps loaded via script tag');
           await initializeGoogleMap();
+        } else if (window.google && window.google.maps) {
+          console.log('⚠️ Google Maps API loaded but Map constructor not ready, waiting...');
+          // Wait for Map constructor to be available
+          let attempts = 0;
+          const maxAttempts = 30; // 3 seconds
+          while (attempts < maxAttempts && typeof window.google?.maps?.Map !== 'function') {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+          }
+          if (typeof window.google?.maps?.Map === 'function') {
+            console.log('✅ Google Maps Map constructor now available');
+            await initializeGoogleMap();
+          } else {
+            console.error('❌ Google Maps Map constructor failed to load');
+            setMapLoading(false);
+          }
         } else {
           console.error('❌ Google Maps failed to load');
           setMapLoading(false);
@@ -5976,8 +6006,8 @@ export default function DeliveryHome() {
       }
 
       // Initialize map once Google Maps is fully loaded
-      // Check for both maps and MapTypeId to ensure API is fully initialized
-      if (window.google && window.google.maps) {
+      // Check for both maps and Map constructor to ensure API is fully initialized
+      if (window.google && window.google.maps && typeof window.google.maps.Map === 'function') {
         // MapTypeId might still not be available, but we have a fallback
         if (!window.google.maps.MapTypeId) {
           console.warn('⚠️ MapTypeId not available, will use string fallback');
@@ -5988,7 +6018,9 @@ export default function DeliveryHome() {
         console.error('❌ API status:', {
           google: !!window.google,
           maps: !!window.google?.maps,
-          MapTypeId: !!window.google?.maps?.MapTypeId
+          MapTypeId: !!window.google?.maps?.MapTypeId,
+          Map: typeof window.google?.maps?.Map,
+          MapIsFunction: typeof window.google?.maps?.Map === 'function'
         });
         setMapLoading(false);
       }
@@ -6018,6 +6050,19 @@ export default function DeliveryHome() {
 
         if (!window.google || !window.google.maps) {
           console.error('❌ Google Maps API not available');
+          setMapLoading(false);
+          return;
+        }
+
+        // Check if Map constructor is available
+        if (typeof window.google.maps.Map !== 'function') {
+          console.error('❌ Google Maps Map constructor not available');
+          console.error('❌ Google Maps API status:', {
+            google: !!window.google,
+            maps: !!window.google?.maps,
+            Map: typeof window.google?.maps?.Map,
+            MapConstructor: window.google?.maps?.Map
+          });
           setMapLoading(false);
           return;
         }
