@@ -3,6 +3,7 @@ import io from 'socket.io-client';
 import { API_BASE_URL } from '@/lib/api/config';
 import { restaurantAPI } from '@/lib/api';
 import alertSound from '@/assets/audio/restaurant aacept ringtone.mp3';
+import { addRestaurantNotification } from '../utils/notifications';
 
 /**
  * Hook for restaurant to receive real-time order notifications with sound
@@ -289,6 +290,15 @@ export const useRestaurantNotifications = () => {
       console.log('📦 New order received:', orderData);
       setNewOrder(orderData);
 
+      // Save notification to localStorage
+      addRestaurantNotification({
+        type: 'order',
+        title: '🔔 New Order Received!',
+        message: `Order #${orderData.orderId || orderData.orderMongoId || 'N/A'} for ₹${orderData.total || 0}`,
+        orderId: orderData.orderId || orderData.orderMongoId,
+        orderData: orderData
+      });
+
       // Play notification sound
       playNotificationSound();
     });
@@ -303,6 +313,26 @@ export const useRestaurantNotifications = () => {
     socketRef.current.on('order_status_update', (data) => {
       console.log('📊 Order status update received via Socket.IO:', data);
       setOrderStatusUpdate(data);
+
+      // Save notification to localStorage
+      if (data.orderId && data.status) {
+        const statusMessages = {
+          'accepted': 'Order Accepted',
+          'preparing': 'Order is being Prepared',
+          'ready': 'Order is Ready',
+          'out_for_delivery': 'Order is Out for Delivery',
+          'delivered': 'Order Delivered',
+          'cancelled': 'Order Cancelled'
+        };
+
+        addRestaurantNotification({
+          type: data.status === 'cancelled' ? 'alert' : data.status === 'delivered' ? 'success' : 'info',
+          title: `📊 ${statusMessages[data.status] || 'Order Status Updated'}`,
+          message: `Order #${data.orderId} status has been updated to ${data.status}`,
+          orderId: data.orderId,
+          orderData: data
+        });
+      }
     });
 
     // Load notification sound

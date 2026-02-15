@@ -1060,7 +1060,7 @@ export default function RestaurantDetails() {
 
     // Create share URL
     const shareUrl = `${window.location.origin}/user/restaurants/${restaurantSlug}`
-    const shareText = `Check out ${restaurantName} on Bakala Cart! ${shareUrl}`
+    const shareText = `Check out ${restaurantName} on Bakalaa! ${shareUrl}`
 
     // Try Web Share API first (mobile)
     if (navigator.share) {

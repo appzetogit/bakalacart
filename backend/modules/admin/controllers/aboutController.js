@@ -20,7 +20,7 @@ export const getAboutPublic = asyncHandler(async (req, res) => {
     // Default about data if none exists
     if (!about) {
       about = {
-        appName: 'Bakala Cart',
+        appName: 'Bakalaa',
         version: '1.0.0',
         description: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
         logo: '',
@@ -109,7 +109,7 @@ export const getAbout = asyncHandler(async (req, res) => {
     if (!about) {
       // Create default about page if it doesn't exist
       about = await About.create({
-        appName: 'Bakala Cart',
+        appName: 'Bakalaa',
         version: '1.0.0',
         description: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
         features: [

@@ -199,7 +199,7 @@ export default function GiftCards() {
                 <h2 className="text-white text-2xl sm:text-3xl font-black text-center leading-tight tracking-wide whitespace-pre-line drop-shadow-lg">
                   {currentCategory?.cardTitle}
                 </h2>
-                <p className="text-white/80 text-xs mt-2 font-medium">Bakala Cart</p>
+                <p className="text-white/80 text-xs mt-2 font-medium">Bakalaa</p>
               </div>
 
               {/* Sparkle Effects */}

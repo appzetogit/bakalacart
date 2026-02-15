@@ -22,6 +22,7 @@ import {
   reverifyRestaurant,
   deleteRestaurant,
   sendRestaurantCredentialsEmail,
+  sendRestaurantEmail,
   getAllOffers,
   getRestaurantAnalytics,
   getCustomerWalletReport
@@ -309,6 +310,7 @@ router.post('/restaurants/:id/reject', rejectRestaurant);
 router.post('/restaurants/:id/reverify', reverifyRestaurant);
 router.put('/restaurants/:id/status', updateRestaurantStatus);
 router.post('/restaurants/:id/send-credentials', sendRestaurantCredentialsEmail);
+router.post('/restaurants/:id/send-email', sendRestaurantEmail);
 router.delete('/restaurants/:id', deleteRestaurant);
 
 // Category Management

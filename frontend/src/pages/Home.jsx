@@ -7,7 +7,7 @@ export default function Home() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-2xl shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-4xl font-bold mb-2">Bakala Cart 🍔</CardTitle>
+          <CardTitle className="text-4xl font-bold mb-2">Bakalaa 🍔</CardTitle>
           <CardDescription className="text-lg">
             Welcome to the Food Delivery Platform
           </CardDescription>

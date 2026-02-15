@@ -170,7 +170,7 @@ export default function Wallet() {
 
             {/* Wallet Details */}
             <div className="flex flex-col md:items-start items-center text-center md:text-left">
-              <h2 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white mb-2 md:mb-3">Bakala Cart Money</h2>
+              <h2 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white mb-2 md:mb-3">Bakalaa Money</h2>
               
               {/* Current Balance */}
               <div className="mb-2 md:mb-3">

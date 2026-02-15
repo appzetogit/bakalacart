@@ -157,8 +157,6 @@ const ZoneSetup = lazy(() => import("@/module/restaurant/pages/ZoneSetup"))
 
 const AdminRouter = lazy(() => import("@/module/admin/components/AdminRouter"))
 const AdminLogin = lazy(() => import("@/module/admin/pages/auth/AdminLogin"))
-const AdminSignup = lazy(() => import("@/module/admin/pages/auth/AdminSignup"))
-const AdminForgotPassword = lazy(() => import("@/module/admin/pages/auth/AdminForgotPassword"))
 // DeliveryRouter with enhanced error handling and retry
 const DeliveryRouter = lazyImport(() => import("@/module/delivery/components/DeliveryRouter"))
 const DeliverySignIn = lazy(() => import("@/module/delivery/pages/auth/SignIn"))
@@ -876,8 +874,6 @@ export default function App() {
 
         {/* Admin Public Routes */}
         <Route path="/admin/login" element={<AuthRedirect module="admin"><AdminLogin /></AuthRedirect>} />
-        <Route path="/admin/signup" element={<AuthRedirect module="admin"><AdminSignup /></AuthRedirect>} />
-        <Route path="/admin/forgot-password" element={<AuthRedirect module="admin"><AdminForgotPassword /></AuthRedirect>} />
 
         {/* Admin Protected Routes */}
         <Route

@@ -24,7 +24,7 @@ export default function RestaurantSignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const [companyName, setCompanyName] = useState("Bakala Cart")
+  const [companyName, setCompanyName] = useState("Bakalaa")
 
   // Fetch business settings for company name
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function RestaurantSignIn() {
         }
       } catch (error) {
         console.error('Error fetching business settings:', error)
-        // Keep default "Bakala Cart" if fetch fails
+        // Keep default "Bakalaa" if fetch fails
       }
     }
     

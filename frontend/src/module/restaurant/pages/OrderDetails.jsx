@@ -8,7 +8,6 @@ import { restaurantAPI } from "@/lib/api"
 import {
   ArrowLeft,
   Printer,
-  FileText,
   Copy,
   User,
   MapPin,
@@ -70,7 +69,20 @@ export default function OrderDetails() {
               itemSubtotal: order.pricing?.subtotal || 0,
               taxes: order.pricing?.tax || 0,
               total: order.pricing?.total || 0,
-              paymentStatus: order.payment?.status === 'completed' ? 'PAID' : 'PENDING'
+              paymentStatus: (() => {
+                const status = order.payment?.status || 'pending';
+                // Map backend payment status to display format
+                const statusMap = {
+                  'completed': 'PAID',
+                  'pending': 'PENDING',
+                  'processing': 'PROCESSING',
+                  'failed': 'FAILED',
+                  'refunded': 'REFUNDED',
+                  'cancelled': 'CANCELLED'
+                };
+                return statusMap[status.toLowerCase()] || 'PENDING';
+              })(),
+              paymentMethod: order.payment?.method || 'cash'
             },
             reason: order.cancellationReason || '',
             timeline: [
@@ -415,6 +427,26 @@ export default function OrderDetails() {
     }
   }
 
+  const getPaymentStatusColor = (paymentStatus) => {
+    switch (paymentStatus) {
+      case "PAID":
+      case "COMPLETED":
+        return "bg-green-100 text-green-700 border border-green-200"
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-700 border border-yellow-200"
+      case "PROCESSING":
+        return "bg-blue-100 text-blue-700 border border-blue-200"
+      case "FAILED":
+        return "bg-red-100 text-red-700 border border-red-200"
+      case "REFUNDED":
+        return "bg-purple-100 text-purple-700 border border-purple-200"
+      case "CANCELLED":
+        return "bg-gray-100 text-gray-700 border border-gray-200"
+      default:
+        return "bg-gray-100 text-gray-700 border border-gray-200"
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -499,12 +531,6 @@ export default function OrderDetails() {
                 <Printer className="w-5 h-5 text-gray-900" />
               )}
             </button>
-            <button
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Receipt"
-            >
-              <FileText className="w-5 h-5 text-gray-900" />
-            </button>
           </div>
         </div>
       </div>
@@ -570,7 +596,9 @@ export default function OrderDetails() {
               <div className="flex-1">
                 <p className="text-sm text-gray-900">{orderData.customer.location}</p>
               </div>
-              <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
+              {orderData.customer.distance && orderData.customer.distance !== 'N/A' && (
+                <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
+              )}
             </div>
             {orderData.customer.deliveryAddressDetails && (
               <div className="flex items-start gap-3 mt-2">
@@ -629,12 +657,7 @@ export default function OrderDetails() {
             </div>
             <div className="my-3"></div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-gray-900">Total bill</span>
-                <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-medium rounded">
-                  {orderData.billing.paymentStatus}
-                </span>
-              </div>
+              <span className="text-sm font-semibold text-gray-900">Total bill</span>
               <span className="text-sm font-semibold text-gray-900">₹{orderData.billing.total}</span>
             </div>
           </div>

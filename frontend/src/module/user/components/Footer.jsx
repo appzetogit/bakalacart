@@ -91,7 +91,7 @@ export default function Footer() {
                   />
                 )}
                 <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  Bakala Cart
+                  Bakalaa
                 </span>
               </div>
               <p className="text-slate-300 text-sm leading-relaxed max-w-md">

@@ -74,7 +74,7 @@ export default function DeliveryWelcome() {
             Hi {userName},
           </h1>
           <h2 className="text-lg font-semibold text-gray-900">
-            Welcome to Bakala Cart Delivery
+            Welcome to Bakalaa Delivery
           </h2>
         </motion.div>
 

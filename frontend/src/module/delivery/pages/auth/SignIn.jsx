@@ -47,7 +47,7 @@ export default function DeliverySignIn() {
   })
   const [error, setError] = useState("")
   const [isSending, setIsSending] = useState(false)
-  const [companyName, setCompanyName] = useState("Bakala Cart")
+  const [companyName, setCompanyName] = useState("Bakalaa")
 
   // Prefill phone number from sessionStorage when returning from OTP screen
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function DeliverySignIn() {
         }
       } catch (error) {
         console.error('Error fetching business settings:', error)
-        // Keep default "Bakala Cart" if fetch fails
+        // Keep default "Bakalaa" if fetch fails
       }
     }
     

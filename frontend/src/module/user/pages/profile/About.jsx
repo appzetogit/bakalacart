@@ -21,7 +21,7 @@ const iconMap = {
 export default function About() {
   const [loading, setLoading] = useState(true)
   const [aboutData, setAboutData] = useState({
-    appName: 'Bakala Cart',
+    appName: 'Bakalaa',
     version: '1.0.0',
     description: 'Your trusted food delivery partner, bringing delicious meals right to your doorstep. Experience the convenience of ordering from your favorite restaurants with fast, reliable delivery.',
     logo: '',
@@ -321,7 +321,7 @@ export default function About() {
           className="text-center mt-8 mb-4"
         >
           <p className="text-sm text-gray-500 dark:text-gray-500">
-            © {new Date().getFullYear()} {businessSettings?.companyName || 'Bakala Cart'}. All rights reserved.
+            © {new Date().getFullYear()} {businessSettings?.companyName || 'Bakalaa'}. All rights reserved.
           </p>
         </motion.div>
       </div>

@@ -1,6 +1,6 @@
-# Bakala Cart Backend API
+# Bakalaa Backend API
 
-Backend API for Bakala Cart Delivery Platform built with Node.js, Express, and MongoDB.
+Backend API for Bakalaa Delivery Platform built with Node.js, Express, and MongoDB.
 
 ## Features
 

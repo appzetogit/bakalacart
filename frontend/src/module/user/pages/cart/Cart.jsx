@@ -1141,7 +1141,7 @@ export default function Cart() {
         amount: razorpay.amount, // Already in paise from backend
         currency: razorpay.currency || 'INR',
         order_id: razorpay.orderId,
-        name: "Bakala Cart",
+        name: "Bakalaa",
         description: `Order ${order.orderId} - ₹${(razorpay.amount / 100).toFixed(2)}`,
         prefill: {
           name: userName,
@@ -1288,11 +1288,11 @@ export default function Cart() {
       : window.location.origin
 
     const shareText = restaurantName
-      ? `Check out ${restaurantName} on Bakala Cart! ${shareUrl}`
-      : `Check out Bakala Cart for amazing food! ${shareUrl}`
+      ? `Check out ${restaurantName} on Bakalaa! ${shareUrl}`
+      : `Check out Bakalaa for amazing food! ${shareUrl}`
 
     const shareData = {
-      title: 'Bakala Cart',
+      title: 'Bakalaa',
       text: shareText,
       url: shareUrl,
     }

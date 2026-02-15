@@ -86,7 +86,7 @@ export default function AddMoneyModal({ open, onOpenChange, onSuccess }) {
         amount: razorpay.amount, // Already in paise from backend
         currency: razorpay.currency || 'INR',
         order_id: razorpay.orderId,
-        name: 'Bakala Cart',
+        name: 'Bakalaa',
         description: `Wallet Top-up - ₹${amountNum.toFixed(2)}`,
         prefill: {
           name: userName,

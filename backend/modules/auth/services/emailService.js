@@ -116,11 +116,11 @@ class EmailService {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Bakala Cart - OTP Verification</title>
+          <title>Bakalaa - OTP Verification</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Bakala Cart</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Bakalaa</h1>
           </div>
           
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0;">
@@ -143,13 +143,13 @@ class EmailService {
             <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
               <strong>Security Notice:</strong><br>
               • Never share this OTP with anyone<br>
-              • Bakala Cart will never ask for your OTP via phone or email<br>
+              • Bakalaa will never ask for your OTP via phone or email<br>
               • If you didn't request this OTP, please ignore this email
             </p>
           </div>
           
           <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-            <p>© ${new Date().getFullYear()} Bakala Cart. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} Bakalaa. All rights reserved.</p>
           </div>
         </body>
       </html>
@@ -169,7 +169,7 @@ class EmailService {
     }[purpose] || 'complete this action';
 
     return `
-Bakala Cart - OTP Verification
+Bakalaa - OTP Verification
 
 Your One-Time Password (OTP) to ${purposeText} is:
 
@@ -179,10 +179,10 @@ This OTP is valid for 5 minutes.
 
 Security Notice:
 - Never share this OTP with anyone
-- Bakala Cart will never ask for your OTP via phone or email
+- Bakalaa will never ask for your OTP via phone or email
 - If you didn't request this OTP, please ignore this email
 
-© ${new Date().getFullYear()} Bakala Cart. All rights reserved.
+© ${new Date().getFullYear()} Bakalaa. All rights reserved.
     `.trim();
   }
 
@@ -208,12 +208,12 @@ Security Notice:
       const { getSMTPCredentials } = await import('../../../shared/utils/envService.js');
       const smtpCreds = await getSMTPCredentials();
       const fromEmail = process.env.SMTP_FROM || smtpCreds.user || process.env.SMTP_USER || 'noreply@appzetofood.com';
-      const fromName = process.env.SMTP_FROM_NAME || 'Bakala Cart';
+      const fromName = process.env.SMTP_FROM_NAME || 'Bakalaa';
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: email,
-        subject: `Your Bakala Cart OTP - ${otp}`,
+        subject: `Your Bakalaa OTP - ${otp}`,
         text: this.generateOTPEmailText(otp, purpose),
         html: this.generateOTPEmailTemplate(otp, purpose)
       };
@@ -262,14 +262,14 @@ Security Notice:
       const { getSMTPCredentials } = await import('../../../shared/utils/envService.js');
       const smtpCreds = await getSMTPCredentials();
       const fromEmail = process.env.SMTP_FROM || smtpCreds.user || process.env.SMTP_USER || 'noreply@appzetofood.com';
-      const fromName = process.env.SMTP_FROM_NAME || 'Bakala Cart';
+      const fromName = process.env.SMTP_FROM_NAME || 'Bakalaa';
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: email,
-        subject: 'Welcome to Bakala Cart!',
+        subject: 'Welcome to Bakalaa!',
         html: `
-          <h1>Welcome to Bakala Cart, ${name}!</h1>
+          <h1>Welcome to Bakalaa, ${name}!</h1>
           <p>Thank you for joining us. We're excited to have you on board.</p>
         `
       };

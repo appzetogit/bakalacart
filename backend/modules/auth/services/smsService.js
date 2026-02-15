@@ -26,7 +26,7 @@ class SMSHubService {
    * Generate OTP message
    */
   generateOTPMessage(otp) {
-    return `Your Bakala Cart OTP is ${otp}. Valid for 5 minutes. Do not share this OTP with anyone.`;
+    return `Your Bakalaa OTP is ${otp}. Valid for 5 minutes. Do not share this OTP with anyone.`;
   }
 
   /**

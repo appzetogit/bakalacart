@@ -10,6 +10,7 @@ import RestaurantNavbar from "../components/RestaurantNavbar"
 import notificationSound from "@/assets/audio/restaurant aacept ringtone.mp3"
 import { restaurantAPI } from "@/lib/api"
 import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications"
+import { addRestaurantNotification } from "../utils/notifications"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 
@@ -770,6 +771,15 @@ export default function OrdersMain() {
             setPopupOrder(orderForPopup)
             setShowNewOrderPopup(true)
             setCountdown(240)
+            
+            // Create notification for this confirmed order
+            addRestaurantNotification({
+              type: 'order',
+              title: '🔔 New Order Received!',
+              message: `Order #${latestConfirmedOrder.orderId || orderId} for ₹${latestConfirmedOrder.pricing?.total || 0}`,
+              orderId: latestConfirmedOrder.orderId || orderId,
+              orderData: orderForPopup
+            })
           }
         }
       } catch (error) {
@@ -856,6 +866,15 @@ export default function OrdersMain() {
         const response = await restaurantAPI.acceptOrder(orderId, prepTime)
         console.log('✅ Order accepted:', orderId)
         toast.success('Order accepted successfully')
+        
+        // Save notification
+        addRestaurantNotification({
+          type: 'success',
+          title: '✅ Order Accepted',
+          message: `Order #${orderToAccept.orderId || orderId} has been accepted and is now being prepared`,
+          orderId: orderToAccept.orderId || orderId,
+          orderData: orderToAccept
+        })
       } catch (error) {
         console.error('❌ Error accepting order:', error)
         console.error('❌ Order details:', {
@@ -914,6 +933,15 @@ export default function OrdersMain() {
         const orderId = orderToReject.orderMongoId || orderToReject.orderId
         await restaurantAPI.rejectOrder(orderId, rejectReason)
         console.log('✅ Order rejected:', orderId)
+        
+        // Save notification
+        addRestaurantNotification({
+          type: 'alert',
+          title: '❌ Order Rejected',
+          message: `Order #${orderToReject.orderId || orderId} has been rejected. Reason: ${rejectReason}`,
+          orderId: orderToReject.orderId || orderId,
+          orderData: orderToReject
+        })
       } catch (error) {
         console.error('❌ Error rejecting order:', error)
         alert('Failed to reject order. Please try again.')
@@ -2429,6 +2457,15 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
     try {
       await restaurantAPI.markOrderReady(mongoId || orderId)
       toast.success(`Order ${orderId} marked as ready`)
+      
+      // Save notification
+      addRestaurantNotification({
+        type: 'success',
+        title: '✅ Order Ready',
+        message: `Order #${orderId} is ready for pickup/delivery`,
+        orderId: orderId,
+        orderData: { orderId, mongoId, customerName }
+      })
       // Order will be removed from preparing list on next fetch
       // Force a refresh after a short delay
       setTimeout(() => {

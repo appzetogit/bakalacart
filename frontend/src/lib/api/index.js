@@ -967,6 +967,14 @@ export const adminAPI = {
     return apiClient.post(API_ENDPOINTS.ADMIN.RESTAURANT_SEND_CREDENTIALS.replace(':id', id));
   },
 
+  // Send custom email to restaurant
+  sendRestaurantEmail: (id, subject, description) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.RESTAURANT_SEND_EMAIL.replace(':id', id), {
+      subject,
+      description
+    });
+  },
+
   // Get all offers (with restaurant and dish details)
   getAllOffers: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.OFFERS, { params });

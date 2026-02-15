@@ -230,7 +230,7 @@ export default function RestaurantSignupEmail() {
             </div>
             <div className="flex flex-col items-start">
               <span className="text-2xl font-bold tracking-wide text-primary-orange">
-                Bakala Cart
+                Bakalaa
               </span>
               <span className="text-xs font-medium text-gray-500">
                 Restaurant Panel

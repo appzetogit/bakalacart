@@ -1,7 +1,7 @@
 {
   "name": "appzeto-food-backend",
   "version": "1.0.0",
-  "description": "Backend API for Bakala Cart Delivery Platform",
+  "description": "Backend API for Bakalaa Delivery Platform",
   "main": "server.js",
   "type": "module",
   "scripts": {

@@ -101,7 +101,7 @@ export default function RestaurantGoogleCallback() {
           </h1>
           <p className="text-sm text-gray-600">
             {status === "loading" &&
-              `Connecting your ${provider || "Google"} account to Bakala Cart Restaurant Panel...`}
+              `Connecting your ${provider || "Google"} account to Bakalaa Restaurant Panel...`}
             {status === "success" && "You will be redirected to your restaurant panel shortly."}
             {status === "error" && "We could not complete the Google sign-in process."}
           </p>

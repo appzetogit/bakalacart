@@ -55,7 +55,7 @@ const aboutSchema = new mongoose.Schema(
     appName: {
       type: String,
       required: true,
-      default: 'Bakala Cart',
+      default: 'Bakalaa',
       trim: true
     },
     version: {

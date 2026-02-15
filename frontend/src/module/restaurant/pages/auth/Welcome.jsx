@@ -14,7 +14,7 @@ export default function RestaurantWelcome() {
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [companyName, setCompanyName] = useState("Bakala Cart")
+  const [companyName, setCompanyName] = useState("Bakalaa")
   const carouselRef = useRef(null)
 
   // Minimum swipe distance (in pixels)
@@ -155,7 +155,7 @@ export default function RestaurantWelcome() {
         }
       } catch (error) {
         console.error('Error fetching business settings:', error)
-        // Keep default "Bakala Cart" if fetch fails
+        // Keep default "Bakalaa" if fetch fails
       }
     }
     

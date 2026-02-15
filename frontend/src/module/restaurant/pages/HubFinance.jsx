@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 import { restaurantAPI } from "@/lib/api"
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
+import { toast } from "sonner"
 
 export default function HubFinance() {
   const navigate = useNavigate()
@@ -26,6 +29,9 @@ export default function HubFinance() {
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [withdrawalAmount, setWithdrawalAmount] = useState('')
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false)
+  const [completedOrders, setCompletedOrders] = useState([])
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
+  const [downloadingInvoice, setDownloadingInvoice] = useState(null)
 
   // Fetch finance data on mount
   useEffect(() => {
@@ -51,6 +57,238 @@ export default function HubFinance() {
 
     fetchFinanceData()
   }, [])
+
+  // Fetch completed orders for invoices tab
+  useEffect(() => {
+    const fetchCompletedOrders = async () => {
+      if (activeTab !== 'invoices') return
+      
+      try {
+        setLoadingInvoices(true)
+        const response = await restaurantAPI.getOrders()
+        if (response.data?.success && response.data.data?.orders) {
+          // Filter only completed/delivered orders
+          const completed = response.data.data.orders.filter(
+            order => order.status === 'delivered' || order.status === 'completed'
+          )
+          // Sort by date (newest first)
+          completed.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          setCompletedOrders(completed)
+        }
+      } catch (error) {
+        if (error.response?.status !== 401) {
+          console.error('❌ Error fetching completed orders:', error)
+        }
+      } finally {
+        setLoadingInvoices(false)
+      }
+    }
+
+    fetchCompletedOrders()
+  }, [activeTab])
+
+  // Generate and download invoice PDF
+  const handleDownloadInvoice = async (order) => {
+    const orderId = order._id || order.orderId
+    setDownloadingInvoice(orderId)
+    
+    try {
+      // Fetch complete order details
+      let completeOrderData = order
+      try {
+        const response = await restaurantAPI.getOrderById(orderId)
+        if (response.data?.success && response.data.data) {
+          const apiOrder = response.data.data.order || response.data.data
+          completeOrderData = { ...order, ...apiOrder }
+        }
+      } catch (apiError) {
+        console.warn('Could not fetch complete order details, using available data:', apiError)
+      }
+
+      // Create PDF document
+      const doc = new jsPDF()
+      let yPos = 20
+
+      // Header
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(20)
+      doc.text('INVOICE', 105, yPos, { align: 'center' })
+      yPos += 10
+
+      // Restaurant name
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'normal')
+      doc.text(completeOrderData.restaurantName || 'Restaurant', 105, yPos, { align: 'center' })
+      yPos += 8
+
+      // Divider line
+      doc.setDrawColor(200, 200, 200)
+      doc.line(20, yPos, 190, yPos)
+      yPos += 8
+
+      // Order details
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('ORDER DETAILS', 20, yPos)
+      yPos += 7
+
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Order ID: ${completeOrderData.orderId || 'N/A'}`, 20, yPos)
+      yPos += 6
+
+      const orderDate = completeOrderData.createdAt
+        ? new Date(completeOrderData.createdAt).toLocaleString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : 'N/A'
+      doc.text(`Date: ${orderDate}`, 20, yPos)
+      yPos += 6
+
+      // Customer Information
+      if (completeOrderData.userId?.name || completeOrderData.customerName) {
+        doc.setFont('helvetica', 'bold')
+        doc.text('CUSTOMER INFORMATION', 20, yPos)
+        yPos += 7
+        doc.setFont('helvetica', 'normal')
+        if (completeOrderData.userId?.name || completeOrderData.customerName) {
+          doc.text(`Name: ${completeOrderData.userId?.name || completeOrderData.customerName}`, 20, yPos)
+          yPos += 6
+        }
+        if (completeOrderData.userId?.phone || completeOrderData.customerPhone) {
+          doc.text(`Phone: ${completeOrderData.userId?.phone || completeOrderData.customerPhone}`, 20, yPos)
+          yPos += 6
+        }
+        yPos += 3
+      }
+
+      // Items Section
+      if (completeOrderData.items && completeOrderData.items.length > 0) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.text('ITEMS', 20, yPos)
+        yPos += 8
+
+        const tableData = completeOrderData.items.map((item, index) => [
+          `${index + 1}. ${item.name || 'Item'}`,
+          item.quantity || 1,
+          `Rs. ${(item.price || 0).toFixed(2)}`,
+          `Rs. ${((item.price || 0) * (item.quantity || 1)).toFixed(2)}`
+        ])
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Item Name', 'Qty', 'Unit Price', 'Total']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold' },
+          styles: { fontSize: 9 },
+          columnStyles: {
+            0: { cellWidth: 90 },
+            1: { cellWidth: 25, halign: 'center' },
+            2: { cellWidth: 35, halign: 'right' },
+            3: { cellWidth: 35, halign: 'right' }
+          }
+        })
+
+        yPos = doc.lastAutoTable.finalY + 10
+      }
+
+      // Pricing breakdown
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text('PRICING BREAKDOWN', 20, yPos)
+      yPos += 7
+
+      doc.setFont('helvetica', 'normal')
+      const pricing = completeOrderData.pricing || {}
+      const subtotal = pricing.subtotal ||
+        completeOrderData.subtotal ||
+        (completeOrderData.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0) || 0)
+      const deliveryFee = pricing.deliveryFee || completeOrderData.deliveryFee || 0
+      const platformFee = pricing.platformFee || completeOrderData.platformFee || 0
+      const tax = pricing.tax || pricing.gst || completeOrderData.tax || completeOrderData.gst || 0
+      const discount = pricing.discount || completeOrderData.discount || 0
+      const total = pricing.total || completeOrderData.total || 0
+
+      doc.text(`Subtotal: Rs. ${subtotal.toFixed(2)}`, 20, yPos)
+      yPos += 6
+
+      if (discount > 0) {
+        doc.text(`Discount: -Rs. ${discount.toFixed(2)}`, 20, yPos)
+        yPos += 6
+      }
+
+      doc.text(`Delivery Fee: Rs. ${deliveryFee.toFixed(2)}`, 20, yPos)
+      yPos += 6
+
+      doc.text(`Platform Fee: Rs. ${platformFee.toFixed(2)}`, 20, yPos)
+      yPos += 6
+
+      doc.text(`GST (Tax): Rs. ${tax.toFixed(2)}`, 20, yPos)
+      yPos += 6
+
+      yPos += 3
+      doc.setDrawColor(0, 0, 0)
+      doc.line(20, yPos, 190, yPos)
+      yPos += 5
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text(`TOTAL: Rs. ${total.toFixed(2)}`, 20, yPos)
+      yPos += 10
+
+      // Payment details
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PAYMENT DETAILS', 20, yPos)
+      yPos += 7
+
+      doc.setFont('helvetica', 'normal')
+      const paymentMethod = completeOrderData.paymentMethod ||
+        completeOrderData.payment?.method ||
+        'Not specified'
+      const paymentMethodDisplay = paymentMethod === 'cash' || paymentMethod === 'cod'
+        ? 'Cash on Delivery (COD)'
+        : paymentMethod === 'razorpay'
+          ? 'Online Payment (Razorpay)'
+          : paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)
+
+      doc.text(`Payment Method: ${paymentMethodDisplay}`, 20, yPos)
+      yPos += 6
+
+      const paymentStatus = completeOrderData.payment?.status === 'paid' || paymentMethod === 'razorpay'
+        ? 'Paid'
+        : paymentMethod === 'cash' || paymentMethod === 'cod'
+          ? 'Cash on Delivery'
+          : 'Pending'
+      doc.text(`Payment Status: ${paymentStatus}`, 20, yPos)
+      yPos += 6
+
+      // Footer
+      yPos = doc.internal.pageSize.getHeight() - 20
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(100, 100, 100)
+      doc.text('Thank you for your business!', 105, yPos, { align: 'center' })
+      yPos += 5
+      doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 105, yPos, { align: 'center' })
+
+      // Save PDF
+      const fileName = `Invoice_${completeOrderData.orderId || orderId}_${new Date().toISOString().split('T')[0]}.pdf`
+      doc.save(fileName)
+
+      toast.success('Invoice downloaded successfully!')
+    } catch (error) {
+      console.error('Error generating invoice:', error)
+      toast.error('Failed to generate invoice. Please try again.')
+    } finally {
+      setDownloadingInvoice(null)
+    }
+  }
 
   // Fetch restaurant data for header display
   useEffect(() => {
@@ -953,10 +1191,72 @@ export default function HubFinance() {
         )}
 
         {activeTab === "invoices" && (
-          <div className=" rounded-lg p-4">
-            <p className="text-sm text-gray-600 text-center py-8">
-              Invoices & Taxes content will be displayed here
-            </p>
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg p-4">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Completed Orders</h2>
+              {loadingInvoices ? (
+                <div className="text-center py-8 text-gray-500">Loading invoices...</div>
+              ) : completedOrders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No completed orders found</div>
+              ) : (
+                <div className="space-y-3">
+                  {completedOrders.map((order) => (
+                    <div
+                      key={order._id || order.orderId}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="w-5 h-5 text-gray-600" />
+                            <h3 className="font-semibold text-gray-900">
+                              Order ID: {order.orderId || order._id}
+                            </h3>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <p>
+                              Date: {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                            <p>
+                              Amount: ₹{(order.pricing?.total || order.total || 0).toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })}
+                            </p>
+                            <p>
+                              Status: <span className="capitalize">{order.status}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadInvoice(order)}
+                          disabled={downloadingInvoice === (order._id || order.orderId)}
+                          className="ml-4 px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {downloadingInvoice === (order._id || order.orderId) ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              Download Invoice
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1039,7 +1339,13 @@ export default function HubFinance() {
                       
                       try {
                         setSubmittingWithdrawal(true)
-                        const response = await restaurantAPI.createWithdrawalRequest(amount)
+                        // Ensure amount is a number, not string
+                        const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount
+                        if (isNaN(numericAmount) || numericAmount <= 0) {
+                          alert('Please enter a valid amount')
+                          return
+                        }
+                        const response = await restaurantAPI.createWithdrawalRequest(numericAmount)
                         if (response.data?.success) {
                           alert('Withdrawal request submitted successfully!')
                           setShowWithdrawalModal(false)
@@ -1054,7 +1360,8 @@ export default function HubFinance() {
                         }
                       } catch (error) {
                         console.error('Error submitting withdrawal request:', error)
-                        alert(error.response?.data?.message || 'Failed to submit withdrawal request. Please try again.')
+                        const errorMessage = error.response?.data?.message || error.message || 'Failed to submit withdrawal request. Please try again.'
+                        alert(errorMessage)
                       } finally {
                         setSubmittingWithdrawal(false)
                       }

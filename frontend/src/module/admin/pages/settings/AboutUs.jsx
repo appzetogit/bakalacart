@@ -42,7 +42,7 @@ export default function AboutUs() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [aboutData, setAboutData] = useState({
-    appName: 'Bakala Cart',
+    appName: 'Bakalaa',
     version: '1.0.0',
     description: '',
     logo: '',
@@ -176,7 +176,7 @@ export default function AboutUs() {
                 id="appName"
                 value={aboutData.appName}
                 onChange={(e) => setAboutData(prev => ({ ...prev, appName: e.target.value }))}
-                placeholder="Bakala Cart"
+                placeholder="Bakalaa"
                 className="mt-1"
               />
             </div>

@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom"
 import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus } from "lucide-react"
 import { adminAPI, restaurantAPI } from "../../../../lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import { exportRestaurantsToPDF } from "../../components/restaurants/restaurantsExportUtils"
 
 // Import icons from Dashboard-icons
@@ -25,6 +31,9 @@ export default function RestaurantsList() {
   const [deleting, setDeleting] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailRestaurantId, setEmailRestaurantId] = useState(null)
+  const [emailDialog, setEmailDialog] = useState(null) // { restaurant, open: true/false }
+  const [emailSubject, setEmailSubject] = useState("")
+  const [emailDescription, setEmailDescription] = useState("")
 
   // Format Restaurant ID to REST format (e.g., REST422829)
   const formatRestaurantId = (id) => {
@@ -383,30 +392,91 @@ export default function RestaurantsList() {
     setDeleteConfirmDialog(null)
   }
 
-  // Handle send credentials email
-  const handleSendCredentialsEmail = async (restaurant) => {
-    const restaurantId = restaurant._id || restaurant.id
-    const restaurantEmail = restaurant.email || restaurant.ownerEmail || restaurant.owner?.email
-    
+  // Handle open email dialog
+  const handleOpenEmailDialog = (restaurant) => {
+    // Check multiple possible email locations
+    const restaurantEmail = 
+      restaurant.email || 
+      restaurant.ownerEmail || 
+      restaurant.owner?.email ||
+      restaurant.originalData?.email ||
+      restaurant.originalData?.ownerEmail ||
+      restaurant.originalData?.onboarding?.step1?.ownerEmail ||
+      restaurant.originalData?.googleEmail ||
+      restaurant.googleEmail
+
+    // Allow dialog to open even if email not found - backend will validate
+    // But show a warning if email is not found
     if (!restaurantEmail) {
-      alert("Restaurant email not found. Cannot send credentials email.")
+      toast.warning("Restaurant email not found. Please ensure the restaurant has an email address before sending.")
+    }
+
+    setEmailDialog({
+      restaurant,
+      open: true
+    })
+    setEmailSubject("")
+    setEmailDescription("")
+  }
+
+  // Handle close email dialog
+  const handleCloseEmailDialog = () => {
+    setEmailDialog(null)
+    setEmailSubject("")
+    setEmailDescription("")
+  }
+
+  // Handle send email
+  const handleSendEmail = async () => {
+    if (!emailDialog?.restaurant) return
+
+    if (!emailSubject.trim()) {
+      toast.error("Please enter email subject")
       return
     }
+
+    if (!emailDescription.trim()) {
+      toast.error("Please enter email description")
+      return
+    }
+
+    const restaurantId = emailDialog.restaurant._id || emailDialog.restaurant.id
+    
+    // Check multiple possible email locations for display
+    const restaurantEmail = 
+      emailDialog.restaurant.email || 
+      emailDialog.restaurant.ownerEmail || 
+      emailDialog.restaurant.owner?.email ||
+      emailDialog.restaurant.originalData?.email ||
+      emailDialog.restaurant.originalData?.ownerEmail ||
+      emailDialog.restaurant.originalData?.onboarding?.step1?.ownerEmail ||
+      emailDialog.restaurant.originalData?.googleEmail ||
+      emailDialog.restaurant.googleEmail ||
+      "restaurant"
 
     try {
       setSendingEmail(true)
       setEmailRestaurantId(restaurantId)
       
-      const response = await adminAPI.sendRestaurantCredentialsEmail(restaurantId)
+      const response = await adminAPI.sendRestaurantEmail(restaurantId, emailSubject.trim(), emailDescription.trim())
       
       if (response?.data?.success) {
-        alert(`Credentials email sent successfully to ${restaurantEmail}`)
+        toast.success(`Email sent successfully to ${restaurantEmail}`)
+        handleCloseEmailDialog()
       } else {
-        alert(response?.data?.message || "Failed to send credentials email")
+        toast.error(response?.data?.message || "Failed to send email")
       }
     } catch (error) {
-      console.error("Error sending credentials email:", error)
-      alert(error.response?.data?.message || "Failed to send credentials email. Please try again.")
+      console.error("Error sending email:", error)
+      const errorMessage = error.response?.data?.message || "Failed to send email. Please try again."
+      toast.error(errorMessage)
+      
+      // If error is about email not found, close dialog after showing error
+      if (errorMessage.includes("email not found") || errorMessage.includes("email not available")) {
+        setTimeout(() => {
+          handleCloseEmailDialog()
+        }, 2000)
+      }
     } finally {
       setSendingEmail(false)
       setEmailRestaurantId(null)
@@ -663,10 +733,10 @@ export default function RestaurantsList() {
                               <ShieldX className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleSendCredentialsEmail(restaurant)}
+                              onClick={() => handleOpenEmailDialog(restaurant)}
                               disabled={sendingEmail && emailRestaurantId === (restaurant._id || restaurant.id)}
                               className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Send Credentials Email"
+                              title="Send Email"
                             >
                               {sendingEmail && emailRestaurantId === (restaurant._id || restaurant.id) ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1447,6 +1517,171 @@ export default function RestaurantsList() {
           </div>
         </div>
       )}
+
+      {/* Send Email Dialog */}
+      <Dialog open={emailDialog?.open || false} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseEmailDialog()
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl w-[95%] max-w-[650px] p-0 border-0 shadow-2xl bg-gradient-to-br from-white via-slate-50 to-white">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 px-6 py-5 rounded-t-lg">
+            <DialogHeader className="mb-0">
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-white" />
+                </div>
+                <span>Send Email to Restaurant</span>
+              </DialogTitle>
+              <p className="text-sm text-blue-100 mt-2 font-normal">
+                Compose and send a custom email message to the restaurant
+              </p>
+            </DialogHeader>
+          </div>
+
+          {emailDialog?.restaurant && (
+            <div className="px-6 py-6 space-y-6">
+              {/* Restaurant Info Card */}
+              <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-white shadow-md ring-2 ring-white flex-shrink-0">
+                      <img
+                        src={emailDialog.restaurant.logo || emailDialog.restaurant.originalData?.logo || emailDialog.restaurant.originalData?.profileImage?.url || "https://via.placeholder.com/64"}
+                        alt={emailDialog.restaurant.name || "Restaurant"}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = "https://via.placeholder.com/64"
+                        }}
+                      />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
+                      <Mail className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Building2 className="w-4 h-4 text-slate-500" />
+                      <p className="font-bold text-slate-900 text-base truncate">
+                        {emailDialog.restaurant.name || "Restaurant"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-sm text-slate-700 truncate">
+                        {emailDialog.restaurant.email || 
+                         emailDialog.restaurant.ownerEmail || 
+                         emailDialog.restaurant.owner?.email ||
+                         emailDialog.restaurant.originalData?.email ||
+                         emailDialog.restaurant.originalData?.ownerEmail ||
+                         emailDialog.restaurant.originalData?.onboarding?.step1?.ownerEmail ||
+                         emailDialog.restaurant.originalData?.googleEmail ||
+                         emailDialog.restaurant.googleEmail ||
+                         "No email found"}
+                      </p>
+                    </div>
+                    {!(emailDialog.restaurant.email || 
+                       emailDialog.restaurant.ownerEmail || 
+                       emailDialog.restaurant.owner?.email ||
+                       emailDialog.restaurant.originalData?.email ||
+                       emailDialog.restaurant.originalData?.ownerEmail ||
+                       emailDialog.restaurant.originalData?.onboarding?.step1?.ownerEmail ||
+                       emailDialog.restaurant.originalData?.googleEmail ||
+                       emailDialog.restaurant.googleEmail) && (
+                      <div className="mt-2 flex items-center gap-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-md">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        <p className="text-xs text-amber-700 font-medium">
+                          Email not found. Please add an email address to the restaurant profile.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Form */}
+              <div className="space-y-5">
+                {/* Subject Field */}
+                <div className="space-y-2.5">
+                  <Label htmlFor="email-subject" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-slate-500" />
+                    Email Subject
+                    <span className="text-red-500 font-bold">*</span>
+                  </Label>
+                  <Input
+                    id="email-subject"
+                    type="text"
+                    placeholder="e.g., Important Update, Account Information, etc."
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    disabled={sendingEmail}
+                    className="w-full h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg text-sm transition-all"
+                  />
+                  {!emailSubject.trim() && (
+                    <p className="text-xs text-slate-500">Enter a clear and concise subject line</p>
+                  )}
+                </div>
+
+                {/* Description Field */}
+                <div className="space-y-2.5">
+                  <Label htmlFor="email-description" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-slate-500" />
+                    Email Message
+                    <span className="text-red-500 font-bold">*</span>
+                  </Label>
+                  <Textarea
+                    id="email-description"
+                    placeholder="Write your message here. Be clear and professional in your communication..."
+                    value={emailDescription}
+                    onChange={(e) => setEmailDescription(e.target.value)}
+                    disabled={sendingEmail}
+                    rows={10}
+                    className="w-full resize-none border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg text-sm transition-all"
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      {emailDescription.length} characters
+                    </p>
+                    {!emailDescription.trim() && (
+                      <p className="text-xs text-slate-500">Enter a detailed message for the restaurant</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer with Actions */}
+          <DialogFooter className="px-6 py-4 bg-slate-50 border-t border-slate-200 rounded-b-lg flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleCloseEmailDialog}
+              disabled={sendingEmail}
+              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              disabled={sendingEmail || !emailSubject.trim() || !emailDescription.trim()}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingEmail ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sending Email...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Send Email
+                </span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -63,13 +63,13 @@ export default function TermsAndConditionsPage() {
             <section>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">1. Acceptance of Terms</h3>
               <p className="mb-3">
-                By accessing and using the Appzeto Food restaurant management platform, you accept and agree to be bound 
+                By accessing and using the Bakalaa restaurant management platform, you accept and agree to be bound 
                 by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use 
                 this service.
               </p>
               <p>
                 These Terms and Conditions ("Terms") govern your access to and use of our services, including our website, 
-                mobile application, and any related services provided by Appzeto Food.
+                mobile application, and any related services provided by Bakalaa.
               </p>
             </section>
 
@@ -128,7 +128,7 @@ export default function TermsAndConditionsPage() {
             <section>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">6. Intellectual Property</h3>
               <p>
-                The service and its original content, features, and functionality are owned by Appzeto Food and are protected 
+                The service and its original content, features, and functionality are owned by Bakalaa and are protected 
                 by international copyright, trademark, patent, trade secret, and other intellectual property laws. You may not 
                 reproduce, distribute, modify, or create derivative works of any material found on the service without our 
                 express written permission.
@@ -138,7 +138,7 @@ export default function TermsAndConditionsPage() {
             <section>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">7. Limitation of Liability</h3>
               <p className="mb-2">
-                To the fullest extent permitted by applicable law, Appzeto Food shall not be liable for any indirect, 
+                To the fullest extent permitted by applicable law, Bakalaa shall not be liable for any indirect, 
                 incidental, special, consequential, or punitive damages, including but not limited to:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-4">
@@ -156,7 +156,7 @@ export default function TermsAndConditionsPage() {
             <section>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">8. Indemnification</h3>
               <p>
-                You agree to defend, indemnify, and hold harmless Appzeto Food and its officers, directors, employees, and 
+                You agree to defend, indemnify, and hold harmless Bakalaa and its officers, directors, employees, and 
                 agents from and against any claims, liabilities, damages, losses, and expenses, including reasonable attorneys' 
                 fees, arising out of or in any way connected with your access to or use of the service, your violation of 
                 these Terms, or your violation of any rights of another.
@@ -202,7 +202,7 @@ export default function TermsAndConditionsPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-3">12. Governing Law</h3>
               <p>
                 These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which 
-                Appzeto Food operates, without regard to its conflict of law provisions.
+                Bakalaa operates, without regard to its conflict of law provisions.
               </p>
             </section>
 

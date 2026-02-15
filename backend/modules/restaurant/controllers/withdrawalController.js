@@ -1,9 +1,12 @@
 import WithdrawalRequest from '../models/WithdrawalRequest.js';
 import RestaurantWallet from '../models/RestaurantWallet.js';
 import Restaurant from '../models/Restaurant.js';
+import Order from '../../order/models/Order.js';
+import RestaurantCommission from '../../admin/models/RestaurantCommission.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import winston from 'winston';
+import mongoose from 'mongoose';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -28,18 +31,83 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
 
-    if (!amount || amount <= 0) {
-      return errorResponse(res, 400, 'Valid withdrawal amount is required');
+    // Validate amount
+    if (amount === undefined || amount === null || amount === '') {
+      return errorResponse(res, 400, 'Withdrawal amount is required');
     }
 
-    // Get restaurant wallet
-    const wallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurant._id);
-    
-    // Check if sufficient balance
-    const availableBalance = wallet.totalBalance || 0;
-    if (amount > availableBalance) {
-      return errorResponse(res, 400, 'Insufficient balance. Available balance: ₹' + availableBalance.toFixed(2));
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return errorResponse(res, 400, 'Valid withdrawal amount is required (must be a positive number)');
     }
+
+    // Check minimum withdrawal amount (if configured)
+    const minWithdrawalAmount = 1; // Minimum ₹1
+    if (parsedAmount < minWithdrawalAmount) {
+      return errorResponse(res, 400, `Minimum withdrawal amount is ₹${minWithdrawalAmount}`);
+    }
+
+    // Calculate available balance from current cycle (matching finance API logic)
+    // This ensures withdrawal validation matches what frontend shows
+    const now = new Date();
+    const currentDay = now.getDay();
+    const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+    
+    const currentCycleStart = new Date(now);
+    currentCycleStart.setDate(now.getDate() - daysFromMonday);
+    currentCycleStart.setHours(0, 0, 0, 0);
+    
+    const currentCycleEnd = new Date(currentCycleStart);
+    currentCycleEnd.setDate(currentCycleStart.getDate() + 6);
+    currentCycleEnd.setHours(23, 59, 59, 999);
+
+    // Get restaurant ID
+    const restaurantId = restaurant._id?.toString() || restaurant.restaurantId || restaurant.id;
+    let restaurantObjectId = null;
+    if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+      restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
+    }
+
+    // Get current cycle orders
+    const currentCycleOrders = await Order.find({
+      restaurantId: restaurantObjectId || restaurantId,
+      status: { $in: ['delivered', 'completed'] },
+      createdAt: {
+        $gte: currentCycleStart,
+        $lte: currentCycleEnd
+      }
+    }).lean();
+
+    // Calculate current cycle payout
+    let currentCyclePayout = 0;
+    for (const order of currentCycleOrders) {
+      const orderTotal = order.pricing?.subtotal || order.pricing?.total || 0;
+      const commissionResult = await RestaurantCommission.calculateCommissionForOrder(
+        restaurant._id,
+        orderTotal
+      );
+      const commissionAmount = commissionResult.commission || 0;
+      const restaurantEarning = orderTotal - commissionAmount;
+      currentCyclePayout += restaurantEarning;
+    }
+
+    // Get all withdrawals (pending + approved) - matching finance API logic
+    // Finance API gets ALL withdrawals, not just current cycle, to show accurate available balance
+    const allWithdrawals = await WithdrawalRequest.find({
+      restaurantId: restaurant._id,
+      status: { $in: ['Pending', 'Approved'] }
+    }).lean();
+
+    const totalWithdrawals = allWithdrawals.reduce((sum, req) => sum + (req.amount || 0), 0);
+    const availableBalance = Math.max(0, Math.round((currentCyclePayout - totalWithdrawals) * 100) / 100);
+
+    // Check if sufficient balance
+    if (parsedAmount > availableBalance) {
+      return errorResponse(res, 400, `Insufficient balance. Available balance: ₹${availableBalance.toFixed(2)}`);
+    }
+
+    // Also get wallet for transaction creation
+    const wallet = await RestaurantWallet.findOrCreateByRestaurantId(restaurant._id);
 
     // Check for pending requests
     const pendingRequest = await WithdrawalRequest.findOne({
@@ -57,7 +125,7 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     // Create withdrawal request
     const withdrawalRequest = await WithdrawalRequest.create({
       restaurantId: restaurant._id,
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       status: 'Pending',
       restaurantName: restaurantDetails?.name || restaurant.name || 'Unknown',
       restaurantIdString: restaurantDetails?.restaurantId || restaurant.restaurantId || restaurant._id.toString()
@@ -67,22 +135,22 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     // Create a pending withdrawal transaction
     const withdrawalRequestId = withdrawalRequest._id.toString();
     const transaction = wallet.addTransaction({
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       type: 'withdrawal',
       status: 'Pending',
       description: `Withdrawal request created - Request ID: ${withdrawalRequestId}`
     });
 
     // Manually deduct from balance (since addTransaction only deducts when status is 'Completed')
-    wallet.totalBalance = Math.max(0, (wallet.totalBalance || 0) - parseFloat(amount));
-    wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + parseFloat(amount);
+    wallet.totalBalance = Math.max(0, (wallet.totalBalance || 0) - parsedAmount);
+    wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + parsedAmount;
     await wallet.save();
 
     // Link transaction ID to withdrawal request for easier tracking
     withdrawalRequest.transactionId = transaction._id;
     await withdrawalRequest.save();
 
-    logger.info(`Withdrawal request created: ${withdrawalRequest._id} for restaurant: ${restaurant._id}, amount: ${amount}. Balance deducted immediately.`);
+    logger.info(`Withdrawal request created: ${withdrawalRequest._id} for restaurant: ${restaurant._id}, amount: ${parsedAmount}. Balance deducted immediately.`);
 
     return successResponse(res, 201, 'Withdrawal request created successfully', {
       withdrawalRequest: {
@@ -94,8 +162,8 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Error creating withdrawal request: ${error.message}`);
-    return errorResponse(res, 500, 'Failed to create withdrawal request');
+    logger.error(`Error creating withdrawal request: ${error.message}`, error.stack);
+    return errorResponse(res, 500, error.message || 'Failed to create withdrawal request');
   }
 });
 

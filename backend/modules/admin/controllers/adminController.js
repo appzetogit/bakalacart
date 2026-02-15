@@ -2134,11 +2134,11 @@ export const sendRestaurantCredentialsEmail = asyncHandler(async (req, res) => {
     const restaurantPassword = restaurant.password ? 'Use your existing password' : 'Password not set. Please use OTP login or contact admin.';
 
     // Prepare email content
-    const emailSubject = `Your Bakala Cart Restaurant Credentials - ${restaurant.name}`;
+    const emailSubject = `Your Bakalaa Restaurant Credentials - ${restaurant.name}`;
     const emailText = `
 Hello ${restaurant.name || 'Restaurant Owner'},
 
-Your restaurant credentials for Bakala Cart are:
+Your restaurant credentials for Bakalaa are:
 
 Restaurant ID: ${restaurant.restaurantId || restaurant._id}
 Email: ${restaurantEmail}
@@ -2149,7 +2149,7 @@ Login URL: ${process.env.FRONTEND_URL || 'https://your-frontend-url.com'}/restau
 If you have any questions, please contact our support team.
 
 Best regards,
-Bakala Cart Team
+Bakalaa Team
     `.trim();
 
     const emailHtml = `
@@ -2169,11 +2169,11 @@ Bakala Cart Team
 <body>
   <div class="container">
     <div class="header">
-      <h1>Bakala Cart Restaurant Credentials</h1>
+      <h1>Bakalaa Restaurant Credentials</h1>
     </div>
     <div class="content">
       <p>Hello ${restaurant.name || 'Restaurant Owner'},</p>
-      <p>Your restaurant credentials for Bakala Cart are:</p>
+      <p>Your restaurant credentials for Bakalaa are:</p>
       <div class="credentials">
         <p><strong>Restaurant ID:</strong> ${restaurant.restaurantId || restaurant._id}</p>
         <p><strong>Email:</strong> ${restaurantEmail}</p>
@@ -2181,10 +2181,10 @@ Bakala Cart Team
       </div>
       <p><strong>Login URL:</strong> <a href="${process.env.FRONTEND_URL || 'https://your-frontend-url.com'}/restaurant/login">Click here to login</a></p>
       <p>If you have any questions, please contact our support team.</p>
-      <p>Best regards,<br>Bakala Cart Team</p>
+      <p>Best regards,<br>Bakalaa Team</p>
     </div>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} Bakala Cart. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} Bakalaa. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -2195,7 +2195,7 @@ Bakala Cart Team
     const { getSMTPCredentials } = await import('../../../shared/utils/envService.js');
     const smtpCreds = await getSMTPCredentials();
     const fromEmail = process.env.SMTP_FROM || smtpCreds.user || process.env.SMTP_USER || 'noreply@bakalacart.com';
-    const fromName = process.env.SMTP_FROM_NAME || 'Bakala Cart';
+    const fromName = process.env.SMTP_FROM_NAME || 'Bakalaa';
 
     // Ensure transporter is initialized
     if (!emailService.transporter) {
@@ -2239,6 +2239,143 @@ Bakala Cart Team
   } catch (error) {
     logger.error(`Error sending credentials email: ${error.message}`, { error: error.stack });
     return errorResponse(res, 500, 'Failed to send credentials email');
+  }
+});
+
+/**
+ * Send Custom Email to Restaurant
+ * POST /api/admin/restaurants/:id/send-email
+ */
+export const sendRestaurantEmail = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, description } = req.body;
+    const adminId = req.user._id;
+
+    if (!subject || !subject.trim()) {
+      return errorResponse(res, 400, 'Email subject is required');
+    }
+
+    if (!description || !description.trim()) {
+      return errorResponse(res, 400, 'Email description is required');
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    // Get restaurant email - check multiple possible locations
+    const restaurantEmail = 
+      restaurant.email || 
+      restaurant.ownerEmail || 
+      restaurant.owner?.email ||
+      restaurant.onboarding?.step1?.ownerEmail ||
+      restaurant.googleEmail;
+    
+    if (!restaurantEmail || !restaurantEmail.trim()) {
+      return errorResponse(res, 400, 'Restaurant email not found. Please add an email address to the restaurant profile before sending emails.');
+    }
+
+    // Prepare email content
+    const emailSubject = subject.trim();
+    const emailText = `
+Hello ${restaurant.name || 'Restaurant Owner'},
+
+${description.trim()}
+
+If you have any questions, please contact our support team.
+
+Best regards,
+Bakalaa Team
+    `.trim();
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+    .message { background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #4CAF50; white-space: pre-wrap; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Bakalaa</h1>
+    </div>
+    <div class="content">
+      <p>Hello ${restaurant.name || 'Restaurant Owner'},</p>
+      <div class="message">
+        ${description.trim().replace(/\n/g, '<br>')}
+      </div>
+      <p>If you have any questions, please contact our support team.</p>
+      <p>Best regards,<br>Bakalaa Team</p>
+    </div>
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} Bakalaa. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    // Send email using the email service
+    const { getSMTPCredentials } = await import('../../../shared/utils/envService.js');
+    const smtpCreds = await getSMTPCredentials();
+    const fromEmail = process.env.SMTP_FROM || smtpCreds.user || process.env.SMTP_USER || 'noreply@bakalacart.com';
+    const fromName = process.env.SMTP_FROM_NAME || 'Bakalaa';
+
+    // Ensure transporter is initialized
+    if (!emailService.transporter) {
+      await emailService.initializeTransporter();
+    }
+    
+    if (!emailService.transporter) {
+      throw new Error('Email transporter is not configured. Please set up SMTP credentials in ENV Setup.');
+    }
+
+    const nodemailer = (await import('nodemailer')).default;
+    const mailOptions = {
+      from: `"${fromName}" <${fromEmail}>`,
+      to: restaurantEmail,
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml
+    };
+
+    const emailInfo = await emailService.transporter.sendMail(mailOptions);
+
+    logger.info(`Custom email sent successfully`, {
+      messageId: emailInfo.messageId,
+      to: restaurantEmail,
+      subject: emailSubject
+    });
+
+    logger.info(`Custom email sent to restaurant: ${id}`, {
+      sentBy: adminId,
+      restaurantName: restaurant.name,
+      email: restaurantEmail,
+      subject: emailSubject
+    });
+
+    return successResponse(res, 200, 'Email sent successfully', {
+      restaurant: {
+        id: restaurant._id,
+        restaurantId: restaurant.restaurantId,
+        name: restaurant.name,
+        email: restaurantEmail
+      }
+    });
+  } catch (error) {
+    logger.error(`Error sending custom email: ${error.message}`, { error: error.stack });
+    return errorResponse(res, 500, 'Failed to send email');
   }
 });
 

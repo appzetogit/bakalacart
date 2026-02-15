@@ -78,7 +78,7 @@ export default function GiftCardCheckout() {
                 <h2 className="text-white text-3xl sm:text-4xl font-black text-center leading-tight tracking-wide whitespace-pre-line drop-shadow-lg">
                   {category?.cardTitle}
                 </h2>
-                <p className="text-white/80 text-sm mt-3 font-medium">Bakala Cart</p>
+                <p className="text-white/80 text-sm mt-3 font-medium">Bakalaa</p>
               </div>
 
               {/* Sparkle Effects */}

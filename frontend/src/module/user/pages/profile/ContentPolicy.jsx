@@ -103,7 +103,7 @@ export default function ContentPolicy() {
                     className="text-center mt-8 mb-4"
                 >
                     <p className="text-sm text-gray-500 dark:text-gray-500">
-                        © {new Date().getFullYear()} Bakala Cart. All rights reserved.
+                        © {new Date().getFullYear()} Bakalaa. All rights reserved.
                     </p>
                 </motion.div>
             </div>

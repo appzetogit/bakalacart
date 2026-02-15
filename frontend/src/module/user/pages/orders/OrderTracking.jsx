@@ -16,7 +16,10 @@ import {
   Shield,
   Receipt,
   CircleSlash,
-  Loader2
+  Loader2,
+  Calendar,
+  Clock,
+  DollarSign
 } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Card, CardContent } from "@/components/ui/card"
@@ -110,6 +113,7 @@ export default function OrderTracking() {
   const [cancellationReason, setCancellationReason] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
   const [socket, setSocket] = useState(null)
+  const [showOrderDetailsDialog, setShowOrderDetailsDialog] = useState(false)
 
   const defaultAddress = getDefaultAddress()
 
@@ -403,15 +407,22 @@ export default function OrderTracking() {
             items: apiOrder.items?.map(item => ({
               name: item.name,
               quantity: item.quantity,
-              price: item.price
+              price: item.price,
+              isVeg: item.isVeg !== undefined ? item.isVeg : true
             })) || [],
             total: apiOrder.pricing?.total || 0,
+            subtotal: apiOrder.pricing?.subtotal || 0,
+            deliveryFee: apiOrder.pricing?.deliveryFee || 0,
+            platformFee: apiOrder.pricing?.platformFee || 0,
+            tax: apiOrder.pricing?.tax || 0,
+            discount: apiOrder.pricing?.discount || 0,
             status: apiOrder.status || 'pending',
-          deliveryPartner: apiOrder.deliveryPartnerId ? {
-            name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
-            phone: apiOrder.deliveryPartnerId.phone || apiOrder.deliveryPartnerId.phoneNumber || null,
-            avatar: null
-          } : null,
+            createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
+            deliveryPartner: apiOrder.deliveryPartnerId ? {
+              name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
+              phone: apiOrder.deliveryPartnerId.phone || apiOrder.deliveryPartnerId.phoneNumber || null,
+              avatar: null
+            } : null,
             deliveryPartnerId: apiOrder.deliveryPartnerId?._id || apiOrder.deliveryPartnerId || apiOrder.assignmentInfo?.deliveryPartnerId || null,
             assignmentInfo: apiOrder.assignmentInfo || null,
             tracking: apiOrder.tracking || {},
@@ -638,10 +649,17 @@ export default function OrderTracking() {
           items: apiOrder.items?.map(item => ({
             name: item.name,
             quantity: item.quantity,
-            price: item.price
+            price: item.price,
+            isVeg: item.isVeg !== undefined ? item.isVeg : true
           })) || [],
           total: apiOrder.pricing?.total || 0,
+          subtotal: apiOrder.pricing?.subtotal || 0,
+          deliveryFee: apiOrder.pricing?.deliveryFee || 0,
+          platformFee: apiOrder.pricing?.platformFee || 0,
+          tax: apiOrder.pricing?.tax || 0,
+          discount: apiOrder.pricing?.discount || 0,
           status: apiOrder.status || 'pending',
+          createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
           deliveryPartner: apiOrder.deliveryPartnerId ? {
             name: apiOrder.deliveryPartnerId.name || 'Delivery Partner',
             phone: apiOrder.deliveryPartnerId.phone || apiOrder.deliveryPartnerId.phoneNumber || null,
@@ -1074,11 +1092,14 @@ export default function OrderTracking() {
             </motion.button>
           </div>
 
-          {/* Order Items */}
-          <div className="p-4 border-b border-dashed border-gray-200">
+          {/* Order Items - Clickable */}
+          <button
+            onClick={() => setShowOrderDetailsDialog(true)}
+            className="w-full p-4 border-b border-dashed border-gray-200 hover:bg-gray-50 transition-colors"
+          >
             <div className="flex items-start gap-3">
               <Receipt className="w-5 h-5 text-gray-500 mt-0.5" />
-              <div className="flex-1">
+              <div className="flex-1 text-left">
                 <p className="font-medium text-gray-900">Order #{order?.id || order?.orderId || 'N/A'}</p>
                 <div className="mt-2 space-y-1">
                   {order?.items?.map((item, index) => (
@@ -1093,7 +1114,7 @@ export default function OrderTracking() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
-          </div>
+          </button>
         </motion.div>
 
         {/* Help Section - Cancel order disabled */}
@@ -1147,6 +1168,143 @@ export default function OrderTracking() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Details Dialog */}
+      <Dialog open={showOrderDetailsDialog} onOpenChange={setShowOrderDetailsDialog}>
+        <DialogContent className="sm:max-w-2xl w-[95%] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-gray-600" />
+              Order Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          {order && (
+            <div className="space-y-4 py-4">
+              {/* Order ID */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Receipt className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-600">Order ID</span>
+                </div>
+                <p className="text-lg font-semibold text-gray-900">
+                  {order.id || order.orderId || 'N/A'}
+                </p>
+              </div>
+
+              {/* Date & Time */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-600">Order Date & Time</span>
+                </div>
+                {order.createdAt && (
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold text-gray-900">
+                      {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        {new Date(order.createdAt).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Dishes Details */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Receipt className="w-4 h-4" />
+                  Order Items
+                </h3>
+                <div className="space-y-3">
+                  {order.items && order.items.length > 0 ? (
+                    order.items.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                            item.isVeg !== false ? 'border-green-600' : 'border-red-600'
+                          }`}>
+                            <div className={`w-2 h-2 rounded-full ${
+                              item.isVeg !== false ? 'bg-green-600' : 'bg-red-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{item.name}</p>
+                            <p className="text-sm text-gray-500">
+                              Quantity: {item.quantity || 1} × ₹{item.price?.toFixed(2) || '0.00'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="font-semibold text-gray-900">
+                          ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">No items found</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Amount Breakdown */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Amount Breakdown
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Item Total</span>
+                    <span className="text-gray-900 font-medium">₹{order.subtotal?.toFixed(2) || order.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0).toFixed(2) || '0.00'}</span>
+                  </div>
+                  {order.deliveryFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Delivery Charges</span>
+                      <span className="text-gray-900 font-medium">₹{order.deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.platformFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Platform Fee</span>
+                      <span className="text-gray-900 font-medium">₹{order.platformFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.tax > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">GST & Charges</span>
+                      <span className="text-gray-900 font-medium">₹{order.tax.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-sm text-red-600">
+                      <span>Discount</span>
+                      <span className="font-medium">-₹{order.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-gray-900">Total Amount</span>
+                      <span className="font-bold text-lg text-green-600">₹{order.total?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

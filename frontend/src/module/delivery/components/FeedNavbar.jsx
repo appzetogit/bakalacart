@@ -213,7 +213,7 @@ export default function FeedNavbar({ className = "" }) {
     { 
       id: "idCard", 
       title: "Show ID card", 
-      subtitle: "See your Bakala Cart ID card", 
+      subtitle: "See your Bakalaa ID card", 
       icon: "idCard", 
       path: "/delivery/help/id-card"
     },

@@ -370,9 +370,9 @@ export default function Orders() {
       order.restaurantLocation ||
       `${order.address?.city || ""}, ${order.address?.state || ""}`.trim()
 
-    const shareText = `Check out ${order.restaurant} on Bakala Cart.
+    const shareText = `Check out ${order.restaurant} on Bakalaa.
 Location: ${location || "Location not available"}
-Order again from this restaurant in the Bakala Cart app.`
+Order again from this restaurant in the Bakalaa app.`
 
     try {
       if (navigator.share) {
@@ -861,7 +861,7 @@ Order again from this restaurant in the Bakala Cart app.`
 
       {/* Footer Branding */}
       <div className="flex justify-center mt-8 mb-4">
-        <h1 className="text-4xl font-black text-gray-200 tracking-tighter italic">Bakala Cart</h1>
+        <h1 className="text-4xl font-black text-gray-200 tracking-tighter italic">Bakalaa</h1>
       </div>
 
       {/* Rating & Feedback Modal */}
