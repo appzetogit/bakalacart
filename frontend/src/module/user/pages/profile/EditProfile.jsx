@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useProfile } from "../../context/ProfileContext"
 import { userAPI } from "@/lib/api"
 import { toast } from "sonner"
-import { openCameraWithFallback } from "@/lib/utils/flutterCamera"
+import ImageUploadButton from "@/components/ImageUploadButton"
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
@@ -85,7 +85,6 @@ export default function EditProfile() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [profileImage, setProfileImage] = useState(initialProfile?.profileImage || "")
   const [imagePreview, setImagePreview] = useState(initialProfile?.profileImage || "")
-  const fileInputRef = useRef(null)
 
   // Update form data when profile changes
   useEffect(() => {
@@ -150,15 +149,8 @@ export default function EditProfile() {
     }))
   }
 
-  const handleImageSelect = async (e) => {
-    const file = e.target.files?.[0]
+  const handleImageSelect = async (file) => {
     if (!file) return
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select a valid image file')
-      return
-    }
 
     // Show immediate preview for better UX
     const previewReader = new FileReader()
@@ -207,8 +199,6 @@ export default function EditProfile() {
       setImagePreview(profileImage)
     } finally {
       setIsUploadingImage(false)
-      // Reset input value so same file can be selected again if needed
-      if (e.target) e.target.value = '';
     }
   }
 
@@ -309,41 +299,21 @@ export default function EditProfile() {
                 {avatarInitial}
               </AvatarFallback>
             </Avatar>
-            {/* Edit Icon */}
-            <button
-              onClick={async () => {
-                // Try Flutter camera first, fallback to file input
-                const file = await openCameraWithFallback(
-                  { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
-                  () => fileInputRef.current?.click()
-                )
-                
-                // If Flutter camera returned a file, process it
-                if (file) {
-                  const syntheticEvent = {
-                    target: {
-                      files: [file]
-                    }
-                  }
-                  handleImageSelect(syntheticEvent)
-                }
-              }}
-              disabled={isUploadingImage}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploadingImage ? (
-                <Loader2 className="h-4 w-4 text-white animate-spin" />
-              ) : (
-                <Pencil className="h-4 w-4 text-white" />
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="hidden"
-            />
+            {/* Edit Icon with Camera/Gallery Options */}
+            <div className="absolute bottom-0 right-0">
+              <ImageUploadButton
+                onFileSelect={handleImageSelect}
+                multiple={false}
+                disabled={isUploadingImage}
+                className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploadingImage ? (
+                  <Loader2 className="h-4 w-4 text-white animate-spin" />
+                ) : (
+                  <Pencil className="h-4 w-4 text-white" />
+                )}
+              </ImageUploadButton>
+            </div>
           </div>
         </div>
 

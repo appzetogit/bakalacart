@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import ImageUploadButton from "@/components/ImageUploadButton"
 
 export default function EditProfile() {
   const navigate = useNavigate()
@@ -58,18 +59,19 @@ export default function EditProfile() {
                     alt="Profile"
                     className="w-20 h-20 md:w-32 md:h-32 rounded-full border-2 md:border-4 border-white object-cover shadow-md"
                   />
-                  <label className="absolute bottom-0 right-0 bg-[#ff8100] text-white p-1.5 md:p-2 rounded-full cursor-pointer hover:bg-[#e67300] transition-colors">
-                    <Camera className="w-3 h-3 md:w-4 md:h-4" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
+                  <div className="absolute bottom-0 right-0">
+                    <ImageUploadButton
+                      onFileSelect={(file) => {
                         // Handle image upload
-                        console.log("Image selected:", e.target.files[0])
+                        console.log("Image selected:", file)
+                        // TODO: Implement image upload logic
                       }}
-                    />
-                  </label>
+                      multiple={false}
+                      className="bg-[#ff8100] text-white p-1.5 md:p-2 rounded-full cursor-pointer hover:bg-[#e67300] transition-colors"
+                    >
+                      <Camera className="w-3 h-3 md:w-4 md:h-4" />
+                    </ImageUploadButton>
+                  </div>
                 </div>
                 <p className="text-gray-600 text-xs md:text-sm text-center">Tap to change profile picture</p>
               </div>

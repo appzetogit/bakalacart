@@ -19,6 +19,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns"
 import { determineStepToShow } from "../utils/onboardingUtils"
 import { toast } from "sonner"
+import ImageUploadButton from "@/components/ImageUploadButton"
 
 const cuisinesOptions = [
   "North Indian",
@@ -1296,32 +1297,23 @@ export default function RestaurantOnboarding() {
                 </span>
               </div>
             </div>
-            <label
-              htmlFor="menuImagesInput"
-              className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center"
+            <ImageUploadButton
+              onFileSelect={(files) => {
+                const fileArray = Array.isArray(files) ? files : [files]
+                if (!fileArray.length) return
+                console.log('📸 Menu images selected:', fileArray.length, 'files')
+                setStep2((prev) => ({
+                  ...prev,
+                  menuImages: [...(prev.menuImages || []), ...fileArray], // Append new files to existing ones
+                }))
+              }}
+              multiple={true}
+              label="Choose files"
+              className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black border-black text-xs font-medium cursor-pointer w-full items-center"
             >
               <Upload className="w-4.5 h-4.5" />
               <span>Choose files</span>
-            </label>
-            <input
-              id="menuImagesInput"
-              type="file"
-              multiple
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || [])
-                if (!files.length) return
-                console.log('📸 Menu images selected:', files.length, 'files')
-                setStep2((prev) => ({
-                  ...prev,
-                  menuImages: [...(prev.menuImages || []), ...files], // Append new files to existing ones
-                }))
-                // Reset input to allow selecting same file again
-                e.target.value = ''
-              }}
-            />
+            </ImageUploadButton>
           </div>
 
           {/* Menu image previews */}
@@ -1416,32 +1408,23 @@ export default function RestaurantOnboarding() {
             </div>
             
           </div>
-           <label
-                htmlFor="profileImageInput"
-                className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black  border-black text-xs font-medium cursor-pointer     w-full items-center"
-                >
-                <Upload className="w-4.5 h-4.5" />
-                <span>Upload</span>
-              </label>
-              <input
-                id="profileImageInput"
-                type="file"
-                accept="image/*"
-                capture="user"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null
-                  if (file) {
-                    console.log('📸 Profile image selected:', file.name)
-                    setStep2((prev) => ({
-                      ...prev,
-                      profileImage: file,
-                    }))
-                  }
-                  // Reset input to allow selecting same file again
-                  e.target.value = ''
-                }}
-              />
+          <ImageUploadButton
+            onFileSelect={(file) => {
+              if (file) {
+                console.log('📸 Profile image selected:', file.name)
+                setStep2((prev) => ({
+                  ...prev,
+                  profileImage: file,
+                }))
+              }
+            }}
+            multiple={false}
+            label="Upload Profile Image"
+            className="inline-flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-sm bg-white text-black border-black text-xs font-medium cursor-pointer w-full items-center"
+          >
+            <Upload className="w-4.5 h-4.5" />
+            <span>Upload</span>
+          </ImageUploadButton>
         </div>
       </section>
 
@@ -1548,15 +1531,16 @@ export default function RestaurantOnboarding() {
         </div>
         <div>
           <Label className="text-xs text-gray-700">PAN image</Label>
-          <Input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) =>
-              setStep3({ ...step3, panImage: e.target.files?.[0] || null })
-            }
-            className="mt-1 bg-white text-sm text-black placeholder-black"
-          />
+          <div className="mt-1">
+            <ImageUploadButton
+              onFileSelect={(file) => {
+                setStep3({ ...step3, panImage: file || null })
+              }}
+              multiple={false}
+              label="Upload PAN Image"
+              className="w-full justify-center px-3 py-2 bg-white text-sm text-black border border-gray-300 rounded-md hover:bg-gray-50"
+            />
+          </div>
         </div>
       </section>
 
@@ -1606,14 +1590,13 @@ export default function RestaurantOnboarding() {
               className="bg-white text-sm"
               placeholder="Registered address"
             />
-            <Input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) =>
-                setStep3({ ...step3, gstImage: e.target.files?.[0] || null })
-              }
-              className="bg-white text-sm"
+            <ImageUploadButton
+              onFileSelect={(file) => {
+                setStep3({ ...step3, gstImage: file || null })
+              }}
+              multiple={false}
+              label="Upload GST Image"
+              className="w-full justify-center px-3 py-2 bg-white text-sm text-black border border-gray-300 rounded-md hover:bg-gray-50"
             />
           </div>
         )}
@@ -1670,15 +1653,17 @@ export default function RestaurantOnboarding() {
             </Popover>
           </div>
         </div>
-        <Input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) =>
-            setStep3({ ...step3, fssaiImage: e.target.files?.[0] || null })
-          }
-          className="bg-white text-sm"
-        />
+        <div>
+          <Label className="text-xs text-gray-700 mb-1 block">FSSAI image</Label>
+          <ImageUploadButton
+            onFileSelect={(file) => {
+              setStep3({ ...step3, fssaiImage: file || null })
+            }}
+            multiple={false}
+            label="Upload FSSAI Image"
+            className="w-full justify-center px-3 py-2 bg-white text-sm text-black border border-gray-300 rounded-md hover:bg-gray-50"
+          />
+        </div>
       </section>
 
       <section className="bg-white p-4 sm:p-6 rounded-md space-y-4">

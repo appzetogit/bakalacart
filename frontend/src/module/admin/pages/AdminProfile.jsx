@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { User, Mail, Phone, Save, Loader2, Upload, X } from "lucide-react";
+import ImageUploadButton from "@/components/ImageUploadButton";
 
 export default function AdminProfile() {
   const [profile, setProfile] = useState(null);
@@ -20,7 +21,6 @@ export default function AdminProfile() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -64,23 +64,8 @@ export default function AdminProfile() {
     }));
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = (file) => {
     if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type. Please upload PNG, JPG, JPEG, or WEBP.");
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      toast.error("File size exceeds 5MB limit.");
-      return;
-    }
 
     // Set file and create preview
     setSelectedFile(file);
@@ -94,9 +79,6 @@ export default function AdminProfile() {
   const handleRemoveImage = () => {
     setSelectedFile(null);
     setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   const handleSubmit = async (e) => {
