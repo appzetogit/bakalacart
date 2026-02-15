@@ -56,26 +56,8 @@ export const calculateDeliveryFee = async (orderValue, restaurant, deliveryAddre
     }
   }
 
-  // Priority 2: Distance-based calculation (Takes priority if coordinates available)
-  if (deliveryAddress?.location?.coordinates && restaurant?.location?.coordinates) {
-    const distance = calculateDistance(
-      restaurant.location.coordinates,
-      deliveryAddress.location.coordinates
-    );
-
-    // Logic: If distance <= minDeliveryDistance, charge minDeliveryFee
-    // If distance > minDeliveryDistance, charge minDeliveryFee + (extra distance * perKmFee)
-    if (distance <= (feeSettings.minDeliveryDistance || 4)) {
-      return feeSettings.minDeliveryFee || 25;
-    } else {
-      const extraDistance = distance - (feeSettings.minDeliveryDistance || 4);
-      const extraFee = extraDistance * (feeSettings.deliveryFeePerKm || 5);
-      return Math.round((feeSettings.minDeliveryFee || 25) + extraFee);
-    }
-  }
-
-  // Priority 3: Check if delivery fee ranges are configured (based on order value)
-  // This takes priority over freeDeliveryThreshold when ranges are configured
+  // Priority 2: Check if delivery fee ranges are configured (based on order value)
+  // This takes priority over distance-based and freeDeliveryThreshold when ranges are configured
   if (feeSettings.deliveryFeeRanges && Array.isArray(feeSettings.deliveryFeeRanges) && feeSettings.deliveryFeeRanges.length > 0) {
     // Sort ranges by min value to ensure proper checking
     const sortedRanges = [...feeSettings.deliveryFeeRanges].sort((a, b) => a.min - b.min);
@@ -98,7 +80,25 @@ export const calculateDeliveryFee = async (orderValue, restaurant, deliveryAddre
     // If we reach here, no range matched - continue to next priority
   }
 
-  // Priority 4: Use admin settings for free delivery threshold (only if no ranges matched)
+  // Priority 3: Distance-based calculation (Takes priority if coordinates available and no ranges matched)
+  if (deliveryAddress?.location?.coordinates && restaurant?.location?.coordinates) {
+    const distance = calculateDistance(
+      restaurant.location.coordinates,
+      deliveryAddress.location.coordinates
+    );
+
+    // Logic: If distance <= minDeliveryDistance, charge minDeliveryFee
+    // If distance > minDeliveryDistance, charge minDeliveryFee + (extra distance * perKmFee)
+    if (distance <= (feeSettings.minDeliveryDistance || 4)) {
+      return feeSettings.minDeliveryFee || 25;
+    } else {
+      const extraDistance = distance - (feeSettings.minDeliveryDistance || 4);
+      const extraFee = extraDistance * (feeSettings.deliveryFeePerKm || 5);
+      return Math.round((feeSettings.minDeliveryFee || 25) + extraFee);
+    }
+  }
+
+  // Priority 4: Use admin settings for free delivery threshold (only if no ranges or distance logic matched)
   const freeDeliveryThreshold = feeSettings.freeDeliveryThreshold || 149;
   if (orderValue >= freeDeliveryThreshold) {
     return 0;
