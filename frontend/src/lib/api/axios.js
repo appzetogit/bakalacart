@@ -322,8 +322,15 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
+        // Check if it's a network error or truly expired token
+        const isNetworkError = refreshError.code === 'ERR_NETWORK' || refreshError.message === 'Network Error';
+        const isTokenExpired = refreshError.response?.status === 401 && 
+          (refreshError.response?.data?.message?.includes('expired') || 
+           refreshError.response?.data?.message?.includes('Invalid refresh token') ||
+           refreshError.response?.data?.message?.includes('Refresh token not found'));
+
         // Show error toast in development mode for refresh errors
-        if (import.meta.env.DEV) {
+        if (import.meta.env.DEV && !isNetworkError) {
           const refreshErrorMessage =
             refreshError.response?.data?.message ||
             refreshError.response?.data?.error ||
@@ -346,43 +353,44 @@ apiClient.interceptors.response.use(
           });
         }
 
-        // Refresh failed, clear module-specific token and redirect to login
-        // BUT: Don't auto-redirect on certain pages - let them handle errors gracefully
-        const currentPath = window.location.pathname;
-        const isOnboardingPage = currentPath.includes('/onboarding');
-        const isLandingPageManagement = currentPath.includes('/hero-banner-management') || currentPath.includes('/landing-page');
+        // Only logout if token is truly expired/invalid, not on network errors
+        // Network errors should not cause logout - user might be offline temporarily
+        if (isTokenExpired && !isNetworkError) {
+          const currentPath = window.location.pathname;
+          const isOnboardingPage = currentPath.includes('/onboarding');
+          const isLandingPageManagement = currentPath.includes('/hero-banner-management') || currentPath.includes('/landing-page');
 
-        // For landing page management, don't auto-logout on 401 - let component handle it
-        // Only auto-logout for other pages after token refresh fails
-        if (!isOnboardingPage && !isLandingPageManagement) {
-          if (currentPath.startsWith('/admin')) {
-            localStorage.removeItem('admin_accessToken');
-            localStorage.removeItem('admin_authenticated');
-            localStorage.removeItem('admin_user');
-            window.location.href = '/admin/login';
-          } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
-            // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-            localStorage.removeItem('restaurant_accessToken');
-            localStorage.removeItem('restaurant_authenticated');
-            localStorage.removeItem('restaurant_user');
-            window.location.href = '/restaurant/login';
-          } else if (currentPath.startsWith('/delivery')) {
-            localStorage.removeItem('delivery_accessToken');
-            localStorage.removeItem('delivery_authenticated');
-            localStorage.removeItem('delivery_user');
-            window.location.href = '/delivery/sign-in';
-          } else {
-            // User module includes /restaurants/* paths
-            localStorage.removeItem('user_accessToken');
-            localStorage.removeItem('user_authenticated');
-            localStorage.removeItem('user');
-            window.location.href = '/user/auth/sign-in';
+          // For landing page management and onboarding, don't auto-logout - let component handle it
+          // Only auto-logout for other pages when token is truly expired
+          if (!isOnboardingPage && !isLandingPageManagement) {
+            if (currentPath.startsWith('/admin')) {
+              localStorage.removeItem('admin_accessToken');
+              localStorage.removeItem('admin_authenticated');
+              localStorage.removeItem('admin_user');
+              window.location.href = '/admin/login';
+            } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
+              // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
+              localStorage.removeItem('restaurant_accessToken');
+              localStorage.removeItem('restaurant_authenticated');
+              localStorage.removeItem('restaurant_user');
+              window.location.href = '/restaurant/login';
+            } else if (currentPath.startsWith('/delivery')) {
+              localStorage.removeItem('delivery_accessToken');
+              localStorage.removeItem('delivery_authenticated');
+              localStorage.removeItem('delivery_user');
+              window.location.href = '/delivery/sign-in';
+            } else {
+              // User module includes /restaurants/* paths
+              localStorage.removeItem('user_accessToken');
+              localStorage.removeItem('user_authenticated');
+              localStorage.removeItem('user');
+              window.location.href = '/user/auth/sign-in';
+            }
           }
         }
 
-        // For onboarding page, reject the promise so component can handle it
-        return Promise.reject(refreshError);
-
+        // For network errors or onboarding page, reject the promise so component can handle it
+        // Don't logout on network errors - user might reconnect
         return Promise.reject(refreshError);
       }
     }

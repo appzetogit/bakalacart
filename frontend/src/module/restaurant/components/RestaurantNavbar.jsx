@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Search, Menu, ChevronRight, MapPin, X, Bell } from "lucide-react"
 import { restaurantAPI } from "@/lib/api"
+import { proactiveTokenRefresh } from "@/lib/utils/auth"
 
 export default function RestaurantNavbar({
   restaurantName: propRestaurantName,
@@ -185,6 +186,31 @@ export default function RestaurantNavbar({
       console.log('⚠️ Restaurant data available but no address found')
     }
   }, [restaurantData, propLocation])
+
+  // Proactive token refresh - refresh before expiration
+  useEffect(() => {
+    const refreshTokenPeriodically = async () => {
+      // Check if user is authenticated
+      const isAuthenticated = localStorage.getItem("restaurant_authenticated") === "true"
+      if (!isAuthenticated) return
+      
+      // Try to refresh token if needed
+      try {
+        await proactiveTokenRefresh('restaurant')
+      } catch (error) {
+        // Silently fail - don't interrupt user experience
+        // Token will be refreshed on next API call via interceptor
+      }
+    }
+    
+    // Refresh immediately on mount
+    refreshTokenPeriodically()
+    
+    // Then refresh every 4 minutes (before 5 minute threshold)
+    const refreshInterval = setInterval(refreshTokenPeriodically, 4 * 60 * 1000)
+    
+    return () => clearInterval(refreshInterval)
+  }, [])
 
   // Load status from localStorage on mount and listen for changes
   useEffect(() => {

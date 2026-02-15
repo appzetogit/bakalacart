@@ -162,6 +162,104 @@ export function clearAuthData() {
 }
 
 /**
+ * Get time until token expires (in milliseconds)
+ * @param {string} token - JWT token
+ * @returns {number|null} - Milliseconds until expiration or null if invalid
+ */
+export function getTokenExpirationTime(token) {
+  const decoded = decodeToken(token);
+  if (!decoded || !decoded.exp) return null;
+  
+  // exp is in seconds, Date.now() is in milliseconds
+  const expirationTime = decoded.exp * 1000;
+  const now = Date.now();
+  
+  return expirationTime - now;
+}
+
+/**
+ * Check if token should be refreshed (expires within threshold)
+ * @param {string} token - JWT token
+ * @param {number} thresholdMs - Refresh threshold in milliseconds (default: 5 minutes)
+ * @returns {boolean} - True if token should be refreshed
+ */
+export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
+  if (!token) return false;
+  
+  const timeUntilExpiry = getTokenExpirationTime(token);
+  if (timeUntilExpiry === null) return true; // Invalid token, should refresh
+  
+  // Refresh if token expires within threshold
+  return timeUntilExpiry <= thresholdMs;
+}
+
+/**
+ * Proactively refresh token for a module if needed
+ * @param {string} module - Module name (admin, restaurant, delivery, user)
+ * @returns {Promise<boolean>} - True if refresh was successful or not needed
+ */
+export async function proactiveTokenRefresh(module) {
+  const token = getModuleToken(module);
+  if (!token) return false;
+  
+  // Check if token needs refresh (expires within 5 minutes)
+  if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
+    return true; // Token is still valid, no refresh needed
+  }
+  
+  try {
+    // Determine refresh endpoint based on module
+    const refreshEndpoints = {
+      'admin': '/admin/auth/refresh-token',
+      'restaurant': '/restaurant/auth/refresh-token',
+      'delivery': '/delivery/auth/refresh-token',
+      'user': '/auth/refresh-token'
+    };
+    
+    const refreshEndpoint = refreshEndpoints[module];
+    if (!refreshEndpoint) {
+      console.warn(`No refresh endpoint for module: ${module}`);
+      return false;
+    }
+    
+    // Import axios and API_BASE_URL dynamically
+    const { default: axios } = await import('axios');
+    const { API_BASE_URL } = await import('../api/config.js');
+    
+    // Call refresh endpoint with credentials
+    const response = await axios.post(
+      `${API_BASE_URL}${refreshEndpoint}`,
+      {},
+      { withCredentials: true }
+    );
+    
+    const { accessToken } = response.data.data || response.data;
+    
+    if (accessToken) {
+      // Verify role matches
+      const role = getRoleFromToken(accessToken);
+      if (role === module) {
+        // Store new token
+        localStorage.setItem(`${module}_accessToken`, accessToken);
+        console.log(`✅ [Proactive Refresh] Token refreshed for ${module}`);
+        return true;
+      } else {
+        console.warn(`[Proactive Refresh] Role mismatch for ${module}: expected ${module}, got ${role}`);
+        return false;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    // Don't log network errors as they're expected when offline
+    if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
+      console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
+    }
+    return false;
+  }
+}
+
+/**
  * Set authentication data for a specific module
  * @param {string} module - Module name (admin, restaurant, delivery, user)
  * @param {string} token - Access token
