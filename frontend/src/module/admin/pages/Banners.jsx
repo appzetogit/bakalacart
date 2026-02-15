@@ -16,7 +16,7 @@ export default function Banners() {
 
   const filteredBanners = useMemo(() => {
     let result = [...banners]
-    
+
     if (bannerType !== "all") {
       if (bannerType === "Restaurant wise") {
         result = result.filter(banner => banner.bannerType === "Restaurant wise")
@@ -216,10 +216,10 @@ export default function Banners() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
-                {filteredBanners.map((banner) => (
+                {filteredBanners.map((banner, index) => (
                   <tr key={banner.sl} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-slate-700">{banner.sl}</span>
+                      <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -249,14 +249,12 @@ export default function Banners() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => handleToggleStatus(banner.sl)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          banner.status ? "bg-blue-600" : "bg-slate-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${banner.status ? "bg-blue-600" : "bg-slate-300"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            banner.status ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${banner.status ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </td>

@@ -48,25 +48,40 @@ export const getOrders = asyncHandler(async (req, res) => {
       const mappedStatus = statusMap[status] || status;
       query.status = mappedStatus;
 
-      // If restaurant-cancelled, filter by cancellation reason
+      // Special handling for offline-payments to filter by payment method
+      if (status === 'offline-payments') {
+        query['payment.method'] = { $nin: ['razorpay', 'cash', 'wallet'] };
+      }
+
+      // If restaurant-cancelled, filter by cancelledBy or cancellation reason
       if (status === 'restaurant-cancelled') {
-        query.cancellationReason = {
-          $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled/i
-        };
+        query.$or = [
+          { cancelledBy: 'restaurant' },
+          { cancellationReason: { $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue/i } }
+        ];
       }
     }
 
     // Also handle cancelledBy query parameter (if passed separately)
     if (cancelledBy === 'restaurant') {
       query.status = 'cancelled';
-      query.cancellationReason = {
-        $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled/i
-      };
+      query.$or = [
+        { cancelledBy: 'restaurant' },
+        { cancellationReason: { $regex: /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue/i } }
+      ];
     }
 
     // Payment status filter
     if (paymentStatus) {
-      query['payment.status'] = paymentStatus.toLowerCase();
+      const pmfMap = {
+        'paid': 'completed',
+        'unpaid': 'pending',
+        'pending': 'pending',
+        'failed': 'failed',
+        'refunded': 'refunded',
+        'processing': 'processing'
+      };
+      query['payment.status'] = pmfMap[paymentStatus.toLowerCase()] || paymentStatus.toLowerCase();
     }
 
     // Date range filter
@@ -128,7 +143,7 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Search filter (orderId, customer name, customer phone)
     if (search) {
-      query.$or = [
+      const searchOrConditions = [
         { orderId: { $regex: search, $options: 'i' } }
       ];
 
@@ -144,7 +159,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         const users = await User.find(userSearchQuery).select('_id').lean();
         const userIds = users.map(u => u._id);
         if (userIds.length > 0) {
-          query.$or.push({ userId: { $in: userIds } });
+          searchOrConditions.push({ userId: { $in: userIds } });
         }
       }
 
@@ -155,13 +170,23 @@ export const getOrders = asyncHandler(async (req, res) => {
       }).select('_id').lean();
       const userIdsByName = usersByName.map(u => u._id);
       if (userIdsByName.length > 0) {
-        if (!query.$or) query.$or = [];
-        query.$or.push({ userId: { $in: userIdsByName } });
+        searchOrConditions.push({ userId: { $in: userIdsByName } });
       }
 
-      // Ensure $or array is not empty
-      if (query.$or && query.$or.length === 0) {
-        delete query.$or;
+      // Ensure searchOrConditions is not empty before applying
+      if (searchOrConditions.length > 0) {
+        if (query.$or) {
+          // If we already have a status-based $or (e.g., for restaurant-cancelled), 
+          // we MUST combine them using $and to avoid overwriting or incorrect logic
+          const existingOr = query.$or;
+          delete query.$or;
+          query.$and = [
+            { $or: existingOr },
+            { $or: searchOrConditions }
+          ];
+        } else {
+          query.$or = searchOrConditions;
+        }
       }
     }
 
@@ -181,15 +206,23 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(query);
 
-    // Batch fetch settlements for platform fee and refund status (more efficient than individual queries)
+    // Batch fetch settlements and payments (more efficient than individual queries)
     let settlementMap = new Map();
     let refundStatusMap = new Map();
+    let paymentMap = new Map();
     try {
       const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
+      const Payment = (await import('../../payment/models/Payment.js')).default;
       const orderIds = orders.map(o => o._id);
-      const settlements = await OrderSettlement.find({ orderId: { $in: orderIds } })
-        .select('orderId userPayment.platformFee cancellationDetails.refundStatus')
-        .lean();
+
+      const [settlements, payments] = await Promise.all([
+        OrderSettlement.find({ orderId: { $in: orderIds } })
+          .select('orderId userPayment.platformFee cancellationDetails.refundStatus')
+          .lean(),
+        Payment.find({ orderId: { $in: orderIds } })
+          .select('orderId status')
+          .lean()
+      ]);
 
       // Create maps for quick lookup
       settlements.forEach(s => {
@@ -202,8 +235,14 @@ export const getOrders = asyncHandler(async (req, res) => {
           }
         }
       });
+
+      payments.forEach(p => {
+        if (p.orderId) {
+          paymentMap.set(p.orderId.toString(), p.status);
+        }
+      });
     } catch (err) {
-      console.warn('Could not batch fetch settlements:', err.message);
+      console.warn('Could not batch fetch settlements/payments:', err.message);
     }
 
     // Transform orders to match frontend format
@@ -226,12 +265,18 @@ export const getOrders = asyncHandler(async (req, res) => {
       // Map payment status
       const paymentStatusMap = {
         'completed': 'Paid',
-        'pending': 'Pending',
+        'pending': 'Unpaid',
         'failed': 'Failed',
         'refunded': 'Refunded',
         'processing': 'Processing'
       };
-      const paymentStatusDisplay = paymentStatusMap[order.payment?.status] || 'Pending';
+
+      // Get payment status from order or payment record (fallback)
+      const dbPaymentStatus = order.payment?.status;
+      const paymentRecordStatus = paymentMap.get(order._id.toString());
+      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
+
+      const paymentStatusDisplay = paymentStatusMap[effectivePaymentStatus] || 'Unpaid';
 
       // Map order status for display
       // Check if cancelled and determine who cancelled it
@@ -336,6 +381,11 @@ export const getOrders = asyncHandler(async (req, res) => {
             return 'Cash on Delivery';
           } else if (paymentMethod === 'wallet') {
             return 'Wallet';
+          } else if (paymentMethod === 'razorpay') {
+            return 'Online (Razorpay)';
+          } else if (paymentMethod) {
+            // Capitalize first letter of payment method
+            return `Offline (${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)})`;
           } else {
             return 'Online';
           }
@@ -512,6 +562,24 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
 
     console.log(`✅ Found ${orders.length} orders (total: ${total})`);
 
+    // Batch fetch payment statuses
+    let paymentMap = new Map();
+    try {
+      const Payment = (await import('../../payment/models/Payment.js')).default;
+      const orderIds = orders.map(o => o._id);
+      const payments = await Payment.find({ orderId: { $in: orderIds } })
+        .select('orderId status')
+        .lean();
+
+      payments.forEach(p => {
+        if (p.orderId) {
+          paymentMap.set(p.orderId.toString(), p.status);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not batch fetch payments:', err.message);
+    }
+
     // Transform orders to match frontend format
     const transformedOrders = orders.map((order, index) => {
       const orderDate = new Date(order.createdAt);
@@ -543,7 +611,13 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         'refunded': 'Refunded',
         'processing': 'Processing'
       };
-      const paymentStatusDisplay = paymentStatusMap[order.payment?.status] || 'Unpaid';
+
+      // Get payment status from order or payment record (fallback)
+      const dbPaymentStatus = order.payment?.status;
+      const paymentRecordStatus = paymentMap.get(order._id.toString());
+      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
+
+      const paymentStatusDisplay = paymentStatusMap[effectivePaymentStatus] || 'Unpaid';
 
       // Map order status for display
       const statusMap = {
@@ -696,6 +770,24 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
 
     console.log(`✅ Found ${orders.length} ongoing orders (total: ${total})`);
 
+    // Batch fetch payment statuses
+    let paymentMap = new Map();
+    try {
+      const Payment = (await import('../../payment/models/Payment.js')).default;
+      const orderIds = orders.map(o => o._id);
+      const payments = await Payment.find({ orderId: { $in: orderIds } })
+        .select('orderId status')
+        .lean();
+
+      payments.forEach(p => {
+        if (p.orderId) {
+          paymentMap.set(p.orderId.toString(), p.status);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not batch fetch payments:', err.message);
+    }
+
     // Transform orders to match frontend format
     const transformedOrders = orders.map((order, index) => {
       const orderDate = new Date(order.createdAt);
@@ -727,7 +819,13 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         'refunded': 'Refunded',
         'processing': 'Processing'
       };
-      const paymentStatusDisplay = paymentStatusMap[order.payment?.status] || 'Unpaid';
+
+      // Get payment status from order or payment record (fallback)
+      const dbPaymentStatus = order.payment?.status;
+      const paymentRecordStatus = paymentMap.get(order._id.toString());
+      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
+
+      const paymentStatusDisplay = paymentStatusMap[effectivePaymentStatus] || 'Unpaid';
 
       // Map order status for display with colors
       const statusMap = {
@@ -937,18 +1035,43 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       .populate('restaurantId', 'name')
       .lean();
 
+    // Batch fetch payment statuses for summary accuracy
+    let summaryPaymentMap = new Map();
+    try {
+      const Payment = (await import('../../payment/models/Payment.js')).default;
+      const orderIds = allOrdersForSummary.map(o => o._id);
+      const payments = await Payment.find({ orderId: { $in: orderIds } })
+        .select('orderId status')
+        .lean();
+
+      payments.forEach(p => {
+        if (p.orderId) {
+          summaryPaymentMap.set(p.orderId.toString(), p.status);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not batch fetch payments for summary:', err.message);
+    }
+
     // Calculate completed transactions (delivered orders)
-    const completedOrders = allOrdersForSummary.filter(order =>
-      order.status === 'delivered' && order.payment?.status === 'completed'
-    );
+    const completedOrders = allOrdersForSummary.filter(order => {
+      const dbPaymentStatus = order.payment?.status;
+      const paymentRecordStatus = summaryPaymentMap.get(order._id.toString());
+      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
+      return order.status === 'delivered' && effectivePaymentStatus === 'completed';
+    });
+
     const completedTransaction = completedOrders.reduce((sum, order) =>
       sum + (order.pricing?.total || 0), 0
     );
 
     // Calculate refunded transactions
-    const refundedOrders = allOrdersForSummary.filter(order =>
-      order.payment?.status === 'refunded' || order.status === 'cancelled'
-    );
+    const refundedOrders = allOrdersForSummary.filter(order => {
+      const dbPaymentStatus = order.payment?.status;
+      const paymentRecordStatus = summaryPaymentMap.get(order._id.toString());
+      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
+      return effectivePaymentStatus === 'refunded' || order.status === 'cancelled';
+    });
     const refundedTransaction = refundedOrders.reduce((sum, order) =>
       sum + (order.pricing?.total || 0), 0
     );
@@ -1745,75 +1868,53 @@ export const processRefund = asyncHandler(async (req, res) => {
     // Handle wallet refunds differently (paymentMethod already declared above)
     // Wallet payments don't use Razorpay - refund is direct wallet credit
     let refundResult;
-    if (paymentMethod === 'wallet') {
-      // For wallet payments, use provided refundAmount or calculate from order
-      const orderTotal = order.pricing?.total || settlement.userPayment?.total || 0;
-      let finalRefundAmount = 0;
+    // Calculate refund amount - priority: 1. Request Body, 2. Settlement Calculation, 3. Wallet Order Total
+    const orderTotal = order.pricing?.total || settlement?.userPayment?.total || 0;
+    let finalRefundAmount = 0;
 
-      // If refundAmount is provided in request body, use it (validate it)
-      if (refundAmount !== undefined && refundAmount !== null && refundAmount !== '') {
-        const requestedAmount = parseFloat(refundAmount);
-        console.log('💰 [processRefund] Validating refund amount:', {
-          original: refundAmount,
-          parsed: requestedAmount,
-          isNaN: isNaN(requestedAmount),
-          orderTotal: orderTotal
-        });
-
-        if (isNaN(requestedAmount) || requestedAmount <= 0) {
-          console.error('❌ [processRefund] Invalid refund amount:', requestedAmount);
-          return errorResponse(res, 400, `Invalid refund amount provided: ${refundAmount}. Please provide a valid positive number.`);
-        }
-        if (requestedAmount > orderTotal) {
-          console.error('❌ [processRefund] Refund amount exceeds order total:', {
-            requestedAmount,
-            orderTotal
-          });
-          return errorResponse(res, 400, `Refund amount (₹${requestedAmount}) cannot exceed order total (₹${orderTotal})`);
-        }
-        finalRefundAmount = requestedAmount;
-        console.log('✅ [processRefund] Wallet payment - using provided refund amount:', finalRefundAmount);
-      } else {
-        // If no amount provided, use calculated refund or order total
-        const calculatedRefund = settlement.cancellationDetails?.refundAmount || 0;
-
-        // For wallet, always use order total if calculated refund is 0
-        if (calculatedRefund <= 0 && orderTotal > 0) {
-          console.log('💰 [processRefund] Wallet payment - using full order total for refund:', orderTotal);
-          finalRefundAmount = orderTotal;
-        } else if (calculatedRefund > 0) {
-          finalRefundAmount = calculatedRefund;
-        } else {
-          return errorResponse(res, 400, 'No refund amount found for this order');
-        }
+    if (refundAmount !== undefined && refundAmount !== null && refundAmount !== '') {
+      const requestedAmount = parseFloat(refundAmount);
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        return errorResponse(res, 400, `Invalid refund amount provided: ${refundAmount}. Please provide a valid positive number.`);
       }
-
-      // Update settlement with refund amount
-      if (!settlement.cancellationDetails) {
-        settlement.cancellationDetails = {};
+      if (requestedAmount > (orderTotal + 0.01)) { // Allow minor rounding difference
+        return errorResponse(res, 400, `Refund amount (₹${requestedAmount}) cannot exceed order total (₹${orderTotal})`);
       }
+      finalRefundAmount = requestedAmount;
+    } else if (settlement?.cancellationDetails?.refundAmount > 0) {
+      finalRefundAmount = settlement.cancellationDetails.refundAmount;
+    } else if (paymentMethod === 'wallet' && orderTotal > 0) {
+      finalRefundAmount = orderTotal;
+    }
+
+    if (finalRefundAmount <= 0) {
+      return errorResponse(res, 400, 'No refund amount found or calculated for this order');
+    }
+
+    // Update settlement with refund amount if it changed
+    if (settlement && settlement.cancellationDetails) {
       settlement.cancellationDetails.refundAmount = finalRefundAmount;
       await settlement.save();
+    }
 
-      // Process wallet refund (add to user wallet) with the specified amount
+    if (paymentMethod === 'wallet') {
+      // Process wallet refund (add to user wallet)
       const { processWalletRefund } = await import('../../order/services/cancellationRefundService.js');
       refundResult = await processWalletRefund(order._id, adminId, finalRefundAmount);
     } else {
-      // For Razorpay, check if refund amount is calculated
-      const refundAmount = settlement.cancellationDetails?.refundAmount || 0;
-      if (refundAmount <= 0) {
-        return errorResponse(res, 400, 'No refund amount calculated for this order');
-      }
-
       // Process Razorpay refund
       const { processRazorpayRefund } = await import('../../order/services/cancellationRefundService.js');
-      refundResult = await processRazorpayRefund(order._id, adminId);
+      refundResult = await processRazorpayRefund(order._id, adminId, finalRefundAmount);
     }
 
     // Update settlement with admin notes if provided
-    if (notes) {
+    if (notes && settlement && settlement.cancellationDetails) {
+      settlement.cancellationDetails.adminNotes = notes;
+
+      // Also keep in metadata for backward compatibility
       settlement.metadata = settlement.metadata || new Map();
       settlement.metadata.set('adminRefundNotes', notes);
+
       await settlement.save();
     }
 
@@ -2298,6 +2399,36 @@ export const acceptOrderOnBehalfOfRestaurant = asyncHandler(async (req, res) => 
     order.acceptedByAdmin = true;
     order.acceptedByAdminAt = new Date();
     order.acceptedByAdminId = req.user?._id?.toString() || req.admin?._id?.toString() || null;
+
+    // Handle payment status for offline payments
+    const paymentMethod = order.payment?.method;
+    const isOfflinePayment = paymentMethod && !['razorpay', 'cash', 'wallet'].includes(paymentMethod);
+
+    if (isOfflinePayment && order.payment.status === 'pending') {
+      order.payment.status = 'completed';
+
+      // Also update the Payment record if it exists
+      try {
+        const Payment = (await import('../../payment/models/Payment.js')).default;
+        const paymentRecord = await Payment.findOne({ orderId: order._id });
+        if (paymentRecord) {
+          paymentRecord.status = 'completed';
+          paymentRecord.completedAt = new Date();
+          paymentRecord.logs.push({
+            action: 'completed',
+            timestamp: new Date(),
+            details: {
+              previousStatus: 'pending',
+              newStatus: 'completed',
+              note: 'Payment marked as completed by admin during order acceptance'
+            }
+          });
+          await paymentRecord.save();
+        }
+      } catch (paymentError) {
+        console.warn('⚠️ Failed to update Payment record:', paymentError.message);
+      }
+    }
 
     await order.save();
 

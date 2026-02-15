@@ -18,6 +18,7 @@ const statusConfig = {
   "pending": { title: "Pending Orders", color: "amber", icon: Package },
   "accepted": { title: "Accepted Orders", color: "green", icon: Package },
   "processing": { title: "Processing Orders", color: "orange", icon: Package },
+  "ready": { title: "Ready to Pick Orders", color: "indigo", icon: Package },
   "food-on-the-way": { title: "Food On The Way Orders", color: "amber", icon: Package },
   "delivered": { title: "Delivered Orders", color: "emerald", icon: Package },
   "canceled": { title: "Canceled Orders", color: "rose", icon: Package },
@@ -35,7 +36,7 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [processingRefund, setProcessingRefund] = useState(null)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
-  
+
   // Fetch orders from backend API
   useEffect(() => {
     const fetchOrders = async () => {
@@ -44,23 +45,17 @@ export default function OrdersPage({ statusKey = "all" }) {
         const params = {
           page: 1,
           limit: 1000, // Fetch all orders for now (can be optimized with pagination later)
-          status: statusKey === "all" ? undefined : 
-                 statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+          status: statusKey === "all" ? undefined :
+            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
           cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
         }
-        
+
         const response = await adminAPI.getOrders(params)
-        
+
         if (response.data?.success && response.data?.data?.orders) {
-          // Filter out wallet payment orders
-          const filteredOrders = response.data.data.orders.filter(order => {
-            const paymentMethod = order.payment?.method || order.paymentMethod || order.paymentType || ''
-            const paymentMethodLower = String(paymentMethod).toLowerCase().trim()
-            return paymentMethodLower !== 'wallet'
-          })
-          
-          setOrders(filteredOrders)
-          setTotalCount(filteredOrders.length)
+          const fetchedOrders = response.data.data.orders;
+          setOrders(fetchedOrders)
+          setTotalCount(fetchedOrders.length)
         } else {
           console.error("Failed to fetch orders:", response.data)
           toast.error("Failed to fetch orders")
@@ -81,7 +76,7 @@ export default function OrdersPage({ statusKey = "all" }) {
   // Handle refund button click - show modal for wallet payments, confirm dialog for others
   const handleRefund = (order) => {
     const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet";
-    
+
     if (isWalletPayment) {
       // Show modal for wallet refunds
       setSelectedOrderForRefund(order)
@@ -89,11 +84,11 @@ export default function OrdersPage({ statusKey = "all" }) {
     } else {
       // For non-wallet payments, use the old confirm dialog flow
       const confirmMessage = `Are you sure you want to process refund for order ${order.orderId}?\n\nThis will initiate a Razorpay refund to the customer's original payment method.`;
-      
+
       if (!confirm(confirmMessage)) {
         return
       }
-      
+
       processRefund(order, null) // null amount means use default
     }
   }
@@ -104,13 +99,13 @@ export default function OrdersPage({ statusKey = "all" }) {
     // Backend accepts either MongoDB ObjectId (24 chars) or orderId string
     // Using MongoDB _id is more reliable for route matching (no dashes/special chars)
     const orderIdToUse = order.id || order._id || order.orderId
-    
+
     if (!orderIdToUse) {
       console.error('❌ No orderId found in order object:', order)
       toast.error('Order ID not found. Please refresh the page and try again.')
       return
     }
-    
+
     console.log('🔍 Order details for refund:', {
       orderIdString: order.orderId,
       mongoId: order.id,
@@ -121,7 +116,7 @@ export default function OrdersPage({ statusKey = "all" }) {
 
     try {
       setProcessingRefund(orderIdToUse)
-      
+
       console.log('🔍 Processing refund for order:', {
         orderId: order.orderId,
         id: order.id,
@@ -130,20 +125,20 @@ export default function OrdersPage({ statusKey = "all" }) {
         refundAmount,
         url: `/api/admin/orders/${orderIdToUse}/refund`
       })
-      
+
       // Include refundAmount in request body if provided (ensure it's a number)
       const requestData = refundAmount !== null ? { refundAmount: parseFloat(refundAmount) } : {}
       console.log('📤 Request data being sent:', requestData)
       const response = await adminAPI.processRefund(orderIdToUse, requestData)
-      
+
       if (response.data?.success) {
         const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet";
-        toast.success(response.data?.message || (isWalletPayment 
+        toast.success(response.data?.message || (isWalletPayment
           ? `Wallet refund of ₹${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}`
           : `Refund initiated successfully for order ${order.orderId}`))
         // Update the order in the local state immediately to show "Refunded" status
-        setOrders(prevOrders => 
-          prevOrders.map(o => 
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
             (o.id === order.id || o.orderId === order.orderId)
               ? { ...o, refundStatus: 'processed' } // Wallet refunds are instant, so mark as processed
               : o
@@ -153,27 +148,22 @@ export default function OrdersPage({ statusKey = "all" }) {
         const params = {
           page: 1,
           limit: 1000,
-          status: statusKey === "all" ? undefined : 
-                 statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+          status: statusKey === "all" ? undefined :
+            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
           cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
         }
         const refreshResponse = await adminAPI.getOrders(params)
         if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
-          // Filter out wallet payment orders
-          const filteredRefreshOrders = refreshResponse.data.data.orders.filter(order => {
-            const paymentMethod = order.payment?.method || order.paymentMethod || order.paymentType || ''
-            const paymentMethodLower = String(paymentMethod).toLowerCase().trim()
-            return paymentMethodLower !== 'wallet'
-          })
-          setOrders(filteredRefreshOrders)
-          setTotalCount(filteredRefreshOrders.length)
+          const fetchedRefreshOrders = refreshResponse.data.data.orders;
+          setOrders(fetchedRefreshOrders)
+          setTotalCount(fetchedRefreshOrders.length)
         }
       } else {
         toast.error(response.data?.message || "Failed to process refund")
       }
     } catch (error) {
       console.error("❌ Error processing refund:", error)
-      
+
       // Log full error details for debugging
       const errorDetails = {
         message: error.message,
@@ -193,10 +183,10 @@ export default function OrdersPage({ statusKey = "all" }) {
         stack: error.stack
       }
       console.error("❌ Error details:", JSON.stringify(errorDetails, null, 2))
-      
+
       // Show more specific error message
       let errorMessage = "Failed to process refund"
-      
+
       if (error.response) {
         // Server responded with error
         if (error.response.status === 404) {
@@ -217,7 +207,7 @@ export default function OrdersPage({ statusKey = "all" }) {
         // Error in setting up the request
         errorMessage = error.message || "Failed to process refund"
       }
-      
+
       console.error("❌ Final error message:", errorMessage)
       toast.error(errorMessage)
     } finally {
@@ -237,25 +227,25 @@ export default function OrdersPage({ statusKey = "all" }) {
   // Handle delete order
   const handleDeleteOrder = async (order) => {
     const orderIdToUse = order.id || order._id || order.orderId
-    
+
     if (!orderIdToUse) {
       toast.error('Order ID not found. Please refresh the page and try again.')
       return
     }
 
     const confirmMessage = `Are you sure you want to delete order ${order.orderId}?\n\nThis action cannot be undone. All order data will be permanently removed.`
-    
+
     if (!confirm(confirmMessage)) {
       return
     }
 
     try {
       const response = await adminAPI.deleteOrder(orderIdToUse)
-      
+
       if (response.data?.success) {
         toast.success(`Order ${order.orderId} deleted successfully`)
         // Remove order from local state
-        setOrders(prevOrders => prevOrders.filter(o => 
+        setOrders(prevOrders => prevOrders.filter(o =>
           o.id !== order.id && o.orderId !== order.orderId && o._id !== order._id
         ))
         setTotalCount(prev => prev - 1)
@@ -265,6 +255,48 @@ export default function OrdersPage({ statusKey = "all" }) {
     } catch (error) {
       console.error("❌ Error deleting order:", error)
       toast.error(error.response?.data?.message || "Failed to delete order. Please try again.")
+    }
+  }
+
+  // Handle accept order on behalf of restaurant
+  const handleAcceptOrder = async (order) => {
+    const orderIdToUse = order.id || order._id || order.orderId
+
+    if (!orderIdToUse) {
+      toast.error('Order ID not found. Please refresh the page and try again.')
+      return
+    }
+
+    const confirmMessage = `Are you sure you want to accept order ${order.orderId} on behalf of the restaurant?\n\nThis will mark the order as accepted and move it to "preparing" status.`
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      const response = await adminAPI.acceptOrderOnBehalfOfRestaurant(orderIdToUse)
+
+      if (response.data?.success) {
+        toast.success(response.data?.message || `Order ${order.orderId} accepted successfully on behalf of restaurant`)
+        // Refresh the orders list
+        const params = {
+          page: 1,
+          limit: 1000,
+          status: statusKey === "all" ? undefined :
+            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
+        }
+        const refreshResponse = await adminAPI.getOrders(params)
+        if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
+          setOrders(refreshResponse.data.data.orders)
+          setTotalCount(refreshResponse.data.data.orders.length)
+        }
+      } else {
+        toast.error(response.data?.message || "Failed to accept order")
+      }
+    } catch (error) {
+      console.error("❌ Error accepting order:", error)
+      toast.error(error.response?.data?.message || "Failed to accept order. Please try again.")
     }
   }
 
@@ -307,9 +339,9 @@ export default function OrdersPage({ statusKey = "all" }) {
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
-      <OrdersTopbar 
-        title={config.title} 
-        count={count} 
+      <OrdersTopbar
+        title={config.title}
+        count={count}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
@@ -345,13 +377,14 @@ export default function OrdersPage({ statusKey = "all" }) {
         onConfirm={handleRefundConfirm}
         isProcessing={processingRefund !== null}
       />
-      <OrdersTable 
-        orders={filteredOrders} 
+      <OrdersTable
+        orders={filteredOrders}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}
         onRefund={handleRefund}
         onDeleteOrder={handleDeleteOrder}
+        onAcceptOrder={handleAcceptOrder}
       />
     </div>
   )

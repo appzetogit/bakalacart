@@ -444,7 +444,7 @@ const reverseAdminEarnings = async (orderId, adminEarning, orderNumber) => {
  * @param {String} adminId - Admin user ID who initiated the refund
  * @returns {Promise<Object>} Refund result
  */
-export const processRazorpayRefund = async (orderId, adminId = null) => {
+export const processRazorpayRefund = async (orderId, adminId = null, refundAmount = null) => {
   try {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -476,14 +476,19 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
       throw new Error('Refund already processed or initiated for this order');
     }
 
-    const refundAmount = settlement.cancellationDetails?.refundAmount || 0;
+    let finalRefundAmount = 0;
+    if (refundAmount !== null && refundAmount !== undefined && refundAmount > 0) {
+      finalRefundAmount = parseFloat(refundAmount);
+    } else {
+      finalRefundAmount = settlement.cancellationDetails?.refundAmount || 0;
+    }
 
-    if (refundAmount <= 0) {
+    if (finalRefundAmount <= 0) {
       throw new Error('No refund amount calculated for this order');
     }
 
     // Convert refund amount to paise (Razorpay uses paise)
-    const refundAmountInPaise = Math.round(refundAmount * 100);
+    const refundAmountInPaise = Math.round(finalRefundAmount * 100);
 
     // Update refund status to 'initiated'
     settlement.cancellationDetails.refundStatus = 'initiated';
@@ -526,8 +531,8 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
     if (payment) {
       payment.status = 'refunded';
       payment.refund = {
-        amount: refundAmount,
-        status: refundAmount === order.pricing.total ? 'full' : 'partial',
+        amount: finalRefundAmount,
+        status: finalRefundAmount === order.pricing.total ? 'full' : 'partial',
         refundId: razorpayRefund.id,
         refundedAt: new Date(),
         reason: order.cancellationReason || 'Order cancelled by restaurant'
@@ -537,7 +542,7 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
         timestamp: new Date(),
         details: {
           refundId: razorpayRefund.id,
-          amount: refundAmount,
+          amount: finalRefundAmount,
           razorpayRefundId: razorpayRefund.id
         }
       });
@@ -548,6 +553,16 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
     settlement.cancellationDetails.razorpayRefundId = razorpayRefund.id;
     settlement.cancellationDetails.refundStatus = 'initiated'; // Will be updated to 'processed' via webhook
     await settlement.save();
+
+    // Update Order model's payment status
+    try {
+      await Order.findByIdAndUpdate(order._id, {
+        'payment.status': 'refunded'
+      });
+      console.log('✅ [processRazorpayRefund] Order payment status updated to refunded');
+    } catch (orderError) {
+      console.error('⚠️ [processRazorpayRefund] Error updating order payment status (non-critical):', orderError.message);
+    }
 
     // Compensate restaurant if applicable
     const restaurantCompensation = settlement.cancellationDetails?.restaurantCompensation || 0;
@@ -578,22 +593,22 @@ export const processRazorpayRefund = async (orderId, adminId = null) => {
         name: adminId ? 'Admin' : 'System'
       },
       transactionDetails: {
-        amount: refundAmount,
+        amount: finalRefundAmount,
         type: 'razorpay_refund',
         status: 'initiated',
         orderId: orderId,
         razorpayRefundId: razorpayRefund.id,
         razorpayPaymentId: order.payment.razorpayPaymentId
       },
-      description: `Razorpay refund initiated for order ${settlement.orderNumber}. Refund ID: ${razorpayRefund.id}, Amount: ₹${refundAmount}`
+      description: `Razorpay refund initiated for order ${settlement.orderNumber || order.orderId}. Refund ID: ${razorpayRefund.id}, Amount: ₹${finalRefundAmount}`
     });
 
     return {
       success: true,
       refundId: razorpayRefund.id,
-      refundAmount: refundAmount,
+      refundAmount: finalRefundAmount,
       razorpayRefund: razorpayRefund,
-      message: `Refund of ₹${refundAmount} initiated successfully. Amount will be credited to customer's account within 3-5 working days.`
+      message: `Refund of ₹${finalRefundAmount} initiated successfully. Amount will be credited to customer's account within 3-5 working days.`
     };
   } catch (error) {
     console.error('Error processing Razorpay refund:', error);
@@ -927,6 +942,17 @@ export const processWalletRefund = async (orderId, adminId = null, refundAmount 
       settlement.cancellationDetails.refundProcessedBy = adminId;
     }
     await settlement.save();
+
+    // Update Order model's payment status
+    try {
+      const OrderModel = (await import('../models/Order.js')).default;
+      await OrderModel.findByIdAndUpdate(order._id, {
+        'payment.status': 'refunded'
+      });
+      console.log('✅ [processWalletRefund] Order payment status updated to refunded');
+    } catch (orderError) {
+      console.error('⚠️ [processWalletRefund] Error updating order payment status (non-critical):', orderError.message);
+    }
 
     // Create audit log for order
     try {

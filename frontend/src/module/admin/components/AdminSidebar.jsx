@@ -109,7 +109,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             setCompanyName(cached.companyName)
           }
         }
-        
+
         // Always try to load fresh data to ensure we have the latest
         const settings = await loadBusinessSettings()
         if (settings) {
@@ -124,10 +124,10 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         console.error('Error loading logo:', error)
       }
     }
-    
+
     // Load immediately
     loadLogo()
-    
+
     // Also try after a small delay to ensure DOM is ready
     const timeoutId = setTimeout(() => {
       loadLogo()
@@ -146,13 +146,13 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    
+
     return () => {
       clearTimeout(timeoutId)
       window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
     }
   }, [])
-  
+
   // Get initial collapsed state from localStorage
   const getInitialCollapsedState = () => {
     try {
@@ -165,9 +165,9 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     }
     return false
   }
-  
+
   const [isCollapsed, setIsCollapsed] = useState(getInitialCollapsedState)
-  
+
   // Save collapsed state to localStorage and notify parent
   useEffect(() => {
     try {
@@ -179,14 +179,14 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
       console.error('Error saving sidebar collapsed state:', e)
     }
   }, [isCollapsed, onCollapseChange])
-  
+
   // Notify parent on initial load
   useEffect(() => {
     if (onCollapseChange) {
       onCollapseChange(isCollapsed)
     }
   }, [])
-  
+
   const toggleCollapse = () => {
     setIsCollapsed(prev => !prev)
   }
@@ -232,7 +232,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         }
       } else if (item.type === "section") {
         const filteredItems = []
-        
+
         item.items.forEach((subItem) => {
           if (subItem.type === "link") {
             if (subItem.label.toLowerCase().includes(query)) {
@@ -243,7 +243,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             const matchingSubItems = subItem.subItems?.filter(
               (si) => si.label.toLowerCase().includes(query)
             ) || []
-            
+
             if (matchesLabel || matchingSubItems.length > 0) {
               filteredItems.push({
                 ...subItem,
@@ -269,10 +269,10 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
   useEffect(() => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
-      
+
       setExpandedSections((prev) => {
         const newExpandedState = { ...prev }
-        
+
         sidebarMenuData.forEach((item) => {
           if (item.type === "section") {
             item.items.forEach((subItem) => {
@@ -281,7 +281,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
                 const hasMatchingSubItems = subItem.subItems?.some(
                   (si) => si.label.toLowerCase().includes(query)
                 )
-                
+
                 if (matchesLabel || hasMatchingSubItems) {
                   const sectionKey = subItem.label.toLowerCase().replace(/\s+/g, "")
                   newExpandedState[sectionKey] = true
@@ -290,7 +290,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
             })
           }
         })
-        
+
         return newExpandedState
       })
     }
@@ -300,7 +300,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     if (path === "/admin") {
       return location.pathname === path
     }
-    
+
     // For subItems, check if this is the most specific match
     if (allPaths.length > 0) {
       // Sort paths by length (longest first) to find most specific match
@@ -308,7 +308,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
       const bestMatch = sortedPaths.find(p => location.pathname.startsWith(p))
       return bestMatch === path
     }
-    
+
     return location.pathname.startsWith(path)
   }
 
@@ -321,10 +321,21 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
   }, [expandedSections])
 
   const toggleSection = (sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }))
+    setExpandedSections(prev => {
+      // If closing, just close it
+      if (prev[sectionKey]) {
+        return { ...prev, [sectionKey]: false }
+      }
+
+      // If opening, close all others first
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = false
+        return acc
+      }, {})
+
+      // Then open the target section
+      return { ...newState, [sectionKey]: true }
+    })
   }
 
   const renderMenuItem = (item, index, isInSection = false) => {
@@ -518,160 +529,160 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
           isCollapsed ? "w-20" : "w-80"
         )}
       >
-      {/* Header with Logo and Brand */}
-      <div className="px-3 py-3 border-b border-neutral-800/60 bg-neutral-900 animate-[fadeIn_0.4s_ease-out]">
-        <div className="flex items-center justify-between mb-3">
-          {!isCollapsed && (
-            <div className="flex items-center gap-2 animate-[slideIn_0.3s_ease-out]">
-              <div className="w-24 h-12 rounded-lg flex items-center justify-center shadow-black/20">
-                {logoUrl ? (
-                  <img 
-                    src={logoUrl} 
-                    alt={companyName || "Company"} 
-                    className="w-24 h-10 object-contain" 
-                    loading="lazy"
-                    onError={(e) => {
-                      // Hide image if it fails to load
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                ) : companyName ? (
-                  <span className="text-xs font-semibold text-white px-2 truncate">
-                    {companyName}
-                  </span>
-                ) : (
-                  <div className="w-24 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
-                    Admin
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {isCollapsed && (
-            <div className="w-full flex items-center justify-center">
-              <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shadow-lg shadow-black/20 ring-1 ring-white/10">
-                {logoUrl ? (
-                  <img 
-                    src={logoUrl} 
-                    alt={companyName || "Company"} 
-                    className="w-10 h-10 object-contain" 
-                    loading="lazy"
-                    onError={(e) => {
-                      // Hide image if it fails to load
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                ) : companyName ? (
-                  <span className="text-[10px] font-semibold text-white truncate px-1">
-                    {companyName.charAt(0).toUpperCase()}
-                  </span>
-                ) : (
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
-                    A
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleCollapse}
-              className="text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110 p-1.5 rounded-lg hover:bg-white/5"
-              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="lg:hidden text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Admin Panel Label */}
-        {!isCollapsed && (
-          <div className="mb-3 animate-[slideIn_0.4s_ease-out_0.1s_both]">
-            <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider text-left">
-              Admin Panel
-            </h2>
-          </div>
-        )}
-
-        {/* Search Bar */}
-        {!isCollapsed && (
-          <div className="relative animate-[slideIn_0.4s_ease-out_0.2s_both]">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4 z-10 transition-colors duration-200" />
-            <Input
-              type="text"
-              placeholder="Search Menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                "w-full pl-9 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all duration-200 text-left",
-                searchQuery ? "pr-9" : "pr-3"
-              )}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-white transition-all duration-200 hover:scale-110 z-10"
-                aria-label="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Navigation Menu */}
-      <nav className="px-3 py-3 space-y-2">
-        {filteredMenuData.length === 0 && searchQuery.trim() ? (
-        <div className="px-3 py-12 text-left animate-[fadeIn_0.4s_ease-out]">
-            <p className="text-neutral-300 text-sm font-medium text-left">No menu items found</p>
-            <p className="text-neutral-500 text-sm mt-2 text-left">Try a different search term</p>
-          </div>
-        ) : (
-          filteredMenuData.map((item, index) => {
-            if (item.type === "link") {
-              return renderMenuItem(item, index)
-            }
-
-            if (item.type === "section") {
-              return (
-                <div 
-                  key={index} 
-                  className={cn(
-                    index > 0 ? "mt-4 pt-4 border-t border-neutral-800/60" : "",
-                    "animate-[fadeIn_0.4s_ease-out]"
-                  )}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  {!isCollapsed && (
-                    <div className="px-3 py-2 mb-2">
-                      <span className="text-neutral-400 font-bold text-sm uppercase tracking-wider text-left">
-                        {item.label}
-                      </span>
+        {/* Header with Logo and Brand */}
+        <div className="px-3 py-3 border-b border-neutral-800/60 bg-neutral-900 animate-[fadeIn_0.4s_ease-out]">
+          <div className="flex items-center justify-between mb-3">
+            {!isCollapsed && (
+              <div className="flex items-center gap-2 animate-[slideIn_0.3s_ease-out]">
+                <div className="w-24 h-12 rounded-lg flex items-center justify-center shadow-black/20">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={companyName || "Company"}
+                      className="w-24 h-10 object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Hide image if it fails to load
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  ) : companyName ? (
+                    <span className="text-xs font-semibold text-white px-2 truncate">
+                      {companyName}
+                    </span>
+                  ) : (
+                    <div className="w-24 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                      Admin
                     </div>
                   )}
-                  <div className="space-y-1">
-                    {item.items.map((subItem, subIndex) => renderMenuItem(subItem, `${index}-${subIndex}`, true))}
-                  </div>
                 </div>
-              )
-            }
+              </div>
+            )}
+            {isCollapsed && (
+              <div className="w-full flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shadow-lg shadow-black/20 ring-1 ring-white/10">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={companyName || "Company"}
+                      className="w-10 h-10 object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Hide image if it fails to load
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  ) : companyName ? (
+                    <span className="text-[10px] font-semibold text-white truncate px-1">
+                      {companyName.charAt(0).toUpperCase()}
+                    </span>
+                  ) : (
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                      A
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleCollapse}
+                className="text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110 p-1.5 rounded-lg hover:bg-white/5"
+                title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="w-4 h-4" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                className="lg:hidden text-neutral-300 hover:text-white transition-all duration-200 hover:scale-110"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
 
-            return null
-          })
-        )}
-      </nav>
-    </div>
+          {/* Admin Panel Label */}
+          {!isCollapsed && (
+            <div className="mb-3 animate-[slideIn_0.4s_ease-out_0.1s_both]">
+              <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider text-left">
+                Admin Panel
+              </h2>
+            </div>
+          )}
+
+          {/* Search Bar */}
+          {!isCollapsed && (
+            <div className="relative animate-[slideIn_0.4s_ease-out_0.2s_both]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4 z-10 transition-colors duration-200" />
+              <Input
+                type="text"
+                placeholder="Search Menu..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={cn(
+                  "w-full pl-9 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/40 transition-all duration-200 text-left",
+                  searchQuery ? "pr-9" : "pr-3"
+                )}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-white transition-all duration-200 hover:scale-110 z-10"
+                  aria-label="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="px-3 py-3 space-y-2">
+          {filteredMenuData.length === 0 && searchQuery.trim() ? (
+            <div className="px-3 py-12 text-left animate-[fadeIn_0.4s_ease-out]">
+              <p className="text-neutral-300 text-sm font-medium text-left">No menu items found</p>
+              <p className="text-neutral-500 text-sm mt-2 text-left">Try a different search term</p>
+            </div>
+          ) : (
+            filteredMenuData.map((item, index) => {
+              if (item.type === "link") {
+                return renderMenuItem(item, index)
+              }
+
+              if (item.type === "section") {
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      index > 0 ? "mt-4 pt-4 border-t border-neutral-800/60" : "",
+                      "animate-[fadeIn_0.4s_ease-out]"
+                    )}
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    {!isCollapsed && (
+                      <div className="px-3 py-2 mb-2">
+                        <span className="text-neutral-400 font-bold text-sm uppercase tracking-wider text-left">
+                          {item.label}
+                        </span>
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      {item.items.map((subItem, subIndex) => renderMenuItem(subItem, `${index}-${subIndex}`, true))}
+                    </div>
+                  </div>
+                )
+              }
+
+              return null
+            })
+          )}
+        </nav>
+      </div>
     </>
   )
 }

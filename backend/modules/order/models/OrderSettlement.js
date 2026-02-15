@@ -147,7 +147,8 @@ const orderSettlementSchema = new mongoose.Schema({
     refundInitiatedAt: Date,
     refundInitiatedBy: { type: mongoose.Schema.Types.ObjectId, sparse: true },
     refundProcessedAt: Date,
-    refundFailureReason: { type: String, sparse: true }
+    refundFailureReason: { type: String, sparse: true },
+    adminNotes: { type: String, sparse: true }
   },
 
   // Audit Trail

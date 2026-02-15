@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   ArrowLeft,
@@ -116,10 +116,16 @@ export default function MenuAdd() {
     }
   }
 
+  const menuListRef = useRef(null)
+
   const handleRestaurantSelect = (restaurant) => {
     if (selectedRestaurant?._id === restaurant._id) return
     setSelectedRestaurant(restaurant)
     setMenu(null)
+    // Scroll to menu section smoothly
+    setTimeout(() => {
+      menuListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   const toggleSection = (sectionId) => {
@@ -435,7 +441,7 @@ export default function MenuAdd() {
         const originalSectionId = editingDish.section.id
         const originalSectionName = editingDish.section.name
         const newCategory = formData.category
-        
+
         // Step 1: Remove dish from original section
         updatedSections = currentMenu.sections.map(section => {
           if (section.id === originalSectionId || section.name === originalSectionName) {
@@ -448,7 +454,7 @@ export default function MenuAdd() {
           }
           return section
         })
-        
+
         // Step 2: Add dish to the correct section (new category or same category)
         let sectionFound = false
         updatedSections = updatedSections.map(section => {
@@ -461,7 +467,7 @@ export default function MenuAdd() {
           }
           return section
         })
-        
+
         // If target section doesn't exist, create it
         if (!sectionFound) {
           const newSection = {
@@ -548,8 +554,8 @@ export default function MenuAdd() {
   }
 
   const filteredRestaurants = restaurants.filter(restaurant =>
-    restaurant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    restaurant.ownerName?.toLowerCase().includes(searchQuery.toLowerCase())
+    restaurant.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+    restaurant.ownerName?.toLowerCase().includes(searchQuery.trim().toLowerCase())
   )
 
   return (
@@ -620,7 +626,7 @@ export default function MenuAdd() {
 
         {/* Menu Sections */}
         {selectedRestaurant && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div ref={menuListRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
                 Menu for {selectedRestaurant.name}

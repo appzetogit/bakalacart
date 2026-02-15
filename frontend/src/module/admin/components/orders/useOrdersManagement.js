@@ -42,7 +42,7 @@ export function useOrdersManagement(orders, statusKey, title) {
     // Apply search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
-      result = result.filter(order => 
+      result = result.filter(order =>
         order.orderId.toLowerCase().includes(query) ||
         order.customerName.toLowerCase().includes(query) ||
         order.restaurant.toLowerCase().includes(query) ||
@@ -161,146 +161,231 @@ export function useOrdersManagement(orders, statusKey, title) {
       // Dynamic import of jsPDF and autoTable for instant PDF download
       const { default: jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
-      
+
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       })
 
+      // Add Header Background
+      doc.setFillColor(59, 130, 246)
+      doc.rect(0, 0, 210, 40, 'F')
+
       // Add title
-      doc.setFontSize(18)
-      doc.setTextColor(30, 30, 30)
-      doc.text('Order Invoice', 105, 20, { align: 'center' })
-      
-      // Order ID
-      doc.setFontSize(12)
-      doc.setTextColor(100, 100, 100)
-      const orderId = order.orderId || order.id || order.subscriptionId || 'N/A'
-      doc.text(`Order ID: ${orderId}`, 105, 28, { align: 'center' })
-      
-      // Date
+      doc.setFontSize(22)
+      doc.setTextColor(255, 255, 255)
+      doc.setFont(undefined, 'bold')
+      doc.text('INVOICE', 105, 18, { align: 'center' })
+
+      // Order ID in header
       doc.setFontSize(10)
+      doc.setTextColor(255, 255, 255)
+      doc.setFont(undefined, 'normal')
+      const orderId = order.orderId || order.id || 'N/A'
+      doc.text(`Order ID: ${orderId}`, 105, 25, { align: 'center' })
+
+      // Date in header
       const orderDate = order.date && order.time ? `${order.date}, ${order.time}` : (order.date || new Date().toLocaleDateString())
-      doc.text(`Date: ${orderDate}`, 105, 34, { align: 'center' })
-      
-      let startY = 45
-      
-      // Customer Information
-      if (order.customerName || order.customerPhone) {
-        doc.setFontSize(12)
-        doc.setTextColor(30, 30, 30)
-        doc.text('Customer Information', 14, startY)
-        startY += 8
-        
-        doc.setFontSize(10)
-        doc.setTextColor(60, 60, 60)
-        if (order.customerName) {
-          doc.text(`Name: ${order.customerName}`, 14, startY)
-          startY += 6
-        }
-        if (order.customerPhone) {
-          doc.text(`Phone: ${order.customerPhone}`, 14, startY)
-          startY += 6
-        }
-        startY += 5
+      doc.text(`Date: ${orderDate}`, 105, 30, { align: 'center' })
+
+      let startY = 50
+
+      // Create two columns for Customer and Restaurant Info
+      doc.setFontSize(12)
+      doc.setTextColor(30, 30, 30)
+      doc.setFont(undefined, 'bold')
+      doc.text('Bill To:', 14, startY)
+      doc.text('Restaurant Info:', 110, startY)
+
+      startY += 7
+      doc.setFontSize(10)
+      doc.setFont(undefined, 'normal')
+      doc.setTextColor(60, 60, 60)
+
+      // Customer details (Left Column)
+      let customerY = startY
+      if (order.customerName) {
+        doc.text(`Name: ${order.customerName}`, 14, customerY)
+        customerY += 5
       }
-      
-      // Restaurant Information
+      if (order.customerPhone) {
+        doc.text(`Phone: ${order.customerPhone}`, 14, customerY)
+        customerY += 5
+      }
+      if (order.customerEmail) {
+        doc.text(`Email: ${order.customerEmail}`, 14, customerY)
+        customerY += 5
+      }
+
+      // Restaurant details (Right Column)
+      let restaurantY = startY
       if (order.restaurant) {
+        doc.text(order.restaurant, 110, restaurantY)
+        restaurantY += 5
+      }
+
+      // Shipping Address (Full Width below)
+      startY = Math.max(customerY, restaurantY) + 5
+      if (order.address) {
         doc.setFontSize(12)
         doc.setTextColor(30, 30, 30)
-        doc.text('Restaurant', 14, startY)
-        startY += 8
-        
+        doc.setFont(undefined, 'bold')
+        doc.text('Shipping Address:', 14, startY)
+        startY += 7
+
         doc.setFontSize(10)
+        doc.setFont(undefined, 'normal')
         doc.setTextColor(60, 60, 60)
-        doc.text(order.restaurant, 14, startY)
-        startY += 10
+
+        const formatAddress = (address) => {
+          if (!address) return ""
+          const parts = []
+          if (address.street) parts.push(address.street)
+          if (address.area) parts.push(address.area)
+          if (address.city) parts.push(address.city)
+          if (address.state) parts.push(address.state)
+          if (address.pincode || address.zipCode) parts.push(address.pincode || address.zipCode)
+          return parts.join(", ")
+        }
+
+        const mainAddress = order.address.formattedAddress || formatAddress(order.address)
+        const splitAddress = doc.splitTextToSize(mainAddress, 180)
+        doc.text(splitAddress, 14, startY)
+        startY += (splitAddress.length * 5)
+
+        if (order.deliveryAddressDetails) {
+          doc.setFont(undefined, 'italic')
+          doc.text(`Note: ${order.deliveryAddressDetails}`, 14, startY)
+          startY += 6
+          doc.setFont(undefined, 'normal')
+        }
       }
-      
-      // Delivery Type
-      if (order.deliveryType) {
-        doc.setFontSize(10)
-        doc.text(`Delivery Type: ${order.deliveryType}`, 14, startY)
-        startY += 8
-      }
-      
+
+      startY += 5
+
+      // Payment & Delivery Type Highlighting
+      doc.setFillColor(245, 247, 250)
+      doc.rect(14, startY, 182, 10, 'F')
+      doc.setFontSize(9)
+      doc.setTextColor(100, 100, 100)
+      const paymentMethod = order.paymentType || 'N/A'
+      const deliveryType = order.deliveryType || 'N/A'
+      doc.text(`Payment: ${paymentMethod} | Status: ${order.paymentStatus || 'Pending'} | Delivery: ${deliveryType}`, 16, startY + 6)
+
+      startY += 15
+
       // Order Items Table
       if (order.items && Array.isArray(order.items) && order.items.length > 0) {
         const tableData = order.items.map((item) => [
           item.quantity || 1,
           item.name || 'Unknown Item',
-          `₹${(item.price || 0).toFixed(2)}`,
-          `₹${((item.quantity || 1) * (item.price || 0)).toFixed(2)}`
+          `Rs. ${(item.price || 0).toFixed(2)}`,
+          `Rs. ${((item.quantity || 1) * (item.price || 0)).toFixed(2)}`
         ])
-        
+
         autoTable(doc, {
           startY: startY,
           head: [['Qty', 'Item Name', 'Price', 'Total']],
           body: tableData,
-          theme: 'striped',
+          theme: 'grid',
           headStyles: {
             fillColor: [59, 130, 246],
             textColor: 255,
             fontStyle: 'bold',
-            fontSize: 10
+            fontSize: 10,
+            halign: 'center'
           },
           bodyStyles: {
             fontSize: 9,
             textColor: [30, 30, 30]
           },
-          alternateRowStyles: {
-            fillColor: [245, 247, 250]
-          },
-          styles: {
-            cellPadding: 4,
-            lineColor: [200, 200, 200],
-            lineWidth: 0.5
-          },
           columnStyles: {
-            0: { cellWidth: 20, halign: 'center' },
-            1: { cellWidth: 80 },
+            0: { cellWidth: 15, halign: 'center' },
+            1: { cellWidth: 100 },
             2: { cellWidth: 35, halign: 'right' },
-            3: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+            3: { cellWidth: 32, halign: 'right' }
           },
           margin: { left: 14, right: 14 }
         })
-        
+
         startY = doc.lastAutoTable.finalY + 10
       }
-      
-      // Total Amount
-      if (order.totalAmount) {
-        doc.setFontSize(14)
-        doc.setTextColor(30, 30, 30)
-        doc.setFont(undefined, 'bold')
-        const totalAmount = typeof order.totalAmount === 'number' ? order.totalAmount.toFixed(2) : order.totalAmount
-        doc.text(`Total Amount: Rs. ${totalAmount}`, 14, startY)
-        startY += 8
-      }
-      
-      // Payment Status
-      if (order.paymentStatus) {
-        doc.setFontSize(10)
-        doc.setTextColor(100, 100, 100)
-        doc.setFont(undefined, 'normal')
-        doc.text(`Payment Status: ${order.paymentStatus}`, 14, startY)
+
+      // Pricing Breakdown (Subtotal, Discounts, Fees, Total)
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const contentWidth = pageWidth - 28 // 14 margin on each side
+      const rightAlignPos = pageWidth - 14
+      const labelPos = pageWidth - 60
+
+      doc.setFontSize(10)
+      doc.setTextColor(60, 60, 60)
+
+      // Subtotal
+      if (order.totalItemAmount !== undefined) {
+        doc.text('Subtotal:', labelPos, startY)
+        doc.text(`Rs. ${order.totalItemAmount.toFixed(2)}`, rightAlignPos, startY, { align: 'right' })
         startY += 6
       }
-      
-      // Order Status
-      if (order.orderStatus) {
-        doc.setFontSize(10)
-        doc.text(`Order Status: ${order.orderStatus}`, 14, startY)
+
+      // Discounts
+      const totalDiscount = (order.itemDiscount || 0) + (order.couponDiscount || 0) + (order.referralDiscount || 0)
+      if (totalDiscount > 0) {
+        doc.setTextColor(16, 185, 129) // Emerald-600
+        doc.text('Total Discount:', labelPos, startY)
+        doc.text(`-Rs. ${totalDiscount.toFixed(2)}`, rightAlignPos, startY, { align: 'right' })
+        startY += 6
+        doc.setTextColor(60, 60, 60)
       }
-      
+
+      // Delivery Charge
+      if (order.deliveryCharge !== undefined) {
+        doc.text('Delivery Charge:', labelPos, startY)
+        const deliveryText = order.deliveryCharge > 0 ? `Rs. ${order.deliveryCharge.toFixed(2)}` : 'FREE'
+        doc.text(deliveryText, rightAlignPos, startY, { align: 'right' })
+        startY += 6
+      }
+
+      // Platform Fee
+      if (order.platformFee !== undefined && order.platformFee > 0) {
+        doc.text('Platform Fee:', labelPos, startY)
+        doc.text(`Rs. ${order.platformFee.toFixed(2)}`, rightAlignPos, startY, { align: 'right' })
+        startY += 6
+      }
+
+      // GST/Tax
+      if (order.vatTax !== undefined && order.vatTax > 0) {
+        doc.text('Tax (GST):', labelPos, startY)
+        doc.text(`Rs. ${order.vatTax.toFixed(2)}`, rightAlignPos, startY, { align: 'right' })
+        startY += 6
+      }
+
+      // Total Amount
+      startY += 2
+      doc.setDrawColor(200, 200, 200)
+      doc.line(labelPos, startY - 4, rightAlignPos, startY - 4)
+
+      doc.setFontSize(14)
+      doc.setTextColor(30, 30, 30)
+      doc.setFont(undefined, 'bold')
+      const finalTotal = typeof order.totalAmount === 'number' ? order.totalAmount.toFixed(2) : order.totalAmount
+      doc.text('Grand Total:', labelPos, startY + 4)
+      doc.text(`Rs. ${finalTotal}`, rightAlignPos, startY + 4, { align: 'right' })
+
+      // Footer
+      doc.setFontSize(8)
+      doc.setTextColor(150, 150, 150)
+      doc.setFont(undefined, 'normal')
+      doc.text('Thank you for choosing Bakalaa Cart!', 105, 280, { align: 'center' })
+      doc.text('This is a computer-generated invoice and does not require a signature.', 105, 284, { align: 'center' })
+
       // Save the PDF instantly
-      const filename = `Invoice_${orderId}_${new Date().toISOString().split("T")[0]}.pdf`
+      const cleanOrderId = orderId.toString().replace(/[^a-zA-Z0-9]/g, '_')
+      const filename = `Invoice_${cleanOrderId}.pdf`
       doc.save(filename)
     } catch (error) {
       console.error("Error generating PDF invoice:", error)
-      alert("Failed to download PDF invoice. Please try again.")
+      alert("Failed to download PDF invoice. Please ensure you have an active internet connection to load PDF libraries.")
     }
   }
 

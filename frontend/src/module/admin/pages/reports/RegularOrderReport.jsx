@@ -39,7 +39,7 @@ export default function RegularOrderReport() {
   const [zones, setZones] = useState([])
   const [restaurants, setRestaurants] = useState([])
   const [customers, setCustomers] = useState([])
-  
+
   const [filters, setFilters] = useState({
     zone: "All Zones",
     restaurant: "All restaurants",
@@ -129,17 +129,10 @@ export default function RegularOrderReport() {
         }
 
         const response = await adminAPI.getOrders(params)
-        
+
         if (response.data?.success) {
-          // Filter out wallet payment orders
-          const nonWalletOrders = (response.data.data.orders || []).filter(order => {
-            const paymentMethod = order.payment?.method || order.paymentMethod || order.paymentType || ''
-            const paymentMethodLower = String(paymentMethod).toLowerCase().trim()
-            return paymentMethodLower !== 'wallet'
-          })
-          
           // Transform backend orders to match frontend format
-          const transformedOrders = nonWalletOrders.map(order => ({
+          const transformedOrders = (response.data.data.orders || []).map(order => ({
             orderId: order.orderId,
             restaurant: order.restaurant,
             customerName: order.customerName,
@@ -385,17 +378,16 @@ export default function RegularOrderReport() {
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
             </div>
 
-            <button 
+            <button
               onClick={handleResetFilters}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap"
             >
               Reset
             </button>
-            <button 
+            <button
               onClick={handleFilterApply}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all whitespace-nowrap relative ${
-                activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all whitespace-nowrap relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                }`}
             >
               Filter
               {activeFiltersCount > 0 && (
@@ -471,7 +463,7 @@ export default function RegularOrderReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >
@@ -612,11 +604,10 @@ export default function RegularOrderReport() {
                 <button
                   key={idx + 1}
                   onClick={() => handlePageChange(idx + 1)}
-                  className={`w-6 h-6 text-[10px] rounded border ${
-                    currentPage === idx + 1
+                  className={`w-6 h-6 text-[10px] rounded border ${currentPage === idx + 1
                       ? "bg-blue-600 border-blue-600 text-white"
                       : "border-slate-300 text-slate-700 hover:bg-slate-50"
-                  }`}
+                    }`}
                 >
                   {idx + 1}
                 </button>

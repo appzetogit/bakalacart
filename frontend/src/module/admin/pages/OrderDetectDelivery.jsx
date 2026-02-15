@@ -182,15 +182,15 @@ const buildStatusHistory = (order) => {
 // Transform backend order to frontend format
 const transformOrder = (order, index) => {
   const orderDate = new Date(order.createdAt)
-  const dateStr = orderDate.toLocaleDateString('en-GB', { 
-    day: '2-digit', 
-    month: 'short', 
-    year: 'numeric' 
+  const dateStr = orderDate.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
   }).toUpperCase()
-  const timeStr = orderDate.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
+  const timeStr = orderDate.toLocaleTimeString('en-US', {
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true 
+    hour12: true
   }).toUpperCase()
 
   const displayStatus = mapOrderStatus(order)
@@ -238,18 +238,11 @@ export default function OrderDetectDelivery() {
           page: 1,
           limit: 1000, // Fetch all orders for now
         }
-        
+
         const response = await adminAPI.getOrders(params)
-        
+
         if (response.data?.success && response.data?.data?.orders) {
-          // Filter out wallet payment orders
-          const nonWalletOrders = response.data.data.orders.filter(order => {
-            const paymentMethod = order.payment?.method || order.paymentMethod || order.paymentType || ''
-            const paymentMethodLower = String(paymentMethod).toLowerCase().trim()
-            return paymentMethodLower !== 'wallet'
-          })
-          
-          const transformedOrders = nonWalletOrders.map((order, index) => 
+          const transformedOrders = response.data.data.orders.map((order, index) =>
             transformOrder(order, index)
           )
           setOrders(transformedOrders)
@@ -310,7 +303,7 @@ export default function OrderDetectDelivery() {
     const orderIdAccepted = filteredData.filter(o => o.status === "Order ID Accepted").length
     const reachedDrop = filteredData.filter(o => o.status === "Reached Drop").length
     const delivered = filteredData.filter(o => o.status === "Ordered Delivered").length
-    
+
     return { total, ordered, restaurantAccepted, rejected, deliveryBoyAssigned, reachedPickup, orderIdAccepted, reachedDrop, delivered }
   }, [filteredData, orders.length])
 
@@ -361,9 +354,9 @@ export default function OrderDetectDelivery() {
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
-      <OrdersTopbar 
-        title="Order Detect Delivery" 
-        count={count} 
+      <OrdersTopbar
+        title="Order Detect Delivery"
+        count={count}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
@@ -496,8 +489,8 @@ export default function OrderDetectDelivery() {
         onOpenChange={setIsViewOrderOpen}
         order={selectedOrder}
       />
-      <OrderDetectDeliveryTable 
-        orders={filteredData} 
+      <OrderDetectDeliveryTable
+        orders={filteredData}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}

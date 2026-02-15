@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, X, Bell, Package, CheckCircle, AlertCircle, Info, Trash2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import {
   getRestaurantNotifications,
   deleteRestaurantNotification,
@@ -18,10 +19,11 @@ export default function Notifications() {
   useEffect(() => {
     const loadNotifications = () => {
       const allNotifications = getRestaurantNotifications()
-      console.log('📬 Loaded notifications:', allNotifications)
+      console.log('📬 Loaded notifications:', allNotifications.length, 'total')
       setNotifications(allNotifications)
     }
 
+    // Initial load
     loadNotifications()
 
     // Listen for notification updates
@@ -29,15 +31,18 @@ export default function Notifications() {
       console.log('🔄 Notification update event received')
       loadNotifications()
     }
-    window.addEventListener('restaurantNotificationsUpdated', handleUpdate)
 
-    // Also check periodically (every 2 seconds) in case event doesn't fire
+    window.addEventListener('restaurantNotificationsUpdated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+
+    // Check for updates every 2 seconds to ensure real-time sync
     const interval = setInterval(() => {
       loadNotifications()
     }, 2000)
 
     return () => {
       window.removeEventListener('restaurantNotificationsUpdated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
       clearInterval(interval)
     }
   }, [])
@@ -45,7 +50,7 @@ export default function Notifications() {
   // Format time ago
   const formatTimeAgo = (dateString) => {
     if (!dateString) return 'Just now'
-    
+
     const date = new Date(dateString)
     const now = new Date()
     const diffInSeconds = Math.floor((now - date) / 1000)
@@ -54,7 +59,7 @@ export default function Notifications() {
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`
-    
+
     return date.toLocaleDateString()
   }
 
@@ -78,6 +83,7 @@ export default function Notifications() {
   const handleDeleteNotification = (notificationId) => {
     deleteRestaurantNotification(notificationId)
     setNotifications(getRestaurantNotifications())
+    toast.success('Notification deleted')
   }
 
   // Handle clear all
@@ -85,6 +91,7 @@ export default function Notifications() {
     if (window.confirm('Are you sure you want to clear all notifications?')) {
       clearAllRestaurantNotifications()
       setNotifications([])
+      toast.success('All notifications cleared')
     }
   }
 
@@ -139,9 +146,8 @@ export default function Notifications() {
               return (
                 <Card
                   key={notification.id}
-                  className={`bg-white shadow-sm border transition-all cursor-pointer ${
-                    !notification.read ? 'border-l-4 border-l-orange-500' : 'border-gray-100'
-                  }`}
+                  className={`bg-white shadow-sm border transition-all cursor-pointer ${!notification.read ? 'border-l-4 border-l-orange-500' : 'border-gray-100'
+                    }`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <CardContent className="p-4">
@@ -150,13 +156,12 @@ export default function Notifications() {
                       <div className={`${color} p-2 rounded-full flex-shrink-0`}>
                         <Icon className="w-5 h-5 text-white" />
                       </div>
-                      
+
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className={`font-semibold text-sm ${
-                            !notification.read ? 'text-gray-900' : 'text-gray-700'
-                          }`}>
+                          <h3 className={`font-semibold text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-700'
+                            }`}>
                             {notification.title || 'Notification'}
                           </h3>
                           <button

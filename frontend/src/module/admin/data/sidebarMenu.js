@@ -97,6 +97,7 @@ export const sidebarMenuData = [
           { label: "Pending", path: "/admin/orders/pending" },
           { label: "Accepted", path: "/admin/orders/accepted" },
           { label: "Processing", path: "/admin/orders/processing" },
+          { label: "Ready to Pick", path: "/admin/orders/ready" },
           { label: "Food On The Way", path: "/admin/orders/food-on-the-way" },
           { label: "Delivered", path: "/admin/orders/delivered" },
           { label: "Canceled", path: "/admin/orders/canceled" },

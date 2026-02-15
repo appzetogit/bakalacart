@@ -419,8 +419,8 @@ function CancelledOrders({ onSelectOrder }) {
 
                       <div className="flex flex-col items-end gap-1">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${order.cancelledBy === 'user'
-                            ? 'border-orange-500 text-orange-600'
-                            : 'border-red-500 text-red-600'
+                          ? 'border-orange-500 text-orange-600'
+                          : 'border-red-500 text-red-600'
                           }`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${order.cancelledBy === 'user' ? 'bg-orange-500' : 'bg-red-500'
                             }`} />
@@ -771,7 +771,7 @@ export default function OrdersMain() {
             setPopupOrder(orderForPopup)
             setShowNewOrderPopup(true)
             setCountdown(240)
-            
+
             // Create notification for this confirmed order
             addRestaurantNotification({
               type: 'order',
@@ -866,7 +866,7 @@ export default function OrdersMain() {
         const response = await restaurantAPI.acceptOrder(orderId, prepTime)
         console.log('✅ Order accepted:', orderId)
         toast.success('Order accepted successfully')
-        
+
         // Save notification
         addRestaurantNotification({
           type: 'success',
@@ -933,7 +933,7 @@ export default function OrdersMain() {
         const orderId = orderToReject.orderMongoId || orderToReject.orderId
         await restaurantAPI.rejectOrder(orderId, rejectReason)
         console.log('✅ Order rejected:', orderId)
-        
+
         // Save notification
         addRestaurantNotification({
           type: 'alert',
@@ -1561,8 +1561,8 @@ export default function OrdersMain() {
                   }
                 }}
                 className={`shrink-0 px-6 py-3.5 rounded-full font-medium text-sm whitespace-nowrap relative overflow-hidden ${isActive
-                    ? 'text-white'
-                    : 'bg-white text-black'
+                  ? 'text-white'
+                  : 'bg-white text-black'
                   }`}
                 animate={{
                   scale: isActive ? 1.05 : 1,
@@ -1674,8 +1674,8 @@ export default function OrdersMain() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
               className={`mt-4 mb-4 rounded-2xl shadow-sm px-6 py-4 ${restaurantStatus.rejectionReason
-                  ? 'bg-white border border-red-200'
-                  : 'bg-white border border-yellow-200'
+                ? 'bg-white border border-red-200'
+                : 'bg-white border border-yellow-200'
                 }`}
             >
               {restaurantStatus.rejectionReason ? (
@@ -1774,10 +1774,10 @@ export default function OrdersMain() {
                       </h3>
                       {countdown > 0 && (
                         <span className={`text-sm font-semibold px-2 py-0.5 rounded ${countdown <= 60
-                            ? 'bg-red-100 text-red-600'
-                            : countdown <= 120
-                              ? 'bg-orange-100 text-orange-600'
-                              : 'bg-green-100 text-green-600'
+                          ? 'bg-red-100 text-red-600'
+                          : countdown <= 120
+                            ? 'bg-orange-100 text-orange-600'
+                            : 'bg-green-100 text-green-600'
                           }`}>
                           {formatTime(countdown)}
                         </span>
@@ -1991,7 +1991,10 @@ export default function OrdersMain() {
 
                 {/* Footer */}
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                  <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors underline mx-auto block">
+                  <button
+                    onClick={() => navigate('/restaurant/help-centre')}
+                    className="text-sm text-gray-600 hover:text-gray-900 transition-colors underline mx-auto block"
+                  >
                     Need help with this order?
                   </button>
                 </div>
@@ -2036,8 +2039,8 @@ export default function OrdersMain() {
                         key={reason}
                         onClick={() => setRejectReason(reason)}
                         className={`w-full text-left p-4 rounded-lg border-2 transition-all ${rejectReason === reason
-                            ? "border-black bg-black/5"
-                            : "border-gray-200 bg-white hover:border-gray-300"
+                          ? "border-black bg-black/5"
+                          : "border-gray-200 bg-white hover:border-gray-300"
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -2070,8 +2073,8 @@ export default function OrdersMain() {
                     onClick={handleRejectConfirm}
                     disabled={!rejectReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${rejectReason
-                        ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                   >
                     Confirm Rejection
@@ -2119,15 +2122,15 @@ export default function OrdersMain() {
                         type="button"
                         onClick={() => setCancelReason(reason)}
                         className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${cancelReason === reason
-                            ? "border-red-500 bg-red-50"
-                            : "border-gray-200 hover:border-gray-300"
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200 hover:border-gray-300"
                           }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${cancelReason === reason
-                                ? "border-red-500 bg-red-500"
-                                : "border-gray-300"
+                              ? "border-red-500 bg-red-500"
+                              : "border-gray-300"
                               }`}
                           >
                             {cancelReason === reason && (
@@ -2158,8 +2161,8 @@ export default function OrdersMain() {
                     onClick={handleCancelConfirm}
                     disabled={!cancelReason}
                     className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors ${cancelReason
-                        ? "!bg-red-600 !text-white hover:bg-red-700"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      ? "!bg-red-600 !text-white hover:bg-red-700"
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                   >
                     Confirm Cancellation
@@ -2212,14 +2215,14 @@ export default function OrdersMain() {
                 <div className="flex flex-col items-end gap-1">
                   <span
                     className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${selectedOrder.status === "Ready"
-                        ? "border-green-500 text-green-600"
-                        : "border-gray-800 text-gray-900"
+                      ? "border-green-500 text-green-600"
+                      : "border-gray-800 text-gray-900"
                       }`}
                   >
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${selectedOrder.status === "Ready"
-                          ? "bg-green-500"
-                          : "bg-gray-800"
+                        ? "bg-green-500"
+                        : "bg-gray-800"
                         }`}
                     />
                     {selectedOrder.status}
@@ -2250,10 +2253,17 @@ export default function OrdersMain() {
               </div>
 
               <button
-                className="w-full bg-black text-white py-2.5 rounded-xl text-sm font-medium"
+                className="w-full bg-black text-white py-2.5 rounded-xl text-sm font-medium mb-3"
                 onClick={() => setIsSheetOpen(false)}
               >
                 Close
+              </button>
+
+              <button
+                onClick={() => navigate('/restaurant/help-centre')}
+                className="w-full text-center text-xs text-gray-500 hover:text-gray-900 transition-colors underline py-1"
+              >
+                Need help with this order?
               </button>
             </motion.div>
           </motion.div>
@@ -2365,8 +2375,8 @@ function OrderCard({
             <div className="flex flex-col items-end gap-1">
               <span
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isReady
-                    ? "border-green-500 text-green-600"
-                    : "border-gray-800 text-gray-900"
+                  ? "border-green-500 text-green-600"
+                  : "border-gray-800 text-gray-900"
                   }`}
               >
                 <span
@@ -2399,8 +2409,8 @@ function OrderCard({
               {status === 'preparing' && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${deliveryPartnerId
-                      ? 'bg-green-100 text-green-700 border border-green-300'
-                      : 'bg-orange-100 text-orange-700 border border-orange-300'
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-orange-100 text-orange-700 border border-orange-300'
                     }`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${deliveryPartnerId ? 'bg-green-500' : 'bg-orange-500'
                       }`} />
@@ -2457,7 +2467,7 @@ function PreparingOrders({ onSelectOrder, onCancel }) {
     try {
       await restaurantAPI.markOrderReady(mongoId || orderId)
       toast.success(`Order ${orderId} marked as ready`)
-      
+
       // Save notification
       addRestaurantNotification({
         type: 'success',

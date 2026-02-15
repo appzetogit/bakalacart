@@ -17,7 +17,7 @@ const TABS = [
 ]
 
 export default function DeliveryWithdrawal() {
-  const [activeTab, setActiveTab] = useState("Pending")
+  const [activeTab, setActiveTab] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
@@ -167,11 +167,10 @@ export default function DeliveryWithdrawal() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === tab.key
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.key
                     ? "border-emerald-600 text-emerald-600"
                     : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>

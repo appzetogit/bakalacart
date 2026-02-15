@@ -10,7 +10,7 @@ export default function FoodCampaign() {
     if (!searchQuery.trim()) {
       return campaigns
     }
-    
+
     const query = searchQuery.toLowerCase().trim()
     return campaigns.filter(campaign =>
       campaign.title.toLowerCase().includes(query)
@@ -132,13 +132,13 @@ export default function FoodCampaign() {
                   </td>
                 </tr>
               ) : (
-                filteredCampaigns.map((campaign) => (
+                filteredCampaigns.map((campaign, index) => (
                   <tr
                     key={campaign.sl}
                     className="hover:bg-slate-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-slate-700">{campaign.sl}</span>
+                      <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                     </td>
                     <td className="px-6 py-4">
                       <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-700">
@@ -157,14 +157,12 @@ export default function FoodCampaign() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => handleToggleStatus(campaign.sl)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          campaign.status ? "bg-blue-600" : "bg-slate-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${campaign.status ? "bg-blue-600" : "bg-slate-300"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            campaign.status ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${campaign.status ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </td>

@@ -326,8 +326,8 @@ restaurantSchema.pre('save', async function (next) {
     }
   }
 
-  // Generate slug from name (always generate if name exists and slug doesn't)
-  if (this.name && !this.slug) {
+  // Generate slug from name (generate if name exists and either slug is missing or name has changed)
+  if (this.name && (this.isModified('name') || !this.slug)) {
     let baseSlug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -388,10 +388,10 @@ restaurantSchema.post('save', async function (doc, next) {
     try {
       // Dynamically import to avoid circular dependencies
       const RestaurantWallet = (await import('./RestaurantWallet.js')).default;
-      
+
       // Create wallet for this restaurant (findOrCreateByRestaurantId handles duplicates)
       await RestaurantWallet.findOrCreateByRestaurantId(doc._id);
-      
+
       console.log(`✅ Wallet automatically created for new restaurant: ${doc._id} (${doc.name || 'Unnamed'})`);
     } catch (error) {
       // Log error but don't fail restaurant creation

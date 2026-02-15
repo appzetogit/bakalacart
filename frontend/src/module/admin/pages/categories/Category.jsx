@@ -57,11 +57,11 @@ export default function Category() {
       setLoading(false)
       return
     }
-    
+
     // Log API base URL for debugging
     console.log('API Base URL:', API_BASE_URL)
     console.log('Admin Token:', adminToken ? 'Present' : 'Missing')
-    
+
     fetchCategories()
   }, [])
 
@@ -107,8 +107,8 @@ export default function Category() {
     try {
       setLoading(true)
       const params = {}
-      if (searchQuery) params.search = searchQuery
-      
+      if (searchQuery?.trim()) params.search = searchQuery.trim()
+
       const response = await adminAPI.getCategories(params)
       if (response.data.success) {
         setCategories(response.data.data.categories || [])
@@ -133,12 +133,12 @@ export default function Category() {
           baseURL: error.config?.baseURL
         } : null
       })
-      
+
       if (error.response) {
         // Server responded with error status
         const status = error.response.status
         const errorData = error.response.data
-        
+
         if (status === 401) {
           toast.error('Authentication required. Please login again.')
         } else if (status === 403) {
@@ -160,7 +160,7 @@ export default function Category() {
         console.error('Request setup error:', error.message)
         toast.error(error.message || 'Failed to load categories')
       }
-      
+
       setCategories([])
     } finally {
       setLoading(false)
@@ -169,7 +169,7 @@ export default function Category() {
 
   const filteredCategories = useMemo(() => {
     let result = [...categories]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(cat =>
@@ -255,22 +255,23 @@ export default function Category() {
   const handleExportPDF = () => {
     try {
       const doc = new jsPDF()
-      
+
       // Add title
       doc.setFontSize(18)
       doc.setTextColor(30, 30, 30)
       doc.text('Category List', 14, 20)
-      
+
       // Add date
       doc.setFontSize(10)
       doc.setTextColor(100, 100, 100)
-      const date = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const date = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       })
       doc.text(`Generated on: ${date}`, 14, 28)
-      
+
+      // Prepare table data
       // Prepare table data
       const tableData = filteredCategories.map((category, index) => [
         category.sl || index + 1,
@@ -279,7 +280,7 @@ export default function Category() {
         category.status ? 'Active' : 'Inactive',
         category.id || 'N/A'
       ])
-      
+
       // Add table
       autoTable(doc, {
         startY: 35,
@@ -290,29 +291,31 @@ export default function Category() {
           fillColor: [59, 130, 246], // Blue color
           textColor: 255,
           fontStyle: 'bold',
-          fontSize: 10
+          fontSize: 10,
+          halign: 'center'
         },
         bodyStyles: {
           fontSize: 9,
-          textColor: [30, 30, 30]
+          textColor: [30, 30, 30],
+          cellPadding: 3
         },
         alternateRowStyles: {
           fillColor: [245, 247, 250]
         },
         styles: {
-          cellPadding: 5,
           lineColor: [200, 200, 200],
-          lineWidth: 0.5
+          lineWidth: 0.1,
+          overflow: 'linebreak'
         },
         columnStyles: {
-          0: { cellWidth: 20 }, // SL
-          1: { cellWidth: 70 }, // Category Name
-          2: { cellWidth: 50 }, // Type
-          3: { cellWidth: 40 }, // Status
-          4: { cellWidth: 50 }  // ID
+          0: { cellWidth: 15, halign: 'center' }, // SL
+          1: { cellWidth: 60 }, // Category Name
+          2: { cellWidth: 30, halign: 'center' }, // Type
+          3: { cellWidth: 25, halign: 'center' }, // Status
+          4: { cellWidth: 50, halign: 'center' }  // ID
         }
       })
-      
+
       // Add footer
       const pageCount = doc.internal.pages.length - 1
       for (let i = 1; i <= pageCount; i++) {
@@ -326,11 +329,11 @@ export default function Category() {
           { align: 'center' }
         )
       }
-      
+
       // Save PDF
       const fileName = `Categories_${new Date().toISOString().split('T')[0]}.pdf`
       doc.save(fileName)
-      
+
       toast.success('PDF exported successfully!')
     } catch (error) {
       console.error('Error exporting PDF:', error)
@@ -438,10 +441,10 @@ export default function Category() {
           toast.success('Category created successfully')
         }
       }
-      
+
       // Close modal and reset form
       handleCloseModal()
-      
+
       // Refresh from server to ensure consistency
       setTimeout(() => fetchCategories(), 500)
     } catch (error) {
@@ -460,7 +463,7 @@ export default function Category() {
           baseURL: error.config?.baseURL
         } : null
       })
-      
+
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         toast.error('Cannot connect to server. Please check if backend is running on ' + API_BASE_URL.replace('/api', ''))
       } else if (error.response) {
@@ -509,7 +512,7 @@ export default function Category() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
 
-            <button 
+            <button
               onClick={handleExportPDF}
               disabled={filteredCategories.length === 0}
               className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -519,7 +522,7 @@ export default function Category() {
               <ChevronDown className="w-3 h-3" />
             </button>
 
-            <button 
+            <button
               onClick={handleAddNew}
               className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 transition-all shadow-sm"
             >
@@ -553,18 +556,17 @@ export default function Category() {
                   key={filter.id}
                   variant="outline"
                   onClick={() => toggleFilter(filter.id)}
-                  className={`h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${
-                    isActive
-                      ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
-                      : 'bg-white border border-gray-200 hover:bg-gray-50'
-                  }`}
+                  className={`h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${isActive
+                    ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
+                    : 'bg-white border border-gray-200 hover:bg-gray-50'
+                    }`}
                 >
                   <span className={`text-[10px] font-bold ${isActive ? 'text-white' : 'text-black'}`}>{filter.label}</span>
                 </Button>
               )
             })}
           </div>
-          
+
           {/* Row 2 */}
           <div className="flex items-center gap-1.5 flex-wrap">
             {[
@@ -578,11 +580,10 @@ export default function Category() {
                   key={filter.id}
                   variant="outline"
                   onClick={() => toggleFilter(filter.id)}
-                  className={`h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${
-                    isActive
-                      ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
-                      : 'bg-white border border-gray-200 hover:bg-gray-50'
-                  }`}
+                  className={`h-5 px-1.5 rounded-md flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${isActive
+                    ? 'bg-green-600 text-white border border-green-600 hover:bg-green-600/90'
+                    : 'bg-white border border-gray-200 hover:bg-gray-50'
+                    }`}
                 >
                   {Icon && <Icon className={`h-2.5 w-2.5 ${isActive ? 'text-white' : 'text-gray-900'}`} />}
                   <span className={`text-[10px] font-bold ${isActive ? 'text-white' : 'text-black'}`}>{filter.label}</span>
@@ -645,7 +646,7 @@ export default function Category() {
                     className="hover:bg-slate-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-slate-700">{category.sl || index + 1}</span>
+                      <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
@@ -669,17 +670,15 @@ export default function Category() {
                       <button
                         onClick={() => handleToggleStatus(category.id)}
                         disabled={loading}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                          category.status
-                            ? "bg-blue-600"
-                            : "bg-slate-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${category.status
+                          ? "bg-blue-600"
+                          : "bg-slate-300"
+                          }`}
                         title={category.status ? "Click to deactivate" : "Click to activate"}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            category.status ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${category.status ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </td>
@@ -716,17 +715,17 @@ export default function Category() {
             {isFilterOpen && (
               <div className="fixed inset-0 z-[100]">
                 {/* Backdrop */}
-                <div 
-                  className="absolute inset-0 bg-black/50" 
+                <div
+                  className="absolute inset-0 bg-black/50"
                   onClick={() => setIsFilterOpen(false)}
                 />
-                
+
                 {/* Modal Content */}
                 <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[85vh] flex flex-col animate-[slideUp_0.3s_ease-out]">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-4 border-b">
                     <h2 className="text-lg font-bold text-gray-900">Filters and sorting</h2>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveFilters(new Set())
                         setSortBy(null)
@@ -737,7 +736,7 @@ export default function Category() {
                       Clear all
                     </button>
                   </div>
-                  
+
                   {/* Body */}
                   <div className="flex flex-1 overflow-hidden">
                     {/* Left Sidebar - Tabs */}
@@ -764,9 +763,8 @@ export default function Category() {
                                 section.scrollIntoView({ behavior: 'smooth', block: 'start' })
                               }
                             }}
-                            className={`flex flex-col items-center gap-1 py-4 px-2 text-center relative transition-colors ${
-                              isActive ? 'bg-white text-green-600' : 'text-gray-500 hover:bg-gray-100'
-                            }`}
+                            className={`flex flex-col items-center gap-1 py-4 px-2 text-center relative transition-colors ${isActive ? 'bg-white text-green-600' : 'text-gray-500 hover:bg-gray-100'
+                              }`}
                           >
                             {isActive && (
                               <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-600 rounded-r" />
@@ -777,11 +775,11 @@ export default function Category() {
                         )
                       })}
                     </div>
-                    
+
                     {/* Right Content Area - Scrollable */}
                     <div ref={rightContentRef} className="flex-1 overflow-y-auto p-4">
                       {/* Sort By Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['sort'] = el}
                         data-section-id="sort"
                         className="space-y-4 mb-8"
@@ -798,11 +796,10 @@ export default function Category() {
                             <button
                               key={option.id || 'relevance'}
                               onClick={() => setSortBy(option.id)}
-                              className={`px-4 py-3 rounded-xl border text-left transition-colors ${
-                                sortBy === option.id
-                                  ? 'border-green-600 bg-green-50'
-                                  : 'border-gray-200 hover:border-green-600'
-                              }`}
+                              className={`px-4 py-3 rounded-xl border text-left transition-colors ${sortBy === option.id
+                                ? 'border-green-600 bg-green-50'
+                                : 'border-gray-200 hover:border-green-600'
+                                }`}
                             >
                               <span className={`text-sm font-medium ${sortBy === option.id ? 'text-green-600' : 'text-gray-700'}`}>
                                 {option.label}
@@ -811,77 +808,72 @@ export default function Category() {
                           ))}
                         </div>
                       </div>
-                      
+
                       {/* Time Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['time'] = el}
                         data-section-id="time"
                         className="space-y-4 mb-8"
                       >
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery Time</h3>
                         <div className="grid grid-cols-2 gap-3">
-                          <button 
+                          <button
                             onClick={() => toggleFilter('delivery-under-30')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('delivery-under-30') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-30')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-600'}`} strokeWidth={1.5} />
                             <span className={`text-sm font-medium ${activeFilters.has('delivery-under-30') ? 'text-green-600' : 'text-gray-700'}`}>Under 30 mins</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => toggleFilter('delivery-under-45')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('delivery-under-45') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('delivery-under-45')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <Timer className={`h-6 w-6 ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-600'}`} strokeWidth={1.5} />
                             <span className={`text-sm font-medium ${activeFilters.has('delivery-under-45') ? 'text-green-600' : 'text-gray-700'}`}>Under 45 mins</span>
                           </button>
                         </div>
                       </div>
-                      
+
                       {/* Rating Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['rating'] = el}
                         data-section-id="rating"
                         className="space-y-4 mb-8"
                       >
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Rating</h3>
                         <div className="grid grid-cols-2 gap-3">
-                          <button 
+                          <button
                             onClick={() => toggleFilter('rating-35-plus')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('rating-35-plus') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-35-plus')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-35-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400'}`} />
                             <span className={`text-sm font-medium ${activeFilters.has('rating-35-plus') ? 'text-green-600' : 'text-gray-700'}`}>Rated 3.5+</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => toggleFilter('rating-4-plus')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('rating-4-plus') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-4-plus')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-4-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400'}`} />
                             <span className={`text-sm font-medium ${activeFilters.has('rating-4-plus') ? 'text-green-600' : 'text-gray-700'}`}>Rated 4.0+</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => toggleFilter('rating-45-plus')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('rating-45-plus') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('rating-45-plus')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <Star className={`h-6 w-6 ${activeFilters.has('rating-45-plus') ? 'text-green-600 fill-green-600' : 'text-gray-400'}`} />
                             <span className={`text-sm font-medium ${activeFilters.has('rating-45-plus') ? 'text-green-600' : 'text-gray-700'}`}>Rated 4.5+</span>
@@ -890,63 +882,59 @@ export default function Category() {
                       </div>
 
                       {/* Distance Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['distance'] = el}
                         data-section-id="distance"
                         className="space-y-4 mb-8"
                       >
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Distance</h3>
                         <div className="grid grid-cols-2 gap-3">
-                          <button 
+                          <button
                             onClick={() => toggleFilter('distance-under-1km')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('distance-under-1km') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-600'}`} strokeWidth={1.5} />
                             <span className={`text-sm font-medium ${activeFilters.has('distance-under-1km') ? 'text-green-600' : 'text-gray-700'}`}>Under 1 km</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => toggleFilter('distance-under-2km')}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
-                              activeFilters.has('distance-under-2km') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <MapPin className={`h-6 w-6 ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-600'}`} strokeWidth={1.5} />
                             <span className={`text-sm font-medium ${activeFilters.has('distance-under-2km') ? 'text-green-600' : 'text-gray-700'}`}>Under 2 km</span>
                           </button>
                         </div>
                       </div>
-                      
+
                       {/* Price Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['price'] = el}
                         data-section-id="price"
                         className="space-y-4 mb-8"
                       >
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Dish Price</h3>
                         <div className="flex flex-col gap-3">
-                          <button 
+                          <button
                             onClick={() => toggleFilter('price-under-200')}
-                            className={`px-4 py-3 rounded-xl border text-left transition-colors ${
-                              activeFilters.has('price-under-200') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <span className={`text-sm font-medium ${activeFilters.has('price-under-200') ? 'text-green-600' : 'text-gray-700'}`}>Under ₹200</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => toggleFilter('price-under-500')}
-                            className={`px-4 py-3 rounded-xl border text-left transition-colors ${
-                              activeFilters.has('price-under-500') 
-                                ? 'border-green-600 bg-green-50' 
-                                : 'border-gray-200 hover:border-green-600'
-                            }`}
+                            className={`px-4 py-3 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-500')
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-gray-200 hover:border-green-600'
+                              }`}
                           >
                             <span className={`text-sm font-medium ${activeFilters.has('price-under-500') ? 'text-green-600' : 'text-gray-700'}`}>Under ₹500</span>
                           </button>
@@ -954,7 +942,7 @@ export default function Category() {
                       </div>
 
                       {/* Cuisine Tab */}
-                      <div 
+                      <div
                         ref={el => filterSectionRefs.current['cuisine'] = el}
                         data-section-id="cuisine"
                         className="space-y-4 mb-8"
@@ -965,11 +953,10 @@ export default function Category() {
                             <button
                               key={cuisine}
                               onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine)}
-                              className={`px-4 py-3 rounded-xl border text-center transition-colors ${
-                                selectedCuisine === cuisine
-                                  ? 'border-green-600 bg-green-50'
-                                  : 'border-gray-200 hover:border-green-600'
-                              }`}
+                              className={`px-4 py-3 rounded-xl border text-center transition-colors ${selectedCuisine === cuisine
+                                ? 'border-green-600 bg-green-50'
+                                : 'border-gray-200 hover:border-green-600'
+                                }`}
                             >
                               <span className={`text-sm font-medium ${selectedCuisine === cuisine ? 'text-green-600' : 'text-gray-700'}`}>
                                 {cuisine}
@@ -978,7 +965,7 @@ export default function Category() {
                           ))}
                         </div>
                       </div>
-                      
+
                       {/* Trust Markers Tab */}
                       {activeFilterTab === 'trust' && (
                         <div className="space-y-4">
@@ -995,22 +982,21 @@ export default function Category() {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Footer */}
                   <div className="flex items-center gap-4 px-4 py-4 border-t bg-white">
-                    <button 
+                    <button
                       onClick={() => setIsFilterOpen(false)}
                       className="flex-1 py-3 text-center font-semibold text-gray-700"
                     >
                       Close
                     </button>
-                    <button 
+                    <button
                       onClick={() => setIsFilterOpen(false)}
-                      className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${
-                        activeFilters.size > 0 || sortBy || selectedCuisine
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-200 text-gray-500'
-                      }`}
+                      className={`flex-1 py-3 font-semibold rounded-xl transition-colors ${activeFilters.size > 0 || sortBy || selectedCuisine
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-200 text-gray-500'
+                        }`}
                     >
                       {activeFilters.size > 0 || sortBy || selectedCuisine
                         ? 'Show results'
@@ -1031,11 +1017,11 @@ export default function Category() {
             {isModalOpen && (
               <div className="fixed inset-0 z-[200]">
                 {/* Backdrop */}
-                <div 
-                  className="absolute inset-0 bg-black/50" 
+                <div
+                  className="absolute inset-0 bg-black/50"
                   onClick={handleCloseModal}
                 />
-                
+
                 {/* Modal Content */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -1048,14 +1034,14 @@ export default function Category() {
                     <h2 className="text-xl font-bold text-slate-900">
                       {editingCategory ? 'Edit Category' : 'Add New Category'}
                     </h2>
-                    <button 
+                    <button
                       onClick={handleCloseModal}
                       className="p-1 rounded hover:bg-slate-100 transition-colors"
                     >
                       <X className="w-5 h-5 text-slate-500" />
                     </button>
                   </div>
-                  
+
                   {/* Form */}
                   <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div>
@@ -1118,7 +1104,7 @@ export default function Category() {
                             )}
                           </div>
                         )}
-                        
+
                         {/* File Input */}
                         <div className="flex items-center gap-3">
                           <input

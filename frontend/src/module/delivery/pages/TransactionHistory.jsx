@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { useNavigate, useLocation } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   Filter
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { 
+import {
   fetchWalletTransactions
 } from "../utils/deliveryWalletState"
 import { formatCurrency } from "../../restaurant/utils/currency"
@@ -26,12 +26,12 @@ export default function TransactionHistory() {
     const loadTransactions = async () => {
       try {
         setLoading(true)
-        
+
         // Build query params
         const params = {
           limit: 1000
         }
-        
+
         // Filter by type based on active tab
         if (activeTab === "withdraw") {
           params.type = "withdrawal"
@@ -41,14 +41,14 @@ export default function TransactionHistory() {
           params.type = "bonus"
         }
         // "all" tab - don't filter by type
-        
+
         // Filter by status if not "All"
         if (selectedStatus !== "All") {
           params.status = selectedStatus
         }
-        
+
         const fetchedTransactions = await fetchWalletTransactions(params)
-        
+
         // Format transactions for display
         const formattedTransactions = fetchedTransactions.map(t => ({
           id: t._id || t.id,
@@ -64,14 +64,14 @@ export default function TransactionHistory() {
             minute: '2-digit'
           }) : 'N/A'
         }))
-        
+
         // Sort by date (newest first)
         formattedTransactions.sort((a, b) => {
           const dateA = new Date(a.date)
           const dateB = new Date(b.date)
           return dateB - dateA
         })
-        
+
         setTransactions(formattedTransactions)
       } catch (error) {
         console.error('Error loading transactions:', error)
@@ -108,10 +108,10 @@ export default function TransactionHistory() {
     const handleClickOutside = (event) => {
       // Check if click is on the filter button
       const isFilterButton = event.target.closest('[data-filter-button]')
-      
+
       // Check if click is inside the dropdown
       const isInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target)
-      
+
       // Close if clicked outside both button and dropdown
       if (!isFilterButton && !isInsideDropdown) {
         setShowDropdown(false)
@@ -132,11 +132,28 @@ export default function TransactionHistory() {
   }, [showDropdown])
 
 
+  // Handle hardware back button for all popups/dialogs
+  useEffect(() => {
+    if (showDropdown) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = () => {
+      if (showDropdown) {
+        setShowDropdown(false);
+        console.log('🔙 Back button detected: Closing TransactionHistory UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showDropdown]);
+
   return (
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4 md:py-3 flex items-center gap-4 rounded-b-3xl md:rounded-b-none">
-        <button 
+        <button
           onClick={() => navigate("/delivery/account")}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -151,11 +168,10 @@ export default function TransactionHistory() {
         <div className="flex gap-4 mb-4 border-b border-gray-200">
           <button
             onClick={() => setActiveTab("all")}
-            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "all"
+            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "all"
                 ? "text-[#ff8100]"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             All
             {activeTab === "all" && (
@@ -167,11 +183,10 @@ export default function TransactionHistory() {
           </button>
           <button
             onClick={() => setActiveTab("payment")}
-            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "payment"
+            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "payment"
                 ? "text-[#ff8100]"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             Payment
             {activeTab === "payment" && (
@@ -183,11 +198,10 @@ export default function TransactionHistory() {
           </button>
           <button
             onClick={() => setActiveTab("bonus")}
-            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "bonus"
+            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "bonus"
                 ? "text-[#ff8100]"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             Bonus
             {activeTab === "bonus" && (
@@ -199,11 +213,10 @@ export default function TransactionHistory() {
           </button>
           <button
             onClick={() => setActiveTab("withdraw")}
-            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
-              activeTab === "withdraw"
+            className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${activeTab === "withdraw"
                 ? "text-[#ff8100]"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             Withdraw
             {activeTab === "withdraw" && (
@@ -231,7 +244,7 @@ export default function TransactionHistory() {
             >
               <Filter className="w-5 h-5 text-gray-600" />
             </motion.button>
-            
+
             {/* Dropdown Menu */}
             {showDropdown && (
               <div
@@ -245,9 +258,8 @@ export default function TransactionHistory() {
                     setSelectedStatus("All")
                     setShowDropdown(false)
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors rounded-t-md ${
-                    selectedStatus === "All" ? "bg-gray-100 font-medium" : ""
-                  }`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors rounded-t-md ${selectedStatus === "All" ? "bg-gray-100 font-medium" : ""
+                    }`}
                 >
                   All
                 </button>
@@ -257,9 +269,8 @@ export default function TransactionHistory() {
                     setSelectedStatus("Pending")
                     setShowDropdown(false)
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
-                    selectedStatus === "Pending" ? "bg-gray-100 font-medium" : ""
-                  }`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${selectedStatus === "Pending" ? "bg-gray-100 font-medium" : ""
+                    }`}
                 >
                   Pending
                 </button>
@@ -269,9 +280,8 @@ export default function TransactionHistory() {
                     setSelectedStatus("Approved")
                     setShowDropdown(false)
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
-                    selectedStatus === "Approved" ? "bg-gray-100 font-medium" : ""
-                  }`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${selectedStatus === "Approved" ? "bg-gray-100 font-medium" : ""
+                    }`}
                 >
                   Approved
                 </button>
@@ -281,9 +291,8 @@ export default function TransactionHistory() {
                     setSelectedStatus("Denied")
                     setShowDropdown(false)
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors rounded-b-md ${
-                    selectedStatus === "Denied" ? "bg-gray-100 font-medium" : ""
-                  }`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors rounded-b-md ${selectedStatus === "Denied" ? "bg-gray-100 font-medium" : ""
+                    }`}
                 >
                   Denied
                 </button>
@@ -317,13 +326,12 @@ export default function TransactionHistory() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-block text-xs md:text-sm font-medium px-3 py-1 rounded-full mb-2 ${
-                      transaction.status === "Completed" 
-                        ? "bg-green-100 text-green-700" 
+                    <span className={`inline-block text-xs md:text-sm font-medium px-3 py-1 rounded-full mb-2 ${transaction.status === "Completed"
+                        ? "bg-green-100 text-green-700"
                         : transaction.status === "Pending"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-red-100 text-red-700"
-                    }`}>
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-red-100 text-red-700"
+                      }`}>
                       {transaction.status}
                     </span>
                     <p className="text-gray-500 text-xs md:text-sm">

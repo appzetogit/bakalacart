@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import Lenis from "lenis"
-import { 
+import {
   ArrowLeft,
   Search,
   Image as ImageIcon
@@ -13,11 +13,49 @@ import { Input } from "@/components/ui/input"
 import BottomNavbar from "../components/BottomNavbar"
 import MenuOverlay from "../components/MenuOverlay"
 
+import { restaurantAPI } from "@/lib/api"
+import { toast } from "sonner"
+
 export default function ReviewsPage() {
   const navigate = useNavigate()
   const [showMenu, setShowMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [failedImages, setFailedImages] = useState(new Set())
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch reviews
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setLoading(true)
+        const response = await restaurantAPI.getReviews({ limit: 50 }); // Fetch up to 50 reviews
+        if (response?.data?.success && response?.data?.data?.reviews) {
+          const fetchedReviews = response.data.data.reviews.map(review => ({
+            id: review.orderMongoId,
+            orderId: review.orderId,
+            date: new Date(review.submittedAt || review.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+            time: new Date(review.submittedAt || review.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            productName: review.items && review.items.length > 0 ? review.items[0].name : `Order #${review.orderId}`,
+            productImage: review.items && review.items.length > 0 ? review.items[0].image : null,
+            reviewerName: review.customer?.name || "Anonymous",
+            phoneNumber: review.customer?.phone || "N/A",
+            hasReply: false, // Default to false as reply status is not yet returned by backend
+            rating: review.rating,
+            comment: review.comment
+          }));
+          setReviews(fetchedReviews);
+        }
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        toast.error("Failed to load reviews");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, []);
 
   // Lenis smooth scrolling
   useEffect(() => {
@@ -39,42 +77,7 @@ export default function ReviewsPage() {
     }
   }, [])
 
-  // Reviews data matching the image
-  const reviews = [
-    {
-      id: 1,
-      orderId: "100113",
-      date: "01 Jun 2023",
-      time: "16:55 PM",
-      productName: "Meat Pizza",
-      productImage: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop",
-      reviewerName: "Purno Test",
-      phoneNumber: "+8801629889679",
-      hasReply: false
-    },
-    {
-      id: 2,
-      orderId: "100080",
-      date: "02 Jan 2023",
-      time: "21:35 PM",
-      productName: "Meat Pizza",
-      productImage: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop",
-      reviewerName: "Jane Doe",
-      phoneNumber: "+8801624343926",
-      hasReply: true
-    },
-    {
-      id: 3,
-      orderId: "100008",
-      date: "22 Aug 2021",
-      time: "03:46 AM",
-      productName: "Meat Pizza",
-      productImage: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop",
-      reviewerName: "John Smith",
-      phoneNumber: "+8801621234567",
-      hasReply: true
-    }
-  ]
+
 
   // Filter reviews based on search
   const filteredReviews = reviews.filter(review => {
@@ -90,7 +93,7 @@ export default function ReviewsPage() {
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden pb-24 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 flex items-center gap-3">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -115,97 +118,104 @@ export default function ReviewsPage() {
 
       {/* Reviews List */}
       <div className="px-4 py-4 space-y-4">
-        {filteredReviews.map((review, index) => (
-          <motion.div
-            key={review.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-          >
-            <Card className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-              <CardContent className="p-4 space-y-3">
-                {/* Order Details */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-900">
-                    Order # {review.orderId}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {review.date} | {review.time}
-                  </span>
-                </div>
-
-                {/* Product Details */}
-                <div className="flex items-center gap-3">
-                  {/* Product Image */}
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                    {failedImages.has(review.id) || !review.productImage ? (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <ImageIcon className="w-6 h-6 text-gray-400" />
-                      </div>
-                    ) : (
-                      <img
-                        src={review.productImage}
-                        alt={review.productName}
-                        className="w-full h-full object-cover"
-                        onError={() => {
-                          setFailedImages(prev => new Set([...prev, review.id]))
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Product Name */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{review.productName}</p>
-                  </div>
-
-                  {/* Action Button */}
-                  <Button
-                    onClick={() => {
-                      if (review.hasReply) {
-                        console.log("View reply for review:", review.id)
-                        // Navigate to view reply page if needed
-                      } else {
-                        navigate(`/restaurant/reviews/${review.id}/reply`)
-                      }
-                    }}
-                    className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg ${
-                      review.hasReply
-                        ? "bg-blue-100 hover:bg-blue-200 text-blue-700"
-                        : "bg-[#ff8100] hover:bg-[#e67300] text-white"
-                    }`}
-                  >
-                    {review.hasReply ? "View Reply" : "Give Reply"}
-                  </Button>
-                </div>
-
-                {/* Reviewer Information */}
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Reviewer</p>
-                    <p className="text-sm font-semibold text-gray-900">{review.reviewerName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500 mb-0.5">Phone</p>
-                    <p className="text-sm font-medium text-gray-700">{review.phoneNumber}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-
-        {/* Empty State */}
-        {filteredReviews.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-sm">No reviews found</p>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff8100]"></div>
           </div>
+        ) : (
+          <>
+            {filteredReviews.map((review, index) => (
+              <motion.div
+                key={review.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <Card className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Order Details */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-900">
+                        Order # {review.orderId}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {review.date} | {review.time}
+                      </span>
+                    </div>
+
+                    {/* Product Details */}
+                    <div className="flex items-center gap-3">
+                      {/* Product Image */}
+                      <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                        {failedImages.has(review.id) || !review.productImage ? (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                            <ImageIcon className="w-6 h-6 text-gray-400" />
+                          </div>
+                        ) : (
+                          <img
+                            src={review.productImage}
+                            alt={review.productName}
+                            className="w-full h-full object-cover"
+                            onError={() => {
+                              setFailedImages(prev => new Set([...prev, review.id]))
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Product Name */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{review.productName}</p>
+                      </div>
+
+                      {/* Action Button */}
+                      <Button
+                        onClick={() => {
+                          if (review.hasReply) {
+                            console.log("View reply for review:", review.id)
+                            // Navigate to view reply page if needed
+                          } else {
+                            navigate(`/restaurant/reviews/${review.id}/reply`)
+                          }
+                        }}
+                        className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg ${review.hasReply
+                          ? "bg-blue-100 hover:bg-blue-200 text-blue-700"
+                          : "bg-[#ff8100] hover:bg-[#e67300] text-white"
+                          }`}
+                      >
+                        {review.hasReply ? "View Reply" : "Give Reply"}
+                      </Button>
+                    </div>
+
+                    {/* Reviewer Information */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">Reviewer</p>
+                        <p className="text-sm font-semibold text-gray-900">{review.reviewerName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500 mb-0.5">Phone</p>
+                        <p className="text-sm font-medium text-gray-700">{review.phoneNumber}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+
+            {/* Empty State */}
+            {filteredReviews.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-sm">No reviews found</p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Bottom Navigation Bar */}
       <BottomNavbar onMenuClick={() => setShowMenu(true)} />
-      
+
       {/* Menu Overlay */}
       <MenuOverlay showMenu={showMenu} setShowMenu={setShowMenu} />
     </div>

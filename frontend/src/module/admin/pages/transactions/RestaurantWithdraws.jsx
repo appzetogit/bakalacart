@@ -7,7 +7,7 @@ import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
 
 export default function RestaurantWithdraws() {
-  const [activeTab, setActiveTab] = useState("Pending")
+  const [activeTab, setActiveTab] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [withdraws, setWithdraws] = useState([])
   const [loading, setLoading] = useState(true)
@@ -64,7 +64,7 @@ export default function RestaurantWithdraws() {
 
   const filteredWithdraws = useMemo(() => {
     let result = [...withdraws]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(w =>
@@ -73,7 +73,7 @@ export default function RestaurantWithdraws() {
         w.amount?.toString().includes(query)
       )
     }
-    
+
     return result
   }, [withdraws, searchQuery])
 
@@ -99,7 +99,7 @@ export default function RestaurantWithdraws() {
     if (!confirm('Are you sure you want to approve this withdrawal request?')) {
       return
     }
-    
+
     try {
       setProcessingAction(id)
       const response = await adminAPI.approveWithdrawalRequest(id)
@@ -122,7 +122,7 @@ export default function RestaurantWithdraws() {
       alert('Please provide a rejection reason')
       return
     }
-    
+
     try {
       setProcessingAction(id)
       const response = await adminAPI.rejectWithdrawalRequest(id, rejectionReason)
@@ -240,11 +240,10 @@ export default function RestaurantWithdraws() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === tab
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {tab}
               </button>

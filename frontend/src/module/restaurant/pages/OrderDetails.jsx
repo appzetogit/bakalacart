@@ -57,7 +57,9 @@ export default function OrderDetails() {
               orderCount: 1,
               location: `${order.address?.city || ''}, ${order.address?.state || ''}`.trim(),
               distance: 'N/A',
-              deliveryAddressDetails: order.deliveryAddressDetails || ''
+              deliveryAddressDetails: order.deliveryAddressDetails || '',
+              note: order.note || '',
+              sendCutlery: order.sendCutlery ?? true
             },
             items: order.items?.map(item => ({
               name: item.name,
@@ -249,6 +251,23 @@ export default function OrderDetails() {
         doc.text(addressLines, 15, yPosition + 6)
         yPosition += 6 + (addressLines.length * 6)
       }
+      if (orderData.customer.note) {
+        doc.setFont("helvetica", "bold")
+        doc.setTextColor(220, 38, 38)
+        doc.text("CUSTOMER NOTE:", 15, yPosition)
+        doc.setFont("helvetica", "normal")
+        const noteLines = doc.splitTextToSize(orderData.customer.note, pageWidth - 50)
+        doc.text(noteLines, 50, yPosition)
+        yPosition += (noteLines.length * 6) + 2
+        doc.setTextColor(0, 0, 0)
+      }
+
+      doc.setFont("helvetica", "bold")
+      doc.text("Cutlery:", 15, yPosition)
+      doc.setFont("helvetica", "normal")
+      doc.text(orderData.customer.sendCutlery ? "Send Cutlery" : "NO CUTLERY (Customer Preference)", 50, yPosition)
+      yPosition += 8
+
       yPosition += 4
 
       // Items Section
@@ -540,7 +559,7 @@ export default function OrderDetails() {
         {/* Order Summary Card */}
         <div className="bg-white rounded-lg p-4">
           {/* Status and Order ID Row */}
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-3 flex-wrap gap-y-2">
             <span className={`px-2.5 py-1 rounded text-xs font-bold ${getStatusColor(orderData.status)}`}>
               {orderData.status}
             </span>
@@ -609,6 +628,30 @@ export default function OrderDetails() {
                 </div>
               </div>
             )}
+
+            {/* Customer Note */}
+            {orderData.customer.note && (
+              <div className="flex items-start gap-3 mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                <div className="w-5 h-5 flex items-center justify-center mt-0.5">
+                  <span className="text-orange-500 font-bold text-lg">!</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-orange-600 font-bold uppercase tracking-wider mb-1">Customer Note</p>
+                  <p className="text-sm text-gray-900 font-medium italic">"{orderData.customer.note}"</p>
+                </div>
+              </div>
+            )}
+
+            {/* Cutlery Preference */}
+            <div className="flex items-center gap-3 mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+              <div className={`w-2 h-2 rounded-full ${orderData.customer.sendCutlery ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">
+                  {orderData.customer.sendCutlery ? 'Send Cutlery' : 'Don\'t Send Cutlery'}
+                </p>
+                <p className="text-[10px] text-gray-500">Customer prefers {orderData.customer.sendCutlery ? 'to have' : 'no'} disposable cutlery</p>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -704,10 +747,10 @@ export default function OrderDetails() {
                   <div key={index} className="relative flex items-start gap-3">
                     {/* Icon */}
                     <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${event.status === "completed"
-                        ? "bg-gray-900"
-                        : event.status === "rejected"
-                          ? "bg-red-600"
-                          : "bg-gray-400"
+                      ? "bg-gray-900"
+                      : event.status === "rejected"
+                        ? "bg-red-600"
+                        : "bg-gray-400"
                       }`}>
                       {event.status === "completed" ? (
                         <CheckCircle className="w-4 h-4 text-white" />
@@ -726,6 +769,16 @@ export default function OrderDetails() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Need Help Section */}
+        <div className="pb-8">
+          <button
+            onClick={() => navigate('/restaurant/help-centre')}
+            className="w-full py-4 bg-white rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors underline text-center font-medium shadow-sm"
+          >
+            Need help with this order?
+          </button>
         </div>
       </div>
 

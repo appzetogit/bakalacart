@@ -123,6 +123,23 @@ export default function ProfilePage() {
     }
   }, [showAlertSoundPopup])
 
+  // Handle hardware back button for all popups/dialogs
+  useEffect(() => {
+    if (showAlertSoundPopup) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = () => {
+      if (showAlertSoundPopup) {
+        setShowAlertSoundPopup(false);
+        console.log('🔙 Back button detected: Closing ProfilePage UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showAlertSoundPopup]);
+
   // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {

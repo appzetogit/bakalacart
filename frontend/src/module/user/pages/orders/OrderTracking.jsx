@@ -5,6 +5,9 @@ import { toast } from "sonner"
 import { io } from "socket.io-client" // Import io
 import { API_BASE_URL } from "@/lib/api/config" // Import API_BASE_URL
 import {
+  MessageSquare,
+  Send,
+  MessageCircle,
   ArrowLeft,
   RefreshCw,
   Phone,
@@ -115,8 +118,94 @@ export default function OrderTracking() {
   const [socket, setSocket] = useState(null)
   const [showOrderDetailsDialog, setShowOrderDetailsDialog] = useState(false)
 
+  // Chat State
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [newMessage, setNewMessage] = useState("")
+  const chatMessagesEndRef = useRef(null)
+  const chatInputRef = useRef(null)
+  const chatInputContainerRef = useRef(null)
+
+  // Helper functions for chat history
+  const getChatHistoryKey = (id) => {
+    return `user_chat_${id}`
+  }
+
+  const loadChatHistory = (id) => {
+    try {
+      const key = getChatHistoryKey(id)
+      const saved = localStorage.getItem(key)
+      if (saved) {
+        const messages = JSON.parse(saved)
+        console.log(`📜 Loaded ${messages.length} messages from history for order ${id}`)
+        return messages
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    }
+    return []
+  }
+
+  const saveChatHistory = (id, messages) => {
+    try {
+      const key = getChatHistoryKey(id)
+      localStorage.setItem(key, JSON.stringify(messages))
+    } catch (error) {
+      console.error('Error saving chat history:', error)
+    }
+  }
+
+  // Handle opening chat
+  const handleOpenChat = () => {
+    if (!order) return
+    const id = order.orderId || order._id || orderId
+    setChatOpen(true)
+    const history = loadChatHistory(id)
+    setChatMessages(history)
+    setNewMessage("")
+  }
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages, chatOpen])
+
+  // Save chat history whenever messages change
+  useEffect(() => {
+    if (order && chatMessages.length > 0) {
+      const id = order.orderId || order._id || orderId
+      saveChatHistory(id, chatMessages)
+    }
+  }, [chatMessages, order, orderId])
+
   const defaultAddress = getDefaultAddress()
 
+  // Handle sending chat message
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !socket || !order) return;
+
+    const id = order.orderId || order._id || orderId;
+    const messageData = {
+      orderId: id,
+      message: newMessage.trim(),
+      timestamp: Date.now(),
+      sender: 'user'
+    };
+
+    console.log('💬 Sending chat message:', messageData);
+    socket.emit('send-chat-message', messageData);
+
+    // Optimistically add to UI if socket is connected
+    if (socket.connected) {
+      setChatMessages(prev => [...prev, { ...messageData, self: true }]);
+      setNewMessage("");
+    } else {
+      toast.error("Connecting to chat server...");
+      socket.connect();
+    }
+  }
 
   // Initialize Socket for Order Tracking
   useEffect(() => {
@@ -128,32 +217,66 @@ export default function OrderTracking() {
 
     newSocket.on('connect', () => {
       console.log('✅ Connected to order tracking socket');
-      // Join order room to listen for order status updates
-      // Join with orderId from params (could be ORD-xxx or MongoDB _id)
-      newSocket.emit('join-order-tracking', orderId);
-      console.log('✅ Joined order room with orderId:', orderId);
-      
-      // Also join with order._id if available and different from orderId
-      // This ensures we receive updates sent to either format
-      if (order?._id && order._id !== orderId) {
+      // Join order room to listen for order status updates and chat
+      const identifier = orderId || order?._id || order?.orderId;
+      newSocket.emit('join-order-tracking', identifier);
+
+      // Also join with MongoDB _id if available
+      if (order?._id && order._id !== identifier) {
         newSocket.emit('join-order-tracking', order._id);
-        console.log('✅ Also joined order room with MongoDB _id:', order._id);
       }
-      
-      // Also join with order.orderId if available and different
-      if (order?.orderId && order.orderId !== orderId && order.orderId !== order._id) {
-        newSocket.emit('join-order-tracking', order.orderId);
-        console.log('✅ Also joined order room with orderId string:', order.orderId);
+
+      // Also join order room for chat (matching backend room name)
+      if (identifier) {
+        newSocket.emit('join-order-room', identifier);
       }
     });
-    
+
+    // Listen for incoming chat messages
+    const handleIncomingMessage = (data) => {
+      console.log('📩 New chat message received:', data);
+
+      // Verify message belongs to this order
+      const possibleIds = [orderId, order?._id, order?.orderId].filter(Boolean);
+      const isForThisOrder = possibleIds.some(id =>
+        id === data.orderId || id === data.orderMongoId ||
+        String(id) === String(data.orderId) || String(id) === String(data.orderMongoId)
+      );
+
+      if (isForThisOrder) {
+        setChatMessages(prev => {
+          // Avoid duplicates (exact match or near match for same sender/message)
+          const isDuplicate = prev.some(msg => {
+            const sameContent = msg.message === data.message && msg.sender === data.sender;
+            if (!sameContent) return false;
+
+            // If exact timestamp, it's a duplicate
+            if (msg.timestamp === data.timestamp) return true;
+
+            // If sender is user, check for near-duplicate (optimistic update vs broadcast)
+            if (msg.sender === 'user') {
+              return Math.abs(msg.timestamp - data.timestamp) < 5000; // 5 second window
+            }
+
+            return false;
+          });
+
+          if (isDuplicate) return prev;
+          return [...prev, data];
+        });
+      }
+    };
+
+    newSocket.on('chat-message', handleIncomingMessage);
+    newSocket.on('receive-chat-message', handleIncomingMessage);
+
     // Handle connection errors - silently handle, don't show error to user
     newSocket.on('connect_error', (error) => {
       console.error('❌ Socket connection error:', error);
       // Don't show error toast - socket connection is optional for order tracking
       // Order status will still update via polling if socket fails
     });
-    
+
     // Handle disconnection
     newSocket.on('disconnect', (reason) => {
       console.warn('⚠️ Socket disconnected:', reason);
@@ -367,7 +490,7 @@ export default function OrderTracking() {
             apiOrder.restaurantId?.ownerPhone ||
             apiOrder.restaurantPhone ||
             '';
-          
+
           // Debug logging for restaurant phone
           if (!restaurantPhone) {
             console.warn('⚠️ Restaurant phone not found:', {
@@ -610,7 +733,7 @@ export default function OrderTracking() {
           apiOrder.restaurantId?.ownerPhone ||
           apiOrder.restaurantPhone ||
           '';
-        
+
         // Debug logging for restaurant phone
         if (!restaurantPhone) {
           console.warn('⚠️ Restaurant phone not found:', {
@@ -694,9 +817,9 @@ export default function OrderTracking() {
   }
 
   const handleCallRestaurant = () => {
-    const phone = order?.restaurantPhone || 
-                  order?.restaurantId?.phone || 
-                  order?.restaurantId?.ownerPhone
+    const phone = order?.restaurantPhone ||
+      order?.restaurantId?.phone ||
+      order?.restaurantId?.ownerPhone
     if (!phone) {
       toast.error("Restaurant phone number not available")
       return
@@ -1038,31 +1161,40 @@ export default function OrderTracking() {
                     )}
                   </div>
                 </div>
-                {order.deliveryPartner.phone && (
-                  <button
-                    onClick={() => {
-                      const deliveryPhone = order.deliveryPartner.phone
-                      if (deliveryPhone) {
-                        // Clean the phone number (remove spaces, dashes, etc. but keep +)
-                        let cleanPhone = String(deliveryPhone).replace(/[\s\-\(\)]/g, '')
-                        // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                          cleanPhone = `+91${cleanPhone}`
-                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                          cleanPhone = `+${cleanPhone}`
+                <div className="flex items-center gap-2">
+                  {order.deliveryPartner.phone && (
+                    <button
+                      onClick={() => {
+                        const deliveryPhone = order.deliveryPartner.phone
+                        if (deliveryPhone) {
+                          // Clean the phone number (remove spaces, dashes, etc. but keep +)
+                          let cleanPhone = String(deliveryPhone).replace(/[\s\-\(\)]/g, '')
+                          // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                          if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                            cleanPhone = `+91${cleanPhone}`
+                          } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                            cleanPhone = `+${cleanPhone}`
+                          }
+                          console.log('📞 Calling delivery partner:', cleanPhone)
+                          window.location.href = `tel:${cleanPhone}`
+                        } else {
+                          toast.error('Delivery partner phone number not available')
                         }
-                        console.log('📞 Calling delivery partner:', cleanPhone)
-                        window.location.href = `tel:${cleanPhone}`
-                      } else {
-                        toast.error('Delivery partner phone number not available')
-                      }
-                    }}
-                    className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors shrink-0"
-                    title="Call delivery partner"
+                      }}
+                      className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors shrink-0"
+                      title="Call delivery partner"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={handleOpenChat}
+                    className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors shrink-0"
+                    title="Chat with delivery partner"
                   >
-                    <Phone className="w-5 h-5" />
+                    <MessageSquare className="w-5 h-5" />
                   </button>
-                )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -1180,7 +1312,7 @@ export default function OrderTracking() {
               Order Details
             </DialogTitle>
           </DialogHeader>
-          
+
           {order && (
             <div className="space-y-4 py-4">
               {/* Order ID */}
@@ -1235,12 +1367,10 @@ export default function OrderTracking() {
                     order.items.map((item, index) => (
                       <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                         <div className="flex items-center gap-3 flex-1">
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                            item.isVeg !== false ? 'border-green-600' : 'border-red-600'
-                          }`}>
-                            <div className={`w-2 h-2 rounded-full ${
-                              item.isVeg !== false ? 'bg-green-600' : 'bg-red-600'
-                            }`} />
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.isVeg !== false ? 'border-green-600' : 'border-red-600'
+                            }`}>
+                            <div className={`w-2 h-2 rounded-full ${item.isVeg !== false ? 'bg-green-600' : 'bg-red-600'
+                              }`} />
                           </div>
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">{item.name}</p>
@@ -1305,6 +1435,84 @@ export default function OrderTracking() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Dialog */}
+      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl h-[80vh] sm:h-[600px] flex flex-col border-none">
+          <DialogHeader className="bg-blue-600 px-4 py-3 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-white text-base">Chat with Partner</DialogTitle>
+                  <p className="text-xs text-blue-100">{order?.deliveryPartner?.name || 'Delivery Partner'}</p>
+                </div>
+              </div>
+              <button onClick={() => setChatOpen(false)} className="text-white/80 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </DialogHeader>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-3">
+            {chatMessages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2 opacity-60">
+                <MessageSquare className="w-12 h-12" />
+                <p className="text-sm">Start a conversation with your delivery partner</p>
+              </div>
+            ) : (
+              chatMessages.map((msg, index) => {
+                const isSelf = msg.sender === 'user' || msg.self;
+                return (
+                  <div
+                    key={index}
+                    className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${isSelf
+                        ? 'bg-blue-600 text-white rounded-tr-none shadow-md'
+                        : 'bg-white text-gray-800 rounded-tl-none border border-gray-100 shadow-sm'
+                        }`}
+                    >
+                      <p>{msg.message}</p>
+                      <span className={`text-[10px] mt-1 block ${isSelf ? 'text-blue-200' : 'text-gray-400'}`}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatMessagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="p-3 bg-white border-t shrink-0">
+            <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1">
+              <input
+                ref={chatInputRef}
+                type="text"
+                placeholder="Type a message..."
+                className="flex-1 bg-transparent py-2 text-sm outline-none"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim()}
+                className={`p-2 rounded-full transition-colors ${newMessage.trim() ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-400'
+                  }`}
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

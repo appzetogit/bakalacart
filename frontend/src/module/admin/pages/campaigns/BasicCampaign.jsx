@@ -31,7 +31,7 @@ export default function BasicCampaign() {
 
   const filteredCampaigns = useMemo(() => {
     let result = [...campaigns]
-    
+
     // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
@@ -180,7 +180,7 @@ export default function BasicCampaign() {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleAdd}
             className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 transition-all shadow-md"
           >
@@ -231,11 +231,10 @@ export default function BasicCampaign() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button 
+          <button
             onClick={() => setIsFilterOpen(true)}
-            className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${
-              activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""
-            }`}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-all relative ${activeFiltersCount > 0 ? "border-emerald-500 bg-emerald-50" : ""
+              }`}
           >
             <Filter className="w-4 h-4" />
             <span>Filter</span>
@@ -246,7 +245,7 @@ export default function BasicCampaign() {
             )}
           </button>
 
-          <button 
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
           >
@@ -317,14 +316,14 @@ export default function BasicCampaign() {
                   </td>
                 </tr>
               ) : (
-                filteredCampaigns.map((campaign) => (
+                filteredCampaigns.map((campaign, index) => (
                   <tr
                     key={campaign.sl}
                     className="hover:bg-slate-50 transition-colors"
                   >
                     {visibleColumns.si && (
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-slate-700">{campaign.sl}</span>
+                        <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                       </td>
                     )}
                     {visibleColumns.title && (
@@ -348,14 +347,12 @@ export default function BasicCampaign() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           onClick={() => handleToggleStatus(campaign.sl)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            campaign.status ? "bg-blue-600" : "bg-slate-300"
-                          }`}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${campaign.status ? "bg-blue-600" : "bg-slate-300"
+                            }`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              campaign.status ? "translate-x-6" : "translate-x-1"
-                            }`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${campaign.status ? "translate-x-6" : "translate-x-1"
+                              }`}
                           />
                         </button>
                       </td>

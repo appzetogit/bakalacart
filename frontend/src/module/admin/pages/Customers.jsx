@@ -25,7 +25,7 @@ export default function Customers() {
 
   const filteredCustomers = useMemo(() => {
     let result = [...customers]
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
@@ -99,7 +99,7 @@ export default function Customers() {
 
         const response = await adminAPI.getUsers(params)
         const data = response?.data?.data || response?.data
-        
+
         if (data?.users) {
           setCustomers(data.users)
           setTotalCustomers(data.total || data.users.length)
@@ -154,7 +154,7 @@ export default function Customers() {
 
       const response = await adminAPI.getUserById(customerId)
       const data = response?.data?.data || response?.data
-      
+
       if (data?.user) {
         setUserDetails(data.user)
       } else {
@@ -285,7 +285,7 @@ export default function Customers() {
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => {
                   // Filters are applied automatically via useMemo
                 }}
@@ -393,10 +393,10 @@ export default function Customers() {
                     </td>
                   </tr>
                 ) : (
-                  filteredCustomers.map((customer) => (
+                  filteredCustomers.map((customer, index) => (
                     <tr key={customer.id || customer.sl} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-slate-700">{customer.sl}</span>
+                        <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -424,19 +424,17 @@ export default function Customers() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           onClick={() => handleToggleStatus(customer.id || customer.sl)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            customer.status ? "bg-blue-600" : "bg-slate-300"
-                          }`}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${customer.status ? "bg-blue-600" : "bg-slate-300"
+                            }`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              customer.status ? "translate-x-6" : "translate-x-1"
-                            }`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.status ? "translate-x-6" : "translate-x-1"
+                              }`}
                           />
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <button 
+                        <button
                           onClick={() => handleViewDetails(customer.id || customer.sl)}
                           className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
                         >
@@ -458,7 +456,7 @@ export default function Customers() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-slate-900">User Details</DialogTitle>
           </DialogHeader>
-          
+
           {loadingDetails ? (
             <div className="py-8 text-center">
               <div className="text-sm text-slate-500">Loading user details...</div>

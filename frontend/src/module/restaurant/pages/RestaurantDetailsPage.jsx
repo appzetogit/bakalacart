@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import BottomNavbar from "../components/BottomNavbar"
 import MenuOverlay from "../components/MenuOverlay"
-import { 
+import {
   Home,
   ShoppingBag,
   Store,
@@ -31,7 +31,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { useNavigate } from "react-router-dom"
 import { getAllFoods } from "../utils/foodManagement"
-import { getRestaurantData } from "../utils/restaurantManagement"
+import { getRestaurantData, setRestaurantData } from "../utils/restaurantManagement"
+import { restaurantAPI } from "@/lib/api"
 
 export default function RestaurantDetailsPage() {
   const navigate = useNavigate()
@@ -62,12 +63,53 @@ export default function RestaurantDetailsPage() {
 
   // Load restaurant data and listen for updates
   useEffect(() => {
+    const fetchAndRefreshRestaurantData = async () => {
+      try {
+        // Fetch fresh data from API
+        const response = await restaurantAPI.getCurrentRestaurant()
+        const apiData = response?.data?.data?.restaurant || response?.data?.restaurant
+
+        if (apiData) {
+          // Transform API data to match expected format
+          const transformedData = {
+            restaurantName: {
+              english: apiData.name || "",
+              bengali: apiData.name || "",
+              arabic: apiData.name || "",
+              spanish: apiData.name || ""
+            },
+            phoneNumber: apiData.phone || "",
+            address: apiData.location?.formattedAddress || apiData.location?.street || "",
+            logo: apiData.profileImage?.url || apiData.logo || null,
+            cover: apiData.coverImage?.url || apiData.cover || null,
+            metaTitle: apiData.metaTitle || "",
+            metaDescription: apiData.metaDescription || "",
+            metaImage: apiData.metaImage || null,
+            rating: apiData.ratings?.average || apiData.rating || 0,
+            totalRatings: apiData.ratings?.count || apiData.totalRatings || 0
+          }
+
+          // Update localStorage with fresh data
+          setRestaurantData(transformedData)
+          // Update local state
+          setRestaurantData(transformedData)
+        }
+      } catch (error) {
+        // Only log error if it's not a network/timeout error
+        if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
+          console.error("Error fetching restaurant data:", error)
+        }
+        // Fall back to localStorage data if API fails
+        setRestaurantData(getRestaurantData())
+      }
+    }
+
     const refreshRestaurantData = () => {
       setRestaurantData(getRestaurantData())
     }
 
-    // Initial load
-    refreshRestaurantData()
+    // Initial fetch from API
+    fetchAndRefreshRestaurantData()
 
     // Listen for restaurant data changes
     window.addEventListener('restaurantDataUpdated', refreshRestaurantData)
@@ -123,28 +165,28 @@ export default function RestaurantDetailsPage() {
       "chinese": "Chinese"
     }
     return item.category?.toLowerCase() === categoryMap[activeCategory]?.toLowerCase() ||
-           item.category === categoryMap[activeCategory]
+      item.category === categoryMap[activeCategory]
   })
 
   return (
     <div className="min-h-screen bg-page-bg overflow-x-hidden">
       {/* Hero Image Section */}
       <div className="relative w-full h-[250px] md:h-[300px] overflow-hidden">
-        <img 
+        <img
           src={restaurantData.cover || "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&h=400&fit=crop"}
           alt="Restaurant Hero"
           className="w-full h-full object-cover"
         />
-        
+
         {/* Restaurant Info Card Overlay */}
         <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-4 md:p-6">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0">
               <div className="bg-primary-orange rounded-lg p-3">
                 {restaurantData.logo ? (
-                  <img 
-                    src={restaurantData.logo} 
-                    alt="Restaurant Logo" 
+                  <img
+                    src={restaurantData.logo}
+                    alt="Restaurant Logo"
                     className="w-6 h-6 md:w-8 md:h-8 object-cover rounded"
                   />
                 ) : (
@@ -212,11 +254,10 @@ export default function RestaurantDetailsPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveCategory(category.id)}
-                className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm md:text-base font-medium transition-colors ${
-                  activeCategory === category.id
-                    ? "text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`relative z-10 flex-shrink-0 px-4 py-2 rounded-full text-sm md:text-base font-medium transition-colors ${activeCategory === category.id
+                  ? "text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 {activeCategory === category.id && (
                   <motion.div
@@ -239,74 +280,74 @@ export default function RestaurantDetailsPage() {
             </div>
           ) : (
             filteredFoodItems.map((item, index) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.1, ease: [0.4, 0, 0.2, 1] }}
-              whileHover={{ y: -4, scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Card 
-                className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/restaurant/food/${item.id}`)}
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1, ease: [0.4, 0, 0.2, 1] }}
+                whileHover={{ y: -4, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <CardContent className="p-0 py-0 gap-0">
-                  <div className="flex gap-2 p-2 md:p-2.5">
-                    {/* Food Image */}
-                    <div className="relative flex-shrink-0">
-                      <img 
-                        src={item.image}
-                        alt={item.name}
-                        className="w-20 h-20 md:w-24 md:h-24 rounded-lg object-cover"
-                      />
-                      {item.discount && (
-                        <div className="absolute top-0 left-0 bg-green-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-tl-lg rounded-br-lg">
-                          {item.discount}$ OFF
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Food Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-0.5">
-                        <h4 className="text-sm md:text-base font-bold text-gray-900 leading-tight">
-                          {item.name}
-                        </h4>
-                        <button className="flex-shrink-0 ml-2 p-1 hover:bg-gray-100 rounded transition-colors">
-                          <div className="w-1 h-1 bg-red-500 rounded-full"></div>
-                        </button>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-gray-500 text-xs">
-                          Category: {item.category}
-                        </p>
-                        <div className="flex items-center gap-1">
-                          <Star className={`w-3 h-3 ${item.rating > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
-                          <span className="text-gray-600 text-xs">
-                            {item.rating.toFixed(1)} ({item.reviews})
-                          </span>
-                        </div>
+                <Card
+                  className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/restaurant/food/${item.id}`)}
+                >
+                  <CardContent className="p-0 py-0 gap-0">
+                    <div className="flex gap-2 p-2 md:p-2.5">
+                      {/* Food Image */}
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 md:w-24 md:h-24 rounded-lg object-cover"
+                        />
+                        {item.discount && (
+                          <div className="absolute top-0 left-0 bg-green-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-tl-lg rounded-br-lg">
+                            {item.discount}$ OFF
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between mt-0.5">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[#ff8100] font-bold text-sm">
-                            ₹ {item.price.toFixed(2)}
-                          </p>
+                      {/* Food Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-0.5">
+                          <h4 className="text-sm md:text-base font-bold text-gray-900 leading-tight">
+                            {item.name}
+                          </h4>
+                          <button className="flex-shrink-0 ml-2 p-1 hover:bg-gray-100 rounded transition-colors">
+                            <div className="w-1 h-1 bg-red-500 rounded-full"></div>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-1">
                           <p className="text-gray-500 text-xs">
-                            Stock : {item.stock}
+                            Category: {item.category}
                           </p>
+                          <div className="flex items-center gap-1">
+                            <Star className={`w-3 h-3 ${item.rating > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                            <span className="text-gray-600 text-xs">
+                              {item.rating.toFixed(1)} ({item.reviews})
+                            </span>
+                          </div>
                         </div>
-                        <div className="w-4"></div>
+
+                        <div className="flex items-center justify-between mt-0.5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[#ff8100] font-bold text-sm">
+                              ₹ {item.price.toFixed(2)}
+                            </p>
+                            <p className="text-gray-500 text-xs">
+                              Stock : {item.stock}
+                            </p>
+                          </div>
+                          <div className="w-4"></div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )))}
         </div>
       </div>
 

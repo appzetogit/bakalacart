@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   ChevronDown,
   Calendar,
@@ -12,7 +12,7 @@ import WeekSelector from "../components/WeekSelector"
 
 export default function TipsStatement() {
   const navigate = useNavigate()
-  
+
   // Date range state
   const [startDate, setStartDate] = useState(() => {
     const today = new Date()
@@ -23,7 +23,7 @@ export default function TipsStatement() {
   const [endDate, setEndDate] = useState(new Date())
   const [showCalendar, setShowCalendar] = useState(false)
   const calendarRef = useRef(null)
-  
+
   // Format date range display
   const dateRangeDisplay = useMemo(() => {
     if (!startDate || !endDate) return "Select date range"
@@ -34,7 +34,7 @@ export default function TipsStatement() {
     }
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
   }, [startDate, endDate])
-  
+
   // Handle date range change from calendar
   const handleDateRangeChange = (start, end) => {
     setStartDate(start)
@@ -42,7 +42,7 @@ export default function TipsStatement() {
     // Here you would fetch tips data for the selected date range
     // fetchTipsData(start, end)
   }
-  
+
   // Close calendar when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -50,34 +50,51 @@ export default function TipsStatement() {
         setShowCalendar(false)
       }
     }
-    
+
     if (showCalendar) {
       document.addEventListener('mousedown', handleClickOutside)
     }
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showCalendar])
-  
+
   // Fetch tips data based on selected date range (mock function - replace with actual API call)
   const getTipsDataForDateRange = (start, end) => {
     // This would be an API call in a real application
     // For now, return empty array
     return []
   }
-  
+
   // Get tips data for current selected date range
   const tips = useMemo(() => {
     if (!startDate || !endDate) return []
     return getTipsDataForDateRange(startDate, endDate)
   }, [startDate, endDate])
-  
+
+  // Handle hardware back button for all popups/dialogs
+  useEffect(() => {
+    if (showCalendar) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = () => {
+      if (showCalendar) {
+        setShowCalendar(false);
+        console.log('🔙 Back button detected: Closing DeductionStatement UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showCalendar]);
+
   return (
     <div className="min-h-screen bg-white overflow-x-hidden pb-24 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4 md:py-6 flex items-center gap-4 rounded-b-3xl md:rounded-b-none">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
@@ -89,7 +106,7 @@ export default function TipsStatement() {
       {/* Main Content */}
       <div className="px-4 py-6">
         {/* Date Range Selector with Calendar */}
-          <WeekSelector />
+        <WeekSelector />
 
         {/* Transactions List */}
         {tips.length === 0 ? (
@@ -135,10 +152,9 @@ export default function TipsStatement() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded ${ 
-                      index % 3 === 0 ? 'bg-green-500' : 
-                      index % 3 === 1 ? 'bg-orange-500' : 'bg-blue-500'
-                    }`}></div>
+                    <div className={`w-2 h-2 rounded ${index % 3 === 0 ? 'bg-green-500' :
+                        index % 3 === 1 ? 'bg-orange-500' : 'bg-blue-500'
+                      }`}></div>
                     <div>
                       <p className="text-gray-900 text-sm font-medium">{tip.description}</p>
                       <p className="text-gray-500 text-xs">{tip.date}</p>

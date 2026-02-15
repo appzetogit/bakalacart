@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import Payment from '../../payment/models/Payment.js';
 import { createOrder as createRazorpayOrder, verifyPayment } from '../../payment/services/razorpayService.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
+import Delivery from '../../delivery/models/Delivery.js';
 import Zone from '../../admin/models/Zone.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
@@ -1487,6 +1488,68 @@ export const submitOrderReview = async (req, res) => {
       }
     } catch (restErr) {
       logger.error('❌ Error updating restaurant rating:', restErr);
+    }
+
+    // Update Delivery Partner average rating
+    try {
+      const deliveryPartnerId = order.deliveryPartnerId;
+      if (deliveryPartnerId) {
+        // Calculate new average rating for the delivery partner
+        const deliveryMatchQuery = {
+          $or: [
+            { deliveryPartnerId: deliveryPartnerId },
+            { deliveryPartnerId: deliveryPartnerId.toString() }
+          ],
+          'review.rating': { $exists: true, $ne: null }
+        };
+
+        // If it's a valid ObjectId, add it to the match query
+        if (mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+          deliveryMatchQuery.$or.push({ deliveryPartnerId: new mongoose.Types.ObjectId(deliveryPartnerId) });
+        }
+
+        const deliveryStats = await Order.aggregate([
+          { $match: deliveryMatchQuery },
+          {
+            $group: {
+              _id: null,
+              avgRating: { $avg: '$review.rating' },
+              totalRatings: { $sum: 1 }
+            }
+          }
+        ]);
+
+        if (deliveryStats.length > 0) {
+          const { avgRating, totalRatings } = deliveryStats[0];
+
+          // Update the delivery partner document
+          // Try to match by _id (ObjectId) or deliveryId (String) if applicable, 
+          // but usually deliveryPartnerId in Order is the _id
+          const deliveryQuery = {
+            $or: [
+              { _id: deliveryPartnerId } // Most likely case
+            ]
+          };
+
+          if (mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+            deliveryQuery.$or.push({ _id: new mongoose.Types.ObjectId(deliveryPartnerId) });
+          }
+
+          await Delivery.findOneAndUpdate(
+            deliveryQuery,
+            {
+              $set: {
+                'metrics.rating': Math.round(avgRating * 10) / 10,
+                'metrics.ratingCount': totalRatings
+              }
+            }
+          );
+
+          logger.info(`✅ Updated delivery partner ${deliveryPartnerId} rating to ${Math.round(avgRating * 10) / 10} based on ${totalRatings} reviews`);
+        }
+      }
+    } catch (delErr) {
+      logger.error('❌ Error updating delivery partner rating:', delErr);
     }
 
     res.json({

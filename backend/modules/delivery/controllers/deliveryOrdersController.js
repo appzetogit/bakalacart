@@ -94,7 +94,7 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Ensure restaurant location is present and calculate estimated earnings
     orders = await Promise.all(orders.map(async (order) => {
       let finalOrder = order;
-      
+
       // If restaurantId was populated correctly (became an object)
       if (order.restaurantId && typeof order.restaurantId === 'object') {
         finalOrder = order;
@@ -115,7 +115,7 @@ export const getOrders = asyncHandler(async (req, res) => {
       // Calculate estimated earnings if not already present
       if (!finalOrder.estimatedEarnings) {
         let deliveryDistance = null;
-        
+
         // Priority 1: Use assignmentInfo.distance if available
         if (finalOrder.assignmentInfo?.distance) {
           deliveryDistance = finalOrder.assignmentInfo.distance;
@@ -1798,6 +1798,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
     // Prepare update object
     const updateData = {
       status: 'delivered',
+      'payment.status': 'completed',
       'tracking.delivered': {
         status: true,
         timestamp: new Date()
@@ -1904,7 +1905,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         distance: settlement.deliveryPartnerEarning?.distance,
         basePayout: settlement.deliveryPartnerEarning?.basePayout
       });
-      
+
       // Ensure settlement is saved (it should be saved by calculateOrderSettlement, but verify)
       if (settlement.isModified && settlement.isModified()) {
         await settlement.save();
@@ -1986,7 +1987,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         totalEarning: `₹${totalEarning.toFixed(2)}`,
         calculation: `${commissionResult.breakdown.basePayout} + ${commissionResult.breakdown.distanceCommission.toFixed(2)} = ${totalEarning.toFixed(2)}`
       });
-      
+
       // Validate that earnings are calculated correctly
       if (totalEarning <= 0) {
         console.warn(`⚠️ Calculated earnings is ₹${totalEarning}, which seems incorrect. Using fallback.`);
@@ -2133,11 +2134,11 @@ export const completeDelivery = asyncHandler(async (req, res) => {
         // Double-check that restaurant._id matches order.restaurantId to prevent cross-restaurant credits
         const orderRestaurantId = order.restaurantId?._id || order.restaurantId;
         const restaurantIdToUse = restaurant._id;
-        
+
         // Verify restaurant ID matches order's restaurant ID
         const orderRestaurantIdStr = orderRestaurantId?.toString();
         const restaurantIdStr = restaurantIdToUse?.toString();
-        
+
         if (orderRestaurantIdStr !== restaurantIdStr) {
           console.error(`❌ CRITICAL: Restaurant ID mismatch! Order restaurant: ${orderRestaurantIdStr}, Restaurant from order: ${restaurantIdStr}`);
           console.error(`❌ Skipping wallet update to prevent cross-restaurant credit`);

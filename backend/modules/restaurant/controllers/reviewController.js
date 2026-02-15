@@ -9,48 +9,48 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 export const getRestaurantReviews = asyncHandler(async (req, res) => {
   try {
     const restaurant = req.restaurant;
-    
+
     if (!restaurant || !restaurant._id) {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
-    
+
     const restaurantId = restaurant._id.toString();
     const { page = 1, limit = 20, rating, sortBy = 'submittedAt', sortOrder = 'desc' } = req.query;
-    
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
-    
+
     const query = {
       restaurantId: restaurantId,
       status: 'delivered',
       'review.rating': { $exists: true, $ne: null }
     };
-    
+
     if (rating) {
       const ratingNum = parseInt(rating);
       if (ratingNum >= 1 && ratingNum <= 5) {
         query['review.rating'] = ratingNum;
       }
     }
-    
+
     const sortOptions = {};
     if (sortBy === 'rating') {
       sortOptions['review.rating'] = sortOrder === 'asc' ? 1 : -1;
     } else {
       sortOptions['review.submittedAt'] = sortOrder === 'asc' ? 1 : -1;
     }
-    
+
     const reviews = await Order.find(query)
       .populate('userId', 'name phone')
-      .select('orderId userId review deliveredAt createdAt')
+      .select('orderId userId review deliveredAt createdAt items')
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
       .lean();
-    
+
     const totalReviews = await Order.countDocuments(query);
-    
+
     // Calculate average rating and distribution
     const avgRatingResult = await Order.aggregate([
       { $match: query },
@@ -65,10 +65,10 @@ export const getRestaurantReviews = asyncHandler(async (req, res) => {
         }
       }
     ]);
-    
+
     let avgRating = 0;
     let ratingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    
+
     if (avgRatingResult.length > 0) {
       avgRating = avgRatingResult[0].avgRating || 0;
       const distribution = avgRatingResult[0].ratingDistribution || [];
@@ -78,7 +78,7 @@ export const getRestaurantReviews = asyncHandler(async (req, res) => {
         }
       });
     }
-    
+
     return successResponse(res, 200, 'Reviews fetched successfully', {
       reviews: reviews.map(review => ({
         orderId: review.orderId,
@@ -92,7 +92,8 @@ export const getRestaurantReviews = asyncHandler(async (req, res) => {
         comment: review.review?.comment,
         submittedAt: review.review?.submittedAt || review.deliveredAt,
         deliveredAt: review.deliveredAt,
-        createdAt: review.createdAt
+        createdAt: review.createdAt,
+        items: review.items
       })),
       pagination: {
         currentPage: pageNum,
@@ -119,14 +120,14 @@ export const getRestaurantReviews = asyncHandler(async (req, res) => {
 export const getReviewByOrderId = asyncHandler(async (req, res) => {
   try {
     const restaurant = req.restaurant;
-    
+
     if (!restaurant || !restaurant._id) {
       return errorResponse(res, 401, 'Restaurant authentication required');
     }
-    
+
     const { orderId } = req.params;
     const restaurantId = restaurant._id.toString();
-    
+
     const order = await Order.findOne({
       $or: [
         { orderId: orderId },
@@ -139,11 +140,11 @@ export const getReviewByOrderId = asyncHandler(async (req, res) => {
       .populate('userId', 'name phone')
       .select('orderId userId review deliveredAt createdAt')
       .lean();
-    
+
     if (!order) {
       return errorResponse(res, 404, 'Review not found for this order');
     }
-    
+
     return successResponse(res, 200, 'Review fetched successfully', {
       orderId: order.orderId,
       orderMongoId: order._id,

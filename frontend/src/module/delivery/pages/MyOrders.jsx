@@ -105,6 +105,29 @@ export default function MyOrders() {
     }
   }
 
+  // Handle hardware back button for all popups/dialogs
+  useEffect(() => {
+    const isUIOpen = chatOpen || showRatingPopup || showOrderDetailsDialog || showBillImageSourceMenu || showMenuForOrder;
+
+    if (isUIOpen) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = () => {
+      if (isUIOpen) {
+        setChatOpen(false);
+        setShowRatingPopup(false);
+        setShowOrderDetailsDialog(false);
+        setShowBillImageSourceMenu(null);
+        setShowMenuForOrder(null);
+        console.log('🔙 Back button detected: Closing MyOrders UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [chatOpen, showRatingPopup, showOrderDetailsDialog, showBillImageSourceMenu, showMenuForOrder]);
+
   // Initialize Socket for Chat
   useEffect(() => {
     if (!chatOpen || !selectedOrderForChat) return
@@ -119,9 +142,9 @@ export default function MyOrders() {
       try {
         // Get current delivery partner's ID from profile
         const profileResponse = await deliveryAPI.getProfile()
-        const deliveryPartnerId = profileResponse?.data?.data?.profile?._id || 
-                                 profileResponse?.data?.data?.profile?.id ||
-                                 profileResponse?.data?.data?._id
+        const deliveryPartnerId = profileResponse?.data?.data?.profile?._id ||
+          profileResponse?.data?.data?.profile?.id ||
+          profileResponse?.data?.data?._id
 
         if (!deliveryPartnerId) {
           console.error('❌ Delivery partner ID not found in profile')
@@ -141,17 +164,17 @@ export default function MyOrders() {
           // Join delivery room with current delivery partner's ID
           socket.emit('join-delivery', deliveryPartnerId.toString())
           console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
-          
+
           // CRITICAL: Also join order room to receive messages from user
           // Join with both orderId formats (ORD-xxx and MongoDB _id) for compatibility
           const orderIdString = selectedOrderForChat.orderId || orderId
           const orderMongoId = selectedOrderForChat._id || orderId
-          
+
           if (orderIdString) {
             socket.emit('join-order-room', orderIdString)
             console.log('✅ Joined order room with orderId string:', orderIdString)
           }
-          
+
           if (orderMongoId && orderMongoId !== orderIdString) {
             socket.emit('join-order-room', orderMongoId)
             console.log('✅ Also joined order room with MongoDB _id:', orderMongoId)
@@ -169,7 +192,7 @@ export default function MyOrders() {
             selectedOrderIdString: selectedOrderForChat.orderId,
             sender: data.sender
           })
-          
+
           // Get all possible order identifiers from the selected order
           const possibleOrderIds = [
             orderId,
@@ -179,7 +202,7 @@ export default function MyOrders() {
             String(selectedOrderForChat._id),
             String(selectedOrderForChat.orderId)
           ].filter(Boolean) // Remove null/undefined
-          
+
           // Get all possible order identifiers from the received message
           const receivedOrderIds = [
             data.orderId,
@@ -187,9 +210,9 @@ export default function MyOrders() {
             String(data.orderId),
             String(data.orderMongoId)
           ].filter(Boolean) // Remove null/undefined
-          
+
           // Check if any received orderId matches any possible orderId
-          const orderIdMatch = possibleOrderIds.some(possibleId => 
+          const orderIdMatch = possibleOrderIds.some(possibleId =>
             receivedOrderIds.some(receivedId => {
               // Exact match
               if (possibleId === receivedId) return true
@@ -200,11 +223,11 @@ export default function MyOrders() {
               return false
             })
           )
-          
+
           // If message is from user and we're in a chat, accept it regardless of orderId match
           // This is because user messages should always be shown when chat is open
           const isUserMessage = data.sender === 'user'
-          
+
           console.log('🔍 OrderId match check:', {
             orderIdMatch,
             isUserMessage,
@@ -213,17 +236,17 @@ export default function MyOrders() {
             possibleOrderIds,
             receivedOrderIds
           })
-          
+
           // Accept message if:
           // 1. OrderId matches exactly, OR
           // 2. It's a user message and chat is open (we trust the backend to send correct messages to the right delivery partner room)
           // Since backend filters by delivery partner room, if message reaches here and it's from user, it's likely for current order
           const shouldAcceptMessage = orderIdMatch || (isUserMessage && chatOpen && selectedOrderForChat && data.sender === 'user')
-          
+
           console.log('🔍 Should accept message:', shouldAcceptMessage, {
             reason: orderIdMatch ? 'orderId match' : (isUserMessage && chatOpen && selectedOrderForChat ? 'user message in open chat' : 'no match')
           })
-          
+
           if (shouldAcceptMessage) {
             console.log('✅ Message matches current order, adding to chat')
             setChatMessages(prev => {
@@ -234,12 +257,12 @@ export default function MyOrders() {
                 const dataKey = `${data.message}_${data.timestamp}_${data.sender}`
                 return msgKey === dataKey
               })
-              
+
               if (exactMatch) {
                 console.log('⚠️ Exact duplicate message detected, skipping')
                 return prev
               }
-              
+
               // Also check for near-duplicates: same message content and sender within 2 seconds
               // This handles cases where server timestamp differs slightly from client timestamp
               const nearDuplicate = prev.some(msg => {
@@ -251,12 +274,12 @@ export default function MyOrders() {
                 }
                 return false
               })
-              
+
               if (nearDuplicate) {
                 console.log('⚠️ Near-duplicate message detected (same content within 2s), skipping')
                 return prev
               }
-              
+
               console.log('✅ Adding new message to chat')
               return [...prev, data]
             })
@@ -329,7 +352,7 @@ export default function MyOrders() {
     const orderId = order.orderId || order._id
     setSelectedOrderForChat(order)
     setChatOpen(true)
-    
+
     // Load chat history for this order
     if (orderId) {
       const history = loadChatHistory(orderId)
@@ -338,7 +361,7 @@ export default function MyOrders() {
     } else {
       setChatMessages([])
     }
-    
+
     setNewMessage("")
   }
 
@@ -358,10 +381,10 @@ export default function MyOrders() {
   // Handle sending message
   const handleSendMessage = () => {
     if (!newMessage.trim() || !chatSocket || !selectedOrderForChat) {
-      console.warn('⚠️ Cannot send message:', { 
-        hasMessage: !!newMessage.trim(), 
-        hasSocket: !!chatSocket, 
-        hasOrder: !!selectedOrderForChat 
+      console.warn('⚠️ Cannot send message:', {
+        hasMessage: !!newMessage.trim(),
+        hasSocket: !!chatSocket,
+        hasOrder: !!selectedOrderForChat
       });
       return;
     }
@@ -388,16 +411,16 @@ export default function MyOrders() {
       orderId: orderId,
       message: messageText,
       socketConnected: chatSocket.connected,
-      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
-                         selectedOrderForChat.assignmentInfo?.deliveryPartnerId
+      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId ||
+        selectedOrderForChat.assignmentInfo?.deliveryPartnerId
     });
 
     // Send message to server
     chatSocket.emit('send-chat-message', {
       orderId: orderId,
       message: messageText,
-      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId || 
-                         selectedOrderForChat.assignmentInfo?.deliveryPartnerId,
+      deliveryPartnerId: selectedOrderForChat.deliveryPartnerId ||
+        selectedOrderForChat.assignmentInfo?.deliveryPartnerId,
       timestamp: messageTimestamp
     });
 
@@ -701,11 +724,11 @@ export default function MyOrders() {
       const status = order.status || order.orderStatus || ''
       const deliveryStatus = order.deliveryState?.status || ''
       const deliveryPhase = order.deliveryState?.currentPhase || ''
-      
+
       // Trip History API returns "Completed" (capital C), regular orders use lowercase
       const normalizedStatus = status.toLowerCase()
       const normalizedDeliveryStatus = deliveryStatus.toLowerCase()
-      
+
       const isDelivered = (
         normalizedStatus === 'delivered' ||
         normalizedStatus === 'completed' ||
@@ -716,7 +739,7 @@ export default function MyOrders() {
         deliveryPhase === 'completed' ||
         isOrderDelivered(order) // Use helper function as fallback
       )
-      
+
       // Debug logging for delivered tab
       if (!isDelivered && orders.length > 0) {
         console.log('🔍 Order filtered out from delivered:', {
@@ -728,12 +751,12 @@ export default function MyOrders() {
           normalizedDeliveryStatus
         })
       }
-      
+
       return isDelivered
     } else if (activeTab === "cancelled") {
       const status = order.status || order.orderStatus || ''
       const deliveryStatus = order.deliveryState?.status || ''
-      
+
       // Trip History API returns "Cancelled" (capital C), regular orders use lowercase
       return (
         status === 'cancelled' ||
@@ -1098,7 +1121,7 @@ export default function MyOrders() {
     }
 
     await handleBillImageUpload(order, file)
-    
+
     // Clear inputs and activeBillUploadOrder after successful upload
     const orderId = order.orderId || order._id
     if (cameraInputRefs.current[orderId]?.current) {
@@ -1130,7 +1153,7 @@ export default function MyOrders() {
 
     try {
       console.log('📸 Uploading bill image for order:', orderId, { fileName: file.name, fileSize: file.size, fileType: file.type })
-      
+
       const response = await uploadAPI.uploadMedia(file, {
         folder: 'appzeto/delivery/bills'
       })
@@ -1600,18 +1623,18 @@ export default function MyOrders() {
               const isActive = isActiveOrder(order)
               const rating = order.rating || order.deliveryState?.rating || null
               const orderId = order.orderId || order._id || 'N/A'
-              
+
               // Calculate estimated earnings from commission rules
-              const estimatedEarnings = order.estimatedEarnings?.totalEarning || 
-                                      (typeof order.estimatedEarnings === 'number' ? order.estimatedEarnings : null) ||
-                                      order.pricing?.deliveryFee || 
-                                      order.earnings || 
-                                      0
-              const deliveryDistance = order.estimatedEarnings?.distance || 
-                                     order.assignmentInfo?.distance || 
-                                     order.deliveryDistance || 
-                                     null
-              
+              const estimatedEarnings = order.estimatedEarnings?.totalEarning ||
+                (typeof order.estimatedEarnings === 'number' ? order.estimatedEarnings : null) ||
+                order.pricing?.deliveryFee ||
+                order.earnings ||
+                0
+              const deliveryDistance = order.estimatedEarnings?.distance ||
+                order.assignmentInfo?.distance ||
+                order.deliveryDistance ||
+                null
+
               // Debug log for first order
               if (order === filteredOrders[0]) {
                 console.log('🔍 Order earnings debug:', {
@@ -1681,7 +1704,7 @@ export default function MyOrders() {
                           {(() => {
                             // Priority 1: Show restaurant pin location (formattedAddress) if available
                             const loc = order.restaurantId?.location || order.restaurantLocation
-                            
+
                             if (loc?.formattedAddress && loc.formattedAddress.trim() !== '' && loc.formattedAddress.trim() !== 'Select location') {
                               // Check if it's coordinates, skip if so
                               const isCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(loc.formattedAddress.trim())
@@ -1689,37 +1712,37 @@ export default function MyOrders() {
                                 return loc.formattedAddress.trim()
                               }
                             }
-                            
+
                             // Priority 2: Build from address components
                             if (loc) {
                               const parts = []
                               if (loc.addressLine1) parts.push(loc.addressLine1.trim())
                               else if (loc.street) parts.push(loc.street.trim())
-                              
+
                               if (loc.addressLine2) parts.push(loc.addressLine2.trim())
                               if (loc.area) parts.push(loc.area.trim())
                               if (loc.city) parts.push(loc.city.trim())
                               if (loc.state) parts.push(loc.state.trim())
-                              
+
                               const pin = loc.pincode || loc.zipCode || loc.postalCode
                               if (pin) parts.push(pin.toString().trim())
-                              
+
                               if (parts.length > 0) {
                                 return parts.join(', ')
                               }
-                              
+
                               // Check address field
                               if (loc.address && loc.address.trim() !== '' && loc.address.trim() !== 'Location not available') {
                                 return loc.address.trim()
                               }
                             }
-                            
+
                             // Priority 3: Use getRestaurantLocation helper
                             const helperLocation = getRestaurantLocation(order)
                             if (helperLocation && helperLocation !== 'Location not available') {
                               return helperLocation
                             }
-                            
+
                             return 'Location not available'
                           })()}
                         </p>
@@ -1737,7 +1760,7 @@ export default function MyOrders() {
                       >
                         <MoreVertical className="w-5 h-5 text-gray-400" />
                       </button>
-                      
+
                       {/* Dropdown Menu */}
                       {showMenuForOrder === orderId && (
                         <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-xl z-50 min-w-[150px]">
@@ -1748,15 +1771,15 @@ export default function MyOrders() {
                               e.preventDefault()
                               // Close menu first
                               setShowMenuForOrder(null)
-                              
+
                               // Navigate to order details page
                               const orderIdToNavigate = order.orderId || order._id || orderId
                               console.log('🔍 View Details clicked for order:', orderIdToNavigate, order)
-                              
+
                               if (orderIdToNavigate) {
                                 const path = `/delivery/order-details/${orderIdToNavigate}`
                                 console.log('📍 Navigating to:', path)
-                                
+
                                 // Use setTimeout to ensure menu closes before navigation
                                 setTimeout(() => {
                                   navigate(path, { replace: false })
@@ -1820,97 +1843,96 @@ export default function MyOrders() {
 
                   {/* Separator */}
                   {activeTab !== "delivered" && (
-                  <div className="border-t border-dashed border-gray-200 mx-4 my-1"></div>
+                    <div className="border-t border-dashed border-gray-200 mx-4 my-1"></div>
                   )}
 
                   {/* Items List - Hidden for delivered orders */}
                   {activeTab !== "delivered" && (
-                  <div className="px-4 py-2">
-                    {order.items && order.items.length > 0 ? (
-                      order.items.map((item, idx) => (
-                        <div key={item._id || item.itemId || idx} className="flex items-center justify-between gap-2 mt-2 first:mt-0">
-                          <div className="flex items-center gap-2 flex-1">
-                            <div className={`w-4 h-4 border ${item.isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-[2px] shrink-0`}>
-                              <div className={`w-full h-full rounded-full ${item.isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                    <div className="px-4 py-2">
+                      {order.items && order.items.length > 0 ? (
+                        order.items.map((item, idx) => (
+                          <div key={item._id || item.itemId || idx} className="flex items-center justify-between gap-2 mt-2 first:mt-0">
+                            <div className="flex items-center gap-2 flex-1">
+                              <div className={`w-4 h-4 border ${item.isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-[2px] shrink-0`}>
+                                <div className={`w-full h-full rounded-full ${item.isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                              </div>
+                              <span className="text-sm text-gray-700 font-medium">
+                                {item.quantity || 1} x {item.name}
+                              </span>
                             </div>
-                            <span className="text-sm text-gray-700 font-medium">
-                              {item.quantity || 1} x {item.name}
-                            </span>
                           </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">No items listed</p>
-                    )}
-                  </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500">No items listed</p>
+                      )}
+                    </div>
                   )}
 
                   {/* Order Details - Show full details for delivered orders */}
                   {activeTab === "delivered" && (
                     <>
                       <div className="border-t border-dashed border-gray-200 mx-4 my-2"></div>
-                      
+
                       {/* Customer Details - Hidden */}
                       {false && (
-                      <div className="px-4 py-2 space-y-2">
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Customer:</span>
-                          <span className="text-xs text-gray-800">{order.userId?.name || order.customer || 'N/A'}</span>
-                        </div>
-                        
-                        {order.address && (
+                        <div className="px-4 py-2 space-y-2">
                           <div className="flex items-start gap-2">
-                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Address:</span>
-                            <div className="flex-1">
-                              {order.address.formattedAddress ? (
-                                <span className="text-xs text-gray-800">{order.address.formattedAddress}</span>
-                              ) : (
-                                <div className="text-xs text-gray-800">
-                                  {order.address.street && <div>{order.address.street}</div>}
-                                  {(order.address.area || order.address.city) && (
-                                    <div>{[order.address.area, order.address.city].filter(Boolean).join(', ')}</div>
-                                  )}
-                                  {(order.address.state || order.address.pincode || order.address.zipCode) && (
-                                    <div>{[order.address.state, order.address.pincode || order.address.zipCode].filter(Boolean).join(' - ')}</div>
-                                  )}
-                                </div>
-                              )}
+                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Customer:</span>
+                            <span className="text-xs text-gray-800">{order.userId?.name || order.customer || 'N/A'}</span>
+                          </div>
+
+                          {order.address && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Address:</span>
+                              <div className="flex-1">
+                                {order.address.formattedAddress ? (
+                                  <span className="text-xs text-gray-800">{order.address.formattedAddress}</span>
+                                ) : (
+                                  <div className="text-xs text-gray-800">
+                                    {order.address.street && <div>{order.address.street}</div>}
+                                    {(order.address.area || order.address.city) && (
+                                      <div>{[order.address.area, order.address.city].filter(Boolean).join(', ')}</div>
+                                    )}
+                                    {(order.address.state || order.address.pincode || order.address.zipCode) && (
+                                      <div>{[order.address.state, order.address.pincode || order.address.zipCode].filter(Boolean).join(' - ')}</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {order.userId?.phone && (
+                          )}
+
+                          {order.userId?.phone && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Phone:</span>
+                              <span className="text-xs text-gray-800">{order.userId.phone}</span>
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Phone:</span>
-                            <span className="text-xs text-gray-800">{order.userId.phone}</span>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Payment:</span>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            (order.payment?.method || order.paymentMethod || '').toLowerCase() === 'cash' || 
-                            (order.payment?.method || order.paymentMethod || '').toLowerCase() === 'cod'
-                              ? 'bg-amber-100 text-amber-700' 
+                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Payment:</span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(order.payment?.method || order.paymentMethod || '').toLowerCase() === 'cash' ||
+                              (order.payment?.method || order.paymentMethod || '').toLowerCase() === 'cod'
+                              ? 'bg-amber-100 text-amber-700'
                               : 'bg-green-100 text-green-700'
-                          }`}>
-                            {(() => {
-                              const paymentMethod = (order.payment?.method || order.paymentMethod || 'razorpay').toLowerCase()
-                              if (paymentMethod === 'cash' || paymentMethod === 'cod') {
-                                return 'COD'
-                              }
-                              return 'Online'
-                            })()}
-                          </span>
-                        </div>
-                        
-                        {order.deliveredAt && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Delivered:</span>
-                            <span className="text-xs text-gray-800">{formatOrderDate(order.deliveredAt)}</span>
+                              }`}>
+                              {(() => {
+                                const paymentMethod = (order.payment?.method || order.paymentMethod || 'razorpay').toLowerCase()
+                                if (paymentMethod === 'cash' || paymentMethod === 'cod') {
+                                  return 'COD'
+                                }
+                                return 'Online'
+                              })()}
+                            </span>
                           </div>
-                        )}
-                      </div>
+
+                          {order.deliveredAt && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-gray-600 min-w-[80px]">Delivered:</span>
+                              <span className="text-xs text-gray-800">{formatOrderDate(order.deliveredAt)}</span>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                     </>
@@ -1926,14 +1948,14 @@ export default function MyOrders() {
                         {(() => {
                           // For delivered orders, get earnings from settlement (amount field from trip history)
                           // Trip history API returns earnings in 'amount' field from OrderSettlement
-                          const earnings = order.amount || 
-                                         order.settlement?.deliveryPartnerEarning?.totalEarning ||
-                                         order.deliveryPartnerEarning?.totalEarning ||
-                                         order.pricing?.deliveryFee || 
-                                         order.estimatedEarnings?.totalEarning || 
-                                         order.estimatedEarnings || 
-                                         order.earnings || 
-                                         0
+                          const earnings = order.amount ||
+                            order.settlement?.deliveryPartnerEarning?.totalEarning ||
+                            order.deliveryPartnerEarning?.totalEarning ||
+                            order.pricing?.deliveryFee ||
+                            order.estimatedEarnings?.totalEarning ||
+                            order.estimatedEarnings ||
+                            order.earnings ||
+                            0
                           return (
                             <span className="text-green-600 font-bold text-lg">
                               Earnings: ₹{Number(earnings).toFixed(2)}
@@ -1984,88 +2006,88 @@ export default function MyOrders() {
                                   </span>
                                 </div>
                               )}
-                              
+
                               {/* Action Icons: Call, Chat, Location - Hide when REACHED PICKUP button is visible */}
                               {/* REACHED PICKUP button shows when: isAcceptedByDeliveryBoy(order) && !isReachedPickup(order) && !isCancelled */}
                               {/* So we hide icons when that same condition is true */}
                               {(() => {
                                 // Check if REACHED PICKUP button would be showing (same condition as button)
-                                const isShowingReachedPickupButton = isAcceptedByDeliveryBoy(order) && 
-                                                                      !isReachedPickup(order) && 
-                                                                      !isCancelled &&
-                                                                      isActive &&
-                                                                      activeTab === "pending"
-                                
+                                const isShowingReachedPickupButton = isAcceptedByDeliveryBoy(order) &&
+                                  !isReachedPickup(order) &&
+                                  !isCancelled &&
+                                  isActive &&
+                                  activeTab === "pending"
+
                                 // Only show icons if order is accepted but REACHED PICKUP button is NOT showing
-                                return isAcceptedByDeliveryBoy(order) && 
-                                       !isReachedPickup(order) && 
-                                       !isOrderPickedUp(order) && 
-                                       !isShowingReachedPickupButton
+                                return isAcceptedByDeliveryBoy(order) &&
+                                  !isReachedPickup(order) &&
+                                  !isOrderPickedUp(order) &&
+                                  !isShowingReachedPickupButton
                               })() && (
-                                <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-200">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      // Try multiple possible fields for customer phone number
-                                      const userPhone = order.userId?.phone || 
-                                                      order.userId?.phoneNumber ||
-                                                      order.userPhone || 
-                                                      order.address?.phone ||
-                                                      order.customerPhone ||
-                                                      order.user?.phone
-                                      
-                                      if (userPhone) {
-                                        // Remove any spaces, dashes, or special characters except +
-                                        const cleanPhone = userPhone.replace(/[\s\-\(\)]/g, '')
-                                        // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                                        let phoneToCall = cleanPhone
-                                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                          phoneToCall = `+91${cleanPhone}`
-                                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                          phoneToCall = `+${cleanPhone}`
-                                        } else if (!cleanPhone.startsWith('+')) {
-                                          phoneToCall = cleanPhone
+                                  <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Try multiple possible fields for customer phone number
+                                        const userPhone = order.userId?.phone ||
+                                          order.userId?.phoneNumber ||
+                                          order.userPhone ||
+                                          order.address?.phone ||
+                                          order.customerPhone ||
+                                          order.user?.phone
+
+                                        if (userPhone) {
+                                          // Remove any spaces, dashes, or special characters except +
+                                          const cleanPhone = userPhone.replace(/[\s\-\(\)]/g, '')
+                                          // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                          let phoneToCall = cleanPhone
+                                          if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                            phoneToCall = `+91${cleanPhone}`
+                                          } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                            phoneToCall = `+${cleanPhone}`
+                                          } else if (!cleanPhone.startsWith('+')) {
+                                            phoneToCall = cleanPhone
+                                          }
+
+                                          console.log('📞 Calling customer:', phoneToCall)
+                                          window.location.href = `tel:${phoneToCall}`
+                                        } else {
+                                          console.error('❌ Customer phone number not found in order:', {
+                                            orderId: order.orderId || order._id,
+                                            userId: order.userId,
+                                            userPhone: order.userPhone,
+                                            address: order.address
+                                          })
+                                          toast.error('Customer phone number not available')
                                         }
-                                        
-                                        console.log('📞 Calling customer:', phoneToCall)
-                                        window.location.href = `tel:${phoneToCall}`
-                                      } else {
-                                        console.error('❌ Customer phone number not found in order:', {
-                                          orderId: order.orderId || order._id,
-                                          userId: order.userId,
-                                          userPhone: order.userPhone,
-                                          address: order.address
-                                        })
-                                        toast.error('Customer phone number not available')
-                                      }
-                                    }}
-                                    className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors"
-                                    title="Call customer"
-                                  >
-                                    <Phone className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleOpenChat(order)
-                                    }}
-                                    className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors"
-                                    title="Chat with customer"
-                                  >
-                                    <MessageSquare className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleCustomerLocationClick(order, e)
-                                    }}
-                                    className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
-                                    title="View customer location"
-                                  >
-                                    <MapPin className="w-5 h-5" />
-                                  </button>
-                                </div>
-                              )}
+                                      }}
+                                      className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 hover:bg-green-200 transition-colors"
+                                      title="Call customer"
+                                    >
+                                      <Phone className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleOpenChat(order)
+                                      }}
+                                      className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors"
+                                      title="Chat with customer"
+                                    >
+                                      <MessageSquare className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleCustomerLocationClick(order, e)
+                                      }}
+                                      className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
+                                      title="View customer location"
+                                    >
+                                      <MapPin className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                )}
                             </>
                           ) : (
                             <div className="flex items-center justify-between">
@@ -2163,78 +2185,78 @@ export default function MyOrders() {
                               order={order}
                               onPickup={handleOrderPickup}
                             />
-                            ) : // Phase 4: Picked up but not reached drop - show Reached Drop button
-                             !isReachedDrop(order) && !isCancelled ? (
-                               <div className="flex items-center gap-2">
-                                 <div className="flex-1">
-                                   <ReachedDropButton
-                                     order={order}
-                                     onReachedDrop={handleReachedDrop}
-                                   />
-                                 </div>
-                                 <button
-                                   onClick={async (e) => {
-                                     e.stopPropagation()
-                                     // Get user phone number
-                                     const userPhone = order?.userId?.phone ||
-                                       order?.userPhone ||
-                                       order?.address?.phone ||
-                                       null
+                          ) : // Phase 4: Picked up but not reached drop - show Reached Drop button
+                            !isReachedDrop(order) && !isCancelled ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                  <ReachedDropButton
+                                    order={order}
+                                    onReachedDrop={handleReachedDrop}
+                                  />
+                                </div>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    // Get user phone number
+                                    const userPhone = order?.userId?.phone ||
+                                      order?.userPhone ||
+                                      order?.address?.phone ||
+                                      null
 
-                                     // If phone not found, try to fetch order details from backend
-                                     if (!userPhone && order.orderId) {
-                                       try {
-                                         const response = await deliveryAPI.getOrderDetails(order.orderId)
-                                         if (response.data?.success && response.data.data?.order) {
-                                           const orderData = response.data.data.order
-                                           const phone = orderData.userId?.phone || orderData.userPhone || null
-                                           if (phone) {
-                                             // Clean the phone number
-                                             let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
-                                             if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                               cleanPhone = `+91${cleanPhone}`
-                                             } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                               cleanPhone = `+${cleanPhone}`
-                                             }
-                                             console.log('📞 Calling customer:', cleanPhone)
-                                             window.location.href = `tel:${cleanPhone}`
-                                             return
-                                           }
-                                         }
-                                       } catch (error) {
-                                         console.error('Error fetching order details for phone:', error)
-                                       }
-                                     }
+                                    // If phone not found, try to fetch order details from backend
+                                    if (!userPhone && order.orderId) {
+                                      try {
+                                        const response = await deliveryAPI.getOrderDetails(order.orderId)
+                                        if (response.data?.success && response.data.data?.order) {
+                                          const orderData = response.data.data.order
+                                          const phone = orderData.userId?.phone || orderData.userPhone || null
+                                          if (phone) {
+                                            // Clean the phone number
+                                            let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
+                                            if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                              cleanPhone = `+91${cleanPhone}`
+                                            } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                              cleanPhone = `+${cleanPhone}`
+                                            }
+                                            console.log('📞 Calling customer:', cleanPhone)
+                                            window.location.href = `tel:${cleanPhone}`
+                                            return
+                                          }
+                                        }
+                                      } catch (error) {
+                                        console.error('Error fetching order details for phone:', error)
+                                      }
+                                    }
 
-                                     if (userPhone) {
-                                       // Clean the phone number (remove spaces, dashes, etc. but keep +)
-                                       let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
-                                       // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                                       if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                         cleanPhone = `+91${cleanPhone}`
-                                       } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                         cleanPhone = `+${cleanPhone}`
-                                       }
-                                       console.log('📞 Calling customer:', cleanPhone)
-                                       window.location.href = `tel:${cleanPhone}`
-                                     } else {
-                                       toast.error('Customer phone number not available')
-                                     }
-                                   }}
-                                   className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
-                                   title="Call customer"
-                                 >
-                                   <Phone className="w-6 h-6" />
-                                 </button>
-                                 <button
-                                   onClick={(e) => handleCustomerLocationClick(order, e)}
-                                   className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
-                                   title="View customer location on map"
-                                 >
-                                   <MapPin className="w-6 h-6" />
-                                 </button>
-                               </div>
-                             ) : // Phase 5: Reached drop but not delivered - show Order Delivered
+                                    if (userPhone) {
+                                      // Clean the phone number (remove spaces, dashes, etc. but keep +)
+                                      let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
+                                      // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                      if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                        cleanPhone = `+91${cleanPhone}`
+                                      } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                        cleanPhone = `+${cleanPhone}`
+                                      }
+                                      console.log('📞 Calling customer:', cleanPhone)
+                                      window.location.href = `tel:${cleanPhone}`
+                                    } else {
+                                      toast.error('Customer phone number not available')
+                                    }
+                                  }}
+                                  className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                                  title="Call customer"
+                                >
+                                  <Phone className="w-6 h-6" />
+                                </button>
+                                <button
+                                  onClick={(e) => handleCustomerLocationClick(order, e)}
+                                  className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                                  title="View customer location on map"
+                                >
+                                  <MapPin className="w-6 h-6" />
+                                </button>
+                              </div>
+                            ) : // Phase 5: Reached drop but not delivered - show Order Delivered
                               !isOrderDelivered(order) ? (
                                 <OrderDeliveredButton
                                   order={order}
@@ -2267,27 +2289,27 @@ export default function MyOrders() {
                       // Removed Reorder button as per user request
                       // Hide status for delivered orders (already shown at top)
                       activeTab !== "delivered" ? (
-                      <div className="flex items-center justify-center py-2">
-                        <span className="text-sm text-gray-600">{orderStatus}</span>
-                      </div>
+                        <div className="flex items-center justify-center py-2">
+                          <span className="text-sm text-gray-600">{orderStatus}</span>
+                        </div>
                       ) : null
                     ) : (
                       <div>
                         <span className="text-sm text-gray-800">{orderStatus}</span>
                       </div>
-        )}
-      </div>
+                    )}
+                  </div>
 
-      {/* Close menu when clicking outside */}
-      {showMenuForOrder && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowMenuForOrder(null)}
-        />
-      )}
-    </div>
-  )
-})}
+                  {/* Close menu when clicking outside */}
+                  {showMenuForOrder && (
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowMenuForOrder(null)}
+                    />
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -2303,7 +2325,7 @@ export default function MyOrders() {
                   Order ID: {selectedOrderForDetails.orderId || selectedOrderForDetails._id || 'N/A'}
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4 mt-4">
                 {/* Order Time */}
                 <div className="border-b pb-3">
@@ -2318,50 +2340,50 @@ export default function MyOrders() {
 
                 {/* Customer Details - Hidden */}
                 {false && (
-                <>
-                <div className="border-b pb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-semibold text-gray-700">Customer Details</span>
-                  </div>
-                  <div className="ml-6 space-y-1">
-                    <p className="text-sm text-gray-800">
-                      <span className="font-medium">Name:</span> {selectedOrderForDetails.userId?.name || selectedOrderForDetails.customer || 'N/A'}
-                    </p>
-                    {selectedOrderForDetails.userId?.phone && (
-                      <p className="text-sm text-gray-800">
-                        <span className="font-medium">Phone:</span> {selectedOrderForDetails.userId.phone}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {selectedOrderForDetails.address && (
-                  <div className="border-b pb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm font-semibold text-gray-700">Customer Address</span>
+                  <>
+                    <div className="border-b pb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">Customer Details</span>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        <p className="text-sm text-gray-800">
+                          <span className="font-medium">Name:</span> {selectedOrderForDetails.userId?.name || selectedOrderForDetails.customer || 'N/A'}
+                        </p>
+                        {selectedOrderForDetails.userId?.phone && (
+                          <p className="text-sm text-gray-800">
+                            <span className="font-medium">Phone:</span> {selectedOrderForDetails.userId.phone}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="ml-6">
-                      {selectedOrderForDetails.address.formattedAddress ? (
-                        <p className="text-sm text-gray-800">{selectedOrderForDetails.address.formattedAddress}</p>
-                      ) : (
-                        <div className="text-sm text-gray-800 space-y-1">
-                          {selectedOrderForDetails.address.street && (
-                            <p>{selectedOrderForDetails.address.street}</p>
-                          )}
-                          {(selectedOrderForDetails.address.area || selectedOrderForDetails.address.city) && (
-                            <p>{[selectedOrderForDetails.address.area, selectedOrderForDetails.address.city].filter(Boolean).join(', ')}</p>
-                          )}
-                          {(selectedOrderForDetails.address.state || selectedOrderForDetails.address.pincode || selectedOrderForDetails.address.zipCode) && (
-                            <p>{[selectedOrderForDetails.address.state, selectedOrderForDetails.address.pincode || selectedOrderForDetails.address.zipCode].filter(Boolean).join(' - ')}</p>
+
+                    {selectedOrderForDetails.address && (
+                      <div className="border-b pb-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm font-semibold text-gray-700">Customer Address</span>
+                        </div>
+                        <div className="ml-6">
+                          {selectedOrderForDetails.address.formattedAddress ? (
+                            <p className="text-sm text-gray-800">{selectedOrderForDetails.address.formattedAddress}</p>
+                          ) : (
+                            <div className="text-sm text-gray-800 space-y-1">
+                              {selectedOrderForDetails.address.street && (
+                                <p>{selectedOrderForDetails.address.street}</p>
+                              )}
+                              {(selectedOrderForDetails.address.area || selectedOrderForDetails.address.city) && (
+                                <p>{[selectedOrderForDetails.address.area, selectedOrderForDetails.address.city].filter(Boolean).join(', ')}</p>
+                              )}
+                              {(selectedOrderForDetails.address.state || selectedOrderForDetails.address.pincode || selectedOrderForDetails.address.zipCode) && (
+                                <p>{[selectedOrderForDetails.address.state, selectedOrderForDetails.address.pincode || selectedOrderForDetails.address.zipCode].filter(Boolean).join(' - ')}</p>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                </>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Restaurant Details */}
@@ -2440,14 +2462,14 @@ export default function MyOrders() {
                 {(() => {
                   // For delivered orders, get actual earnings from settlement (amount field from trip history)
                   // For pending orders, show estimated earnings
-                  const actualEarnings = selectedOrderForDetails.amount || 
-                                        selectedOrderForDetails.settlement?.deliveryPartnerEarning?.totalEarning ||
-                                        selectedOrderForDetails.deliveryPartnerEarning?.totalEarning ||
-                                        selectedOrderForDetails.pricing?.deliveryFee || 
-                                        selectedOrderForDetails.estimatedEarnings?.totalEarning || 
-                                        selectedOrderForDetails.estimatedEarnings || 
-                                        0
-                  
+                  const actualEarnings = selectedOrderForDetails.amount ||
+                    selectedOrderForDetails.settlement?.deliveryPartnerEarning?.totalEarning ||
+                    selectedOrderForDetails.deliveryPartnerEarning?.totalEarning ||
+                    selectedOrderForDetails.pricing?.deliveryFee ||
+                    selectedOrderForDetails.estimatedEarnings?.totalEarning ||
+                    selectedOrderForDetails.estimatedEarnings ||
+                    0
+
                   if (actualEarnings > 0) {
                     return (
                       <div className="border-b pb-3">
@@ -2493,14 +2515,13 @@ export default function MyOrders() {
                     <span className="text-sm font-semibold text-gray-700">Payment Mode</span>
                   </div>
                   <div className="ml-6">
-                    <span className={`text-sm font-medium px-3 py-1 rounded-full inline-block ${
-                      (() => {
-                        const paymentMethod = (selectedOrderForDetails.payment?.method || selectedOrderForDetails.paymentMethod || 'razorpay').toLowerCase()
-                        return paymentMethod === 'cash' || paymentMethod === 'cod'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-green-100 text-green-700'
-                      })()
-                    }`}>
+                    <span className={`text-sm font-medium px-3 py-1 rounded-full inline-block ${(() => {
+                      const paymentMethod = (selectedOrderForDetails.payment?.method || selectedOrderForDetails.paymentMethod || 'razorpay').toLowerCase()
+                      return paymentMethod === 'cash' || paymentMethod === 'cod'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-green-100 text-green-700'
+                    })()
+                      }`}>
                       {(() => {
                         const paymentMethod = (selectedOrderForDetails.payment?.method || selectedOrderForDetails.paymentMethod || 'razorpay').toLowerCase()
                         if (paymentMethod === 'cash' || paymentMethod === 'cod') {
@@ -2595,7 +2616,7 @@ export default function MyOrders() {
         if (!galleryInputRefs.current[orderId]) {
           galleryInputRefs.current[orderId] = { current: null }
         }
-        
+
         return (
           <div key={orderId}>
             <input
@@ -2628,7 +2649,7 @@ export default function MyOrders() {
           </div>
         )
       })}
-      
+
       {/* Image Source Menu Modal - Mobile only */}
       <AnimatePresence>
         {showBillImageSourceMenu && (
@@ -2660,16 +2681,16 @@ export default function MyOrders() {
                     onClick={async () => {
                       const orderId = showBillImageSourceMenu
                       const order = activeBillUploadOrder
-                      
+
                       if (!order) {
                         setShowBillImageSourceMenu(null)
                         setActiveBillUploadOrder(null)
                         return
                       }
-                      
+
                       // Close menu first
                       setShowBillImageSourceMenu(null)
-                      
+
                       // Try Flutter camera first
                       const file = await openCameraWithFallback(
                         { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
@@ -2680,7 +2701,7 @@ export default function MyOrders() {
                           }, 100)
                         }
                       )
-                      
+
                       // If Flutter camera returned a file, process it
                       if (file) {
                         setActiveBillUploadOrder(null) // Clear after successful Flutter upload
@@ -2703,16 +2724,16 @@ export default function MyOrders() {
                     onClick={async () => {
                       const orderId = showBillImageSourceMenu
                       const order = activeBillUploadOrder
-                      
+
                       if (!order) {
                         setShowBillImageSourceMenu(null)
                         setActiveBillUploadOrder(null)
                         return
                       }
-                      
+
                       // Close menu first
                       setShowBillImageSourceMenu(null)
-                      
+
                       // Try Flutter gallery first
                       const file = await openGalleryWithFallback(
                         { accept: 'image/*', multiple: false, quality: 0.8 },
@@ -2723,7 +2744,7 @@ export default function MyOrders() {
                           }, 100)
                         }
                       )
-                      
+
                       // If Flutter gallery returned a file, process it
                       if (file) {
                         setActiveBillUploadOrder(null) // Clear after successful Flutter upload
@@ -2792,101 +2813,99 @@ export default function MyOrders() {
             </div>
           </DialogHeader>
 
-              {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-[#0a0a0a] scroll-smooth">
-                {chatMessages.length === 0 ? (
-                  <div className="text-center py-10 space-y-3">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <MessageSquare className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h4 className="text-gray-900 dark:text-white font-medium">Start a conversation</h4>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[200px] mx-auto">
-                      Communicate with the customer about delivery instructions or updates.
-                    </p>
-                  </div>
-                ) : (
-                  chatMessages.map((msg, index) => {
-                    const isDelivery = msg.sender === 'delivery'
-                    return (
-                      <div
-                        key={index}
-                        className={`flex ${isDelivery ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                            isDelivery
-                              ? 'bg-purple-600 text-white rounded-br-none'
-                              : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
-                          }`}
-                        >
-                          <p>{msg.message}</p>
-                          <p
-                            className={`text-[10px] mt-1 text-right ${
-                              isDelivery ? 'text-purple-100' : 'text-gray-400 dark:text-gray-500'
-                            }`}
-                          >
-                            {new Date(msg.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-                <div ref={chatMessagesEndRef} />
-              </div>
-
-              {/* Input Area - Always visible when focused */}
-              <div 
-                ref={chatInputContainerRef}
-                className="p-3 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800 sticky bottom-0 z-10"
-              >
-                <div className="flex items-end gap-2">
-                  <Textarea
-                    ref={chatInputRef}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onFocus={(e) => {
-                      // Ensure input is visible when keyboard appears
-                      setTimeout(() => {
-                        if (chatInputContainerRef.current) {
-                          chatInputContainerRef.current.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'end',
-                            inline: 'nearest'
-                          });
-                        }
-                        // Also scroll the input itself into view
-                        e.target.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'center',
-                          inline: 'nearest'
-                        });
-                      }, 300); // Delay to account for keyboard animation
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    placeholder="Type your message..."
-                    className="flex-1 min-h-[60px] max-h-[120px] resize-none bg-gray-50 dark:bg-[#0a0a0a] border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg"
-                    rows={2}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim()}
-                    className="w-12 h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors flex-shrink-0"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-[#0a0a0a] scroll-smooth">
+            {chatMessages.length === 0 ? (
+              <div className="text-center py-10 space-y-3">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-gray-400" />
                 </div>
+                <h4 className="text-gray-900 dark:text-white font-medium">Start a conversation</h4>
+                <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[200px] mx-auto">
+                  Communicate with the customer about delivery instructions or updates.
+                </p>
               </div>
+            ) : (
+              chatMessages.map((msg, index) => {
+                const isDelivery = msg.sender === 'delivery'
+                return (
+                  <div
+                    key={index}
+                    className={`flex ${isDelivery ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isDelivery
+                        ? 'bg-purple-600 text-white rounded-br-none'
+                        : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
+                        }`}
+                    >
+                      <p>{msg.message}</p>
+                      <p
+                        className={`text-[10px] mt-1 text-right ${isDelivery ? 'text-purple-100' : 'text-gray-400 dark:text-gray-500'
+                          }`}
+                      >
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+            <div ref={chatMessagesEndRef} />
+          </div>
+
+          {/* Input Area - Always visible when focused */}
+          <div
+            ref={chatInputContainerRef}
+            className="p-3 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800 sticky bottom-0 z-10"
+          >
+            <div className="flex items-end gap-2">
+              <Textarea
+                ref={chatInputRef}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onFocus={(e) => {
+                  // Ensure input is visible when keyboard appears
+                  setTimeout(() => {
+                    if (chatInputContainerRef.current) {
+                      chatInputContainerRef.current.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'end',
+                        inline: 'nearest'
+                      });
+                    }
+                    // Also scroll the input itself into view
+                    e.target.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+                  }, 300); // Delay to account for keyboard animation
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
+                placeholder="Type your message..."
+                className="flex-1 min-h-[60px] max-h-[120px] resize-none bg-gray-50 dark:bg-[#0a0a0a] border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg"
+                rows={2}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim()}
+                className="w-12 h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors flex-shrink-0"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   )
-}
+}  

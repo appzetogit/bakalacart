@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
+import {
   Bell,
   Sun,
   HelpCircle,
@@ -40,7 +40,7 @@ export default function UpdatesPage() {
   const carouselRef2 = useRef(null)
   const touchStartY = useRef(0)
   const touchEndY = useRef(0)
-  
+
   const {
     isOnline,
     bookedGigs,
@@ -78,7 +78,7 @@ export default function UpdatesPage() {
     const month = today.toLocaleString('en-US', { month: 'long' })
     return `${day} ${month}`
   }
-  
+
   // Handle online toggle
   const handleToggleOnline = () => {
     if (isOnline) {
@@ -230,7 +230,7 @@ export default function UpdatesPage() {
 
   const handleTouchEnd = () => {
     if (!touchStartY.current || !touchEndY.current) return
-    
+
     const distance = touchStartY.current - touchEndY.current
     const minSwipeDistance = 50
 
@@ -260,14 +260,34 @@ export default function UpdatesPage() {
     setVideoDislikes(initialDislikes)
   }, [])
 
+  // Handle hardware back button for all popups/dialogs
+  useEffect(() => {
+    const isUIOpen = !!selectedStory || !!selectedVideo;
+
+    if (isUIOpen) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = () => {
+      if (isUIOpen) {
+        setSelectedStory(null);
+        setSelectedVideo(null);
+        console.log('🔙 Back button detected: Closing UpdatesPage UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedStory, selectedVideo]);
+
   return (
     <div className="min-h-screen bg-white  text-gray-900 overflow-x-hidden pb-24">
       {/* Top Bar */}
       <FeedNavbar
         isOnline={isOnline}
         onToggleOnline={handleToggleOnline}
-        onEmergencyClick={() => {}}
-        onHelpClick={() => {}}
+        onEmergencyClick={() => { }}
+        onHelpClick={() => { }}
         className=""
       />
 
@@ -284,7 +304,7 @@ export default function UpdatesPage() {
                 <div className="w-16 h-16 rounded-full overflow-hidden">
                   {story.isAdd ? (
                     <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      <img 
+                      <img
                         src={story.image}
                         alt={story.title}
                         className="w-full h-full object-cover opacity-50"
@@ -294,7 +314,7 @@ export default function UpdatesPage() {
                       />
                     </div>
                   ) : (
-                    <img 
+                    <img
                       src={story.image}
                       alt={story.title}
                       className="w-full h-full object-cover"
@@ -339,15 +359,15 @@ export default function UpdatesPage() {
       </div>
 
       <div className="bg-black text-white py-6">
-      <div className="px-4 mb-4 flex items-center justify-between">
+        <div className="px-4 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-white font-semibold font-medium">Cares for you</span>
           </div>
           <button className="flex items-center gap-1 text-sm text-white hover:text-gray-300 transition-colors">
             <span>View all</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Video Carousel */}
         <div className="relative">
@@ -399,11 +419,10 @@ export default function UpdatesPage() {
               <button
                 key={index}
                 onClick={() => goToCarouselSlide1(index)}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  index === currentCarouselIndex1
+                className={`w-2 h-2 rounded-full transition-all ${index === currentCarouselIndex1
                     ? "bg-white w-6"
                     : "bg-white/40 hover:bg-white/60"
-                }`}
+                  }`}
               />
             ))}
           </div>
@@ -412,15 +431,15 @@ export default function UpdatesPage() {
 
       <div className="text-black py-6">
         {/* Header */}
-      <div className="px-4 mb-4 flex items-center justify-between">
+        <div className="px-4 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-black font-semibold font-medium">Videos for you</span>
           </div>
           <button className="flex items-center gap-1 text-sm text-black hover:text-gray-300 transition-colors">
             <span>View all</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Video Carousel */}
         <div className="relative">
@@ -445,11 +464,11 @@ export default function UpdatesPage() {
                     <img
                       src={video.thumbnail}
                       alt={video.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=600&fit=crop"
-                    }}
-                  />
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=600&fit=crop"
+                      }}
+                    />
                     {/* Play Button Overlay */}
                     <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                       <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
@@ -462,8 +481,8 @@ export default function UpdatesPage() {
                     </div>
                   </div>
                 </div>
-          </motion.div>
-        ))}
+              </motion.div>
+            ))}
           </div>
 
           {/* Dots Indicator - Center Below */}
@@ -472,11 +491,10 @@ export default function UpdatesPage() {
               <button
                 key={index}
                 onClick={() => goToCarouselSlide2(index)}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  index === currentCarouselIndex2
+                className={`w-2 h-2 rounded-full transition-all ${index === currentCarouselIndex2
                     ? "bg-black w-6"
                     : "bg-black/40 hover:bg-black/60"
-                }`}
+                  }`}
               />
             ))}
           </div>
@@ -495,7 +513,7 @@ export default function UpdatesPage() {
               onClick={() => setSelectedStory(null)}
               className="fixed inset-0 bg-black z-50"
             />
-            
+
             {/* Story Content */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -549,9 +567,8 @@ export default function UpdatesPage() {
                   {selectedStory.content.map((_, index) => (
                     <div
                       key={index}
-                      className={`h-1 flex-1 rounded-full ${
-                        index === currentStoryIndex ? "bg-white" : "bg-white/30"
-                      }`}
+                      className={`h-1 flex-1 rounded-full ${index === currentStoryIndex ? "bg-white" : "bg-white/30"
+                        }`}
                     />
                   ))}
                 </div>
@@ -572,7 +589,7 @@ export default function UpdatesPage() {
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black z-[60]"
             />
-            
+
             {/* Video Player */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -589,7 +606,7 @@ export default function UpdatesPage() {
               </button>
 
               {/* Video Container - Fullscreen Vertical */}
-              <div 
+              <div
                 className="w-full h-full flex items-center justify-center"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -612,17 +629,16 @@ export default function UpdatesPage() {
                   {/* Video Info Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-6">
                     <h3 className="text-white font-bold text-lg mb-4">{selectedVideo.title}</h3>
-                    
+
                     {/* Actions Bar - Bottom Right */}
                     <div className="flex items-center justify-end gap-4">
                       {/* Like Button */}
                       <button
                         onClick={() => handleLike(selectedVideo.id)}
-                        className={`flex flex-col items-center gap-1 transition-colors ${
-                          userReactions[selectedVideo.id] === 'like'
+                        className={`flex flex-col items-center gap-1 transition-colors ${userReactions[selectedVideo.id] === 'like'
                             ? 'text-blue-500'
                             : 'text-white hover:text-blue-400'
-                        }`}
+                          }`}
                       >
                         <ThumbsUp className="w-6 h-6" fill={userReactions[selectedVideo.id] === 'like' ? 'currentColor' : 'none'} />
                         <span className="text-xs font-medium">
@@ -633,11 +649,10 @@ export default function UpdatesPage() {
                       {/* Dislike Button */}
                       <button
                         onClick={() => handleDislike(selectedVideo.id)}
-                        className={`flex flex-col items-center gap-1 transition-colors ${
-                          userReactions[selectedVideo.id] === 'dislike'
+                        className={`flex flex-col items-center gap-1 transition-colors ${userReactions[selectedVideo.id] === 'dislike'
                             ? 'text-red-500'
                             : 'text-white hover:text-red-400'
-                        }`}
+                          }`}
                       >
                         <ThumbsDown className="w-6 h-6" fill={userReactions[selectedVideo.id] === 'dislike' ? 'currentColor' : 'none'} />
                         <span className="text-xs font-medium">
@@ -664,7 +679,7 @@ export default function UpdatesPage() {
                       <ChevronLeft className="w-6 h-6 text-white" />
                     </button>
                   )}
-                  
+
                   {currentVideoIndex < videos.length - 1 && (
                     <button
                       onClick={handleNextVideo}

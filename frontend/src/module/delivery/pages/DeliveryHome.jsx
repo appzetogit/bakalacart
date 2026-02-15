@@ -5397,6 +5397,64 @@ export default function DeliveryHome() {
   // Emergency help popup state
   const [showEmergencyPopup, setShowEmergencyPopup] = useState(false)
 
+  // --- BACK BUTTON HANDLING (Tops all UI states) ---
+  // Handle hardware back button for all popups/sections to prevent app exit
+  useEffect(() => {
+    // List of states that should be closed before navigating back
+    const isUIOpen =
+      showHomeSections ||
+      showNewOrderPopup ||
+      showRejectPopup ||
+      showreachedPickupPopup ||
+      showOrderIdConfirmationPopup ||
+      showReachedDropPopup ||
+      chatOpen ||
+      showEmergencyPopup ||
+      showDirectionsMap;
+
+    // Whenever a popup opens, we push a "dummy" state into history
+    // This ensures the next "back" button press triggers popstate instead of leaving the page
+    if (isUIOpen) {
+      window.history.pushState({ popup: true }, "");
+    }
+
+    const handlePopState = (e) => {
+      // If we are at /delivery and something is open, close it
+      if (isUIOpen) {
+        // Close everything
+        if (showHomeSections) {
+          setShowHomeSections(false);
+          setSwipeBarPosition(0);
+        }
+        setShowNewOrderPopup(false);
+        setShowRejectPopup(false);
+        setShowreachedPickupPopup(false);
+        setShowOrderIdConfirmationPopup(false);
+        setShowReachedDropPopup(false);
+        setChatOpen(false);
+        setShowEmergencyPopup(false);
+        setShowDirectionsMap(false);
+
+        // Use toast or log for debugging if needed
+        console.log('🔙 Back button detected: Closing MyOrders UI elements');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    showHomeSections,
+    showNewOrderPopup,
+    showRejectPopup,
+    showreachedPickupPopup,
+    showOrderIdConfirmationPopup,
+    showReachedDropPopup,
+    chatOpen,
+    showEmergencyPopup,
+    showDirectionsMap
+  ]);
+  // ------------------------------------------------
+
   // Help popup state
   const [showHelpPopup, setShowHelpPopup] = useState(false)
 

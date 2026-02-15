@@ -643,6 +643,11 @@ export const restaurantAPI = {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.FINANCE, { params });
   },
 
+  // Review operations
+  getReviews: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.REVIEWS, { params });
+  },
+
   // Complaint operations
   getComplaints: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.COMPLAINTS, { params });
