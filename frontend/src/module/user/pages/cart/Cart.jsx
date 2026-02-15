@@ -655,11 +655,45 @@ export default function Cart() {
     ? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee)
     : (pricing?.deliveryFee ?? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee))
   
-  const platformFee = pricing?.platformFee || feeSettings.platformFee
-  const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100))
+  const platformFee = Math.round(pricing?.platformFee || feeSettings.platformFee || 5)
+  // GST should be calculated on subtotal after discount (matching backend logic)
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0)
+  const taxableAmount = subtotal - discount
+  const gstCharges = pricing?.tax || Math.round(taxableAmount * ((feeSettings.gstRate || 5) / 100))
   const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges
-  const total = pricing?.total || (totalBeforeDiscount - discount)
+  const total = pricing?.total || Math.round(totalBeforeDiscount - discount)
+  
+  // Verify calculation matches
+  const calculatedTotal = Math.round(subtotal + deliveryFee + platformFee + gstCharges - discount)
+  if (Math.abs(total - calculatedTotal) > 1 && import.meta.env.DEV) {
+    console.warn('⚠️ [CART CALCULATION MISMATCH]', {
+      subtotal,
+      deliveryFee,
+      platformFee,
+      gstCharges,
+      discount,
+      totalBeforeDiscount,
+      expectedTotal: calculatedTotal,
+      actualTotal: total,
+      difference: total - calculatedTotal
+    })
+  }
+  
+  // Debug: Log calculation breakdown
+  if (import.meta.env.DEV) {
+    console.log('💰 [CART CALCULATION]', {
+      subtotal,
+      deliveryFee,
+      platformFee,
+      gstCharges,
+      discount,
+      taxableAmount,
+      totalBeforeDiscount,
+      total,
+      calculatedTotal,
+      calculation: `${subtotal} + ${deliveryFee} + ${platformFee} + ${gstCharges} - ${discount} = ${total}`
+    })
+  }
   const savings = pricing?.savings || (discount + (subtotal > 500 ? 32 : 0))
 
   // Restaurant name from data or cart
@@ -1809,13 +1843,13 @@ export default function Cart() {
                       <span className="text-gray-800 dark:text-gray-200">₹{platformFee}</span>
                     </div>
                     <div className="flex justify-between text-sm md:text-base">
-                      <span className="text-gray-600 dark:text-gray-400">GST</span>
+                      <span className="text-gray-600 dark:text-gray-400">GST and Restaurant Charges</span>
                       <span className="text-gray-800 dark:text-gray-200">₹{gstCharges}</span>
                     </div>
-                    {discount > 0 && (
+                    {(discount > 0 || (pricing?.discount && pricing.discount > 0)) && (
                       <div className="flex justify-between text-sm md:text-base text-red-600 dark:text-red-400">
-                        <span>Discount</span>
-                        <span>-₹{discount}</span>
+                        <span>Coupon Discount</span>
+                        <span>-₹{Math.round(discount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-base md:text-lg font-bold pt-3 md:pt-4 border-t dark:border-gray-700">
