@@ -715,10 +715,10 @@ export default function DeliveryHome() {
   // Handle sending message
   const handleSendMessage = () => {
     if (!newMessage.trim() || !chatSocket || !selectedRestaurant) {
-      console.warn('⚠️ Cannot send message:', { 
-        hasMessage: !!newMessage.trim(), 
-        hasSocket: !!chatSocket, 
-        hasRestaurant: !!selectedRestaurant 
+      console.warn('⚠️ Cannot send message:', {
+        hasMessage: !!newMessage.trim(),
+        hasSocket: !!chatSocket,
+        hasRestaurant: !!selectedRestaurant
       });
       return;
     }
@@ -799,17 +799,17 @@ export default function DeliveryHome() {
           // Join delivery room with current delivery partner's ID
           socket.emit('join-delivery', deliveryPartnerId.toString())
           console.log('✅ Joined delivery room:', deliveryPartnerId.toString())
-          
+
           // CRITICAL: Also join order room to receive messages from user
           // Join with both orderId formats (ORD-xxx and MongoDB _id) for compatibility
           const orderIdString = selectedRestaurant.orderId || orderId
           const orderMongoId = selectedRestaurant._id || orderId
-          
+
           if (orderIdString) {
             socket.emit('join-order-room', orderIdString)
             console.log('✅ Joined order room with orderId string:', orderIdString)
           }
-          
+
           if (orderMongoId && orderMongoId !== orderIdString) {
             socket.emit('join-order-room', orderMongoId)
             console.log('✅ Also joined order room with MongoDB _id:', orderMongoId)
@@ -2373,25 +2373,25 @@ export default function DeliveryHome() {
             if (currentPos) {
               const prevLat = currentPos.lat();
               const prevLng = currentPos.lng();
-              
+
               // CRITICAL: Calculate bearing from previous to current position
               // This ensures bike faces the direction user is moving (mub/mouth in travel direction)
               const calculatedBearing = calculateBearing(prevLat, prevLng, smoothedLat, smoothedLng);
-              
+
               // CRITICAL: Ensure NO animation is set (no blinking) - stability is key
               bikeMarkerRef.current.setAnimation(null);
-              
+
               // Animate marker with rotation update
               // Make getRotatedBikeIcon available globally for animation function
               if (!window.getRotatedBikeIcon && typeof getRotatedBikeIcon === 'function') {
                 window.getRotatedBikeIcon = getRotatedBikeIcon;
               }
-              
+
               animateMarkerSmoothlyWithRotation(
-                bikeMarkerRef.current, 
-                newSmoothedLocation, 
+                bikeMarkerRef.current,
+                newSmoothedLocation,
                 calculatedBearing,
-                1500, 
+                1500,
                 markerAnimationRef
               );
             } else {
@@ -4388,7 +4388,7 @@ export default function DeliveryHome() {
                       if (window.deliveryMapInstance && customerLat && customerLng && bikeMarkerRef.current) {
                         const customerPosition = new window.google.maps.LatLng(customerLat, customerLng);
                         const currentMarkerPos = bikeMarkerRef.current.getPosition();
-                        
+
                         if (currentMarkerPos) {
                           // Calculate bearing from current position to customer
                           const bearingToCustomer = calculateBearing(
@@ -4401,14 +4401,14 @@ export default function DeliveryHome() {
                           // Smoothly pan camera to show route to customer
                           // Use panTo for smooth animation (Google Maps native animation)
                           window.deliveryMapInstance.panTo(customerPosition);
-                          
+
                           // Update marker rotation to face customer direction
                           // CRITICAL: Bike should face the direction of travel (mub/mouth in travel direction)
                           // Ensure NO animation (no blinking) - stability is key
                           if (bikeMarkerRef.current) {
                             bikeMarkerRef.current.setAnimation(null); // Remove any animation
                           }
-                          
+
                           getRotatedBikeIcon(bearingToCustomer).then(rotatedIconUrl => {
                             if (bikeMarkerRef.current) {
                               const currentIcon = bikeMarkerRef.current.getIcon();
@@ -6136,7 +6136,11 @@ export default function DeliveryHome() {
             zoomControl: false,
             mapTypeControl: false,
             streetViewControl: false,
-            fullscreenControl: false
+            fullscreenControl: false,
+            rotateControl: true,
+            gestureHandling: "greedy",
+            heading: 0,
+            tilt: 45
           });
         } catch (mapError) {
           console.error('❌ Error creating Google Map:', mapError);
@@ -6456,7 +6460,11 @@ export default function DeliveryHome() {
           zoomControl: false,
           mapTypeControl: false,
           streetViewControl: false,
-          fullscreenControl: false
+          fullscreenControl: false,
+          rotateControl: true,
+          gestureHandling: "greedy",
+          heading: 0,
+          tilt: 45
         })
 
         window.deliveryMapInstance = map
@@ -6876,10 +6884,10 @@ export default function DeliveryHome() {
                   steps: result.routes[0].legs[0].steps?.length,
                   travelMode: modeName
                 });
-                
+
                 // Cache result in global cache (shared across all components)
                 cacheDirections(originObj, destObj, result, modeName);
-                
+
                 setDirectionsResponse(result);
                 directionsResponseRef.current = result; // Store in ref for callbacks
                 resolve(result);
@@ -6976,7 +6984,7 @@ export default function DeliveryHome() {
     const orderStatus = selectedRestaurant?.orderStatus || selectedRestaurant?.status || '';
     const deliveryPhase = selectedRestaurant?.deliveryPhase || selectedRestaurant?.deliveryState?.currentPhase || '';
     const deliveryStateStatus = selectedRestaurant?.deliveryState?.status || '';
-    
+
     // Check if order is picked up
     const isPickedUp = orderStatus === 'picked_up' ||
       orderStatus === 'out_for_delivery' ||
@@ -6985,7 +6993,7 @@ export default function DeliveryHome() {
       deliveryPhase === 'at_delivery' ||
       deliveryStateStatus === 'picked_up' ||
       deliveryStateStatus === 'en_route_to_delivery';
-    
+
     // Check if order is accepted (but not picked up yet)
     const isAccepted = (orderStatus === 'accepted' ||
       deliveryStateStatus === 'accepted' ||
@@ -7133,7 +7141,7 @@ export default function DeliveryHome() {
           // Trim polyline: keep only from nearest point onwards
           // This removes all points that driver has already crossed
           const trimmedPolyline = trimPolylineBehindRider(trimmedPath, nearestPoint, segmentIndex);
-          
+
           if (trimmedPolyline && trimmedPolyline.length > 0) {
             trimmedPath = trimmedPolyline;
             console.log('✂️ Polyline trimmed:', {
@@ -13170,8 +13178,8 @@ export default function DeliveryHome() {
                   >
                     <div
                       className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isDelivery
-                          ? 'bg-purple-600 text-white rounded-br-none'
-                          : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
+                        ? 'bg-purple-600 text-white rounded-br-none'
+                        : 'bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-800 rounded-bl-none'
                         }`}
                     >
                       <p>{msg.message}</p>
@@ -13193,7 +13201,7 @@ export default function DeliveryHome() {
           </div>
 
           {/* Input Area - Always visible when focused */}
-          <div 
+          <div
             ref={chatInputContainerRef}
             className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0a0a] sticky bottom-0 z-10"
           >
