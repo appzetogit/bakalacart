@@ -413,6 +413,15 @@ export default function OrderDetailsPage() {
                 <p className="text-sm text-gray-900 break-words">{customerAddress}</p>
               </div>
             </div>
+            {orderData.deliveryAddressDetails && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Additional Address Details</p>
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-gray-900 break-words">{orderData.deliveryAddressDetails}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

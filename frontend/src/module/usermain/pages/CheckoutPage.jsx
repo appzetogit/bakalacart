@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { 
   ArrowLeft,
@@ -9,7 +9,9 @@ import {
   Home,
   Heart,
   Menu,
-  ChefHat
+  ChefHat,
+  Phone,
+  User
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +19,9 @@ import { Input } from "@/components/ui/input"
 export default function CheckoutPage() {
   const navigate = useNavigate()
   const [paymentMethod, setPaymentMethod] = useState("card")
+  const [additionalAddressDetails, setAdditionalAddressDetails] = useState("")
+  const [userData, setUserData] = useState(null)
+  const [addressLabel, setAddressLabel] = useState("Other")
 
   // Get order data from localStorage (set by CartPage) or use default
   const getOrderData = () => {
@@ -62,9 +67,36 @@ export default function CheckoutPage() {
 
   const orderSummary = getOrderData()
 
+  // Get user data from localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user_user') || localStorage.getItem('userProfile')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        setUserData(user)
+      } catch (error) {
+        console.error('Error parsing user data:', error)
+      }
+    }
+  }, [])
+
   // Save order data to localStorage before navigating to payment
   const handleProceedToPayment = () => {
-    localStorage.setItem('usermain_current_order', JSON.stringify(orderSummary))
+    // Validate additional address details is filled
+    if (!additionalAddressDetails.trim()) {
+      alert("Please add delivery address details")
+      return
+    }
+
+    const orderDataWithDetails = {
+      ...orderSummary,
+      additionalAddressDetails: additionalAddressDetails.trim(),
+      addressLabel: addressLabel,
+      customerName: userData?.name || "Guest",
+      customerPhone: userData?.phone || ""
+    }
+    
+    localStorage.setItem('usermain_current_order', JSON.stringify(orderDataWithDetails))
     if (paymentMethod === "cash") {
       navigate(`/usermain/payment?method=cash`)
     } else {
@@ -87,20 +119,72 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Delivery Address */}
+      {/* Delivery at Location */}
       <div className="px-4 py-4">
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="bg-[#ff8100] rounded-lg p-2">
-              <MapPin className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-gray-900 mb-1">Delivery Address</h3>
-              <p className="text-xs text-gray-600">{orderSummary.deliveryAddress}</p>
-              <button className="text-[#ff8100] text-xs font-medium mt-2">
-                Change Address
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Delivery at Location</h3>
+            <button className="text-gray-400 hover:text-gray-600">
+              <ArrowLeft className="w-4 h-4 rotate-180" />
+            </button>
+          </div>
+          <div className="flex items-start gap-2 mb-3">
+            <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-600 flex-1">{orderSummary.deliveryAddress}</p>
+          </div>
+          <div className="flex gap-2">
+            {["Home", "Office", "Other"].map((label) => (
+              <button
+                key={label}
+                onClick={() => setAddressLabel(label)}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  addressLabel === label
+                    ? "bg-gray-200 text-gray-900 border border-gray-300"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {label}
               </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Address Input Field */}
+      <div className="px-4 mb-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <Input
+            type="text"
+            placeholder="Enter address details (e.g., Flat number, Building name, Landmark)"
+            value={additionalAddressDetails}
+            onChange={(e) => setAdditionalAddressDetails(e.target.value)}
+            className="w-full h-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-[#ff8100] text-sm"
+            required
+          />
+          {!additionalAddressDetails.trim() && (
+            <p className="text-xs text-red-500 mt-1">This field is required</p>
+          )}
+        </div>
+      </div>
+
+      {/* Customer Contact */}
+      <div className="px-4 mb-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Phone className="w-4 h-4 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {userData?.name || "Guest"}
+                </p>
+                {userData?.phone && (
+                  <p className="text-xs text-gray-600">{userData.phone}</p>
+                )}
+              </div>
             </div>
+            <button className="text-gray-400 hover:text-gray-600">
+              <ArrowLeft className="w-4 h-4 rotate-180" />
+            </button>
           </div>
         </div>
       </div>

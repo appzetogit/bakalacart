@@ -49,9 +49,17 @@ export default function FeeSettings() {
   const handleSaveFeeSettings = async () => {
     try {
       setSavingFeeSettings(true)
+      
+      // Ensure deliveryFeeRanges is always an array (even if empty)
+      const rangesToSave = Array.isArray(feeSettings.deliveryFeeRanges) 
+        ? feeSettings.deliveryFeeRanges 
+        : []
+      
+      console.log('Saving fee settings with ranges:', rangesToSave)
+      
       const response = await adminAPI.createOrUpdateFeeSettings({
         deliveryFee: Number(feeSettings.deliveryFee),
-        deliveryFeeRanges: feeSettings.deliveryFeeRanges,
+        deliveryFeeRanges: rangesToSave, // Always send array, even if empty
         freeDeliveryThreshold: Number(feeSettings.freeDeliveryThreshold),
         platformFee: Number(feeSettings.platformFee),
         gstRate: Number(feeSettings.gstRate),
@@ -60,7 +68,8 @@ export default function FeeSettings() {
 
       if (response.data.success) {
         toast.success('Fee settings saved successfully')
-        fetchFeeSettings()
+        // Refresh to get latest from backend
+        await fetchFeeSettings()
       } else {
         toast.error(response.data.message || 'Failed to save fee settings')
       }
@@ -112,7 +121,14 @@ export default function FeeSettings() {
 
   // Delete delivery fee range
   const handleDeleteRange = (index) => {
+    if (index < 0 || index >= feeSettings.deliveryFeeRanges.length) {
+      toast.error('Invalid range index')
+      return
+    }
+
+    // Create a new array without the deleted range
     const newRanges = feeSettings.deliveryFeeRanges.filter((_, i) => i !== index)
+    
     setFeeSettings({
       ...feeSettings,
       deliveryFeeRanges: newRanges

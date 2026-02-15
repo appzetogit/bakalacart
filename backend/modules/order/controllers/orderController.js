@@ -42,6 +42,7 @@ export const createOrder = async (req, res) => {
       deliveryFleet,
       note,
       sendCutlery,
+      deliveryAddressDetails,
       paymentMethod: bodyPaymentMethod
     } = req.body;
     // Support both camelCase and snake_case from client
@@ -77,6 +78,13 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Delivery address is required'
+      });
+    }
+
+    if (!deliveryAddressDetails || !deliveryAddressDetails.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery address details are required'
       });
     }
 
@@ -315,6 +323,7 @@ export const createOrder = async (req, res) => {
       deliveryFleet: deliveryFleet || 'standard',
       note: note || '',
       sendCutlery: sendCutlery !== false,
+      deliveryAddressDetails: deliveryAddressDetails.trim(),
       status: 'pending',
       payment: {
         method: normalizedPaymentMethod,

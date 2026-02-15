@@ -4175,12 +4175,7 @@ export default function DeliveryHome() {
   }
 
   const handleOrderIdConfirmTouchEnd = (e) => {
-    // Disable swipe if bill image is not uploaded
-    if (!billImageUploaded) {
-      toast.error('Please upload bill image first')
-      setOrderIdConfirmButtonProgress(0)
-      return
-    }
+    // Bill upload requirement removed - button is always enabled
 
     if (!orderIdConfirmIsSwiping.current) {
       setOrderIdConfirmButtonProgress(0)
@@ -4289,21 +4284,18 @@ export default function DeliveryHome() {
           const orderIdForApi = selectedRestaurant?.orderId || selectedRestaurant?.id
           const confirmedOrderIdForApi = selectedRestaurant?.orderId || (orderIdForApi && String(orderIdForApi).startsWith('ORD-') ? orderIdForApi : undefined)
 
-          // Call backend API to confirm order ID with bill image
+          // Call backend API to confirm order ID (bill image requirement removed)
           console.log('📦 Confirming order ID:', {
             orderIdForApi,
             confirmedOrderIdForApi,
             lat: currentLocation[0],
-            lng: currentLocation[1],
-            billImageUrl
+            lng: currentLocation[1]
           })
 
-          // Update API call to include bill image URL
+          // API call without bill image requirement
           const response = await deliveryAPI.confirmOrderId(orderIdForApi, confirmedOrderIdForApi, {
             lat: currentLocation[0],
             lng: currentLocation[1]
-          }, {
-            billImageUrl: billImageUrl
           })
 
           console.log('✅ Order ID confirmed, response:', response.data)
@@ -12890,180 +12882,20 @@ export default function DeliveryHome() {
               </p>
             </div>
 
-            {/* Bill Image Upload Section */}
-            <div className="mb-6">
-              <p className="text-gray-600 text-sm mb-3 text-center">
-                {billImageUploaded ? '✅ Bill image uploaded' : 'Please capture bill image'}
-              </p>
-
-              {/* Bill Upload Button */}
-              <div className="flex justify-center mb-4">
-                <button
-                  onClick={async () => {
-                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
-                    if (isMobile) {
-                      // Show menu on mobile
-                      setShowBillImageSourceMenu(true)
-                    } else {
-                      // On desktop, directly open gallery with Flutter handler
-                      const file = await openGalleryWithFallback(
-                        { accept: 'image/*', multiple: false, quality: 0.8 },
-                        () => galleryInputRef.current?.click()
-                      )
-                      if (file) {
-                        await processBillImageFile(file)
-                      }
-                    }
-                  }}
-                  disabled={isUploadingBill}
-                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg transition-colors ${isUploadingBill
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : billImageUploaded
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                    } text-white font-medium`}
-                >
-                  {isUploadingBill ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Uploading...</span>
-                    </>
-                  ) : billImageUploaded ? (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Bill Uploaded</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      <span>Upload Bill</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Hidden file inputs for camera and gallery */}
-              <input
-                id="bill-camera-input"
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleBillImageSelect}
-                className="sr-only"
-              />
-              <input
-                id="bill-gallery-input"
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleBillImageSelect}
-                className="sr-only"
-              />
-
-              {/* Image Source Menu Modal - Mobile only */}
-              <AnimatePresence>
-                {showBillImageSourceMenu && (
-                  <>
-                    <motion.div
-                      className="fixed inset-0 bg-black/50 z-[9999]"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setShowBillImageSourceMenu(false)}
-                    />
-                    <motion.div
-                      className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[10000] shadow-2xl"
-                      initial={{ y: "100%" }}
-                      animate={{ y: 0 }}
-                      exit={{ y: "100%" }}
-                      transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    >
-                      <div className="p-4">
-                        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                          Select Image Source
-                        </h3>
-                        <div className="space-y-3">
-                          <button
-                            onClick={async () => {
-                              setShowBillImageSourceMenu(false)
-
-                              // Try Flutter camera first
-                              const file = await openCameraWithFallback(
-                                { source: 'camera', accept: 'image/*', multiple: false, quality: 0.8 },
-                                () => cameraInputRef.current?.click()
-                              )
-
-                              // If Flutter camera returned a file, process it
-                              if (file) {
-                                await processBillImageFile(file)
-                              }
-                            }}
-                            className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
-                          >
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                              <Camera className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="font-semibold text-gray-900">Take Photo</p>
-                              <p className="text-sm text-gray-500">Use camera to capture bill</p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setShowBillImageSourceMenu(false)
-
-                              // Try Flutter gallery first
-                              const file = await openGalleryWithFallback(
-                                { accept: 'image/*', multiple: false, quality: 0.8 },
-                                () => galleryInputRef.current?.click()
-                              )
-
-                              // If Flutter gallery returned a file, process it
-                              if (file) {
-                                await processBillImageFile(file)
-                              }
-                            }}
-                            className="w-full flex items-center gap-4 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
-                          >
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                              <Plus className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="font-semibold text-gray-900">Choose from Gallery</p>
-                              <p className="text-sm text-gray-500">Select existing photo</p>
-                            </div>
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => setShowBillImageSourceMenu(false)}
-                          className="w-full mt-4 py-3 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
 
             {/* Order Picked Up Button with Swipe */}
             <div className="relative w-full">
               <motion.div
                 ref={orderIdConfirmButtonRef}
-                className={`relative w-full rounded-full overflow-hidden shadow-xl ${billImageUploaded ? 'bg-green-600' : 'bg-gray-400 cursor-not-allowed'
-                  }`}
+                className="relative w-full rounded-full overflow-hidden shadow-xl bg-green-600"
                 style={{
-                  touchAction: billImageUploaded ? 'pan-x' : 'none',
-                  opacity: billImageUploaded ? 1 : 0.6
+                  touchAction: 'pan-x',
+                  opacity: 1
                 }}
-                onTouchStart={billImageUploaded ? handleOrderIdConfirmTouchStart : undefined}
-                onTouchMove={billImageUploaded ? handleOrderIdConfirmTouchMove : undefined}
-                onTouchEnd={billImageUploaded ? handleOrderIdConfirmTouchEnd : undefined}
-                whileTap={billImageUploaded ? { scale: 0.98 } : {}}
+                onTouchStart={handleOrderIdConfirmTouchStart}
+                onTouchMove={handleOrderIdConfirmTouchMove}
+                onTouchEnd={handleOrderIdConfirmTouchEnd}
+                whileTap={{ scale: 0.98 }}
               >
                 {/* Swipe progress background */}
                 <motion.div
@@ -13109,11 +12941,9 @@ export default function DeliveryHome() {
                         damping: 25
                       } : { duration: 0 }}
                     >
-                      {!billImageUploaded
-                        ? 'Upload Bill First'
-                        : orderIdConfirmButtonProgress > 0.5
-                          ? 'Release to Confirm'
-                          : 'Order Picked Up'}
+                      {orderIdConfirmButtonProgress > 0.5
+                        ? 'Release to Confirm'
+                        : 'Order Picked Up'}
                     </motion.span>
                   </div>
                 </div>

@@ -11,14 +11,12 @@ import {
   ChevronRight,
   MapPin,
   Home as HomeIcon,
-  MessageSquare,
   X,
   Check,
   Shield,
   Receipt,
   CircleSlash,
-  Loader2,
-  Send // Import Send icon
+  Loader2
 } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
 import { Card, CardContent } from "@/components/ui/card"
@@ -111,46 +109,9 @@ export default function OrderTracking() {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
-
-  // Chat State
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [socket, setSocket] = useState(null);
-  const chatInputRef = useRef(null);
-  const chatInputContainerRef = useRef(null);
+  const [socket, setSocket] = useState(null)
 
   const defaultAddress = getDefaultAddress()
-
-  // Helper functions for chat history
-  const getChatHistoryKey = (orderId) => {
-    return `user_chat_${orderId}`
-  }
-
-  const loadChatHistory = (orderId) => {
-    try {
-      const key = getChatHistoryKey(orderId)
-      const saved = localStorage.getItem(key)
-      if (saved) {
-        const messages = JSON.parse(saved)
-        console.log(`📜 Loaded ${messages.length} messages from history for order ${orderId}`)
-        return messages
-      }
-    } catch (error) {
-      console.error('Error loading chat history:', error)
-    }
-    return []
-  }
-
-  const saveChatHistory = (orderId, messages) => {
-    try {
-      const key = getChatHistoryKey(orderId)
-      localStorage.setItem(key, JSON.stringify(messages))
-      console.log(`💾 Saved ${messages.length} messages to history for order ${orderId}`)
-    } catch (error) {
-      console.error('Error saving chat history:', error)
-    }
-  }
 
 
   // Initialize Socket for Chat
@@ -197,44 +158,11 @@ export default function OrderTracking() {
       }
     });
 
-    newSocket.on('receive-chat-message', (data) => {
-      console.log('📩 New chat message received:', data);
-      setChatMessages(prev => {
-        // Check for duplicates before adding
-        const messageKey = `${data.message}_${data.timestamp}_${data.sender}`
-        const exists = prev.some(msg => {
-          const msgKey = `${msg.message}_${msg.timestamp}_${msg.sender}`
-          return msgKey === messageKey
-        })
-
-        if (exists) {
-          console.log('⚠️ Duplicate message detected, skipping')
-          return prev
-        }
-
-        const updated = [...prev, data]
-        // Save to history whenever messages change
-        const orderIdToSave = order?._id || order?.orderId || orderId
-        if (orderIdToSave) {
-          saveChatHistory(orderIdToSave, updated)
-        }
-        return updated
-      });
-
-      // If chat is closed, maybe show a toast or badge?
-      // Check if message is from delivery partner
-      if (data.sender === 'delivery' && !chatOpen) {
-        toast.info(`New message from Delivery Partner: ${data.message}`, {
-          icon: '💬',
-          duration: 4000
-        });
-      }
-    });
 
     return () => {
       newSocket.disconnect();
     };
-  }, [orderId, chatOpen]);
+  }, [orderId]);
 
   // Join additional order room when order is loaded (for MongoDB _id format)
   useEffect(() => {
@@ -255,78 +183,6 @@ export default function OrderTracking() {
     });
   }, [socket, order?._id, order?.orderId, orderId]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !socket) {
-      console.warn('⚠️ Cannot send message:', { hasMessage: !!newMessage.trim(), hasSocket: !!socket });
-      return;
-    }
-
-    // Get orderId - try multiple formats to ensure message is delivered
-    const orderIdToSend = order?._id || order?.orderId || orderId;
-
-    if (!orderIdToSend) {
-      console.error('❌ No orderId available to send message');
-      toast.error('Unable to send message. Order ID not found.');
-      return;
-    }
-
-    console.log('💬 Sending message:', {
-      orderId: orderIdToSend,
-      orderFromState: order?._id || order?.orderId,
-      orderIdFromParams: orderId,
-      message: newMessage.trim(),
-      socketConnected: socket.connected
-    });
-
-    // Check if socket is connected
-    if (!socket.connected) {
-      console.error('❌ Socket not connected, attempting to reconnect...');
-      socket.connect();
-      toast.error('Reconnecting to chat...');
-      return;
-    }
-
-    // Send message to server
-    // Server will broadcast receiving-chat-message back to us
-    socket.emit('send-chat-message', {
-      orderId: orderIdToSend, // Send MongoDB _id if available, otherwise orderId string
-      message: newMessage.trim(),
-      sender: 'user',
-      timestamp: Date.now()
-    });
-
-    console.log('✅ Message sent to server');
-
-    // Note: Message will be saved to history when received via socket
-    setNewMessage("");
-  };
-
-  // Load chat history when chat opens
-  useEffect(() => {
-    if (chatOpen && orderId) {
-      const orderIdToLoad = order?._id || order?.orderId || orderId
-      if (orderIdToLoad) {
-        const history = loadChatHistory(orderIdToLoad)
-        if (history.length > 0) {
-          setChatMessages(history)
-          console.log(`📜 Loaded ${history.length} messages from history`)
-        } else {
-          // If no history, start with empty array
-          setChatMessages([])
-        }
-      }
-    }
-  }, [chatOpen, orderId, order?._id, order?.orderId]);
-
-  // Save chat history whenever messages change
-  useEffect(() => {
-    if (chatMessages.length > 0 && orderId) {
-      const orderIdToSave = order?._id || order?.orderId || orderId
-      if (orderIdToSave) {
-        saveChatHistory(orderIdToSave, chatMessages)
-      }
-    }
-  }, [chatMessages, orderId, order?._id, order?.orderId]);
 
   // Poll for order updates (especially when delivery partner accepts)
   // Only poll if delivery partner is not yet assigned to avoid unnecessary updates
@@ -1138,63 +994,6 @@ export default function OrderTracking() {
           />
         </motion.div>
 
-        {/* Chat with Delivery Partner */}
-        <motion.div
-          className="bg-white rounded-xl shadow-sm overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.72 }}
-        >
-          {(() => {
-            // Check if delivery partner is assigned
-            const hasDeliveryPartner = !!order?.deliveryPartnerId;
-            
-            // Check if bill is uploaded and pickup is confirmed
-            const isPickupConfirmed = 
-              order?.billImageUrl && 
-              (order?.deliveryState?.status === 'picked_up' || 
-               order?.status === 'out_for_delivery' ||
-               order?.deliveryState?.currentPhase === 'en_route_to_delivery');
-            
-            // Chat is only available if delivery partner is assigned AND pickup is confirmed
-            const isChatEnabled = hasDeliveryPartner && isPickupConfirmed;
-            
-            return (
-              <SectionItem
-                icon={MessageSquare}
-                title="Chat with Delivery Partner"
-                subtitle={
-                  !hasDeliveryPartner 
-                    ? "Available when delivery partner is assigned"
-                    : !isPickupConfirmed
-                    ? "Chat will be available after delivery partner confirms pickup"
-                    : "Chat with your delivery partner"
-                }
-                onClick={() => {
-                  if (isChatEnabled) {
-                    setChatOpen(true);
-                  } else if (!hasDeliveryPartner) {
-                    toast.error("Chat will be available once a delivery partner is assigned", { icon: "🔒" });
-                  } else {
-                    toast.error("Chat will be available after delivery partner uploads bill and confirms pickup", { icon: "🔒" });
-                  }
-                }}
-                rightContent={
-                  isChatEnabled ? (
-                    <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      Open Chat
-                    </div>
-                  ) : (
-                    <div className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                      <Shield className="w-3 h-3" /> Locked
-                    </div>
-                  )
-                }
-              />
-            );
-          })()}
-        </motion.div>
-
         {/* Delivery Partner Contact - Show name and call icon */}
         {order?.deliveryPartner && order?.deliveryPartnerId && (
           <motion.div
@@ -1350,121 +1149,6 @@ export default function OrderTracking() {
         </DialogContent>
       </Dialog>
 
-      {/* Chat Dialog */}
-      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
-        <DialogContent className="sm:max-w-md w-[95%] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Chat with Delivery Partner</DialogTitle>
-          </DialogHeader>
-          {/* Header */}
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-lg">🏍️</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Delivery Partner</h3>
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  Online
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scroll-smooth">
-            {chatMessages.length === 0 ? (
-              <div className="text-center py-10 space-y-3">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-8 h-8 text-gray-400" />
-                </div>
-                <h4 className="text-gray-900 font-medium">Start a conversation</h4>
-                <p className="text-gray-500 text-sm max-w-[200px] mx-auto">
-                  Ask about your order delivery or give instructions here.
-                </p>
-              </div>
-            ) : (
-              chatMessages.map((msg, index) => {
-                const isUser = msg.sender === 'user';
-                return (
-                  <div
-                    key={index}
-                    className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isUser
-                        ? 'bg-blue-600 text-white rounded-br-none'
-                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                        }`}
-                    >
-                      <p>{msg.message}</p>
-                      <p className={`text-[10px] mt-1 text-right ${isUser ? 'text-blue-100' : 'text-gray-400'
-                        }`}>
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Input Area - Always visible when focused */}
-          <div 
-            ref={chatInputContainerRef}
-            className="p-3 bg-white border-t border-gray-100 sticky bottom-0 z-10"
-          >
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex items-center gap-2"
-            >
-              <input
-                ref={chatInputRef}
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onFocus={(e) => {
-                  // Ensure input is visible when keyboard appears
-                  setTimeout(() => {
-                    if (chatInputContainerRef.current) {
-                      chatInputContainerRef.current.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'end',
-                        inline: 'nearest'
-                      });
-                    }
-                    // Also scroll the input itself into view
-                    e.target.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center',
-                      inline: 'nearest'
-                    });
-                  }, 300); // Delay to account for keyboard animation
-                }}
-                placeholder="Type a message..."
-                className="flex-1 bg-gray-100 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!newMessage.trim()}
-                className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
-              >
-                <Send className="w-4 h-4 ml-0.5" />
-              </button>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

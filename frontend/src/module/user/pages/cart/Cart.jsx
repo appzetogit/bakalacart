@@ -6,6 +6,7 @@ import confetti from "canvas-confetti"
 
 import AnimatedPage from "../../components/AnimatedPage"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useCart } from "../../context/CartContext"
 import { useProfile } from "../../context/ProfileContext"
 import { useOrders } from "../../context/OrdersContext"
@@ -98,6 +99,7 @@ export default function Cart() {
   const [note, setNote] = useState("")
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [sendCutlery, setSendCutlery] = useState(true)
+  const [manualAddressDetails, setManualAddressDetails] = useState("")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [showBillDetails, setShowBillDetails] = useState(false)
   const [showPlacingOrder, setShowPlacingOrder] = useState(false)
@@ -121,10 +123,11 @@ export default function Cart() {
 
   // Fee settings from database (used as fallback if pricing not available)
   const [feeSettings, setFeeSettings] = useState({
-    deliveryFee: 25,
+    deliveryFee: 0, // Will be set from admin settings
     freeDeliveryThreshold: 149,
     platformFee: 5,
     gstRate: 5,
+    deliveryFeeRanges: [],
   })
 
 
@@ -514,6 +517,31 @@ export default function Cart() {
     fetchCouponsForCartItems()
   }, [cart, restaurantId])
 
+  // Fetch fee settings function (reusable)
+  const fetchFeeSettings = async () => {
+    try {
+      const response = await adminAPI.getPublicFeeSettings()
+      if (response.data.success && response.data.data.feeSettings) {
+        const settings = response.data.data.feeSettings
+        setFeeSettings({
+          deliveryFee: settings.deliveryFee ?? 0, // Use admin value, 0 if not set
+          freeDeliveryThreshold: settings.freeDeliveryThreshold ?? 149,
+          platformFee: settings.platformFee ?? 5,
+          gstRate: settings.gstRate ?? 5,
+          deliveryFeeRanges: settings.deliveryFeeRanges || [],
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching fee settings:', error)
+      // Keep default values on error
+    }
+  }
+
+  // Fetch fee settings on mount
+  useEffect(() => {
+    fetchFeeSettings()
+  }, [])
+
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
     const calculatePricing = async () => {
@@ -524,6 +552,10 @@ export default function Cart() {
 
       try {
         setLoadingPricing(true)
+        
+        // Re-fetch fee settings to get latest admin updates
+        await fetchFeeSettings()
+        
         const items = cart.map(item => ({
           itemId: item.id,
           name: item.name,
@@ -568,31 +600,61 @@ export default function Cart() {
     calculatePricing()
   }, [cart, defaultAddress, appliedCoupon, couponCode, deliveryFleet, restaurantId])
 
+  // Calculate delivery fee based on ranges (same logic as backend)
+  const calculateDeliveryFeeFromRanges = (orderValue, settings) => {
+    // Priority 1: Check if delivery fee ranges are configured
+    if (settings.deliveryFeeRanges && Array.isArray(settings.deliveryFeeRanges) && settings.deliveryFeeRanges.length > 0) {
+      // Sort ranges by min value to ensure proper checking
+      const sortedRanges = [...settings.deliveryFeeRanges].sort((a, b) => a.min - b.min);
 
-  // Fetch fee settings on mount
-  useEffect(() => {
-    const fetchFeeSettings = async () => {
-      try {
-        const response = await adminAPI.getPublicFeeSettings()
-        if (response.data.success && response.data.data.feeSettings) {
-          setFeeSettings({
-            deliveryFee: response.data.data.feeSettings.deliveryFee || 25,
-            freeDeliveryThreshold: response.data.data.feeSettings.freeDeliveryThreshold || 149,
-            platformFee: response.data.data.feeSettings.platformFee || 5,
-            gstRate: response.data.data.feeSettings.gstRate || 5,
-          })
+      console.log('Checking ranges for order value:', orderValue, 'Ranges:', sortedRanges);
+
+      // Find matching range (orderValue >= min && orderValue < max)
+      for (let i = 0; i < sortedRanges.length; i++) {
+        const range = sortedRanges[i];
+        const isLastRange = i === sortedRanges.length - 1;
+
+        if (isLastRange) {
+          if (orderValue >= range.min && orderValue <= range.max) {
+            console.log('Matched last range:', range, 'Fee:', range.fee);
+            return range.fee; // Return the fee from range (even if it's 0)
+          }
+        } else {
+          if (orderValue >= range.min && orderValue < range.max) {
+            console.log('Matched range:', range, 'Fee:', range.fee);
+            return range.fee; // Return the fee from range (even if it's 0)
+          }
         }
-      } catch (error) {
-        console.error('Error fetching fee settings:', error)
-        // Keep default values on error
       }
+      console.log('No range matched for order value:', orderValue);
+      // If we reach here, no range matched - continue to next priority
     }
-    fetchFeeSettings()
-  }, [])
+
+    // Priority 2: Use admin settings for free delivery threshold (only if no ranges matched)
+    if (orderValue >= settings.freeDeliveryThreshold) {
+      console.log('Using free delivery threshold, returning 0');
+      return 0;
+    }
+
+    // Priority 3: Default delivery fee from admin settings
+    console.log('Using default delivery fee:', settings.deliveryFee);
+    return settings.deliveryFee ?? 0;
+  }
 
   // Use backend pricing if available, otherwise fallback to database settings
   const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
-  const deliveryFee = pricing?.deliveryFee ?? (subtotal >= feeSettings.freeDeliveryThreshold || appliedCoupon?.freeDelivery ? 0 : feeSettings.deliveryFee)
+  
+  // Calculate delivery fee: prioritize frontend calculation from ranges if ranges exist
+  // Only use backend pricing if no ranges are configured or if backend explicitly returns a non-zero value
+  const calculatedDeliveryFee = calculateDeliveryFeeFromRanges(subtotal, feeSettings)
+  
+  // If ranges are configured, use frontend calculation (ranges take priority)
+  // Otherwise, use backend pricing if available
+  const hasRanges = feeSettings.deliveryFeeRanges && feeSettings.deliveryFeeRanges.length > 0;
+  const deliveryFee = hasRanges 
+    ? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee)
+    : (pricing?.deliveryFee ?? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee))
+  
   const platformFee = pricing?.platformFee || feeSettings.platformFee
   const gstCharges = pricing?.tax || Math.round(subtotal * (feeSettings.gstRate / 100))
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0)
@@ -751,6 +813,11 @@ export default function Cart() {
   const handlePlaceOrder = async () => {
     if (!defaultAddress) {
       alert("Please add a delivery address")
+      return
+    }
+
+    if (!manualAddressDetails.trim()) {
+      alert("Please enter additional address details")
       return
     }
 
@@ -972,6 +1039,7 @@ export default function Cart() {
         deliveryFleet: deliveryFleet || 'standard',
         note: note || "",
         sendCutlery: sendCutlery !== false,
+        deliveryAddressDetails: manualAddressDetails.trim(),
         paymentMethod: selectedPaymentMethod,
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
@@ -1625,6 +1693,25 @@ export default function Cart() {
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-primary-orange transition-colors" />
+                </div>
+              </div>
+
+              {/* Manual Address Input Field */}
+              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+                <div className="space-y-2">
+                  <label className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                    Additional Address Details
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Enter address details (e.g., Flat number, Building name, Landmark)"
+                    value={manualAddressDetails}
+                    onChange={(e) => setManualAddressDetails(e.target.value)}
+                    className="w-full h-10 md:h-12 bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-primary-orange text-sm md:text-base"
+                  />
+                  {!manualAddressDetails.trim() && (
+                    <p className="text-xs text-red-500 dark:text-red-400">This field is required</p>
+                  )}
                 </div>
               </div>
 

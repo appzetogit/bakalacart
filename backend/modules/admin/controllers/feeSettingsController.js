@@ -93,47 +93,85 @@ export const createOrUpdateFeeSettings = asyncHandler(async (req, res) => {
       }
     }
 
-    // Deactivate all existing settings if this is being set as active
-    if (isActive !== false) {
-      await FeeSettings.updateMany(
-        { isActive: true },
-        { isActive: false, updatedBy: req.admin?._id || null }
-      );
+    // Check if there's an existing active fee settings to update
+    let feeSettings = await FeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 });
+
+    if (feeSettings) {
+      // Update existing active settings
+      if (deliveryFee !== undefined) {
+        feeSettings.deliveryFee = Number(deliveryFee);
+      }
+      if (deliveryFeePerKm !== undefined) {
+        feeSettings.deliveryFeePerKm = Number(deliveryFeePerKm);
+      }
+      if (minDeliveryDistance !== undefined) {
+        feeSettings.minDeliveryDistance = Number(minDeliveryDistance);
+      }
+      if (minDeliveryFee !== undefined) {
+        feeSettings.minDeliveryFee = Number(minDeliveryFee);
+      }
+      if (freeDeliveryThreshold !== undefined) {
+        feeSettings.freeDeliveryThreshold = Number(freeDeliveryThreshold);
+      }
+      feeSettings.platformFee = Number(platformFee);
+      feeSettings.gstRate = Number(gstRate);
+      
+      // Update delivery fee ranges if provided (including empty arrays)
+      if (deliveryFeeRanges !== undefined && Array.isArray(deliveryFeeRanges)) {
+        // If empty array, set to empty array; otherwise map the ranges
+        if (deliveryFeeRanges.length === 0) {
+          feeSettings.deliveryFeeRanges = [];
+        } else {
+          feeSettings.deliveryFeeRanges = deliveryFeeRanges.map(range => ({
+            min: Number(range.min),
+            max: Number(range.max),
+            fee: Number(range.fee),
+          }));
+        }
+      }
+      
+      feeSettings.isActive = isActive !== false;
+      feeSettings.updatedBy = req.admin?._id || null;
+
+      await feeSettings.save();
+
+      return successResponse(res, 200, 'Fee settings updated successfully', {
+        feeSettings,
+      });
+    } else {
+      // Create new fee settings if none exist
+      const feeSettingsData = {
+        deliveryFee: deliveryFee !== undefined ? Number(deliveryFee) : 25,
+        deliveryFeePerKm: deliveryFeePerKm !== undefined ? Number(deliveryFeePerKm) : 5,
+        minDeliveryDistance: minDeliveryDistance !== undefined ? Number(minDeliveryDistance) : 4,
+        minDeliveryFee: minDeliveryFee !== undefined ? Number(minDeliveryFee) : 25,
+        freeDeliveryThreshold: freeDeliveryThreshold ? Number(freeDeliveryThreshold) : 149,
+        platformFee: Number(platformFee),
+        gstRate: Number(gstRate),
+        isActive: isActive !== false,
+        createdBy: req.admin?._id || null,
+        updatedBy: req.admin?._id || null,
+      };
+
+      // Add delivery fee ranges if provided
+      if (deliveryFeeRanges && Array.isArray(deliveryFeeRanges)) {
+        feeSettingsData.deliveryFeeRanges = deliveryFeeRanges.map(range => ({
+          min: Number(range.min),
+          max: Number(range.max),
+          fee: Number(range.fee),
+        }));
+      }
+
+      feeSettings = new FeeSettings(feeSettingsData);
+      await feeSettings.save();
+
+      return successResponse(res, 201, 'Fee settings created successfully', {
+        feeSettings,
+      });
     }
-
-    // Create new fee settings
-    const feeSettingsData = {
-      deliveryFee: deliveryFee !== undefined ? Number(deliveryFee) : 25,
-      deliveryFeePerKm: deliveryFeePerKm !== undefined ? Number(deliveryFeePerKm) : 5,
-      minDeliveryDistance: minDeliveryDistance !== undefined ? Number(minDeliveryDistance) : 4,
-      minDeliveryFee: minDeliveryFee !== undefined ? Number(minDeliveryFee) : 25,
-      freeDeliveryThreshold: freeDeliveryThreshold ? Number(freeDeliveryThreshold) : 149,
-      platformFee: Number(platformFee),
-      gstRate: Number(gstRate),
-      isActive: isActive !== false,
-      createdBy: req.admin?._id || null,
-      updatedBy: req.admin?._id || null,
-    };
-
-    // Add delivery fee ranges if provided
-    if (deliveryFeeRanges && Array.isArray(deliveryFeeRanges)) {
-      feeSettingsData.deliveryFeeRanges = deliveryFeeRanges.map(range => ({
-        min: Number(range.min),
-        max: Number(range.max),
-        fee: Number(range.fee),
-      }));
-    }
-
-    const feeSettings = new FeeSettings(feeSettingsData);
-
-    await feeSettings.save();
-
-    return successResponse(res, 201, 'Fee settings created successfully', {
-      feeSettings,
-    });
   } catch (error) {
-    logger.error(`Error creating fee settings: ${error.message}`);
-    return errorResponse(res, 500, 'Failed to create fee settings');
+    logger.error(`Error creating/updating fee settings: ${error.message}`);
+    return errorResponse(res, 500, 'Failed to create/update fee settings');
   }
 });
 
@@ -284,7 +322,7 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
   try {
     const feeSettings = await FeeSettings.findOne({ isActive: true })
       .sort({ createdAt: -1 })
-      .select('deliveryFee freeDeliveryThreshold platformFee gstRate')
+      .select('deliveryFee freeDeliveryThreshold platformFee gstRate deliveryFeeRanges')
       .lean();
 
     // If no active settings, return default values
@@ -295,8 +333,14 @@ export const getPublicFeeSettings = asyncHandler(async (req, res) => {
           freeDeliveryThreshold: 149,
           platformFee: 5,
           gstRate: 5,
+          deliveryFeeRanges: [],
         },
       });
+    }
+
+    // Ensure deliveryFeeRanges is always an array
+    if (!feeSettings.deliveryFeeRanges) {
+      feeSettings.deliveryFeeRanges = [];
     }
 
     return successResponse(res, 200, 'Fee settings retrieved successfully', {

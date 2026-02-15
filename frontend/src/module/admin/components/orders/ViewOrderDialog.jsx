@@ -330,6 +330,12 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
               </h3>
               <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-900">{formatAddress(order.address)}</p>
+                {order.deliveryAddressDetails && (
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Additional Address Details</p>
+                    <p className="text-sm text-slate-900">{order.deliveryAddressDetails}</p>
+                  </div>
+                )}
                 {getCoordinates(order.address) && (
                   <p className="text-xs text-slate-500 mt-2">
                     <span className="font-medium">Coordinates:</span> {getCoordinates(order.address)}

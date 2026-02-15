@@ -436,6 +436,11 @@ export default function OrderAssign() {
                                 {order.address.additionalDetails}
                               </div>
                             )}
+                            {order.deliveryAddressDetails && (
+                              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium line-clamp-2 mt-1">
+                                <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not available</span>

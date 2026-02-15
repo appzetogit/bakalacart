@@ -1150,6 +1150,19 @@ export default function OrdersMain() {
           yPos += 5
         }
 
+        // Additional Address Details (user entered manually)
+        if (completeOrderData.deliveryAddressDetails) {
+          yPos += 3
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(10)
+          doc.text('Additional Address Details:', 20, yPos)
+          yPos += 6
+          doc.setFont('helvetica', 'normal')
+          const additionalAddressLines = doc.splitTextToSize(completeOrderData.deliveryAddressDetails, 170)
+          doc.text(additionalAddressLines, 20, yPos)
+          yPos += additionalAddressLines.length * 5
+        }
+
         // Location coordinates if available
         if (address.location?.coordinates) {
           yPos += 3

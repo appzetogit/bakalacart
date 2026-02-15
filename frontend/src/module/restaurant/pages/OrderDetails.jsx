@@ -57,7 +57,8 @@ export default function OrderDetails() {
               name: order.userId?.name || 'Customer',
               orderCount: 1,
               location: `${order.address?.city || ''}, ${order.address?.state || ''}`.trim(),
-              distance: 'N/A'
+              distance: 'N/A',
+              deliveryAddressDetails: order.deliveryAddressDetails || ''
             },
             items: order.items?.map(item => ({
               name: item.name,
@@ -225,7 +226,18 @@ export default function OrderDetails() {
       doc.text("Distance:", 15, yPosition)
       doc.setFont("helvetica", "normal")
       doc.text(orderData.customer.distance, 50, yPosition)
-      yPosition += 10
+      yPosition += 6
+
+      if (orderData.customer.deliveryAddressDetails) {
+        doc.setFont("helvetica", "bold")
+        doc.text("Additional Address Details:", 15, yPosition)
+        doc.setFont("helvetica", "normal")
+        // Split long text into multiple lines if needed
+        const addressLines = doc.splitTextToSize(orderData.customer.deliveryAddressDetails, pageWidth - 50)
+        doc.text(addressLines, 15, yPosition + 6)
+        yPosition += 6 + (addressLines.length * 6)
+      }
+      yPosition += 4
 
       // Items Section
       doc.setLineWidth(0.5)
@@ -560,6 +572,15 @@ export default function OrderDetails() {
               </div>
               <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
             </div>
+            {orderData.customer.deliveryAddressDetails && (
+              <div className="flex items-start gap-3 mt-2">
+                <MapPin className="w-5 h-5 text-gray-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 mb-1">Additional Address Details</p>
+                  <p className="text-sm text-gray-900">{orderData.customer.deliveryAddressDetails}</p>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

@@ -1981,6 +1981,7 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
         restaurantAccepted: isRestaurantAccepted,
         items: order.items || [],
         address: order.address || {},
+        deliveryAddressDetails: order.deliveryAddressDetails || '',
         deliveryPartnerId: order.deliveryPartnerId?.toString() || null,
         isAssigned: !!order.deliveryPartnerId,
         deliveryStateStatus: deliveryStateStatus,

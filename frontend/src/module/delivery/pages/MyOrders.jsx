@@ -1160,7 +1160,7 @@ export default function MyOrders() {
   }
 
 
-  // Handle order pickup (after bill upload)
+  // Handle order pickup (bill upload requirement removed)
   const handleOrderPickup = async (order) => {
     const orderId = order.orderId || order._id
     if (!orderId) {
@@ -1168,16 +1168,8 @@ export default function MyOrders() {
       return
     }
 
-    const billImageUrl = billImages[orderId]
-    if (!billImageUrl) {
-      toast.error('Please upload bill image first')
-      return
-    }
-
     try {
-      const response = await deliveryAPI.confirmOrderId(orderId, order.orderId || orderId, {}, {
-        billImageUrl
-      })
+      const response = await deliveryAPI.confirmOrderId(orderId, order.orderId || orderId, {})
 
       if (response.data?.success) {
         toast.success('Order picked up!')
@@ -1412,43 +1404,16 @@ export default function MyOrders() {
 
   // No swipeable action button needed anymore, replaced by ActionButton
 
-  // 3. Swipeable Order Pickup Button
-  const OrderPickupButton = ({ order, onPickup, billImageUrl, isUploading, onCameraClick }) => {
-    const orderId = order.orderId || order._id
-
+  // 3. Swipeable Order Pickup Button (Bill upload requirement removed)
+  const OrderPickupButton = ({ order, onPickup }) => {
     return (
-      <div className="space-y-3">
-        <div className="flex gap-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onCameraClick(order, e)
-            }}
-            disabled={isUploading}
-            className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-xl border-2 border-dashed transition-all ${billImageUrl ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-orange-500'
-              }`}
-          >
-            {isUploading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Camera className="w-5 h-5" />
-                <span>{billImageUrl ? 'Update Bill' : 'Upload Bill Image'}</span>
-              </>
-            )}
-          </button>
-        </div>
-        <SwipeButton
-          label="Confirm Order Pickup"
-          onComplete={() => {
-            if (billImageUrl) onPickup(order)
-            else toast.error('Please upload bill image first')
-          }}
-          color={billImageUrl ? "bg-green-600" : "bg-gray-300"}
-          progressColor={billImageUrl ? "bg-green-500" : "bg-gray-400"}
-          icon={<Package className="w-5 h-5 text-white" />}
-        />
-      </div>
+      <SwipeButton
+        label="Confirm Order Pickup"
+        onComplete={() => onPickup(order)}
+        color="bg-green-600"
+        progressColor="bg-green-500"
+        icon={<Package className="w-5 h-5 text-white" />}
+      />
     )
   }
 
@@ -1811,6 +1776,48 @@ export default function MyOrders() {
                     </div>
                   </div>
 
+                  {/* Customer Address Section - Show for active orders */}
+                  {isActive && activeTab === "pending" && (
+                    <div className="px-4 py-3 border-t border-dashed border-gray-200">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Delivery Address</p>
+                          {order.address ? (
+                            <div className="space-y-1">
+                              {order.address.formattedAddress ? (
+                                <p className="text-xs text-gray-800">{order.address.formattedAddress}</p>
+                              ) : (
+                                <>
+                                  {order.address.street && (
+                                    <p className="text-xs text-gray-800">{order.address.street}</p>
+                                  )}
+                                  {(order.address.area || order.address.city) && (
+                                    <p className="text-xs text-gray-600">
+                                      {[order.address.area, order.address.city].filter(Boolean).join(', ')}
+                                    </p>
+                                  )}
+                                  {(order.address.state || order.address.pincode || order.address.zipCode) && (
+                                    <p className="text-xs text-gray-600">
+                                      {[order.address.state, order.address.pincode || order.address.zipCode].filter(Boolean).join(' - ')}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                              {order.deliveryAddressDetails && (
+                                <p className="text-xs text-blue-600 font-medium mt-1">
+                                  <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500">Address not available</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Separator */}
                   {activeTab !== "delivered" && (
                   <div className="border-t border-dashed border-gray-200 mx-4 my-1"></div>
@@ -2097,6 +2104,52 @@ export default function MyOrders() {
                               />
                             </div>
                             <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                // Try multiple paths to find restaurant phone number
+                                let restaurantPhone = order?.restaurantId?.phone ||
+                                  order?.restaurantId?.ownerPhone ||
+                                  order?.restaurantId?.primaryContactNumber ||
+                                  order?.restaurantPhone ||
+                                  null
+
+                                // If phone not found, try to fetch order details from backend
+                                if (!restaurantPhone && order.orderId) {
+                                  try {
+                                    const response = await deliveryAPI.getOrderDetails(order.orderId)
+                                    if (response.data?.success && response.data.data?.order) {
+                                      const orderData = response.data.data.order
+                                      restaurantPhone = orderData.restaurantId?.phone ||
+                                        orderData.restaurantId?.ownerPhone ||
+                                        orderData.restaurantId?.primaryContactNumber ||
+                                        null
+                                    }
+                                  } catch (error) {
+                                    console.error('Error fetching order details for phone:', error)
+                                  }
+                                }
+
+                                if (restaurantPhone) {
+                                  // Clean the phone number (remove spaces, dashes, etc. but keep +)
+                                  let cleanPhone = String(restaurantPhone).replace(/[\s\-\(\)]/g, '')
+                                  // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                  if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                    cleanPhone = `+91${cleanPhone}`
+                                  } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                    cleanPhone = `+${cleanPhone}`
+                                  }
+                                  console.log('📞 Calling restaurant:', cleanPhone)
+                                  window.location.href = `tel:${cleanPhone}`
+                                } else {
+                                  toast.error('Restaurant phone number not available')
+                                }
+                              }}
+                              className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100 hover:bg-green-100 transition-colors"
+                              title="Call restaurant"
+                            >
+                              <Phone className="w-6 h-6" />
+                            </button>
+                            <button
                               onClick={(e) => handleRestaurantLocationClick(order, e)}
                               className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100"
                               title="View restaurant location"
@@ -2109,16 +2162,78 @@ export default function MyOrders() {
                             <OrderPickupButton
                               order={order}
                               onPickup={handleOrderPickup}
-                              billImageUrl={billImages[order.orderId || order._id]}
-                              isUploading={uploadingBills[order.orderId || order._id]}
-                              onCameraClick={handleBillImageCapture}
                             />
                             ) : // Phase 4: Picked up but not reached drop - show Reached Drop button
                              !isReachedDrop(order) && !isCancelled ? (
-                               <ReachedDropButton
-                                 order={order}
-                                 onReachedDrop={handleReachedDrop}
-                               />
+                               <div className="flex items-center gap-2">
+                                 <div className="flex-1">
+                                   <ReachedDropButton
+                                     order={order}
+                                     onReachedDrop={handleReachedDrop}
+                                   />
+                                 </div>
+                                 <button
+                                   onClick={async (e) => {
+                                     e.stopPropagation()
+                                     // Get user phone number
+                                     const userPhone = order?.userId?.phone ||
+                                       order?.userPhone ||
+                                       order?.address?.phone ||
+                                       null
+
+                                     // If phone not found, try to fetch order details from backend
+                                     if (!userPhone && order.orderId) {
+                                       try {
+                                         const response = await deliveryAPI.getOrderDetails(order.orderId)
+                                         if (response.data?.success && response.data.data?.order) {
+                                           const orderData = response.data.data.order
+                                           const phone = orderData.userId?.phone || orderData.userPhone || null
+                                           if (phone) {
+                                             // Clean the phone number
+                                             let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
+                                             if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                               cleanPhone = `+91${cleanPhone}`
+                                             } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                               cleanPhone = `+${cleanPhone}`
+                                             }
+                                             console.log('📞 Calling customer:', cleanPhone)
+                                             window.location.href = `tel:${cleanPhone}`
+                                             return
+                                           }
+                                         }
+                                       } catch (error) {
+                                         console.error('Error fetching order details for phone:', error)
+                                       }
+                                     }
+
+                                     if (userPhone) {
+                                       // Clean the phone number (remove spaces, dashes, etc. but keep +)
+                                       let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
+                                       // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
+                                       if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                         cleanPhone = `+91${cleanPhone}`
+                                       } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                         cleanPhone = `+${cleanPhone}`
+                                       }
+                                       console.log('📞 Calling customer:', cleanPhone)
+                                       window.location.href = `tel:${cleanPhone}`
+                                     } else {
+                                       toast.error('Customer phone number not available')
+                                     }
+                                   }}
+                                   className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                                   title="Call customer"
+                                 >
+                                   <Phone className="w-6 h-6" />
+                                 </button>
+                                 <button
+                                   onClick={(e) => handleCustomerLocationClick(order, e)}
+                                   className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                                   title="View customer location on map"
+                                 >
+                                   <MapPin className="w-6 h-6" />
+                                 </button>
+                               </div>
                              ) : // Phase 5: Reached drop but not delivered - show Order Delivered
                               !isOrderDelivered(order) ? (
                                 <OrderDeliveredButton

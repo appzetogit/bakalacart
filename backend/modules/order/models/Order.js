@@ -184,6 +184,11 @@ const orderSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  deliveryAddressDetails: {
+    type: String,
+    required: true,
+    trim: true
+  },
   deliveryPartnerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Delivery'
