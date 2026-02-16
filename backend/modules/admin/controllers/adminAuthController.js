@@ -86,11 +86,11 @@ export const adminSignup = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error(`Error in admin signup: ${error.message}`);
-    
+
     if (error.code === 11000) {
       return errorResponse(res, 400, 'Admin with this email already exists');
     }
-    
+
     return errorResponse(res, 500, 'Failed to register admin');
   }
 });
@@ -236,11 +236,11 @@ export const adminSignupWithOTP = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error(`Error in admin signup with OTP: ${error.message}`);
-    
+
     if (error.code === 11000) {
       return errorResponse(res, 400, 'Admin with this email already exists');
     }
-    
+
     return errorResponse(res, 500, 'Failed to register admin');
   }
 });
@@ -285,5 +285,43 @@ export const adminLogout = asyncHandler(async (req, res) => {
   logger.info(`Admin logged out: ${req.user?._id || req.user?.userId}`);
 
   return successResponse(res, 200, 'Logout successful');
+});
+
+/**
+ * Save FCM Token
+ * POST /api/admin/auth/fcm-token
+ */
+export const saveFcmToken = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  const adminId = req.user._id || req.user.userId;
+
+  if (!token) {
+    return errorResponse(res, 400, 'Token is required');
+  }
+
+  await Admin.findByIdAndUpdate(adminId, {
+    $addToSet: { fcmTokens: token }
+  });
+
+  return successResponse(res, 200, 'FCM token saved successfully');
+});
+
+/**
+ * Remove FCM Token
+ * DELETE /api/admin/auth/fcm-token
+ */
+export const removeFcmToken = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  const adminId = req.user._id || req.user.userId;
+
+  if (!token) {
+    return errorResponse(res, 400, 'Token is required');
+  }
+
+  await Admin.findByIdAndUpdate(adminId, {
+    $pull: { fcmTokens: token }
+  });
+
+  return successResponse(res, 200, 'FCM token removed successfully');
 });
 

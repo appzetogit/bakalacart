@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Outlet } from "react-router-dom"
 import AdminSidebar from "./AdminSidebar"
 import AdminNavbar from "./AdminNavbar"
+import { initializePushNotifications, registerFCMToken } from "@/services/pushNotificationService"
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -17,6 +18,20 @@ export default function AdminLayout() {
     } catch (e) {
       console.error('Error loading sidebar collapsed state:', e)
     }
+
+    // Initialize push notifications for admin
+    const initPush = async () => {
+      try {
+        await initializePushNotifications();
+        const token = localStorage.getItem('admin_accessToken');
+        if (token) {
+          await registerFCMToken('admin', token);
+        }
+      } catch (err) {
+        console.error('Failed to initialize admin push notifications:', err);
+      }
+    };
+    initPush();
   }, [])
 
   const handleCollapseChange = (collapsed) => {

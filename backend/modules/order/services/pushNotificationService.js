@@ -85,19 +85,32 @@ export const sendOrderPushNotification = async (userId, userType, payload) => {
  * Send push notification to all admin users
  * @param {Object} payload - { title, body, data }
  */
+/**
+ * Send push notification to all admin users
+ * @param {Object} payload - { title, body, data }
+ */
 export const sendAdminPushNotification = async (payload) => {
     try {
-        const admins = await User.find({ role: 'admin' }).select('fcmTokens fcmTokenMobile');
+        const Admin = (await import('../../admin/models/Admin.js')).default;
+
+        // Fetch admins from Admin collection (the dedicated admin users)
+        const admins = await Admin.find({
+            fcmTokens: { $exists: true, $not: { $size: 0 } }
+        }).select('fcmTokens');
+
+        // Also fetch Users with admin role if applicable (optional, depending on if you use dual systems)
+        // For now, focusing on the dedicated Admin model as that's what the request implies
 
         if (!admins || admins.length === 0) {
-            console.log('⚠️ [Push Notification] No admin users found.');
+            console.log('⚠️ [Push Notification] No admin users found with tokens.');
             return;
         }
 
         let allTokens = [];
         admins.forEach(admin => {
-            const tokens = [...(admin.fcmTokens || []), ...(admin.fcmTokenMobile || [])];
-            allTokens.push(...tokens);
+            if (admin.fcmTokens && Array.isArray(admin.fcmTokens)) {
+                allTokens.push(...admin.fcmTokens);
+            }
         });
 
         allTokens = [...new Set(allTokens)].filter(Boolean);
@@ -131,12 +144,13 @@ export const sendAdminPushNotification = async (payload) => {
         // Cleanup invalid tokens if any
         if (response && response.cleanupTokens && response.cleanupTokens.length > 0) {
             console.log(`🧹 [Push Notification] ${response.cleanupTokens.length} admin tokens are invalid. Cleaning them up...`);
-            await User.updateMany(
-                { role: 'admin' },
+
+            // Clean up from Admin collection
+            await Admin.updateMany(
+                {},
                 {
                     $pull: {
-                        fcmTokens: { $in: response.cleanupTokens },
-                        fcmTokenMobile: { $in: response.cleanupTokens }
+                        fcmTokens: { $in: response.cleanupTokens }
                     }
                 }
             );

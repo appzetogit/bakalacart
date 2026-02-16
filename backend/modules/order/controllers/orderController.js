@@ -9,7 +9,7 @@ import winston from 'winston';
 import { calculateOrderPricing } from '../services/orderCalculationService.js';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
 import { notifyRestaurantNewOrder } from '../services/restaurantNotificationService.js';
-import { sendOrderPushNotification } from '../services/pushNotificationService.js';
+import { sendOrderPushNotification, sendAdminPushNotification } from '../services/pushNotificationService.js';
 import { calculateOrderSettlement } from '../services/orderSettlementService.js';
 import { holdEscrow } from '../services/escrowWalletService.js';
 import { processCancellationRefund } from '../services/cancellationRefundService.js';
@@ -629,13 +629,30 @@ export const createOrder = async (req, res) => {
           data: {
             orderId: order.orderId,
             orderMongoId: order._id.toString(),
-            type: 'order_confirmed',
+            type: 'new_order',
             click_action: '/my-orders'
           }
         });
         logger.info('✅ [Push Notification] Sent to user for order placement');
-      } catch (pushError) {
-        logger.error('❌ [Push Notification] Error sending to user:', pushError);
+      } catch (fcmError) {
+        logger.error('❌ Error sending FCM notification to user for COD order:', fcmError);
+      }
+
+      // Notify Admin about new COD order
+      try {
+        await sendAdminPushNotification({
+          title: 'New COD Order Received! 🆕',
+          body: `New order #${order.orderId} via COD. Total: ₹${order.pricing.total}`,
+          data: {
+            orderId: order.orderId,
+            orderMongoId: order._id.toString(),
+            type: 'new_order',
+            paymentMethod: 'cash'
+          }
+        });
+        logger.info('✅ Admin notification sent for COD order', { orderId: order.orderId });
+      } catch (adminNotifyError) {
+        logger.error('❌ Error notifying admin about COD order:', adminNotifyError);
       }
 
       // Respond to client (no Razorpay details for COD)
@@ -952,6 +969,23 @@ export const verifyOrderPayment = async (req, res) => {
       logger.info('✅ [Push Notification] Sent to user for payment success');
     } catch (pushError) {
       logger.error('❌ [Push Notification] Error sending to user:', pushError);
+    }
+
+    // Notify Admin about new Online Order
+    try {
+      await sendAdminPushNotification({
+        title: 'New Online Order! 💳',
+        body: `New order #${order.orderId} (Paid). Total: ₹${order.pricing.total}`,
+        data: {
+          orderId: order.orderId,
+          orderMongoId: order._id.toString(),
+          type: 'new_order',
+          paymentMethod: 'razorpay'
+        }
+      });
+      logger.info('✅ Admin notification sent for Online order', { orderId: order.orderId });
+    } catch (adminNotifyError) {
+      logger.error('❌ Error notifying admin about Online order:', adminNotifyError);
     }
 
     logger.info(`Order payment verified: ${order.orderId}`, {

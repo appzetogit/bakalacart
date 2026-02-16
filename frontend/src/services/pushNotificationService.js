@@ -124,7 +124,8 @@ async function registerFCMToken(authType = 'user', authToken = null) {
         const endpointMap = {
             'user': '/api/auth/fcm-token',
             'restaurant': '/api/restaurant/auth/fcm-token',
-            'delivery': '/api/delivery/auth/fcm-token'
+            'delivery': '/api/delivery/auth/fcm-token',
+            'admin': '/api/admin/auth/fcm-token'
         };
 
         const endpoint = endpointMap[authType];

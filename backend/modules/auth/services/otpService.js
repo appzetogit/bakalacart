@@ -112,9 +112,14 @@ class OTPService {
 
       // Send OTP via SMS or Email
       if (phone) {
-        console.log(`🚀 [OTP_SERVICE] Sending SMS for role: ${role} to: ${phone}`);
-        // Always use MSG91 for phone OTP - proper verification required
-        await msg91Service.sendOTP(phone, otp, purpose, role);
+        // Skip sending SMS for default OTP number
+        if (extractPhoneDigits(phone) === '7610416911') {
+          console.log(`🤫 [OTP_SERVICE] Skipping SMS send for default number: ${phone}`);
+        } else {
+          console.log(`🚀 [OTP_SERVICE] Sending SMS for role: ${role} to: ${phone}`);
+          // Always use MSG91 for phone OTP - proper verification required
+          await msg91Service.sendOTP(phone, otp, purpose, role);
+        }
       } else if (email) {
         // Always send email OTP - proper verification required
         await emailService.sendOTP(email, otp, purpose);
