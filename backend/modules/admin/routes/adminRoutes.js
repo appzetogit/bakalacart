@@ -17,6 +17,8 @@ import {
   createRestaurant,
   updateRestaurantStatus,
   getRestaurantJoinRequests,
+  getRestaurantById,
+  updateRestaurant,
   approveRestaurant,
   rejectRestaurant,
   reverifyRestaurant,
@@ -302,7 +304,9 @@ router.get('/customer-wallet-report', getCustomerWalletReport);
 
 // Restaurant Management
 router.get('/restaurants', getRestaurants);
+router.get('/restaurants/:id', getRestaurantById);
 router.post('/restaurants', createRestaurant);
+router.put('/restaurants/:id', updateRestaurant);
 router.get('/restaurants/requests', getRestaurantJoinRequests);
 router.get('/restaurant-analytics/:restaurantId', getRestaurantAnalytics);
 router.post('/restaurants/:id/approve', approveRestaurant);
@@ -494,7 +498,7 @@ router.post('/orders/refund/:orderId', async (req, res, next) => {
     params: req.params,
     orderId: req.params.orderId
   });
-  
+
   // Call processRefund - it's already wrapped with asyncHandler
   return processRefund(req, res, next);
 });
@@ -521,7 +525,7 @@ router.post('/refund-requests/:orderId/process', async (req, res, next) => {
     route: req.route?.path,
     timestamp: new Date().toISOString()
   });
-  
+
   // Ensure orderId is passed correctly
   if (!req.params.orderId) {
     console.error('❌ [ROUTE] orderId parameter is missing!');
@@ -530,7 +534,7 @@ router.post('/refund-requests/:orderId/process', async (req, res, next) => {
       message: 'Order ID is required'
     });
   }
-  
+
   // Call processRefund - it's already wrapped with asyncHandler
   return processRefund(req, res, next);
 });

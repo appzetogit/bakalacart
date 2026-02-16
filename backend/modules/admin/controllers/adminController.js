@@ -1805,6 +1805,131 @@ export const reverifyRestaurant = asyncHandler(async (req, res) => {
   }
 });
 
+
+/**
+ * Get Restaurant by ID
+ * GET /api/admin/restaurants/:id
+ */
+export const getRestaurantById = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await Restaurant.findById(id).lean();
+
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    return successResponse(res, 200, 'Restaurant retrieved successfully', { restaurant });
+  } catch (error) {
+    logger.error(`Error fetching restaurant: ${error.message}`, { error: error.stack });
+    return errorResponse(res, 500, 'Failed to fetch restaurant');
+  }
+});
+
+/**
+ * Update Restaurant Details
+ * PUT /api/admin/restaurants/:id
+ */
+export const updateRestaurant = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const adminId = req.user._id;
+
+    logger.info(`Admin ${adminId} attempting to update restaurant ${id}`, { updateData });
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    // List of allowed fields to update
+    const allowedFields = [
+      'name', 'email', 'phone', 'ownerName', 'ownerEmail', 'ownerPhone',
+      'primaryContactNumber', 'isAcceptingOrders', 'isActive',
+      'cuisines', 'openDays', 'estimatedDeliveryTime', 'featuredDish', 'featuredPrice', 'offer',
+      'businessModel'
+    ];
+
+    // Update basic fields
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        restaurant[field] = updateData[field];
+      }
+    });
+
+    // Sync with onboarding details if they exist
+    if (restaurant.onboarding) {
+      if (!restaurant.onboarding.step1) {
+        restaurant.onboarding.step1 = {};
+      }
+
+      if (updateData.name) restaurant.onboarding.step1.restaurantName = updateData.name;
+      if (updateData.ownerName) restaurant.onboarding.step1.ownerName = updateData.ownerName;
+      if (updateData.ownerEmail) restaurant.onboarding.step1.ownerEmail = updateData.ownerEmail;
+      if (updateData.ownerPhone) restaurant.onboarding.step1.ownerPhone = updateData.ownerPhone;
+      if (updateData.primaryContactNumber) restaurant.onboarding.step1.primaryContactNumber = updateData.primaryContactNumber;
+
+      // Explicitly mark as modified
+      restaurant.markModified('onboarding');
+      restaurant.markModified('onboarding.step1');
+    }
+
+    // Handle location update if provided
+    if (updateData.location) {
+      restaurant.location = {
+        ...restaurant.location ? (typeof restaurant.location.toObject === 'function' ? restaurant.location.toObject() : restaurant.location) : {},
+        ...updateData.location
+      };
+
+      if (restaurant.onboarding && restaurant.onboarding.step1) {
+        restaurant.onboarding.step1.location = restaurant.location;
+      }
+
+      restaurant.markModified('location');
+    }
+
+    // Handle onboarding specific updates if provided
+    if (updateData.onboarding) {
+      const mergedOnboarding = {
+        ...restaurant.onboarding ? (typeof restaurant.onboarding.toObject === 'function' ? restaurant.onboarding.toObject() : restaurant.onboarding) : {},
+        ...updateData.onboarding
+      };
+      restaurant.onboarding = mergedOnboarding;
+      restaurant.markModified('onboarding');
+    }
+
+    // Save will trigger the pre-save hook for normalized phone and slug generation
+    await restaurant.save();
+
+    logger.info(`Restaurant updated successfully: ${id}`, {
+      updatedBy: adminId
+    });
+
+    return successResponse(res, 200, 'Restaurant updated successfully', {
+      restaurant: {
+        id: restaurant._id,
+        name: restaurant.name,
+        email: restaurant.email,
+        phone: restaurant.phone,
+        isActive: restaurant.isActive,
+        isAcceptingOrders: restaurant.isAcceptingOrders
+      }
+    });
+  } catch (error) {
+    logger.error(`Error updating restaurant: ${error.message}`, { error: error.stack });
+
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      return errorResponse(res, 400, `A restaurant with this ${field} already exists. Please use a unique ${field}.`);
+    }
+
+    return errorResponse(res, 500, `Failed to update restaurant: ${error.message}`);
+  }
+});
+
 /**
  * Create Restaurant by Admin
  * POST /api/admin/restaurants

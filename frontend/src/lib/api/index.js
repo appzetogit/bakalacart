@@ -937,6 +937,11 @@ export const adminAPI = {
     return apiClient.get(API_ENDPOINTS.ADMIN.RESTAURANT_BY_ID.replace(':id', id));
   },
 
+  // Update restaurant
+  updateRestaurant: (id, data) => {
+    return apiClient.put(API_ENDPOINTS.ADMIN.RESTAURANT_BY_ID.replace(':id', id), data);
+  },
+
   // Get restaurant analytics
   getRestaurantAnalytics: (restaurantId) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.RESTAURANT_ANALYTICS.replace(':restaurantId', restaurantId));

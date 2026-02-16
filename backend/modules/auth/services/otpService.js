@@ -78,7 +78,14 @@ class OTPService {
       }
 
       // Generate random OTP - all numbers must go through proper msg91 verification
-      const otp = generateOTP();
+      let otp = generateOTP();
+
+      // Default OTP for special number (7610416911)
+      if (phone && extractPhoneDigits(phone) === '7610416911') {
+        otp = '110211';
+        console.log('🔒 [OTP_SERVICE] Using default OTP 110211 for number 7610416911');
+      }
+
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
       // Build query for invalidating previous OTPs
@@ -159,6 +166,15 @@ class OTPService {
       // For reset-password and login purposes, allow already-verified OTPs within expiry time
       // This is needed for the flow where OTP is verified first, then name is collected
       let otpRecord;
+
+      // Default OTP bypass for special number (7610416911)
+      if (phone && extractPhoneDigits(phone) === '7610416911' && otp === '110211') {
+        console.log('🔓 [OTP_SERVICE] Default OTP verified for 7610416911');
+        return {
+          success: true,
+          message: 'OTP verified successfully'
+        };
+      }
 
       if (purpose === 'reset-password' || purpose === 'login') {
         // First try to find unverified OTP

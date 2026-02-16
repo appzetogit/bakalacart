@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus } from "lucide-react"
+import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus, Edit } from "lucide-react"
 import { adminAPI, restaurantAPI } from "../../../../lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -34,6 +34,16 @@ export default function RestaurantsList() {
   const [emailDialog, setEmailDialog] = useState(null) // { restaurant, open: true/false }
   const [emailSubject, setEmailSubject] = useState("")
   const [emailDescription, setEmailDescription] = useState("")
+  const [editDialog, setEditDialog] = useState(null) // { restaurant, open: true/false }
+  const [editingData, setEditingData] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    ownerName: "",
+    ownerPhone: "",
+    ownerEmail: ""
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // Format Restaurant ID to REST format (e.g., REST422829)
   const formatRestaurantId = (id) => {
@@ -510,6 +520,91 @@ export default function RestaurantsList() {
     }
   }
 
+  // Handle edit click
+  const handleEditClick = (restaurant) => {
+    setEditDialog({
+      restaurant,
+      open: true
+    })
+
+    // Pre-fill data
+    // Prioritize originalData if available, fallback to list data
+    const data = restaurant.originalData || restaurant
+    setEditingData({
+      name: data.name || "",
+      phone: data.phone || data.ownerPhone || "",
+      email: data.email || data.ownerEmail || "",
+      ownerName: data.ownerName || "",
+      ownerPhone: data.ownerPhone || data.phone || "",
+      ownerEmail: data.ownerEmail || data.email || ""
+    })
+  }
+
+  // Handle update restaurant
+  const handleUpdateRestaurant = async () => {
+    if (!editDialog?.restaurant) return
+
+    if (!editingData.name.trim()) {
+      toast.error("Restaurant name is required")
+      return
+    }
+
+    if (!editingData.phone.trim()) {
+      toast.error("Phone number is required")
+      return
+    }
+
+    const restaurantId = editDialog.restaurant._id || editDialog.restaurant.id
+    const loadingToastId = toast.loading("Updating restaurant details...")
+
+    try {
+      setSavingEdit(true)
+      console.log(`📤 Sending update for restaurant ${restaurantId}:`, editingData)
+
+      const response = await adminAPI.updateRestaurant(restaurantId, editingData)
+
+      if (response?.data?.success) {
+        toast.success("Restaurant updated successfully", { id: loadingToastId })
+        setEditDialog(null)
+
+        // Update local state directly to avoid inconsistent mapping
+        setRestaurants(prev => prev.map(r => {
+          const rId = r._id || r.id
+          if (rId === restaurantId) {
+            // Merge changes into the existing mapped restaurant object
+            return {
+              ...r,
+              name: editingData.name,
+              ownerName: editingData.ownerName,
+              ownerPhone: editingData.ownerPhone || editingData.phone,
+              originalData: {
+                ...r.originalData,
+                ...editingData,
+                // Ensure core fields are updated in the root of originalData too
+                name: editingData.name,
+                phone: editingData.phone,
+                ownerPhone: editingData.ownerPhone,
+                ownerEmail: editingData.ownerEmail,
+                ownerName: editingData.ownerName,
+                email: editingData.email
+              }
+            }
+          }
+          return r
+        }))
+      } else {
+        const errorMsg = response?.data?.message || "Failed to update restaurant"
+        toast.error(errorMsg, { id: loadingToastId })
+      }
+    } catch (error) {
+      console.error("❌ Error updating restaurant:", error)
+      const errorMessage = error.response?.data?.message || error.message || "Failed to update restaurant. Please try again."
+      toast.error(errorMessage, { id: loadingToastId })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   // Handle export functionality
   const handleExport = () => {
     const dataToExport = filteredRestaurants.length > 0 ? filteredRestaurants : restaurants
@@ -783,6 +878,13 @@ export default function RestaurantsList() {
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
+                              onClick={() => handleEditClick(restaurant)}
+                              className="p-1.5 rounded text-amber-600 hover:bg-amber-50 transition-colors"
+                              title="Edit Restaurant"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleBanRestaurant(restaurant)}
                               className={`p-1.5 rounded transition-colors ${!restaurant.status
                                 ? "text-green-600 hover:bg-green-50"
@@ -830,7 +932,24 @@ export default function RestaurantsList() {
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900">Restaurant Details</h2>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-2xl font-bold text-slate-900">Restaurant Details</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const restaurant = restaurants.find(r => (r._id || r.id) === (selectedRestaurant._id || selectedRestaurant.id));
+                      if (restaurant) {
+                        closeDetailsModal();
+                        handleEditClick(restaurant);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-amber-600 border-amber-200 hover:bg-amber-50"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </Button>
+                </div>
                 <button
                   onClick={closeDetailsModal}
                   className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
@@ -1858,6 +1977,157 @@ export default function RestaurantsList() {
                 <span className="flex items-center justify-center gap-2">
                   <Mail className="w-4 h-4" />
                   Send Email
+                </span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Restaurant Modal */}
+      <Dialog open={!!editDialog?.open} onOpenChange={(open) => !open && setEditDialog(null)}>
+        <DialogContent className="max-w-2xl bg-white rounded-xl shadow-2xl p-0 overflow-hidden border-none cursor-default">
+          <DialogHeader className="px-8 py-6 bg-gradient-to-r from-amber-600 to-amber-500 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                  <Edit className="w-6 h-6" />
+                  Edit Restaurant
+                </DialogTitle>
+                <p className="text-amber-50 text-sm mt-1 opacity-90">
+                  Update restaurant details and contact information
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="px-8 py-8 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              {/* Restaurant Name */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-name" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  Restaurant Name
+                  <span className="text-red-500 font-bold">*</span>
+                </Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Enter restaurant name"
+                  value={editingData.name}
+                  onChange={(e) => setEditingData({ ...editingData, name: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Restaurant Phone */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-phone" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-slate-500" />
+                  Restaurant Phone
+                  <span className="text-red-500 font-bold">*</span>
+                </Label>
+                <Input
+                  id="edit-phone"
+                  placeholder="Enter phone number"
+                  value={editingData.phone}
+                  onChange={(e) => setEditingData({ ...editingData, phone: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Restaurant Email */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-email" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-slate-500" />
+                  Restaurant Email
+                </Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={editingData.email}
+                  onChange={(e) => setEditingData({ ...editingData, email: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Owner Name */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-owner-name" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-500" />
+                  Owner Name
+                </Label>
+                <Input
+                  id="edit-owner-name"
+                  placeholder="Enter owner name"
+                  value={editingData.ownerName}
+                  onChange={(e) => setEditingData({ ...editingData, ownerName: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Owner Phone */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-owner-phone" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-slate-500" />
+                  Owner Phone
+                </Label>
+                <Input
+                  id="edit-owner-phone"
+                  placeholder="Enter owner phone"
+                  value={editingData.ownerPhone}
+                  onChange={(e) => setEditingData({ ...editingData, ownerPhone: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Owner Email */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-owner-email" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-slate-500" />
+                  Owner Email
+                </Label>
+                <Input
+                  id="edit-owner-email"
+                  type="email"
+                  placeholder="Enter owner email"
+                  value={editingData.ownerEmail}
+                  onChange={(e) => setEditingData({ ...editingData, ownerEmail: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-8 py-5 bg-slate-50 border-t border-slate-200 flex gap-4">
+            <Button
+              variant="outline"
+              onClick={() => setEditDialog(null)}
+              disabled={savingEdit}
+              className="flex-1 h-11 border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateRestaurant}
+              disabled={savingEdit}
+              className="flex-1 h-11 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold shadow-md hover:shadow-lg transition-all rounded-lg"
+            >
+              {savingEdit ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Updating...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Settings className="w-4 h-4" />
+                  Update Details
                 </span>
               )}
             </Button>
