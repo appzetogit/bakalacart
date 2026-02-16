@@ -105,7 +105,7 @@ export const initRazorpayPayment = async (options) => {
       order_id: options.order_id,
       name: options.name || 'Bakalaa',
       description: options.description || 'Order Payment',
-      image: options.image || '/logo.png',
+      image: options.image || '/bakalalogo.png',
       prefill: {
         name: options.prefill?.name || '',
         email: options.prefill?.email || '',

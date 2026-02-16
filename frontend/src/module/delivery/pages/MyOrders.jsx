@@ -2128,46 +2128,55 @@ export default function MyOrders() {
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation()
-                                // Try multiple paths to find restaurant phone number
-                                let restaurantPhone = order?.restaurantId?.phone ||
-                                  order?.restaurantId?.ownerPhone ||
-                                  order?.restaurantId?.primaryContactNumber ||
-                                  order?.restaurantPhone ||
+                                // Get user phone number
+                                const userPhone = order?.userId?.phone ||
+                                  order?.userPhone ||
+                                  order?.address?.phone ||
+                                  order?.customerPhone ||
                                   null
 
                                 // If phone not found, try to fetch order details from backend
-                                if (!restaurantPhone && order.orderId) {
+                                if (!userPhone && order.orderId) {
                                   try {
                                     const response = await deliveryAPI.getOrderDetails(order.orderId)
                                     if (response.data?.success && response.data.data?.order) {
                                       const orderData = response.data.data.order
-                                      restaurantPhone = orderData.restaurantId?.phone ||
-                                        orderData.restaurantId?.ownerPhone ||
-                                        orderData.restaurantId?.primaryContactNumber ||
-                                        null
+                                      const phone = orderData.userId?.phone || orderData.userPhone || null
+                                      if (phone) {
+                                        // Clean the phone number
+                                        let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
+                                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
+                                          cleanPhone = `+91${cleanPhone}`
+                                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+                                          cleanPhone = `+${cleanPhone}`
+                                        }
+                                        console.log('📞 Calling customer:', cleanPhone)
+                                        window.location.href = `tel:${cleanPhone}`
+                                        return
+                                      }
                                     }
                                   } catch (error) {
                                     console.error('Error fetching order details for phone:', error)
                                   }
                                 }
 
-                                if (restaurantPhone) {
+                                if (userPhone) {
                                   // Clean the phone number (remove spaces, dashes, etc. but keep +)
-                                  let cleanPhone = String(restaurantPhone).replace(/[\s\-\(\)]/g, '')
+                                  let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
                                   // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
                                   if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
                                     cleanPhone = `+91${cleanPhone}`
                                   } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
                                     cleanPhone = `+${cleanPhone}`
                                   }
-                                  console.log('📞 Calling restaurant:', cleanPhone)
+                                  console.log('📞 Calling customer:', cleanPhone)
                                   window.location.href = `tel:${cleanPhone}`
                                 } else {
-                                  toast.error('Restaurant phone number not available')
+                                  toast.error('Customer phone number not available')
                                 }
                               }}
                               className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100 hover:bg-green-100 transition-colors"
-                              title="Call restaurant"
+                              title="Call customer"
                             >
                               <Phone className="w-6 h-6" />
                             </button>

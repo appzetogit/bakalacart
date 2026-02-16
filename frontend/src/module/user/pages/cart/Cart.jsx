@@ -552,10 +552,10 @@ export default function Cart() {
 
       try {
         setLoadingPricing(true)
-        
+
         // Re-fetch fee settings to get latest admin updates
         await fetchFeeSettings()
-        
+
         const items = cart.map(item => ({
           itemId: item.id,
           name: item.name,
@@ -643,18 +643,18 @@ export default function Cart() {
 
   // Use backend pricing if available, otherwise fallback to database settings
   const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
-  
+
   // Calculate delivery fee: prioritize frontend calculation from ranges if ranges exist
   // Only use backend pricing if no ranges are configured or if backend explicitly returns a non-zero value
   const calculatedDeliveryFee = calculateDeliveryFeeFromRanges(subtotal, feeSettings)
-  
+
   // If ranges are configured, use frontend calculation (ranges take priority)
   // Otherwise, use backend pricing if available
   const hasRanges = feeSettings.deliveryFeeRanges && feeSettings.deliveryFeeRanges.length > 0;
-  const deliveryFee = hasRanges 
+  const deliveryFee = hasRanges
     ? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee)
     : (pricing?.deliveryFee ?? (appliedCoupon?.freeDelivery ? 0 : calculatedDeliveryFee))
-  
+
   const platformFee = Math.round(pricing?.platformFee || feeSettings.platformFee || 5)
   // GST should be calculated on subtotal after discount (matching backend logic)
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0)
@@ -662,7 +662,7 @@ export default function Cart() {
   const gstCharges = pricing?.tax || Math.round(taxableAmount * ((feeSettings.gstRate || 5) / 100))
   const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges
   const total = pricing?.total || Math.round(totalBeforeDiscount - discount)
-  
+
   // Verify calculation matches
   const calculatedTotal = Math.round(subtotal + deliveryFee + platformFee + gstCharges - discount)
   if (Math.abs(total - calculatedTotal) > 1 && import.meta.env.DEV) {
@@ -678,7 +678,7 @@ export default function Cart() {
       difference: total - calculatedTotal
     })
   }
-  
+
   // Debug: Log calculation breakdown
   if (import.meta.env.DEV) {
     console.log('💰 [CART CALCULATION]', {
@@ -1142,6 +1142,7 @@ export default function Cart() {
         currency: razorpay.currency || 'INR',
         order_id: razorpay.orderId,
         name: "Bakalaa",
+        image: '/bakalalogo.png',
         description: `Order ${order.orderId} - ₹${(razorpay.amount / 100).toFixed(2)}`,
         prefill: {
           name: userName,

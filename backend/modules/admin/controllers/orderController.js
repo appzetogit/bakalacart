@@ -390,9 +390,18 @@ export const getOrders = asyncHandler(async (req, res) => {
             return 'Online';
           }
         })(),
-        paymentCollectionStatus: (order.payment?.method === 'cash' || order.payment?.method === 'cod')
-          ? (order.status === 'delivered' ? 'Collected' : 'Not Collected')
-          : 'Collected',
+        paymentCollectionStatus: (() => {
+          const method = order.payment?.method;
+          const isCod = method === 'cash' || method === 'cod';
+
+          if (isCod) {
+            return (order.status === 'delivered' ? 'Collected' : 'Not Collected');
+          } else {
+            // For online payments, use the effective payment status
+            // It is collected only if payment is completed
+            return (effectivePaymentStatus === 'completed') ? 'Collected' : 'Not Collected';
+          }
+        })(),
         orderStatus: orderStatusDisplay,
         status: order.status, // Backend status
         deliveryType: deliveryType,
@@ -652,6 +661,16 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         restaurant: order.restaurantName || order.restaurantId?.name || 'Unknown Restaurant',
         total: formattedTotal,
         paymentStatus: paymentStatusDisplay,
+        paymentCollectionStatus: (() => {
+          const method = order.payment?.method;
+          const isCod = method === 'cash' || method === 'cod';
+
+          if (isCod) {
+            return (order.status === 'delivered' ? 'Collected' : 'Not Collected');
+          } else {
+            return (effectivePaymentStatus === 'completed') ? 'Collected' : 'Not Collected';
+          }
+        })(),
         orderStatus: orderStatusDisplay,
         deliveryType: deliveryType,
         // Additional fields for view order dialog
@@ -871,6 +890,16 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         restaurant: order.restaurantName || order.restaurantId?.name || 'Unknown Restaurant',
         total: formattedTotal,
         paymentStatus: paymentStatusDisplay,
+        paymentCollectionStatus: (() => {
+          const method = order.payment?.method;
+          const isCod = method === 'cash' || method === 'cod';
+
+          if (isCod) {
+            return (order.status === 'delivered' ? 'Collected' : 'Not Collected');
+          } else {
+            return (effectivePaymentStatus === 'completed') ? 'Collected' : 'Not Collected';
+          }
+        })(),
         orderStatus: orderStatusDisplay,
         orderStatusColor: orderStatusColor,
         deliveryType: deliveryType,

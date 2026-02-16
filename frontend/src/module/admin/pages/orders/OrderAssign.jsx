@@ -154,6 +154,13 @@ export default function OrderAssign() {
     try {
       setAssigningOrderId(selectedOrder.id)
       const orderId = selectedOrder.id || selectedOrder.orderId
+
+      console.log('📦 Attempting to assign order:', {
+        orderId,
+        deliveryBoyId,
+        selectedOrder: selectedOrder
+      });
+
       const response = await adminAPI.assignOrderToDeliveryBoy(orderId, deliveryBoyId)
 
       if (response?.data?.success) {
@@ -170,6 +177,7 @@ export default function OrderAssign() {
       const errorMessage = error.response?.data?.message ||
         error.message ||
         "Failed to assign order. Please try again."
+      console.error("Assign order error response:", error.response?.data);
       toast.error(errorMessage)
     } finally {
       setAssigningOrderId(null)
@@ -444,21 +452,21 @@ export default function OrderAssign() {
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
+                        <div className="text-xs text-gray-900 dark:text-white max-w-[300px]">
                           {order.address ? (
                             <div className="space-y-0.5">
                               {order.address.formattedAddress ? (
                                 <div className="flex items-start gap-1">
                                   <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
-                                  <span className="text-[10px] break-words line-clamp-2">{order.address.formattedAddress}</span>
+                                  <span className="text-[10px] break-words">{order.address.formattedAddress}</span>
                                 </div>
                               ) : (
                                 <>
                                   {order.address.street && (
-                                    <div className="text-[10px] line-clamp-1">{order.address.street}</div>
+                                    <div className="text-[10px]">{order.address.street}</div>
                                   )}
                                   {(order.address.area || order.address.city) && (
-                                    <div className="text-[10px] text-gray-500 line-clamp-1">
+                                    <div className="text-[10px] text-gray-500">
                                       {[order.address.area, order.address.city].filter(Boolean).join(', ')}
                                     </div>
                                   )}
@@ -470,12 +478,12 @@ export default function OrderAssign() {
                                 </>
                               )}
                               {order.address.additionalDetails && (
-                                <div className="text-[10px] text-gray-400 italic line-clamp-1">
+                                <div className="text-[10px] text-gray-400 italic">
                                   {order.address.additionalDetails}
                                 </div>
                               )}
                               {order.deliveryAddressDetails && (
-                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium line-clamp-2 mt-1">
+                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium mt-1">
                                   <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
                                 </div>
                               )}
@@ -1096,6 +1104,6 @@ export default function OrderAssign() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }
