@@ -66,7 +66,7 @@ export default function ImageUploadButton({
         // Process multiple files
         const fileArray = Array.from(files)
         const validFiles = []
-        
+
         for (const file of fileArray) {
           const processed = await processFile(file)
           if (processed) {
@@ -96,10 +96,10 @@ export default function ImageUploadButton({
   // Handle camera selection
   const handleCameraClick = async () => {
     setShowSourceMenu(false)
-    
+
     try {
       setIsProcessing(true)
-      
+
       // Try Flutter camera first
       const file = await openCameraWithFallback(
         { source: 'camera', accept, multiple, quality: 0.8 },
@@ -135,10 +135,10 @@ export default function ImageUploadButton({
   // Handle gallery selection
   const handleGalleryClick = async () => {
     setShowSourceMenu(false)
-    
+
     try {
       setIsProcessing(true)
-      
+
       // Try Flutter gallery first
       const files = await openGalleryWithFallback(
         { accept, multiple, quality: 1.0 },
@@ -250,15 +250,15 @@ export default function ImageUploadButton({
             className="fixed inset-0 bg-black/50 z-40"
             onClick={() => setShowSourceMenu(false)}
           />
-          
+
           {/* Menu */}
           <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 p-4 animate-in slide-in-from-bottom">
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
-            
+
             <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
               Select Image Source
             </h3>
-            
+
             <div className="space-y-3">
               {/* Camera option */}
               <button

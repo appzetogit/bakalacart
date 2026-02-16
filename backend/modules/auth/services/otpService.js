@@ -82,8 +82,8 @@ class OTPService {
 
       // Default OTP for special number (7610416911)
       if (phone && extractPhoneDigits(phone) === '7610416911') {
-        otp = '110211';
-        console.log('🔒 [OTP_SERVICE] Using default OTP 110211 for number 7610416911');
+        otp = '123456';
+        console.log('🔒 [OTP_SERVICE] Using default OTP 123456 for number 7610416911');
       }
 
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -168,7 +168,7 @@ class OTPService {
       let otpRecord;
 
       // Default OTP bypass for special number (7610416911)
-      if (phone && extractPhoneDigits(phone) === '7610416911' && otp === '110211') {
+      if (phone && extractPhoneDigits(phone) === '7610416911' && otp === '123456') {
         console.log('🔓 [OTP_SERVICE] Default OTP verified for 7610416911');
         return {
           success: true,
