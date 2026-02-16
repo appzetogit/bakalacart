@@ -366,7 +366,7 @@ deliveryNamespace.on('connection', (socket) => {
       if (orderIdString) {
         io.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
         console.log(`✅ Emitted to order:${orderIdString} room (user namespace)`);
-        
+
         // Also emit to delivery namespace order room (delivery boy might be in this room)
         deliveryNamespace.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderIdString} room (delivery namespace)`);
@@ -376,7 +376,7 @@ deliveryNamespace.on('connection', (socket) => {
       if (orderMongoId && orderMongoId !== orderIdString) {
         io.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderMongoId} room (user namespace)`);
-        
+
         // Also emit to delivery namespace order room
         deliveryNamespace.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderMongoId} room (delivery namespace)`);
@@ -386,7 +386,7 @@ deliveryNamespace.on('connection', (socket) => {
       if (orderId && orderId !== orderIdString && orderId !== orderMongoId) {
         io.to(`order:${orderId}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderId} room (original, user namespace)`);
-        
+
         // Also emit to delivery namespace order room
         deliveryNamespace.to(`order:${orderId}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderId} room (original, delivery namespace)`);
@@ -844,12 +844,12 @@ io.on('connection', (socket) => {
       // CRITICAL: Also emit to order room (delivery boy might be listening there)
       const orderIdString = order.orderId || orderId;
       const orderMongoId = order._id ? order._id.toString() : (orderId && mongoose.Types.ObjectId.isValid(orderId) ? orderId : null);
-      
+
       if (orderIdString) {
         deliveryNamespace.to(`order:${orderIdString}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderIdString} room (delivery namespace)`);
       }
-      
+
       if (orderMongoId && orderMongoId !== orderIdString) {
         deliveryNamespace.to(`order:${orderMongoId}`).emit('receive-chat-message', messageData);
         console.log(`✅ Also emitted to order:${orderMongoId} room (delivery namespace)`);
@@ -965,6 +965,25 @@ function initializeScheduledTasks() {
     console.log('✅ Auto-reject order scheduler initialized (runs every 30 seconds)');
   }).catch((error) => {
     console.error('❌ Failed to initialize auto-reject service:', error);
+  });
+
+  // Import restaurant availability service (Auto-Close)
+  import('./modules/restaurant/services/restaurantAvailabilityService.js').then(({ processRestaurantAvailability }) => {
+    // Run every minute to check and close restaurants past their closing time
+    cron.schedule('* * * * *', async () => {
+      try {
+        const result = await processRestaurantAvailability();
+        if (result.closed > 0) {
+          console.log(`[Restaurant Availability Cron] Auto-closed ${result.closed} restaurants outside business hours.`);
+        }
+      } catch (error) {
+        console.error('[Restaurant Availability Cron] Error:', error);
+      }
+    });
+
+    console.log('✅ Restaurant availability scheduler initialized (runs every minute)');
+  }).catch((error) => {
+    console.error('❌ Failed to initialize restaurant availability service:', error);
   });
 }
 

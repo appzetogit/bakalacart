@@ -641,8 +641,9 @@ export default function Cart() {
     return settings.deliveryFee ?? 0;
   }
 
-  // Use backend pricing if available, otherwise fallback to database settings
-  const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
+  // Use frontend calculation for subtotal to ensure immediate updates when quantity changes
+  // Stale pricing from backend causes lag/mismatch
+  const subtotal = cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
 
   // Calculate delivery fee: prioritize frontend calculation from ranges if ranges exist
   // Only use backend pricing if no ranges are configured or if backend explicitly returns a non-zero value
@@ -659,9 +660,16 @@ export default function Cart() {
   // GST should be calculated on subtotal after discount (matching backend logic)
   const discount = pricing?.discount || (appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0)
   const taxableAmount = subtotal - discount
-  const gstCharges = pricing?.tax || Math.round(taxableAmount * ((feeSettings.gstRate || 5) / 100))
+
+  // Always calculate GST on frontend to ensure it matches the current subtotal
+  // Stale pricing.tax allows old tax amount to persist after subtotal change
+  const gstCharges = Math.round(taxableAmount * ((feeSettings.gstRate || 5) / 100))
+
   const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges
-  const total = pricing?.total || Math.round(totalBeforeDiscount - discount)
+
+  // Always calculate total on frontend
+  // pricing?.total is removed to prevent stale total from showing
+  const total = Math.round(totalBeforeDiscount - discount)
 
   // Verify calculation matches
   const calculatedTotal = Math.round(subtotal + deliveryFee + platformFee + gstCharges - discount)

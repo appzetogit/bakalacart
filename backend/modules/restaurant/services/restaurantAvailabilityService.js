@@ -1,0 +1,169 @@
+import Restaurant from '../models/Restaurant.js';
+
+/**
+ * Helper to parse time string into minutes from midnight
+ * Supports "HH:mm", "HH:mm AM/PM", "H:mm", etc.
+ * @param {string} timeStr 
+ * @returns {number|null} Minutes from midnight (0-1439) or null if invalid
+ */
+const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return null;
+
+    try {
+        // Normalize string
+        let normalized = timeStr.toLowerCase().trim();
+
+        // Check for AM/PM
+        const isPM = normalized.includes('pm');
+        const isAM = normalized.includes('am');
+
+        // Remove non-time characters
+        normalized = normalized.replace(/[a-z\s]/g, '');
+
+        const parts = normalized.split(':');
+        let hours = parseInt(parts[0]);
+        let minutes = parseInt(parts[1] || '0');
+
+        if (isNaN(hours)) return null;
+
+        // Adjust for 12-hour format
+        if (isPM && hours < 12) hours += 12;
+        if (isAM && hours === 12) hours = 0;
+
+        return (hours * 60) + minutes;
+    } catch (e) {
+        console.error('Error parsing time:', timeStr, e);
+        return null;
+    }
+};
+
+/**
+ * Check if current time is within the opening window
+ * @param {string} openStr - Opening time string
+ * @param {string} closeStr - Closing time string
+ * @param {Date} now - Current date/time
+ * @returns {boolean}
+ */
+const isRestaurantCurrentlyOpen = (openStr, closeStr, now) => {
+    const currentMinutes = (now.getHours() * 60) + now.getMinutes();
+    const openMinutes = parseTimeToMinutes(openStr);
+    const closeMinutes = parseTimeToMinutes(closeStr);
+
+    if (openMinutes === null || closeMinutes === null) return true; // Fail safe: assume open if times are invalid
+
+    if (openMinutes < closeMinutes) {
+        // Standard day shift (e.g. 09:00 to 22:00)
+        // 540 to 1320
+        return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    } else {
+        // Overnight shift (e.g. 18:00 to 02:00)
+        // 1080 to 120
+        // Open if current >= 18:00 OR current < 02:00
+        return currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+    }
+};
+
+/**
+ * Process restaurant availability based on schedule
+ * - Auto-decides if a restaurant should be CLOSED based on time.
+ * - Runs periodically via cron.
+ */
+export const processRestaurantAvailability = async () => {
+    try {
+        const now = new Date(); // Server time (assuming IST per user context or handling globally)
+
+        // Convert UTC to IST if server is UTC (Best practice is to handle times carefully)
+        // Assuming the parsed times from DB are "local" times implies we should compare with "local" current time.
+        // Since this is a specific client app likely running in India (Bakala), we can force IST offset if needed,
+        // but usually new Date() on the server corresponds to the system time.
+        // Let's assume server is correctly configured or use an offset.
+        // Node.js date is UTC. .getHours() depends on system TZ or we use UTC methods.
+        // Safest for Indian clients on global servers: shift to IST.
+
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istDate = new Date(Date.now() + istOffset);
+        // Wait: Date.now() is UTC timestamp. Adding offset makes a "fake UTC" date that looks like IST when printed as UTC.
+        // Better: use .toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) to get components.
+
+        const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric', minute: 'numeric' };
+        const timeString = now.toLocaleTimeString('en-US', options);
+        const [currentHour, currentMinute] = timeString.split(':').map(Number);
+
+        const currentMinutesCapped = (currentHour * 60) + currentMinute;
+
+        // Find restaurants with delivery timings
+        const restaurants = await Restaurant.find({
+            isActive: true, // Only check active accounts
+            'deliveryTimings.openingTime': { $exists: true, $ne: null },
+            'deliveryTimings.closingTime': { $exists: true, $ne: null }
+        }).select('_id name deliveryTimings isAcceptingOrders').lean();
+
+        if (restaurants.length === 0) {
+            return { processed: 0, message: 'No restaurants with timings found' };
+        }
+
+        let closedCount = 0;
+        let openedCount = 0;
+
+        for (const restaurant of restaurants) {
+            if (!restaurant.deliveryTimings.openingTime || !restaurant.deliveryTimings.closingTime) continue;
+
+            const openMinutes = parseTimeToMinutes(restaurant.deliveryTimings.openingTime);
+            const closeMinutes = parseTimeToMinutes(restaurant.deliveryTimings.closingTime);
+
+            if (openMinutes === null || closeMinutes === null) continue;
+
+            let isOpenWindow = false;
+            if (openMinutes < closeMinutes) {
+                // Standard day
+                isOpenWindow = currentMinutesCapped >= openMinutes && currentMinutesCapped < closeMinutes;
+            } else {
+                // Overnight
+                isOpenWindow = currentMinutesCapped >= openMinutes || currentMinutesCapped < closeMinutes;
+            }
+
+            // Action Logic
+
+            // Case 1: Time is OUTSIDE business hours, but restaurant is OPEN
+            // -> System should CLOSE it.
+            if (!isOpenWindow && restaurant.isAcceptingOrders) {
+                await Restaurant.findByIdAndUpdate(restaurant._id, { isAcceptingOrders: false });
+                console.log(`🔒 Auto-closing restaurant ${restaurant.name} (${restaurant._id}) - Outside business hours`);
+                closedCount++;
+            }
+
+            // Case 2: Time is INSIDE business hours, but restaurant is CLOSED
+            // -> Should we auto-open?
+            // User complaint was specific about "not closing".
+            // Auto-opening can be dangerous if owner manually closed for emergency.
+            // However, for "New" restaurants as mentioned, they might expect automation.
+            // Compromise: We will NOT auto-open to avoid breaking manual overrides, 
+            // UNLESS we decide to simply enforce schedule.
+            // Given "flow change mat karna", modifying "Close" behavior is the safe fix for the bug.
+            // Modifying "Open" behavior is a feature change that overrides user control.
+            // I will skip auto-open for now.
+
+            // Correction: If I don't auto-open, they have to manually open every morning?
+            // That's also annoying.
+            // Most systems: If you manually toggle, it stays.
+            // But we don't have a "manual override" flag.
+            // Let's implement AUTO-OPEN only if it's EXACTLY the opening minute (or close to it),
+            // effectively triggers "at start of day".
+            // But cron runs every few mins.
+
+            // Let's stick to the user's specific request: "ye close time apne aap close nhi hota h".
+            // I will only implement Auto-Close.
+        }
+
+        return {
+            processed: restaurants.length,
+            closed: closedCount,
+            opened: openedCount,
+            message: `Checked ${restaurants.length} restaurants. Auto-closed: ${closedCount}.`
+        };
+
+    } catch (error) {
+        console.error('Error in processRestaurantAvailability:', error);
+        throw error;
+    }
+};

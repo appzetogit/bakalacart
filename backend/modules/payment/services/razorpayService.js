@@ -244,5 +244,48 @@ export {
   createOrder,
   verifyPayment,
   fetchPayment,
-  createRefund
+  createRefund,
+  fetchOrder,
+  fetchOrderPayments
 };
+
+/**
+ * Fetch order details from Razorpay
+ * @param {String} orderId - Razorpay order ID
+ * @returns {Promise<Object>} Order details
+ */
+const fetchOrder = async (orderId) => {
+  const razorpay = await getRazorpayInstance();
+  if (!razorpay) {
+    throw new Error('Razorpay is not initialized');
+  }
+
+  try {
+    const order = await razorpay.orders.fetch(orderId);
+    return order;
+  } catch (error) {
+    logger.error(`Error fetching Razorpay order: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Fetch payments for a Razorpay order
+ * @param {String} orderId - Razorpay order ID
+ * @returns {Promise<Object>} List of payments
+ */
+const fetchOrderPayments = async (orderId) => {
+  const razorpay = await getRazorpayInstance();
+  if (!razorpay) {
+    throw new Error('Razorpay is not initialized');
+  }
+
+  try {
+    const payments = await razorpay.orders.fetchPayments(orderId);
+    return payments;
+  } catch (error) {
+    logger.error(`Error fetching payments for Razorpay order: ${error.message}`);
+    throw error;
+  }
+};
+
