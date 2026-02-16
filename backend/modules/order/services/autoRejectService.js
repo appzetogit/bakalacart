@@ -10,7 +10,7 @@ import { calculateCancellationRefund } from './cancellationRefundService.js';
  */
 export async function processAutoRejectOrders() {
   try {
-    const ACCEPT_TIME_LIMIT_SECONDS = 240; // 4 minutes
+    const ACCEPT_TIME_LIMIT_SECONDS = 600; // 10 minutes (increased from 4 mins for better reliability)
     const ACCEPT_TIME_LIMIT_MS = ACCEPT_TIME_LIMIT_SECONDS * 1000;
 
     // Find all orders with status 'pending' or 'confirmed' that haven't been accepted yet

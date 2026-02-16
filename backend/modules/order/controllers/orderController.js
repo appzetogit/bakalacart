@@ -325,10 +325,17 @@ export const createOrder = async (req, res) => {
       note: note || '',
       sendCutlery: sendCutlery !== false,
       deliveryAddressDetails: deliveryAddressDetails.trim(),
-      status: 'pending',
+      status: (normalizedPaymentMethod === 'wallet' || normalizedPaymentMethod === 'cash') ? 'confirmed' : 'pending',
       payment: {
         method: normalizedPaymentMethod,
-        status: 'pending'
+        status: (normalizedPaymentMethod === 'wallet') ? 'completed' : 'pending'
+      },
+      assignmentInfo: {
+        restaurantId: assignedRestaurantId,
+        zoneId: restaurantZone?._id?.toString(),
+        zoneName: restaurantZone?.name || restaurantZone?.zoneName,
+        assignedBy: 'zone_match',
+        assignedAt: new Date()
       }
     });
 
@@ -598,12 +605,13 @@ export const createOrder = async (req, res) => {
 
       // Mark order as confirmed so restaurant can prepare it (ensure payment.method is cash for notification)
       order.payment.method = 'cash';
-      order.payment.status = 'pending';
-      order.status = 'confirmed';
-      order.tracking.confirmed = {
-        status: true,
-        timestamp: new Date()
-      };
+      // Status and tracking already set above in constructor for new flow consistency
+      // order.payment.status = 'pending';
+      // order.status = 'confirmed';
+      // order.tracking.confirmed = {
+      //   status: true,
+      //   timestamp: new Date()
+      // };
       await order.save();
 
       // Notify restaurant about new COD order via Socket.IO (non-blocking)
