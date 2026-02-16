@@ -134,12 +134,6 @@ export const processRestaurantAvailability = async () => {
                 isOpenWindow = currentMinutesCapped >= openMinutes || currentMinutesCapped < closeMinutes;
             }
 
-            // Action Logic
-
-            if (restaurant.name.toLowerCase().includes("test") || true) { // Log for all for debugging given small count
-                console.log(`[Clock Check] ${restaurant.name}: Open ${restaurant.deliveryTimings.openingTime} (${openMinutes}), Close ${restaurant.deliveryTimings.closingTime} (${closeMinutes}), Current ${currentMinutesCapped} -> IsOpenWindow: ${isOpenWindow}, Accepting: ${restaurant.isAcceptingOrders}`);
-            }
-
             // Case 1: Time is OUTSIDE business hours, but restaurant is OPEN
             // -> System should CLOSE it.
             if (!isOpenWindow && restaurant.isAcceptingOrders) {
@@ -149,27 +143,19 @@ export const processRestaurantAvailability = async () => {
             }
 
             // Case 2: Time is INSIDE business hours, but restaurant is CLOSED
-            // -> Should we auto-open?
-            // User complaint: "ye close time apne aap close nhi hota h"
-            // I will skip auto-open for now as requested to minimize changes.
-
-            // Correction: If I don't auto-open, they have to manually open every morning?
-            // That's also annoying.
-            // Most systems: If you manually toggle, it stays.
-            // But we don't have a "manual override" flag.
-            // Let's implement AUTO-OPEN only if it's EXACTLY the opening minute (or close to it),
-            // effectively triggers "at start of day".
-            // But cron runs every few mins.
-
-            // Let's stick to the user's specific request: "ye close time apne aap close nhi hota h".
-            // I will only implement Auto-Close.
+            // -> System should OPEN it (User requirement: "jo jis time tak h restauarnt wo sare dikhna chiaye na")
+            if (isOpenWindow && !restaurant.isAcceptingOrders) {
+                await Restaurant.findByIdAndUpdate(restaurant._id, { isAcceptingOrders: true });
+                console.log(`🔓 Auto-opening restaurant ${restaurant.name} (${restaurant._id}) - Inside business hours (Time: ${currentHour}:${currentMinute})`);
+                openedCount++;
+            }
         }
 
         return {
             processed: restaurants.length,
             closed: closedCount,
             opened: openedCount,
-            message: `Checked ${restaurants.length} restaurants. Auto-closed: ${closedCount}.`
+            message: `Checked ${restaurants.length} restaurants. Auto-closed: ${closedCount}, Auto-opened: ${openedCount}.`
         };
 
     } catch (error) {

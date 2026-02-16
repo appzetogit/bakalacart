@@ -135,13 +135,13 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   if (displayImages.length === 0 || !displayImages[0]) {
     const fallbackImageRef = useRef(null)
     const [fallbackLoading, setFallbackLoading] = useState(true)
-    
+
     useEffect(() => {
       if (fallbackImageRef.current && fallbackImageRef.current.complete && fallbackImageRef.current.naturalHeight !== 0) {
         setFallbackLoading(false)
       }
     }, [])
-    
+
     return (
       <div className="relative h-48 sm:h-56 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
         {fallbackLoading && (
@@ -232,7 +232,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                 <Loader2 className="h-8 w-8 text-green-600 dark:text-green-500 animate-spin" strokeWidth={2.5} />
               </div>
             )}
-            
+
             {displayImages[currentIndex] ? (
               <>
                 {/* Use regular img tag directly for Cloudinary URLs - OptimizedImage is causing issues */}
@@ -286,8 +286,8 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
               }}
               aria-label={`Go to image ${index + 1}`}
               className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${index === currentIndex
-                  ? "w-6 bg-white"
-                  : "w-1.5 bg-white/50 hover:bg-white/75"
+                ? "w-6 bg-white"
+                : "w-1.5 bg-white/50 hover:bg-white/75"
                 }`}
             />
           ))}
@@ -1028,10 +1028,10 @@ export default function Home() {
 
         // Transform API data to match expected format
         // IMPORTANT: Filter out offline restaurants (isAcceptingOrders: false) before transforming
-        const onlineRestaurants = restaurantsArray.filter(restaurant => 
+        const onlineRestaurants = restaurantsArray.filter(restaurant =>
           restaurant.isActive !== false && restaurant.isAcceptingOrders !== false
         )
-        
+
         const transformedRestaurants = onlineRestaurants.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
           const deliveryTime = restaurant.estimatedDeliveryTime || "25-30 mins"
@@ -1310,7 +1310,7 @@ export default function Home() {
   const filteredRestaurants = useMemo(() => {
     // Use only API data - no mock data fallback
     // IMPORTANT: First filter out offline restaurants (isAcceptingOrders: false)
-    let filtered = restaurantsData.filter(r => 
+    let filtered = restaurantsData.filter(r =>
       r.isActive !== false && r.isAcceptingOrders !== false
     )
 
@@ -2460,21 +2460,6 @@ export default function Home() {
                               </Button>
                             </motion.div>
 
-                            {/* FREE delivery Badge - Bottom Left (only for first 3 restaurants) */}
-                            {index < 3 && (
-                              <motion.div
-                                className="absolute bottom-2 left-0 sm:bottom-2 sm:left-0 z-10"
-                                variants={{
-                                  rest: { x: 0, opacity: 1 },
-                                  hover: { x: 4, opacity: 1 }
-                                }}
-                                transition={{ duration: 0.3 }}
-                              >
-                                <div className="bg-gradient-to-r from-blue-600 via-blue-500/80 to-transparent text-white px-2.5 py-1 rounded-r-sm text-[10px] sm:text-xs font-bold shadow-lg backdrop-blur-sm">
-                                  FREE delivery
-                                </div>
-                              </motion.div>
-                            )}
                           </div>
 
                           {/* Content Section */}

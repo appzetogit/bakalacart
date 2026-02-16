@@ -29,19 +29,7 @@ export default function LocationPrompt() {
         const currentLocation = localStorage.getItem("userLocation")
         if (!currentLocation && !permissionGranted) {
           setShowPrompt(true)
-
-          // SHOW REAL-TIME PUSH NOTIFICATION (As requested)
-          // Use sessionStorage to ensure it only shows once per session (prevent double notifications)
-          const notificationShown = sessionStorage.getItem("locationNotificationShown")
-          if (!notificationShown) {
-            showLocalNotification(
-              "Bakala Cart",
-              "To see restaurants, please turn on location",
-              "location_off_alert" // tag to prevent system duplicates
-            ).catch(err => console.debug("Notification failed:", err))
-
-            sessionStorage.setItem("locationNotificationShown", "true")
-          }
+          sessionStorage.setItem("location_off_notified", "true")
 
           // Prevent body scroll when popup is open
           document.body.style.overflow = "hidden"
@@ -65,6 +53,7 @@ export default function LocationPrompt() {
       }
     }
   }, [permissionGranted])
+
 
   // Close prompt when location is successfully obtained
   useEffect(() => {

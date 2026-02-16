@@ -1639,8 +1639,32 @@ export function useLocation() {
             } else {
               console.error("❌ Geolocation error:", err.code, err.message)
             }
+
+            // TRIGGER: Notification for NEW CUSTOMERS with LOCATION OFF
+            // err.code 1 is PERMISSION_DENIED
+            // Check if we've already notified to prevent duplicates
+            if (err.code === 1 || err.code === 2) {
+              const hasStoredLocation = localStorage.getItem("userLocation")
+              const hasBeenNotified = sessionStorage.getItem("location_off_notified")
+
+              // If it's a new customer (no stored location) and we haven't notified yet in this session
+              if (!hasStoredLocation && !hasBeenNotified) {
+                import('@/services/pushNotificationService').then(({ showLocalNotification }) => {
+                  showLocalNotification(
+                    "Enable Location services",
+                    "To see nearby restaurants, please turn on location!",
+                    "location_off_prompt"
+                  )
+                  sessionStorage.setItem("location_off_notified", "true")
+                  console.log("🔔 Location Off Notification sent to new customer")
+                }).catch(e => console.warn("Failed to load notification service:", e))
+              }
+
+            }
+
             // Try multiple fallback strategies
             try {
+
               // Strategy 1: Use DB location if available
               let fallback = dbLocation
               if (!fallback) {
@@ -2180,13 +2204,34 @@ export function useLocation() {
       startWatchingLocation()
     }
 
-    // Cleanup timeout and watcher
+    // Add storage event listener to sync location across different instances of this hook
+    const handleStorageChange = (e) => {
+      if (e.key === "userLocation" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue)
+          if (parsed && (parsed.latitude || parsed.city)) {
+            console.log("🔄 Syncing location from localStorage event:", parsed)
+            setLocation(parsed)
+            setPermissionGranted(true)
+            setError(null)
+          }
+        } catch (err) {
+          console.error("Failed to sync location from storage event:", err)
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+
+    // Cleanup timeout, watcher and storage listener
     return () => {
       clearTimeout(loadingTimeout)
-      console.log("🧹 Cleaning up location watcher")
+      console.log("🧹 Cleaning up location watcher and storage listener")
       stopWatchingLocation()
+      window.removeEventListener("storage", handleStorageChange)
     }
   }, [])
+
 
   const requestLocation = async () => {
     console.log("📍📍📍 User requested location update - clearing cache and fetching fresh")
