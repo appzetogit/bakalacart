@@ -14,18 +14,16 @@ export async function processAutoRejectOrders() {
     const ACCEPT_TIME_LIMIT_MS = ACCEPT_TIME_LIMIT_SECONDS * 1000;
 
     // Find all orders with status 'pending' or 'confirmed' that haven't been accepted yet
-    // These are orders waiting for restaurant to accept
     const validPendingOrders = await Order.find({
       status: { $in: ['pending', 'confirmed'] }
     }).lean();
 
     if (validPendingOrders.length === 0) {
-      return { processed: 0, message: 'No pending orders to check' };
+      // Still run recovery loop even if no pending orders
     }
 
     const now = new Date();
     let processedCount = 0;
-    const rejectedOrders = [];
 
     for (const order of validPendingOrders) {
       const orderCreatedAt = new Date(order.createdAt);
@@ -34,179 +32,140 @@ export async function processAutoRejectOrders() {
       // Check if accept time has expired
       if (elapsedMs >= ACCEPT_TIME_LIMIT_MS) {
         try {
-          // Double-check order hasn't been accepted or cancelled by another process
           const currentOrder = await Order.findById(order._id);
-          if (!currentOrder) {
-            continue; // Order was deleted
-          }
+          if (!currentOrder || !['pending', 'confirmed'].includes(currentOrder.status)) continue;
 
-          // Only reject if still in pending/confirmed status
-          if (!['pending', 'confirmed'].includes(currentOrder.status)) {
-            continue; // Order was already accepted/rejected
-          }
+          // DYNAMIC RECOVERY: Check Razorpay for payment status before rejecting
+          let successfulPayment = null;
+          try {
+            const { fetchOrderPayments, getRazorpayInstance } = await import('../../payment/services/razorpayService.js');
+            const razorpayOrderId = currentOrder.payment?.razorpayOrderId;
 
-          // CRITICAL FIX: Check if payment was actually made (for Razorpay orders)
-          // Ideally, frontend handles verification, but if user closed tab, payment might be successful but order pending
-          if (currentOrder.payment?.method === 'razorpay' && currentOrder.payment?.status === 'pending') {
-            try {
-              const { fetchOrderPayments } = await import('../../payment/services/razorpayService.js');
-              const razorpayOrderId = currentOrder.payment.razorpayOrderId;
-
-              if (razorpayOrderId) {
-                const payments = await fetchOrderPayments(razorpayOrderId);
-                // Check if any payment is captured or authorized
-                const successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
-
-                if (successfulPayment) {
-                  console.log(`✅ FOUND SUCCESSFUL PAYMENT for pending order ${currentOrder.orderId}:`, successfulPayment.id);
-
-                  // Mark order as paid and confirmed instead of cancelling
-                  currentOrder.payment.status = 'completed';
-                  currentOrder.payment.razorpayPaymentId = successfulPayment.id;
-                  currentOrder.payment.transactionId = successfulPayment.id;
-                  currentOrder.status = 'confirmed';
-                  currentOrder.tracking.confirmed = { status: true, timestamp: new Date() };
-
-                  await currentOrder.save();
-
-                  console.log(`✅ Auto-confirmed order ${currentOrder.orderId} (recovered from pending state)`);
-
-                  // Notify restaurant about the recovered order
-                  try {
-                    const { notifyRestaurantNewOrder } = await import('./restaurantNotificationService.js');
-                    await notifyRestaurantNewOrder(currentOrder, currentOrder.restaurantId);
-                  } catch (notifyError) {
-                    console.error('Error notifying restaurant for recovered order:', notifyError);
+            if (razorpayOrderId) {
+              const payments = await fetchOrderPayments(razorpayOrderId);
+              successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
+            } else {
+              // Search by receipt (Order ID) if razorpayOrderId is missing
+              const razorpay = await getRazorpayInstance();
+              if (razorpay) {
+                const rzpOrders = await razorpay.orders.all({ receipt: currentOrder.orderId });
+                if (rzpOrders.items?.length > 0) {
+                  const rzpOrderId = rzpOrders.items[0].id;
+                  const payments = await razorpay.orders.fetchPayments(rzpOrderId);
+                  successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
+                  if (successfulPayment) {
+                    currentOrder.payment.razorpayOrderId = rzpOrderId;
                   }
-
-                  continue; // Skip cancellation logic!
                 }
               }
-            } catch (paymentCheckError) {
-              console.error(`⚠️ Error checking Razorpay status for auto-reject candidate ${currentOrder.orderId}:`, paymentCheckError);
-              // Fallthrough to cancel if check fails (safest default for truly abandoned orders)
             }
+          } catch (e) {
+            console.error(`Error checking payment for ${currentOrder.orderId}:`, e.message);
           }
 
-          // Update order status to cancelled
+          if (successfulPayment) {
+            console.log(`✅ [Auto-Reject] Recovery triggered for ${currentOrder.orderId}: Payment found (${successfulPayment.id})`);
+            currentOrder.payment.status = 'completed';
+            currentOrder.payment.razorpayPaymentId = successfulPayment.id;
+            currentOrder.payment.transactionId = successfulPayment.id;
+            currentOrder.status = 'confirmed';
+            currentOrder.tracking.confirmed = { status: true, timestamp: new Date() };
+            await currentOrder.save();
+
+            try {
+              const { notifyRestaurantNewOrder } = await import('./restaurantNotificationService.js');
+              await notifyRestaurantNewOrder(currentOrder, currentOrder.restaurantId);
+            } catch (nErr) { console.error('Notify Error:', nErr.message); }
+            continue;
+          }
+
+          // Proceed with rejection if no payment found
           currentOrder.status = 'cancelled';
           currentOrder.cancellationReason = 'Order not accepted within time limit. Restaurant did not respond in time.';
           currentOrder.cancelledBy = 'restaurant';
           currentOrder.cancelledAt = now;
-
           await currentOrder.save();
-
-          rejectedOrders.push({
-            orderId: currentOrder.orderId,
-            elapsedSeconds: Math.floor(elapsedMs / 1000)
-          });
           processedCount++;
 
-          console.log(`✅ Order ${currentOrder.orderId} automatically rejected (elapsed: ${Math.floor(elapsedMs / 1000)}s >= ${ACCEPT_TIME_LIMIT_SECONDS}s)`);
+          console.log(`🔒 Order ${currentOrder.orderId} auto-rejected.`);
 
-          // Calculate refund amount but don't process automatically
-          // Admin will process refund manually via refund button
           try {
-            await calculateCancellationRefund(
-              currentOrder._id,
-              'Order not accepted within time limit. Restaurant did not respond in time.'
-            );
-            console.log(`✅ Cancellation refund calculated for order ${currentOrder.orderId} - awaiting admin approval`);
-          } catch (refundError) {
-            console.error(`❌ Error calculating cancellation refund for order ${currentOrder.orderId}:`, refundError);
-            // Don't fail order cancellation if refund calculation fails
-          }
+            await calculateCancellationRefund(currentOrder._id, 'Order not accepted within time limit.');
+          } catch (refErr) { console.error('Refund calc error:', refErr.message); }
 
-          // Notify about status update
           try {
             await notifyRestaurantOrderUpdate(currentOrder._id.toString(), 'cancelled');
-          } catch (notifError) {
-            console.error(`❌ Error sending notification for order ${currentOrder.orderId}:`, notifError);
-          }
+          } catch (notifError) { console.error('Update notification error:', notifError.message); }
+
         } catch (updateError) {
-          console.error(`❌ Error auto-rejecting order ${order.orderId}:`, updateError);
+          console.error(`❌ Error processing order ${order.orderId}:`, updateError);
         }
       }
     }
 
-    // --- ADDITIONAL RECOVERY FOR ALREADY CANCELLED ORDERS ---
-    // Check for orders cancelled recently (e.g. last 1 hour) that are Razorpay + Pending Payment
-    // This fixes the issue where an order was auto-cancelled BEFORE the payment could be verified
+    // --- RECOVERY FOR ALREADY CANCELLED ORDERS (FIX FOR USER) ---
     try {
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       const ambiguousCancelledOrders = await Order.find({
         status: 'cancelled',
-        'payment.method': 'razorpay',
-        'payment.status': 'pending',
-        updatedAt: { $gte: oneHourAgo } // Limit scope to recently modified orders
+        updatedAt: { $gte: oneHourAgo }
       });
 
       if (ambiguousCancelledOrders.length > 0) {
-        console.log(`🔍 Checking ${ambiguousCancelledOrders.length} recently cancelled orders for payments...`);
-        const { fetchOrderPayments } = await import('../../payment/services/razorpayService.js');
+        console.log(`🔍 Checking ${ambiguousCancelledOrders.length} recently cancelled orders...`);
+        const { fetchOrderPayments, getRazorpayInstance } = await import('../../payment/services/razorpayService.js');
+        const razorpay = await getRazorpayInstance();
 
         for (const cancelledOrder of ambiguousCancelledOrders) {
           try {
-            const razorpayOrderId = cancelledOrder.payment.razorpayOrderId;
+            let successfulPayment = null;
+            const razorpayOrderId = cancelledOrder.payment?.razorpayOrderId;
+
             if (razorpayOrderId) {
               const payments = await fetchOrderPayments(razorpayOrderId);
-              const successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
-
-              if (successfulPayment) {
-                console.log(`✅ FOUND PAYMENT FOR CANCELLED ORDER ${cancelledOrder.orderId}:`, successfulPayment.id);
-
-                // CRITICAL FIX: Reactivate the order!
-                // The user wants it to appear in "Order Assign" (active orders).
-                // So we must revert 'cancelled' -> 'confirmed'.
-
-                cancelledOrder.status = 'confirmed'; // Reactivate order!
-
-                cancelledOrder.payment.status = 'completed';
-                cancelledOrder.payment.razorpayPaymentId = successfulPayment.id;
-                cancelledOrder.payment.transactionId = successfulPayment.id;
-
-                // Update tracking
-                if (!cancelledOrder.tracking) cancelledOrder.tracking = {};
-                cancelledOrder.tracking.confirmed = { status: true, timestamp: new Date() };
-
-                // Add a note but clear cancellation flags so it's treated as active
-                const oldReason = cancelledOrder.cancellationReason || '';
-                cancelledOrder.cancellationReason = ''; // Clear reason so it doesn't look cancelled
-                cancelledOrder.note = (cancelledOrder.note || '') + ` [System: Auto-recovered from cancellation. Payment verified. Previous reason: ${oldReason}]`;
-
-                // Remove cancellation meta
-                cancelledOrder.cancelledBy = undefined;
-                cancelledOrder.cancelledAt = undefined;
-
-                await cancelledOrder.save();
-                console.log(`✅ REACTIVATED Order ${cancelledOrder.orderId}. Status: CONFIRMED, Payment: COMPLETED.`);
-
-                // Notify restaurant again so they see it in "New Orders"
-                try {
-                  const { notifyRestaurantNewOrder } = await import('./restaurantNotificationService.js');
-                  await notifyRestaurantNewOrder(cancelledOrder, cancelledOrder.restaurantId);
-                } catch (notifyError) {
-                  console.error('Error notifying restaurant for reactivated order:', notifyError);
-                }
+              successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
+            } else if (razorpay) {
+              const rzpOrders = await razorpay.orders.all({ receipt: cancelledOrder.orderId });
+              if (rzpOrders.items?.length > 0) {
+                const rzpOrderId = rzpOrders.items[0].id;
+                const payments = await razorpay.orders.fetchPayments(rzpOrderId);
+                successfulPayment = payments.items?.find(p => p.status === 'captured' || p.status === 'authorized');
+                if (successfulPayment) cancelledOrder.payment.razorpayOrderId = rzpOrderId;
               }
             }
-          } catch (err) {
-            console.error(`Error checking payment for cancelled order ${cancelledOrder.orderId}:`, err);
+
+            if (successfulPayment) {
+              console.log(`✅ [Recovery] Reactivating order ${cancelledOrder.orderId} due to verified payment.`);
+              cancelledOrder.status = 'confirmed';
+              cancelledOrder.payment.status = 'completed';
+              cancelledOrder.payment.razorpayPaymentId = successfulPayment.id;
+              cancelledOrder.payment.transactionId = successfulPayment.id;
+              cancelledOrder.cancellationReason = '';
+              cancelledOrder.cancelledBy = undefined;
+              cancelledOrder.cancelledAt = undefined;
+              cancelledOrder.note = (cancelledOrder.note || '') + ' [System: Recovery verified payment]';
+              if (!cancelledOrder.tracking) cancelledOrder.tracking = {};
+              cancelledOrder.tracking.confirmed = { status: true, timestamp: new Date() };
+
+              await cancelledOrder.save();
+
+              try {
+                const { notifyRestaurantNewOrder } = await import('./restaurantNotificationService.js');
+                await notifyRestaurantNewOrder(cancelledOrder, cancelledOrder.restaurantId);
+              } catch (nErr) { console.error('Recovery Notify Error:', nErr.message); }
+            }
+          } catch (innerErr) {
+            console.error(`Error in recovery loop for ${cancelledOrder.orderId}:`, innerErr.message);
           }
         }
       }
-    } catch (recoveryError) {
-      console.error('Error in cancelled order recovery loop:', recoveryError);
+    } catch (recErr) {
+      console.error('Recovery Loop Error:', recErr.message);
     }
 
-    return {
-      processed: processedCount,
-      message: processedCount > 0
-        ? `Auto-rejected ${processedCount} order(s) that were not accepted within ${ACCEPT_TIME_LIMIT_SECONDS} seconds`
-        : 'No orders to auto-reject'
-    };
+    return { processed: processedCount, message: `Processed ${processedCount} rejections.` };
   } catch (error) {
-    console.error('❌ Error processing auto-reject orders:', error);
-    return { processed: 0, message: `Error: ${error.message}` };
+    console.error('❌ Global error in autoReject:', error);
+    return { processed: 0, message: error.message };
   }
 }

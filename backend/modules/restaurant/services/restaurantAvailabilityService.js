@@ -14,17 +14,29 @@ const parseTimeToMinutes = (timeStr) => {
         let normalized = timeStr.toLowerCase().trim();
 
         // Check for AM/PM
-        const isPM = normalized.includes('pm');
-        const isAM = normalized.includes('am');
+        const isPM = normalized.includes('pm') || normalized.includes('p.m');
+        const isAM = normalized.includes('am') || normalized.includes('a.m');
 
-        // Remove non-time characters
-        normalized = normalized.replace(/[a-z\s]/g, '');
+        // Extract numbers
+        const timeMatch = normalized.match(/(\d+)[:.]?(\d+)?/);
+        if (!timeMatch) return null;
 
-        const parts = normalized.split(':');
-        let hours = parseInt(parts[0]);
-        let minutes = parseInt(parts[1] || '0');
+        let hours = parseInt(timeMatch[1]);
+        let minutes = parseInt(timeMatch[2] || '0');
 
         if (isNaN(hours)) return null;
+
+        // Smart adjustment for ambiguous hours (e.g., "1:00" or "01:00" without AM/PM)
+        // In restaurant context, a closing time of 1, 2, 3, 4, 5 is almost always PM
+        // UNLESS AM is explicitly specified.
+        if (!isAM && !isPM) {
+            if (hours >= 1 && hours <= 6) {
+                // If opening is early morning (e.g. 6-11), and closing is 1-6, it's likely PM
+                // We'll treat 1-6 as PM by default in ambiguous cases for CLOSING times
+                // but for now let's just assume most people enter 24h format if not AM/PM.
+                // Actually, let's keep it strict but handle the most common user error.
+            }
+        }
 
         // Adjust for 12-hour format
         if (isPM && hours < 12) hours += 12;
@@ -124,24 +136,22 @@ export const processRestaurantAvailability = async () => {
 
             // Action Logic
 
+            if (restaurant.name.toLowerCase().includes("test") || true) { // Log for all for debugging given small count
+                console.log(`[Clock Check] ${restaurant.name}: Open ${restaurant.deliveryTimings.openingTime} (${openMinutes}), Close ${restaurant.deliveryTimings.closingTime} (${closeMinutes}), Current ${currentMinutesCapped} -> IsOpenWindow: ${isOpenWindow}, Accepting: ${restaurant.isAcceptingOrders}`);
+            }
+
             // Case 1: Time is OUTSIDE business hours, but restaurant is OPEN
             // -> System should CLOSE it.
             if (!isOpenWindow && restaurant.isAcceptingOrders) {
                 await Restaurant.findByIdAndUpdate(restaurant._id, { isAcceptingOrders: false });
-                console.log(`🔒 Auto-closing restaurant ${restaurant.name} (${restaurant._id}) - Outside business hours`);
+                console.log(`🔒 Auto-closing restaurant ${restaurant.name} (${restaurant._id}) - Outside business hours (Time: ${currentHour}:${currentMinute})`);
                 closedCount++;
             }
 
             // Case 2: Time is INSIDE business hours, but restaurant is CLOSED
             // -> Should we auto-open?
-            // User complaint was specific about "not closing".
-            // Auto-opening can be dangerous if owner manually closed for emergency.
-            // However, for "New" restaurants as mentioned, they might expect automation.
-            // Compromise: We will NOT auto-open to avoid breaking manual overrides, 
-            // UNLESS we decide to simply enforce schedule.
-            // Given "flow change mat karna", modifying "Close" behavior is the safe fix for the bug.
-            // Modifying "Open" behavior is a feature change that overrides user control.
-            // I will skip auto-open for now.
+            // User complaint: "ye close time apne aap close nhi hota h"
+            // I will skip auto-open for now as requested to minimize changes.
 
             // Correction: If I don't auto-open, they have to manually open every morning?
             // That's also annoying.
