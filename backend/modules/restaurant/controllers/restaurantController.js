@@ -119,7 +119,11 @@ export const getRestaurants = async (req, res) => {
     }
     
     // Build query
-    const query = { isActive: true };
+    // Only show restaurants that are active AND currently accepting orders (online)
+    const query = { 
+      isActive: true,
+      isAcceptingOrders: true 
+    };
     
     // Cuisine filter
     if (cuisine) {
@@ -139,23 +143,8 @@ export const getRestaurants = async (req, res) => {
         query.totalRatings = { $gte: 100 }; // At least 100 ratings to be "trusted"
       }
     
-    // Delivery time filter (estimatedDeliveryTime contains time in format "25-30 mins")
-    if (maxDeliveryTime) {
-      const maxTime = parseInt(maxDeliveryTime);
-      query.$or = [
-        { estimatedDeliveryTime: { $regex: new RegExp(`(\\d+)-?\\d*\\s*mins?`, 'i') } }
-      ];
-      // We'll filter this in application logic since it's a string field
-    }
-    
-    // Distance filter (distance is stored as string like "1.2 km")
-    if (maxDistance) {
-      const maxDist = parseFloat(maxDistance);
-      query.$or = [
-        { distance: { $regex: new RegExp(`\\d+\\.?\\d*\\s*km`, 'i') } }
-      ];
-      // We'll filter this in application logic since it's a string field
-    }
+    // Note: Delivery time and distance filters are applied in application logic after fetching
+    // because they are stored as strings. We don't add them to query.$or to avoid conflicts.
     
     // Price range filter
     if (maxPrice) {
@@ -167,6 +156,7 @@ export const getRestaurants = async (req, res) => {
     
     // Offers filter
     if (hasOffers === 'true') {
+      // Add offers condition - MongoDB will combine this with isAcceptingOrders: true
       query.$or = [
         { offer: { $exists: true, $ne: null, $ne: '' } },
         { featuredPrice: { $exists: true } }
@@ -288,8 +278,10 @@ export const getRestaurantById = async (req, res) => {
     const { id } = req.params;
     
     // Build query conditions - only include _id if it's a valid ObjectId
+    // IMPORTANT: Only show restaurants that are active AND currently accepting orders (online)
     const queryConditions = {
       isActive: true,
+      isAcceptingOrders: true, // Only show online restaurants to users
     };
     
     const orConditions = [
@@ -1026,8 +1018,12 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       }
     };
 
-    // Get all active restaurants - Show ALL restaurants regardless of zone
-    let restaurants = await Restaurant.find({ isActive: true })
+    // Get all active restaurants that are currently accepting orders (online)
+    // These are the only ones that should be visible to users
+    let restaurants = await Restaurant.find({ 
+      isActive: true,
+      isAcceptingOrders: true 
+    })
       .select('-owner -createdAt -updatedAt')
       .lean()
       .limit(100); // Limit to first 100 restaurants for performance

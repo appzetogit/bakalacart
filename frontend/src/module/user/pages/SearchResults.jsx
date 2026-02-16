@@ -224,10 +224,16 @@ export default function SearchResults() {
           }
           
           // First transform restaurants without menu data - USE ONLY BACKEND DATA
-          // Filter out restaurants with only default/mock data
+          // IMPORTANT: Filter out offline restaurants (isAcceptingOrders: false) first
+          // Then filter out restaurants with only default/mock data
           const restaurantsWithIds = restaurantsArray
             .filter((restaurant) => {
-              // Only include restaurants with real data (not just defaults)
+              // First check: Only show online restaurants (isAcceptingOrders: true)
+              if (restaurant.isActive === false || restaurant.isAcceptingOrders === false) {
+                return false
+              }
+              
+              // Second check: Only include restaurants with real data (not just defaults)
               // At minimum, restaurant should have a name and either images or menu
               const hasName = restaurant.name && restaurant.name.trim().length > 0
               const hasRealImage = restaurant.profileImage?.url || 

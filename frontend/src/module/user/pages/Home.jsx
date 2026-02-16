@@ -1027,7 +1027,12 @@ export default function Home() {
         }
 
         // Transform API data to match expected format
-        const transformedRestaurants = restaurantsArray.map((restaurant, index) => {
+        // IMPORTANT: Filter out offline restaurants (isAcceptingOrders: false) before transforming
+        const onlineRestaurants = restaurantsArray.filter(restaurant => 
+          restaurant.isActive !== false && restaurant.isAcceptingOrders !== false
+        )
+        
+        const transformedRestaurants = onlineRestaurants.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
           const deliveryTime = restaurant.estimatedDeliveryTime || "25-30 mins"
 
@@ -1304,7 +1309,10 @@ export default function Home() {
   // Filter restaurants and foods based on active filters
   const filteredRestaurants = useMemo(() => {
     // Use only API data - no mock data fallback
-    let filtered = [...restaurantsData]
+    // IMPORTANT: First filter out offline restaurants (isAcceptingOrders: false)
+    let filtered = restaurantsData.filter(r => 
+      r.isActive !== false && r.isAcceptingOrders !== false
+    )
 
     // Apply filters
     if (activeFilters.has('price-under-200')) {
