@@ -39,9 +39,15 @@ export default function Logout() {
       }
 
       // Clear all authentication data from localStorage
+      localStorage.removeItem("user_accessToken")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
+      localStorage.removeItem("userProfile")
+      localStorage.removeItem("userAddresses")
+      localStorage.removeItem("userPaymentMethods")
+      localStorage.removeItem("userFavorites")
+      localStorage.removeItem("userDishFavorites")
       localStorage.removeItem("cart")
 
       // Clear sessionStorage
@@ -59,9 +65,15 @@ export default function Logout() {
       console.error("Error during logout:", err)
 
       // Clear local data anyway
+      localStorage.removeItem("user_accessToken")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user_authenticated")
       localStorage.removeItem("user_user")
+      localStorage.removeItem("userProfile")
+      localStorage.removeItem("userAddresses")
+      localStorage.removeItem("userPaymentMethods")
+      localStorage.removeItem("userFavorites")
+      localStorage.removeItem("userDishFavorites")
       localStorage.removeItem("cart")
       sessionStorage.removeItem("userAuthData")
       window.dispatchEvent(new Event("userAuthChanged"))

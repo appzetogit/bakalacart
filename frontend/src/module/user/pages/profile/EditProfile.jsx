@@ -356,8 +356,8 @@ export default function EditProfile() {
                   id="mobile"
                   type="tel"
                   value={formData.mobile}
-                  readOnly
-                  className="flex-1 h-12 text-base border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 cursor-not-allowed rounded-lg pr-24"
+                  onChange={(e) => handleChange('mobile', e.target.value)}
+                  className="flex-1 h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white pr-24"
                   placeholder="Mobile"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-bold rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800/50">
@@ -367,9 +367,6 @@ export default function EditProfile() {
                   Verified
                 </div>
               </div>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
-                Verified mobile number cannot be changed from profile.
-              </p>
             </div>
 
             {/* Email Field */}
@@ -382,11 +379,20 @@ export default function EditProfile() {
                   id="email"
                   type="email"
                   value={formData.email}
+                  readOnly={userProfile?.signupMethod === 'email' || userProfile?.signupMethod === 'google' || !!userProfile?.googleId}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="flex-1 h-12 text-base border border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 rounded-lg bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white"
+                  className={`flex-1 h-12 text-base border rounded-lg ${(userProfile?.signupMethod === 'email' || userProfile?.signupMethod === 'google' || !!userProfile?.googleId)
+                      ? "border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 cursor-not-allowed shadow-none"
+                      : "border-gray-300 dark:border-gray-700 focus:border-green-600 focus:ring-1 focus:ring-green-600 bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white"
+                    }`}
                   placeholder="Email"
                 />
               </div>
+              {(userProfile?.signupMethod === 'email' || userProfile?.signupMethod === 'google' || !!userProfile?.googleId) && (
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                  Email cannot be changed for accounts created via {userProfile?.signupMethod === 'google' || userProfile?.googleId ? 'Google' : 'Email'}.
+                </p>
+              )}
             </div>
 
             {/* Date of Birth Field */}

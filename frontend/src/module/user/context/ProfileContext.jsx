@@ -14,7 +14,7 @@ export function ProfileProvider({ children }) {
         console.error("Error parsing user_user from localStorage:", e)
       }
     }
-    
+
     // Fallback to userProfile from localStorage
     const saved = localStorage.getItem("userProfile")
     if (saved) {
@@ -24,11 +24,11 @@ export function ProfileProvider({ children }) {
         console.error("Error parsing userProfile from localStorage:", e)
       }
     }
-    
+
     // Default empty profile
     return null
   })
-  
+
   const [loading, setLoading] = useState(true)
 
   const [addresses, setAddresses] = useState([])
@@ -36,20 +36,20 @@ export function ProfileProvider({ children }) {
   // Helper function to deduplicate addresses by ID and label
   const deduplicateAddresses = useCallback((addressList) => {
     if (!Array.isArray(addressList) || addressList.length === 0) return []
-    
+
     // First pass: Remove duplicates by ID (keep first occurrence)
     const uniqueById = addressList.filter((address, index, self) => {
       if (!address.id) return true // Keep addresses without ID
       const firstIndex = self.findIndex(addr => addr.id === address.id)
       return index === firstIndex
     })
-    
+
     // Second pass: Remove duplicates by label (keep first occurrence)
     const uniqueByLabel = uniqueById.filter((address, index, self) => {
       const firstIndex = self.findIndex(addr => addr.label === address.label)
       return index === firstIndex
     })
-    
+
     return uniqueByLabel
   }, [])
 
@@ -133,22 +133,52 @@ export function ProfileProvider({ children }) {
   useEffect(() => {
     const fetchUserProfile = async () => {
       // Check if user is authenticated
-      const isAuthenticated = localStorage.getItem("user_authenticated") === "true" || 
-                             localStorage.getItem("user_accessToken")
-      
+      const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
+        localStorage.getItem("user_accessToken")
+
       if (!isAuthenticated) {
+        setUserProfile(null)
+        setAddresses([])
+        setFavorites([])
+        setDishFavorites([])
+        // Reset payment methods to default dummy cards or empty
+        const savedPayments = localStorage.getItem("userPaymentMethods")
+        if (!savedPayments) {
+          setPaymentMethods([
+            {
+              id: "1",
+              cardNumber: "1234",
+              cardHolder: "John Doe",
+              expiryMonth: "12",
+              expiryYear: "2025",
+              cvv: "123",
+              isDefault: true,
+              type: "visa",
+            },
+            {
+              id: "2",
+              cardNumber: "5678",
+              cardHolder: "John Doe",
+              expiryMonth: "12",
+              expiryYear: "2026",
+              cvv: "456",
+              isDefault: false,
+              type: "mastercard",
+            },
+          ])
+        }
         setLoading(false)
         return
       }
 
       try {
         setLoading(true)
-        
+
         // Fetch user profile
         try {
           const response = await authAPI.getCurrentUser()
           const userData = response?.data?.data?.user || response?.data?.user || response?.data
-          
+
           if (userData) {
             setUserProfile(userData)
             // Update localStorage
@@ -225,14 +255,14 @@ export function ProfileProvider({ children }) {
     }
 
     fetchUserProfile()
-    
+
     // Listen for auth changes
     const handleAuthChange = () => {
       fetchUserProfile()
     }
-    
+
     window.addEventListener("userAuthChanged", handleAuthChange)
-    
+
     return () => {
       window.removeEventListener("userAuthChanged", handleAuthChange)
     }
@@ -243,7 +273,7 @@ export function ProfileProvider({ children }) {
     try {
       const response = await userAPI.addAddress(address)
       const newAddress = response?.data?.data?.address || response?.data?.address
-      
+
       if (newAddress) {
         setAddresses((prev) => {
           const updated = [...prev, newAddress]
@@ -264,7 +294,7 @@ export function ProfileProvider({ children }) {
     try {
       const response = await userAPI.updateAddress(id, updatedAddress)
       const updatedAddr = response?.data?.data?.address || response?.data?.address
-      
+
       if (updatedAddr) {
         setAddresses((prev) => {
           const updated = prev.map((addr) => (addr.id === id ? { ...updatedAddr, id } : addr))
@@ -334,12 +364,12 @@ export function ProfileProvider({ children }) {
     setPaymentMethods((prev) => {
       const paymentToDelete = prev.find((pm) => pm.id === id)
       const newPayments = prev.filter((pm) => pm.id !== id)
-      
+
       // If deleting default, set first remaining as default
       if (paymentToDelete?.isDefault && newPayments.length > 0) {
         newPayments[0].isDefault = true
       }
-      
+
       return newPayments
     })
   }, [])
@@ -398,7 +428,7 @@ export function ProfileProvider({ children }) {
   }, [])
 
   const removeDishFavorite = useCallback((dishId, restaurantId) => {
-    setDishFavorites((prev) => 
+    setDishFavorites((prev) =>
       prev.filter(fav => !(fav.id === dishId && fav.restaurantId === restaurantId))
     )
   }, [])

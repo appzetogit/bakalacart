@@ -56,36 +56,45 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (name !== undefined && name !== null) {
       user.name = name.trim();
     }
-    
+
     if (email !== undefined && email !== null && email.trim() !== '') {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // RESTRICTION: If user signed up via email or Google, they cannot change their email address
+      if (user.email && normalizedEmail !== user.email) {
+        if (user.signupMethod === 'email' || user.signupMethod === 'google' || user.googleId) {
+          return errorResponse(res, 400, 'Email address cannot be changed for accounts created via Email or Google login');
+        }
+      }
+
       // Check if email already exists for another user
-      const existingUser = await User.findOne({ 
-        email: email.toLowerCase().trim(),
+      const existingUser = await User.findOne({
+        email: normalizedEmail,
         _id: { $ne: user._id },
         role: 'user'
       });
-      
+
       if (existingUser) {
         return errorResponse(res, 400, 'Email already in use');
       }
-      
-      user.email = email.toLowerCase().trim();
+
+      user.email = normalizedEmail;
     }
-    
+
     if (phone !== undefined && phone !== null) {
       // Check if phone already exists for another user
       if (phone.trim() !== '') {
-        const existingUser = await User.findOne({ 
+        const existingUser = await User.findOne({
           phone: phone.trim(),
           _id: { $ne: user._id },
           role: 'user'
         });
-        
+
         if (existingUser) {
           return errorResponse(res, 400, 'Phone number already in use');
         }
       }
-      
+
       user.phone = phone ? phone.trim() : null;
     }
 
@@ -176,13 +185,13 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
  */
 export const updateUserLocation = asyncHandler(async (req, res) => {
   try {
-    const { 
-      latitude, 
-      longitude, 
-      address, 
-      city, 
-      state, 
-      area, 
+    const {
+      latitude,
+      longitude,
+      address,
+      city,
+      state,
+      area,
       formattedAddress,
       accuracy,
       postalCode,

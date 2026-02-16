@@ -3,6 +3,7 @@ import { MapPin, X } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useLocation } from "../hooks/useLocation"
+import { showLocalNotification } from "@/services/pushNotificationService"
 
 export default function LocationPrompt() {
   const { location, loading, permissionGranted, requestLocation } = useLocation()
@@ -19,7 +20,7 @@ export default function LocationPrompt() {
     // 1. No location is stored (first time user)
     // 2. Prompt hasn't been dismissed
     // 3. Location permission was denied (we'll detect this after a delay)
-    
+
     if (!storedLocation && !promptDismissed) {
       // Wait a bit to let the hook try to get location automatically
       // If it fails, we'll show the prompt
@@ -28,6 +29,20 @@ export default function LocationPrompt() {
         const currentLocation = localStorage.getItem("userLocation")
         if (!currentLocation && !permissionGranted) {
           setShowPrompt(true)
+
+          // SHOW REAL-TIME PUSH NOTIFICATION (As requested)
+          // Use sessionStorage to ensure it only shows once per session (prevent double notifications)
+          const notificationShown = sessionStorage.getItem("locationNotificationShown")
+          if (!notificationShown) {
+            showLocalNotification(
+              "Bakala Cart",
+              "To see restaurants, please turn on location",
+              "location_off_alert" // tag to prevent system duplicates
+            ).catch(err => console.debug("Notification failed:", err))
+
+            sessionStorage.setItem("locationNotificationShown", "true")
+          }
+
           // Prevent body scroll when popup is open
           document.body.style.overflow = "hidden"
           // CSS animation will handle the fade-in

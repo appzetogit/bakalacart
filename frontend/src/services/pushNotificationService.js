@@ -268,11 +268,32 @@ async function initializePushNotifications() {
     }
 }
 
+// Show a local notification (Real-time)
+async function showLocalNotification(title, body, tag = 'general') {
+    if (!('Notification' in window)) return;
+
+    // Check if permission already granted
+    if (Notification.permission !== 'granted') {
+        const granted = await requestNotificationPermission();
+        if (!granted) return;
+    }
+
+    // Use a unique tag to prevent duplicates in the system tray
+    new Notification(title, {
+        body: body,
+        icon: '/bakalalogo.png',
+        tag: tag, // This ensures that if the same tag is used, it replaces the old one instead of creating a new entry
+        silent: false,
+        requireInteraction: false
+    });
+}
+
 export {
     initializePushNotifications,
     registerFCMToken,
     setupForegroundNotificationHandler,
     requestNotificationPermission,
     getFCMToken,
-    getPlatform
+    getPlatform,
+    showLocalNotification
 };
