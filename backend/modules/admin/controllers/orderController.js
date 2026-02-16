@@ -2460,6 +2460,85 @@ export const acceptOrderOnBehalfOfRestaurant = asyncHandler(async (req, res) => 
 });
 
 /**
+ * Reject order on behalf of restaurant
+ * POST /api/admin/orders/:orderId/reject-restaurant
+ */
+export const rejectOrderOnBehalfOfRestaurant = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason = 'Rejected by Admin' } = req.body;
+
+    // Find order
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+      order = await Order.findById(orderId);
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: orderId });
+    }
+
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Check if order can be cancelled
+    if (['delivered', 'cancelled'].includes(order.status)) {
+      return errorResponse(res, 400, `Cannot reject order. Current status: ${order.status}`);
+    }
+
+    // Set status to cancelled
+    order.status = 'cancelled';
+    order.cancellationReason = reason;
+    order.cancelledBy = 'restaurant'; // Treat as restaurant (admin acting on behalf)
+    order.cancelledAt = new Date();
+
+    // Add admin metadata
+    order.assignmentInfo = {
+      ...(order.assignmentInfo || {}),
+      rejectedByAdmin: req.user?._id?.toString() || req.admin?._id?.toString() || null,
+      rejectedByAdminAt: new Date()
+    };
+
+    await order.save();
+
+    // Handle refunds for online payments
+    const paymentMethod = order.payment?.method;
+    if (paymentMethod === 'razorpay' || paymentMethod === 'wallet') {
+      try {
+        const { calculateCancellationRefund } = await import('../../order/services/cancellationRefundService.js');
+        await calculateCancellationRefund(order._id, reason);
+        console.log(`✅ Cancellation refund calculated for admin rejected order ${order.orderId}`);
+      } catch (refundError) {
+        console.error('Error calculating refund:', refundError);
+      }
+    }
+
+    // Notify User
+    try {
+      const { notifyUserOrderUpdate } = await import('../../order/services/userNotificationService.js');
+      await notifyUserOrderUpdate(order._id, 'cancelled');
+    } catch (e) {
+      console.error('Error notifying user:', e);
+    }
+
+    // Notify Restaurant
+    try {
+      const { notifyRestaurantOrderUpdate } = await import('../../order/services/restaurantNotificationService.js');
+      await notifyRestaurantOrderUpdate(order._id.toString(), 'cancelled');
+    } catch (restNotifError) {
+      console.error('Error notifying restaurant:', restNotifError);
+    }
+
+    return successResponse(res, 200, 'Order rejected successfully on behalf of restaurant', {
+      order
+    });
+  } catch (error) {
+    console.error('Error rejecting order on behalf of restaurant:', error);
+    return errorResponse(res, 500, 'Failed to reject order');
+  }
+});
+
+/**
  * Reassign order to same restaurant (resend notification)
  * POST /api/admin/orders/:orderId/reassign-restaurant
  */

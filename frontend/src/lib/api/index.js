@@ -1202,6 +1202,16 @@ export const adminAPI = {
     return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_REASSIGN_RESTAURANT.replace(':orderId', orderId));
   },
 
+  // Accept order on behalf of restaurant
+  acceptOrderOnBehalfOfRestaurant: (orderId) => {
+    return apiClient.post(`/admin/orders/${orderId}/accept-restaurant`);
+  },
+
+  // Reject order on behalf of restaurant
+  rejectOrderOnBehalfOfRestaurant: (orderId, reason) => {
+    return apiClient.post(`/admin/orders/${orderId}/reject-restaurant`, { reason });
+  },
+
   // Get delivery boys for assignment dropdown
   getDeliveryBoysForAssignment: () => {
     return apiClient.get(API_ENDPOINTS.ADMIN.DELIVERY_BOYS_FOR_ASSIGNMENT);

@@ -222,6 +222,7 @@ import {
   assignOrderToDeliveryBoy,
   getDeliveryBoysForAssignment,
   acceptOrderOnBehalfOfRestaurant,
+  rejectOrderOnBehalfOfRestaurant,
   reassignOrderToRestaurant,
   deleteOrder
 } from '../controllers/orderController.js';
@@ -482,6 +483,7 @@ router.get('/orders/restaurant-report', getRestaurantReport);
 router.get('/orders/for-assignment', getOrdersForAssignment);
 router.post('/orders/:orderId/assign', assignOrderToDeliveryBoy);
 router.post('/orders/:orderId/accept-restaurant', acceptOrderOnBehalfOfRestaurant);
+router.post('/orders/:orderId/reject-restaurant', rejectOrderOnBehalfOfRestaurant);
 router.post('/orders/:orderId/reassign-restaurant', reassignOrderToRestaurant);
 router.get('/delivery-boys/for-assignment', getDeliveryBoysForAssignment);
 

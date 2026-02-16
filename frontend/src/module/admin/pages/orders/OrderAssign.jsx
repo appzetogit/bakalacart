@@ -167,9 +167,9 @@ export default function OrderAssign() {
       }
     } catch (error) {
       console.error("Error assigning order:", error)
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          "Failed to assign order. Please try again."
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        "Failed to assign order. Please try again."
       toast.error(errorMessage)
     } finally {
       setAssigningOrderId(null)
@@ -252,6 +252,44 @@ export default function OrderAssign() {
       setSelectedOrders(new Set())
     } else {
       setSelectedOrders(new Set(orders.map(o => o.id || o._id)))
+    }
+  }
+
+  // Handle restaurant accept
+  const handleRestaurantAccept = async (orderId) => {
+    try {
+      // Show loading or optimistic update could be added here
+      const response = await adminAPI.acceptOrderOnBehalfOfRestaurant(orderId)
+      if (response?.data?.success) {
+        toast.success("Order accepted on behalf of restaurant")
+        // Refresh orders to update status
+        fetchOrders()
+      } else {
+        toast.error(response?.data?.message || "Failed to accept order")
+      }
+    } catch (error) {
+      console.error("Error accepting order:", error)
+      toast.error(error.response?.data?.message || "Failed to accept order")
+    }
+  }
+
+  // Handle restaurant reject
+  const handleRestaurantReject = async (orderId) => {
+    // Prompt for rejection reason
+    const reason = window.prompt("Enter rejection reason:", "Rejected by Admin")
+    if (reason === null) return; // User cancelled
+
+    try {
+      const response = await adminAPI.rejectOrderOnBehalfOfRestaurant(orderId, reason)
+      if (response?.data?.success) {
+        toast.success("Order rejected on behalf of restaurant")
+        fetchOrders()
+      } else {
+        toast.error(response?.data?.message || "Failed to reject order")
+      }
+    } catch (error) {
+      console.error("Error rejecting order:", error)
+      toast.error(error.response?.data?.message || "Failed to reject order")
     }
   }
 
@@ -374,256 +412,276 @@ export default function OrderAssign() {
                   const orderId = order.id || order._id
                   const isSelected = selectedOrders.has(orderId)
                   return (
-                  <tr key={orderId} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleOrderSelection(orderId)}
-                        className="flex items-center justify-center"
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-3 h-3 text-blue-600" />
-                        ) : (
-                          <Square className="w-3 h-3 text-gray-400" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="text-xs font-medium text-gray-900 dark:text-white">
-                        {order.orderId}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="text-xs text-gray-900 dark:text-white">
-                        {order.customerName}
-                      </div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                        {order.customerPhone}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="text-xs text-gray-900 dark:text-white">
-                        {order.restaurant}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
-                        {order.address ? (
-                          <div className="space-y-0.5">
-                            {order.address.formattedAddress ? (
-                              <div className="flex items-start gap-1">
-                                <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
-                                <span className="text-[10px] break-words line-clamp-2">{order.address.formattedAddress}</span>
-                              </div>
-                            ) : (
-                              <>
-                                {order.address.street && (
-                                  <div className="text-[10px] line-clamp-1">{order.address.street}</div>
-                                )}
-                                {(order.address.area || order.address.city) && (
-                                  <div className="text-[10px] text-gray-500 line-clamp-1">
-                                    {[order.address.area, order.address.city].filter(Boolean).join(', ')}
-                                  </div>
-                                )}
-                                {(order.address.state || order.address.zipCode || order.address.pincode) && (
-                                  <div className="text-[10px] text-gray-500">
-                                    {[order.address.state, order.address.zipCode || order.address.pincode].filter(Boolean).join(' - ')}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {order.address.additionalDetails && (
-                              <div className="text-[10px] text-gray-400 italic line-clamp-1">
-                                {order.address.additionalDetails}
-                              </div>
-                            )}
-                            {order.deliveryAddressDetails && (
-                              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium line-clamp-2 mt-1">
-                                <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not available</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
-                        <div className="space-y-0.5">
-                          {order.restaurantZoneName ? (
-                            <div className="flex items-center gap-1">
-                              <Navigation className="w-2.5 h-2.5 text-blue-600" />
-                              <span className="text-[10px] font-medium">{order.restaurantZoneName}</span>
+                    <tr key={orderId} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <button
+                          onClick={() => toggleOrderSelection(orderId)}
+                          className="flex items-center justify-center"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-3 h-3 text-blue-600" />
+                          ) : (
+                            <Square className="w-3 h-3 text-gray-400" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="text-xs font-medium text-gray-900 dark:text-white">
+                          {order.orderId}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="text-xs text-gray-900 dark:text-white">
+                          {order.customerName}
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {order.customerPhone}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="text-xs text-gray-900 dark:text-white">
+                          {order.restaurant}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
+                          {order.address ? (
+                            <div className="space-y-0.5">
+                              {order.address.formattedAddress ? (
+                                <div className="flex items-start gap-1">
+                                  <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
+                                  <span className="text-[10px] break-words line-clamp-2">{order.address.formattedAddress}</span>
+                                </div>
+                              ) : (
+                                <>
+                                  {order.address.street && (
+                                    <div className="text-[10px] line-clamp-1">{order.address.street}</div>
+                                  )}
+                                  {(order.address.area || order.address.city) && (
+                                    <div className="text-[10px] text-gray-500 line-clamp-1">
+                                      {[order.address.area, order.address.city].filter(Boolean).join(', ')}
+                                    </div>
+                                  )}
+                                  {(order.address.state || order.address.zipCode || order.address.pincode) && (
+                                    <div className="text-[10px] text-gray-500">
+                                      {[order.address.state, order.address.zipCode || order.address.pincode].filter(Boolean).join(' - ')}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {order.address.additionalDetails && (
+                                <div className="text-[10px] text-gray-400 italic line-clamp-1">
+                                  {order.address.additionalDetails}
+                                </div>
+                              )}
+                              {order.deliveryAddressDetails && (
+                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium line-clamp-2 mt-1">
+                                  <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
+                                </div>
+                              )}
                             </div>
-                          ) : null}
-                          {order.restaurantLocation ? (
-                            <div className="text-[10px] text-gray-500">
-                              <div className="flex items-start gap-1">
-                                <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
-                                <span className="break-words line-clamp-2">
-                                  {/* Priority 1: formattedAddress (live location from Google Maps) */}
-                                  {order.restaurantLocation.formattedAddress && 
-                                   order.restaurantLocation.formattedAddress.trim() !== '' &&
-                                   order.restaurantLocation.formattedAddress.trim() !== 'Select location' &&
-                                   !/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(order.restaurantLocation.formattedAddress.trim())
-                                    ? order.restaurantLocation.formattedAddress.trim()
-                                    : null}
-                                  
-                                  {/* Priority 2: address field */}
-                                  {!order.restaurantLocation.formattedAddress && 
-                                   order.restaurantLocation.address && 
-                                   order.restaurantLocation.address.trim() !== '' &&
-                                   order.restaurantLocation.address.trim() !== 'Location not available'
-                                    ? order.restaurantLocation.address.trim()
-                                    : null}
-                                  
-                                  {/* Priority 3: Build from components */}
-                                  {!order.restaurantLocation.formattedAddress && 
-                                   !order.restaurantLocation.address && 
-                                   (order.restaurantLocation.area || order.restaurantLocation.city || order.restaurantLocation.addressLine1)
-                                    ? [
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not available</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
+                          <div className="space-y-0.5">
+                            {order.restaurantZoneName ? (
+                              <div className="flex items-center gap-1">
+                                <Navigation className="w-2.5 h-2.5 text-blue-600" />
+                                <span className="text-[10px] font-medium">{order.restaurantZoneName}</span>
+                              </div>
+                            ) : null}
+                            {order.restaurantLocation ? (
+                              <div className="text-[10px] text-gray-500">
+                                <div className="flex items-start gap-1">
+                                  <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
+                                  <span className="break-words line-clamp-2">
+                                    {/* Priority 1: formattedAddress (live location from Google Maps) */}
+                                    {order.restaurantLocation.formattedAddress &&
+                                      order.restaurantLocation.formattedAddress.trim() !== '' &&
+                                      order.restaurantLocation.formattedAddress.trim() !== 'Select location' &&
+                                      !/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(order.restaurantLocation.formattedAddress.trim())
+                                      ? order.restaurantLocation.formattedAddress.trim()
+                                      : null}
+
+                                    {/* Priority 2: address field */}
+                                    {!order.restaurantLocation.formattedAddress &&
+                                      order.restaurantLocation.address &&
+                                      order.restaurantLocation.address.trim() !== '' &&
+                                      order.restaurantLocation.address.trim() !== 'Location not available'
+                                      ? order.restaurantLocation.address.trim()
+                                      : null}
+
+                                    {/* Priority 3: Build from components */}
+                                    {!order.restaurantLocation.formattedAddress &&
+                                      !order.restaurantLocation.address &&
+                                      (order.restaurantLocation.area || order.restaurantLocation.city || order.restaurantLocation.addressLine1)
+                                      ? [
                                         order.restaurantLocation.addressLine1,
                                         order.restaurantLocation.addressLine2,
                                         order.restaurantLocation.area,
                                         order.restaurantLocation.city,
                                         order.restaurantLocation.state
                                       ].filter(Boolean).join(', ')
-                                    : null}
-                                  
-                                  {/* Pincode */}
-                                  {(order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode) && (
-                                    <span className="ml-1 font-medium">
-                                      - {order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode}
-                                    </span>
-                                  )}
-                                  
-                                  {/* Fallback if nothing found */}
-                                  {!order.restaurantLocation.formattedAddress && 
-                                   !order.restaurantLocation.address && 
-                                   !order.restaurantLocation.area && 
-                                   !order.restaurantLocation.city && 
-                                   !order.restaurantLocation.addressLine1
-                                    ? 'Location not available'
-                                    : null}
-                                </span>
+                                      : null}
+
+                                    {/* Pincode */}
+                                    {(order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode) && (
+                                      <span className="ml-1 font-medium">
+                                        - {order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode}
+                                      </span>
+                                    )}
+
+                                    {/* Fallback if nothing found */}
+                                    {!order.restaurantLocation.formattedAddress &&
+                                      !order.restaurantLocation.address &&
+                                      !order.restaurantLocation.area &&
+                                      !order.restaurantLocation.city &&
+                                      !order.restaurantLocation.addressLine1
+                                      ? 'Location not available'
+                                      : null}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-gray-400">Pin location not set</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="text-xs text-gray-900 dark:text-white max-w-[150px]">
-                        {order.items && order.items.length > 0 ? (
-                          <div className="space-y-0.5">
-                            {order.items.slice(0, 2).map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-1">
-                                <span className="font-medium text-[10px]">{item.name || 'Item'}</span>
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                  (Qty: {item.quantity || 1})
-                                </span>
-                              </div>
-                            ))}
-                            {order.items.length > 2 && (
-                              <div className="text-[10px] text-gray-500">+{order.items.length - 2} more</div>
+                            ) : (
+                              <div className="text-[10px] text-gray-400">Pin location not set</div>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">No items</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="text-xs font-medium text-gray-900 dark:text-white">
-                        ₹{order.totalAmount?.toFixed(2) || "0.00"}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {order.restaurantAccepted ? (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          Accepted
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                          <XCircle className="w-2.5 h-2.5" />
-                          Not Accepted
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {order.isAssigned || order.deliveryPartnerId ? (
-                        order.isDeliveryBoyAccepted ? (
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="text-xs text-gray-900 dark:text-white max-w-[150px]">
+                          {order.items && order.items.length > 0 ? (
+                            <div className="space-y-0.5">
+                              {order.items.slice(0, 2).map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-1">
+                                  <span className="font-medium text-[10px]">{item.name || 'Item'}</span>
+                                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                    (Qty: {item.quantity || 1})
+                                  </span>
+                                </div>
+                              ))}
+                              {order.items.length > 2 && (
+                                <div className="text-[10px] text-gray-500">+{order.items.length - 2} more</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 text-[10px]">No items</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="text-xs font-medium text-gray-900 dark:text-white">
+                          ₹{order.totalAmount?.toFixed(2) || "0.00"}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {order.restaurantAccepted ? (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                             <CheckCircle2 className="w-2.5 h-2.5" />
                             Accepted
                           </span>
-                        ) : order.isDeliveryBoyPending ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                            Pending
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 w-fit">
+                              <XCircle className="w-2.5 h-2.5" />
+                              Not Accepted
+                            </span>
+                            <div className="flex gap-1 mt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRestaurantAccept(order.id || order._id)}
+                                className="h-6 px-2 text-[10px] bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRestaurantReject(order.id || order._id)}
+                                className="h-6 px-2 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {order.isAssigned || order.deliveryPartnerId ? (
+                          order.isDeliveryBoyAccepted ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Accepted
+                            </span>
+                          ) : order.isDeliveryBoyPending ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              Pending
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Assigned
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="text-xs text-gray-900 dark:text-white">
+                          {order.date}
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {order.time}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {order.canReassign ? (
+                          <Button
+                            onClick={() => handleAssignClick(order)}
+                            disabled={assigningOrderId === order.id}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
+                          >
+                            {assigningOrderId === order.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Assigning...
+                              </>
+                            ) : (
+                              "Reassign"
+                            )}
+                          </Button>
+                        ) : order.isAssigned && !order.canReassign ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Accepted
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            <CheckCircle2 className="w-2.5 h-2.5" />
-                            Assigned
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not Assigned</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="text-xs text-gray-900 dark:text-white">
-                        {order.date}
-                      </div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                        {order.time}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {order.canReassign ? (
-                        <Button
-                          onClick={() => handleAssignClick(order)}
-                          disabled={assigningOrderId === order.id}
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
-                        >
-                          {assigningOrderId === order.id ? (
-                            <>
-                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              Assigning...
-                            </>
-                          ) : (
-                            "Reassign"
-                          )}
-                        </Button>
-                      ) : order.isAssigned && !order.canReassign ? (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          Accepted
-                        </span>
-                      ) : (
-                        <Button
-                          onClick={() => handleAssignClick(order)}
-                          disabled={assigningOrderId === order.id}
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
-                        >
-                          {assigningOrderId === order.id ? (
-                            <>
-                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              Assigning...
-                            </>
-                          ) : (
-                            "Assign"
-                          )}
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
+                          <Button
+                            onClick={() => handleAssignClick(order)}
+                            disabled={assigningOrderId === order.id}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
+                          >
+                            {assigningOrderId === order.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Assigning...
+                              </>
+                            ) : (
+                              "Assign"
+                            )}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
                   )
                 })}
               </tbody>
@@ -670,7 +728,7 @@ export default function OrderAssign() {
               Select a delivery boy to assign this order
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Order Details Card */}
           {selectedOrder && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-3">
@@ -778,16 +836,16 @@ export default function OrderAssign() {
                       const isOnline = db.isOnline || false
                       const cashInHand = Number(db.cashInHand) || 0
                       // Use totalCashLimit from backend, or default to 750 if not provided
-                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null) 
-                        ? Number(db.totalCashLimit) 
+                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null)
+                        ? Number(db.totalCashLimit)
                         : 750
                       const availableCashLimit = Number(db.availableCashLimit) || 0
                       const isCashLimitExceeded = cashInHand >= totalCashLimit
-                      
+
                       return (
-                        <SelectItem 
-                          key={dbId} 
-                          value={dbId?.toString()} 
+                        <SelectItem
+                          key={dbId}
+                          value={dbId?.toString()}
                           className="cursor-pointer py-2"
                         >
                           <div className="flex items-start justify-between w-full gap-2">
@@ -875,7 +933,7 @@ export default function OrderAssign() {
               Assign {selectedOrders.size} order{selectedOrders.size > 1 ? 's' : ''} to a delivery boy
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Selected Orders Info */}
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-3">
             <div className="flex items-center gap-2 mb-2">
@@ -954,16 +1012,16 @@ export default function OrderAssign() {
                       const isOnline = db.isOnline || false
                       const cashInHand = Number(db.cashInHand) || 0
                       // Use totalCashLimit from backend, or default to 750 if not provided
-                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null) 
-                        ? Number(db.totalCashLimit) 
+                      const totalCashLimit = (db.totalCashLimit !== undefined && db.totalCashLimit !== null)
+                        ? Number(db.totalCashLimit)
                         : 750
                       const availableCashLimit = Number(db.availableCashLimit) || 0
                       const isCashLimitExceeded = cashInHand >= totalCashLimit
-                      
+
                       return (
-                        <SelectItem 
-                          key={dbId} 
-                          value={dbId?.toString()} 
+                        <SelectItem
+                          key={dbId}
+                          value={dbId?.toString()}
                           className="cursor-pointer py-2"
                         >
                           <div className="flex items-start justify-between w-full gap-2">
