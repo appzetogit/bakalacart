@@ -100,35 +100,35 @@ apiClient.interceptors.request.use(
     // Determine if this is an authenticated route
     const path = window.location.pathname;
     const requestUrl = config.url || '';
-    
+
     // Check if this is a public restaurant route (should not require authentication)
-    const isPublicRestaurantRoute = requestUrl.includes('/restaurant/list') || 
-                                    requestUrl.includes('/restaurant/under-250') ||
-                                    (requestUrl.includes('/restaurant/') && 
-                                     !requestUrl.includes('/restaurant/orders') &&
-                                     !requestUrl.includes('/restaurant/auth') &&
-                                     !requestUrl.includes('/restaurant/menu') &&
-                                     !requestUrl.includes('/restaurant/profile') &&
-                                     !requestUrl.includes('/restaurant/staff') &&
-                                     !requestUrl.includes('/restaurant/offers') &&
-                                     !requestUrl.includes('/restaurant/inventory') &&
-                                     !requestUrl.includes('/restaurant/categories') &&
-                                     !requestUrl.includes('/restaurant/onboarding') &&
-                                     !requestUrl.includes('/restaurant/delivery-status') &&
-                                     !requestUrl.includes('/restaurant/finance') &&
-                                     !requestUrl.includes('/restaurant/wallet') &&
-                                     !requestUrl.includes('/restaurant/analytics') &&
-                                     !requestUrl.includes('/restaurant/complaints') &&
-                                     (requestUrl.match(/\/restaurant\/[^/]+$/) || 
-                                      requestUrl.match(/\/restaurant\/[^/]+\/menu/) || 
-                                      requestUrl.match(/\/restaurant\/[^/]+\/addons/) || 
-                                      requestUrl.match(/\/restaurant\/[^/]+\/inventory/) || 
-                                      requestUrl.match(/\/restaurant\/[^/]+\/offers/)));
-    
-    const isAuthenticatedRoute = (path.startsWith('/admin') || 
-                                  (path.startsWith('/restaurant') && !path.startsWith('/restaurants') && !isPublicRestaurantRoute) || 
-                                  path.startsWith('/delivery')) && !isPublicRestaurantRoute;
-    
+    const isPublicRestaurantRoute = requestUrl.includes('/restaurant/list') ||
+      requestUrl.includes('/restaurant/under-250') ||
+      (requestUrl.includes('/restaurant/') &&
+        !requestUrl.includes('/restaurant/orders') &&
+        !requestUrl.includes('/restaurant/auth') &&
+        !requestUrl.includes('/restaurant/menu') &&
+        !requestUrl.includes('/restaurant/profile') &&
+        !requestUrl.includes('/restaurant/staff') &&
+        !requestUrl.includes('/restaurant/offers') &&
+        !requestUrl.includes('/restaurant/inventory') &&
+        !requestUrl.includes('/restaurant/categories') &&
+        !requestUrl.includes('/restaurant/onboarding') &&
+        !requestUrl.includes('/restaurant/delivery-status') &&
+        !requestUrl.includes('/restaurant/finance') &&
+        !requestUrl.includes('/restaurant/wallet') &&
+        !requestUrl.includes('/restaurant/analytics') &&
+        !requestUrl.includes('/restaurant/complaints') &&
+        (requestUrl.match(/\/restaurant\/[^/]+$/) ||
+          requestUrl.match(/\/restaurant\/[^/]+\/menu/) ||
+          requestUrl.match(/\/restaurant\/[^/]+\/addons/) ||
+          requestUrl.match(/\/restaurant\/[^/]+\/inventory/) ||
+          requestUrl.match(/\/restaurant\/[^/]+\/offers/)));
+
+    const isAuthenticatedRoute = (path.startsWith('/admin') ||
+      (path.startsWith('/restaurant') && !path.startsWith('/restaurants') && !isPublicRestaurantRoute) ||
+      path.startsWith('/delivery')) && !isPublicRestaurantRoute;
+
     // For authenticated routes, ALWAYS ensure Authorization header is set if we have a token
     // This ensures FormData requests and other requests always have the token
     if (isAuthenticatedRoute) {
@@ -324,10 +324,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Check if it's a network error or truly expired token
         const isNetworkError = refreshError.code === 'ERR_NETWORK' || refreshError.message === 'Network Error';
-        const isTokenExpired = refreshError.response?.status === 401 && 
-          (refreshError.response?.data?.message?.includes('expired') || 
-           refreshError.response?.data?.message?.includes('Invalid refresh token') ||
-           refreshError.response?.data?.message?.includes('Refresh token not found'));
+        const isTokenExpired = refreshError.response?.status === 401 &&
+          (refreshError.response?.data?.message?.includes('expired') ||
+            refreshError.response?.data?.message?.includes('Invalid refresh token') ||
+            refreshError.response?.data?.message?.includes('Refresh token not found'));
 
         // Show error toast in development mode for refresh errors
         if (import.meta.env.DEV && !isNetworkError) {
@@ -509,9 +509,9 @@ apiClient.interceptors.response.use(
           // Only show error for critical restaurant endpoints like /restaurant/list
           // Individual restaurant lookups (like /restaurant/:id) can legitimately return 404 if restaurant doesn't exist
           // So we silently handle those 404s
-          const isIndividualRestaurantLookup = /\/restaurant\/[a-f0-9]{24}$/i.test(url) || 
-                                                (url.match(/\/restaurant\/[^/]+$/) && !url.includes('/restaurant/list'));
-          
+          const isIndividualRestaurantLookup = /\/restaurant\/[a-f0-9]{24}$/i.test(url) ||
+            (url.match(/\/restaurant\/[^/]+$/) && !url.includes('/restaurant/list'));
+
           if (!isIndividualRestaurantLookup && url.includes('/restaurant/list')) {
             toast.error('Restaurant API endpoint not found. Check backend routes.', {
               duration: 5000,
@@ -535,6 +535,11 @@ apiClient.interceptors.response.use(
 
     // Show error toast in development mode only
     if (import.meta.env.DEV) {
+      // Ignore canceled requests - don't show toast
+      if (axios.isCancel(error) || error.message === 'canceled' || error.name === 'CanceledError') {
+        return Promise.reject(error);
+      }
+
       // Extract error messages from various possible locations
       const errorData = error.response?.data;
 

@@ -13,15 +13,39 @@ import { Badge } from "@/components/ui/badge"
 import { useCart } from "../../context/CartContext"
 import { useProfile } from "../../context/ProfileContext"
 import { useOrders } from "../../context/OrdersContext"
+import { ChevronRight, Plus } from "lucide-react"
+import AddressFormModal from "../../components/AddressFormModal"
+import DeliveryAddressSelectionModal from "../../components/DeliveryAddressSelectionModal"
+import { useLocation } from "../../hooks/useLocation"
+import { useEffect } from "react"
 
 export default function Checkout() {
   const navigate = useNavigate()
   const { cart, clearCart } = useCart()
   const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods } = useProfile()
+  const { location } = useLocation()
   const { createOrder } = useOrders()
   const [selectedAddress, setSelectedAddress] = useState(getDefaultAddress()?.id || "")
   const [selectedPayment, setSelectedPayment] = useState(getDefaultPaymentMethod()?.id || "")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  const [showAddressSelection, setShowAddressSelection] = useState(false)
+  const [showAddressForm, setShowAddressForm] = useState(false)
+
+  // Synchronize selection with global location context
+  useEffect(() => {
+    if (location?.addressId && location.addressId !== selectedAddress) {
+      console.log("🔄 Syncing checkout address with global location:", location.addressId)
+      setSelectedAddress(location.addressId)
+    }
+  }, [location?.addressId, selectedAddress])
+
+  // If selectedAddress is still empty but addresses are available, set default
+  useEffect(() => {
+    if (!selectedAddress && addresses.length > 0) {
+      const defaultAddr = getDefaultAddress()
+      if (defaultAddr) setSelectedAddress(defaultAddr.id)
+    }
+  }, [addresses, getDefaultAddress, selectedAddress])
 
   const defaultAddress = addresses.find(addr => addr.id === selectedAddress) || getDefaultAddress()
   const defaultPayment = paymentMethods.find(pm => pm.id === selectedPayment) || getDefaultPaymentMethod()
@@ -153,60 +177,45 @@ export default function Checkout() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Left Column - Order Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Delivery Address */}
+            {/* Delivery address details */}
             <ScrollReveal delay={0.1}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-yellow-600" />
-                    Delivery Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {addresses.length > 0 ? (
-                    <div className="space-y-3">
-                      {filteredAddressesWithKeys.map(({ address, uniqueKey }, index) => {
-                        const isSelected = selectedAddress === address.id
-                        const addressString = [
-                          address.street,
-                          address.additionalDetails,
-                          `${address.city}, ${address.state} ${address.zipCode}`
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery address details</p>
+                  <div className="bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm">
+                    <p className="text-gray-800 dark:text-white font-medium line-clamp-1 flex-1 pr-4">
+                      {defaultAddress ? (
+                        [
+                          defaultAddress.street,
+                          defaultAddress.additionalDetails,
+                          `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.zipCode}`
                         ].filter(Boolean).join(", ")
+                      ) : (
+                        "No delivery address selected"
+                      )}
+                    </p>
+                    <button
+                      onClick={() => setShowAddressSelection(true)}
+                      className="text-gray-400 dark:text-gray-500 font-medium flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      Change <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
 
-                        return (
-                          <div
-                            key={uniqueKey}
-                            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${isSelected
-                              ? "border-yellow-500 bg-yellow-50"
-                              : "border-gray-200 hover:border-yellow-300"
-                              }`}
-                            onClick={() => setSelectedAddress(address.id)}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                {address.isDefault && (
-                                  <Badge className="mb-2 bg-yellow-500 text-white">Default</Badge>
-                                )}
-                                <p className="text-sm font-medium">{addressString}</p>
-                              </div>
-                              {isSelected && (
-                                <CheckCircle className="h-5 w-5 text-yellow-600" />
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
+                <div
+                  onClick={() => setShowAddressForm(true)}
+                  className="w-full flex items-center justify-between p-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30 rounded-2xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-full">
+                      <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">No addresses saved</p>
-                      <Link to="/user/profile/addresses/new">
-                        <Button>Add Address</Button>
-                      </Link>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">Add New Address</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-emerald-400 dark:text-emerald-600 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
             </ScrollReveal>
 
             {/* Payment Method */}
@@ -338,6 +347,30 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+      {/* Modals */}
+      <DeliveryAddressSelectionModal
+        isOpen={showAddressSelection}
+        onClose={() => setShowAddressSelection(false)}
+        addresses={addresses}
+        selectedAddressId={selectedAddress}
+        onSelect={(id) => {
+          setSelectedAddress(id)
+          setShowAddressSelection(false)
+        }}
+        onAddNew={() => {
+          setShowAddressSelection(false)
+          setShowAddressForm(true)
+        }}
+      />
+
+      <AddressFormModal
+        isOpen={showAddressForm}
+        onClose={() => setShowAddressForm(false)}
+        onSaveSuccess={(newAddress) => {
+          setSelectedAddress(newAddress.id)
+          setShowAddressForm(false)
+        }}
+      />
     </AnimatedPage>
   )
 }

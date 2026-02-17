@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   Clock,
   MapPin,
@@ -90,11 +90,11 @@ export default function OrderDetailsPage() {
         navigate('/delivery/orders')
         return
       }
-      
+
       try {
         setLoading(true)
         let order = null
-        
+
         // First try to get from deliveryAPI.getOrderDetails (for active orders)
         try {
           console.log('📡 OrderDetailsPage: Trying deliveryAPI.getOrderDetails...')
@@ -107,7 +107,7 @@ export default function OrderDetailsPage() {
         } catch (orderErr) {
           console.log('⚠️ OrderDetailsPage: Delivery Order API failed, trying trip history...', orderErr)
         }
-        
+
         // If not found, try trip history API for delivered/cancelled orders
         if (!order) {
           try {
@@ -122,9 +122,9 @@ export default function OrderDetailsPage() {
               const trips = tripResponse.data.data.trips
               console.log(`📋 OrderDetailsPage: Found ${trips.length} trips, searching for orderId: ${orderId}`)
               const foundOrder = trips.find(
-                trip => (trip.orderId && trip.orderId === orderId) || 
-                        (trip._id && trip._id === orderId) ||
-                        (trip.id && trip.id === orderId)
+                trip => (trip.orderId && trip.orderId === orderId) ||
+                  (trip._id && trip._id === orderId) ||
+                  (trip.id && trip.id === orderId)
               )
               if (foundOrder) {
                 order = foundOrder
@@ -137,7 +137,7 @@ export default function OrderDetailsPage() {
             console.error('❌ OrderDetailsPage: Error fetching from trip history:', tripErr)
           }
         }
-        
+
         if (order) {
           console.log('✅ OrderDetailsPage: Setting order data:', order)
           setOrderData(order)
@@ -190,7 +190,7 @@ export default function OrderDetailsPage() {
   const paymentMethod = (orderData.payment?.method || 'razorpay').toLowerCase()
   const isCOD = paymentMethod === 'cash' || paymentMethod === 'cod'
   const earnings = orderData.pricing?.deliveryFee || orderData.estimatedEarnings || 0
-  
+
   // Calculate distance from restaurant to user's delivery location
   const getDistance = () => {
     console.log('📏 Calculating distance - Order data:', {
@@ -224,7 +224,7 @@ export default function OrderDetailsPage() {
       console.log('✅ Using distance from estimatedEarnings:', orderData.estimatedEarnings.distance)
       return Number(orderData.estimatedEarnings.distance).toFixed(2)
     }
-    
+
     // Priority 5: Calculate from restaurant to customer delivery address coordinates
     // This is the main calculation - restaurant location to user's delivery location
     let restaurantLat = null
@@ -268,7 +268,7 @@ export default function OrderDetailsPage() {
           Math.sin(dLng / 2) * Math.sin(dLng / 2)
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         const distance = R * c
-        
+
         console.log('✅ Calculated distance (Restaurant → Customer):', distance.toFixed(2), 'km')
         if (distance > 0) {
           return distance.toFixed(2)
@@ -282,13 +282,13 @@ export default function OrderDetailsPage() {
         hasCustomerCoords: !!(customerLat && customerLng)
       })
     }
-    
+
     return null
   }
-  
+
   const getTimeTaken = () => {
     if (!orderData.createdAt || !orderData.deliveredAt) return null
-    
+
     try {
       const startTime = new Date(orderData.createdAt)
       const endTime = new Date(orderData.deliveredAt)
@@ -296,7 +296,7 @@ export default function OrderDetailsPage() {
       const diffMins = Math.floor(diffMs / 60000)
       const diffHours = Math.floor(diffMins / 60)
       const remainingMins = diffMins % 60
-      
+
       if (diffHours > 0) {
         return `${diffHours} hr ${remainingMins} min`
       }
@@ -305,7 +305,7 @@ export default function OrderDetailsPage() {
       return null
     }
   }
-  
+
   const distance = getDistance()
   const timeTaken = getTimeTaken()
 
@@ -314,7 +314,7 @@ export default function OrderDetailsPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-4 flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
@@ -479,7 +479,15 @@ export default function OrderDetailsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
                         {item.quantity || 1} x {item.name}
+                        {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
+                          <span className="text-xs font-bold ml-2 italic text-[#ff8100]">
+                            ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')})
+                          </span>
+                        )}
                       </p>
+                      {item.description && (
+                        <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                      )}
                       {item.variation && (
                         <p className="text-xs text-gray-500 mt-0.5">{item.variation}</p>
                       )}
@@ -507,9 +515,8 @@ export default function OrderDetailsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">Payment Mode</span>
               </div>
-              <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                isCOD ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
-              }`}>
+              <span className={`text-sm font-semibold px-3 py-1 rounded-full ${isCOD ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                }`}>
                 {isCOD ? 'COD' : 'Online'}
               </span>
             </div>
@@ -540,7 +547,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.subtotal || 0).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Packaging Fee */}
               {orderData.pricing.packagingFee != null && Number(orderData.pricing.packagingFee) > 0 && (
                 <div className="flex items-center justify-between py-2">
@@ -548,7 +555,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.packagingFee).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Platform Fee */}
               {orderData.pricing.platformFee != null && Number(orderData.pricing.platformFee) > 0 && (
                 <div className="flex items-center justify-between py-2">
@@ -556,7 +563,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.platformFee).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Delivery Fee */}
               {orderData.pricing.deliveryFee != null && (
                 <div className="flex items-center justify-between py-2">
@@ -564,7 +571,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-green-600">₹{Number(orderData.pricing.deliveryFee || 0).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Tax / GST */}
               {(orderData.pricing.tax != null || orderData.pricing.gst != null) && (
                 <div className="flex items-center justify-between py-2">
@@ -574,7 +581,7 @@ export default function OrderDetailsPage() {
                   </span>
                 </div>
               )}
-              
+
               {/* Discount / Coupon Discount */}
               {(orderData.pricing.discount != null || orderData.pricing.couponDiscount != null) && (
                 <div className="flex items-center justify-between py-2">
@@ -586,7 +593,7 @@ export default function OrderDetailsPage() {
                   </span>
                 </div>
               )}
-              
+
               {/* Service Charge */}
               {orderData.pricing.serviceCharge != null && Number(orderData.pricing.serviceCharge) > 0 && (
                 <div className="flex items-center justify-between py-2">
@@ -594,7 +601,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.serviceCharge).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Convenience Fee */}
               {orderData.pricing.convenienceFee != null && Number(orderData.pricing.convenienceFee) > 0 && (
                 <div className="flex items-center justify-between py-2">
@@ -602,7 +609,7 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-medium text-gray-900">₹{Number(orderData.pricing.convenienceFee).toFixed(2)}</span>
                 </div>
               )}
-              
+
               {/* Total - Always show */}
               <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-2">
                 <span className="text-base font-bold text-gray-900">Total</span>
@@ -627,18 +634,17 @@ export default function OrderDetailsPage() {
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Order Status</span>
-            <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-              orderData.status === 'delivered' || orderData.status === 'Delivered' || orderData.deliveredAt
-                ? 'bg-green-100 text-green-700'
-                : orderData.status === 'cancelled' || orderData.status === 'Cancelled'
+            <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${orderData.status === 'delivered' || orderData.status === 'Delivered' || orderData.deliveredAt
+              ? 'bg-green-100 text-green-700'
+              : orderData.status === 'cancelled' || orderData.status === 'Cancelled'
                 ? 'bg-red-100 text-red-700'
                 : 'bg-blue-100 text-blue-700'
-            }`}>
+              }`}>
               {orderData.status === 'delivered' || orderData.status === 'Delivered' || orderData.deliveredAt
                 ? 'Delivered'
                 : orderData.status === 'cancelled' || orderData.status === 'Cancelled'
-                ? 'Cancelled'
-                : orderData.status || 'Pending'}
+                  ? 'Cancelled'
+                  : orderData.status || 'Pending'}
             </span>
           </div>
         </div>

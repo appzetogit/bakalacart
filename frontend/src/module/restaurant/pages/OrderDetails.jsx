@@ -65,7 +65,11 @@ export default function OrderDetails() {
               name: item.name,
               quantity: item.quantity,
               price: item.price,
-              type: item.isVeg ? 'Veg' : 'Non-Veg'
+              type: item.isVeg ? 'Veg' : 'Non-Veg',
+              itemSizeQuantity: item.itemSizeQuantity,
+              itemSizeUnit: item.itemSizeUnit,
+              unit: item.unit,
+              description: item.description
             })) || [],
             billing: {
               itemSubtotal: order.pricing?.subtotal || 0,
@@ -670,7 +674,15 @@ export default function OrderDetails() {
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-gray-900">
                       {item.quantity} x {item.name}
+                      {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) && (
+                        <span className="text-xs font-bold text-[#ff8100] ml-2 italic">
+                          ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')})
+                        </span>
+                      )}
                     </p>
+                    {item.description && (
+                      <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                    )}
                     <p className="text-sm font-semibold text-gray-900">₹{item.price}</p>
                   </div>
                   {item.type && (

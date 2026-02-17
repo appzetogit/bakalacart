@@ -44,8 +44,8 @@ import { useProfile } from "../../context/ProfileContext"
 import AddToCartAnimation from "../../components/AddToCartAnimation"
 import FoodCustomizationModal from "../../components/FoodCustomizationModal"
 
-
-
+// Persistent memory cache to speed up navigation and prevent redundant API calls
+const RESTAURANT_DATA_CACHE = new Map();
 
 // Carousel component for dish images
 const DishImageCarousel = ({ images, name, className, onClick }) => {
@@ -158,6 +158,8 @@ export default function RestaurantDetails() {
   const [filters, setFilters] = useState({
     sortBy: null, // "low-to-high" | "high-to-low"
     vegNonVeg: null, // "veg" | "non-veg"
+    highlyReordered: false,
+    spicy: false,
   })
 
   // Restaurant data state
@@ -172,12 +174,24 @@ export default function RestaurantDetails() {
       if (!slug) return
 
       // Prevent re-fetching if we've already fetched for this slug and zoneId hasn't changed meaningfully
-      // Only re-fetch if slug changed or if we're waiting for zoneId and it just became available
       if (fetchedRestaurantRef.current && restaurant && restaurant.slug === slug) {
         // Only re-fetch if zoneId changed from null to a value (zone just detected)
         if (zoneId && !loadingZone) {
-          // Zone is available, but we already have restaurant data - don't re-fetch
           return
+        }
+      }
+
+      // Check persistent memory cache for faster back navigation
+      if (RESTAURANT_DATA_CACHE.has(slug)) {
+        const cachedRestaurant = RESTAURANT_DATA_CACHE.get(slug);
+        setRestaurant(cachedRestaurant);
+        setLoadingRestaurant(false);
+        fetchedRestaurantRef.current = true;
+        console.log('🚀 Loaded restaurant from memory cache:', slug);
+
+        // Even if we have cached basic data, check if we need to fetch menu/inventory
+        if (cachedRestaurant.menuSections && cachedRestaurant.menuSections.length > 0) {
+          return; // Skip full fetch if we have everything
         }
       }
 
@@ -470,6 +484,8 @@ export default function RestaurantDetails() {
 
           setRestaurant(transformedRestaurant)
           fetchedRestaurantRef.current = true // Mark as fetched
+          // Store in cache
+          RESTAURANT_DATA_CACHE.set(slug, transformedRestaurant);
 
           // Fetch menu and inventory for this restaurant
           // If no restaurant ID, try to find matching restaurant by name
@@ -570,10 +586,15 @@ export default function RestaurantDetails() {
                 // Always create recommended section (even if empty) - will show "No dish Yet" if empty
                 const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...menuSections]
 
-                setRestaurant(prev => ({
-                  ...prev,
-                  menuSections: finalMenuSections,
-                }))
+                setRestaurant(prev => {
+                  const updated = {
+                    ...prev,
+                    menuSections: finalMenuSections,
+                  };
+                  // Update cache
+                  if (slug) RESTAURANT_DATA_CACHE.set(slug, updated);
+                  return updated;
+                })
 
                 // Set first 3 sections (Recommended, Starters, Main Course) as expanded by default
                 const defaultExpandedSections = new Set([0, 1, 2]) // Index 0, 1, 2
@@ -672,11 +693,13 @@ export default function RestaurantDetails() {
     }
 
     // Wait for zone to load before fetching (if zone-based search might be needed)
-    // But don't block if we're fetching by direct ID
+    // But don't block if we're fetching by direct ID - ALLOW parallel fetch
+    /* 
     if (loadingZone) {
       console.log('⏳ Waiting for zone detection before fetching restaurant...')
       return
-    }
+    } 
+    */
 
     fetchRestaurant()
   }, [slug, zoneId, loadingZone, restaurant?.slug])
@@ -772,11 +795,12 @@ export default function RestaurantDetails() {
     const cartQuantities = {}
     cart.forEach((item) => {
       if (item.restaurant === restaurant.name) {
-        cartQuantities[item.id] = item.quantity || 0
+        // Group by originalItemId if it's a variant, otherwise use id
+        const baseId = item.originalItemId || item.id
+        cartQuantities[baseId] = (cartQuantities[baseId] || 0) + (item.quantity || 0)
       }
     })
     setQuantities(cartQuantities)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant?.name, cart])
 
   // Helper function to update item quantity in both local state and cart
@@ -854,7 +878,8 @@ export default function RestaurantDetails() {
       isVeg: item.isVeg !== false, // Add isVeg property
       itemSize: item.itemSize || "",
       itemSizeQuantity: item.itemSizeQuantity || "",
-      itemSizeUnit: item.itemSizeUnit || ""
+      itemSizeUnit: item.itemSizeUnit || "",
+      unit: item.unit || ""
     }
 
     // Get source position for animation from event target
@@ -893,15 +918,24 @@ export default function RestaurantDetails() {
 
     // Update cart context
     if (newQuantity <= 0) {
-      // Pass sourcePosition and product info for removal animation
-      const productInfo = {
-        id: item.id,
-        name: item.name,
-        imageUrl: item.image,
+      // Find the specific item(s) in cart to remove
+      // If it's a variant item, we might have multiple entries. 
+      // We'll remove the most recently added variation if multiple exist.
+      const entriesToRemove = cart.filter(c => (c.id === item.id || c.originalItemId === item.id))
+
+      if (entriesToRemove.length > 0) {
+        // Remove the latest one
+        const itemToRemove = entriesToRemove[entriesToRemove.length - 1]
+
+        const productInfo = {
+          id: item.id,
+          name: item.name,
+          imageUrl: item.image,
+        }
+        removeFromCart(itemToRemove.id, sourcePosition, productInfo)
       }
-      removeFromCart(item.id, sourcePosition, productInfo)
     } else {
-      const existingCartItem = getCartItem(item.id)
+      const existingCartItem = cart.find(c => c.id === item.id || c.originalItemId === item.id)
       if (existingCartItem) {
         // Prepare product info for animation
         const productInfo = {
@@ -925,8 +959,17 @@ export default function RestaurantDetails() {
           }
         }
         // If decreasing quantity, trigger removal animation with sourcePosition
-        else if (newQuantity < existingCartItem.quantity && sourcePosition) {
-          updateQuantity(item.id, newQuantity, sourcePosition, productInfo)
+        else if (newQuantity < (quantities[item.id] || 0) && sourcePosition) {
+          // Find variations for this base item
+          const variationsInCart = cart.filter(c => (c.id === item.id || c.originalItemId === item.id))
+          if (variationsInCart.length > 0) {
+            const latestVar = variationsInCart[variationsInCart.length - 1]
+            if (latestVar.quantity > 1) {
+              updateQuantity(latestVar.id, latestVar.quantity - 1, sourcePosition, productInfo)
+            } else {
+              removeFromCart(latestVar.id, sourcePosition, productInfo)
+            }
+          }
         }
         // Otherwise just update quantity without animation
         else {
@@ -950,29 +993,31 @@ export default function RestaurantDetails() {
   }
 
   // Menu categories - dynamically generated from restaurant menu sections
-  const menuCategories = (restaurant?.menuSections && Array.isArray(restaurant.menuSections))
-    ? restaurant.menuSections.map((section, index) => {
-      // Handle section name - check for valid non-empty string
-      let sectionTitle = "Unnamed Section"
-      if (index === 0) {
-        sectionTitle = "Recommended for you"
-      } else if (section?.name && typeof section.name === 'string' && section.name.trim()) {
-        sectionTitle = section.name.trim()
-      } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
-        sectionTitle = section.title.trim()
-      }
+  const menuCategories = useMemo(() => {
+    return (restaurant?.menuSections && Array.isArray(restaurant.menuSections))
+      ? restaurant.menuSections.map((section, index) => {
+        // Handle section name - check for valid non-empty string
+        let sectionTitle = "Unnamed Section"
+        if (index === 0) {
+          sectionTitle = "Recommended for you"
+        } else if (section?.name && typeof section.name === 'string' && section.name.trim()) {
+          sectionTitle = section.name.trim()
+        } else if (section?.title && typeof section.title === 'string' && section.title.trim()) {
+          sectionTitle = section.title.trim()
+        }
 
-      const itemCount = section?.items?.length || 0
-      const subsectionCount = section?.subsections?.reduce((sum, sub) => sum + (sub?.items?.length || 0), 0) || 0
-      const totalCount = itemCount + subsectionCount
+        const itemCount = section?.items?.length || 0
+        const subsectionCount = section?.subsections?.reduce((sum, sub) => sum + (sub?.items?.length || 0), 0) || 0
+        const totalCount = itemCount + subsectionCount
 
-      return {
-        name: sectionTitle,
-        count: totalCount,
-        sectionIndex: index,
-      }
-    })
-    : []
+        return {
+          name: sectionTitle,
+          count: totalCount,
+          sectionIndex: index,
+        }
+      })
+      : []
+  }, [restaurant?.menuSections])
 
   // Count active filters
   const getActiveFilterCount = () => {
@@ -1167,6 +1212,40 @@ export default function RestaurantDetails() {
     setShowItemDetail(true)
   }
 
+  // Helper function to check if item matches all active filters
+  const doesItemMatchFilters = (item) => {
+    if (!item) return false
+
+    // VegMode check
+    if (vegMode === true && item.foodType !== "Veg") return false
+
+    // Veg/Non-veg local filter
+    if (filters.vegNonVeg === "veg" && item.foodType !== "Veg") return false
+    if (filters.vegNonVeg === "non-veg" && item.foodType !== "Non-Veg") return false
+
+    // Price filter
+    if (showOnlyUnder250) {
+      const finalPrice = getFinalPrice(item)
+      if (finalPrice > 250) return false
+    }
+
+    // Highly reordered
+    if (filters.highlyReordered && !item.customisable) return false
+
+    // Spicy
+    if (filters.spicy && !item.isSpicy) return false
+
+    // Search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      const matchesName = item.name?.toLowerCase().includes(query)
+      const matchesDesc = item.description?.toLowerCase().includes(query)
+      if (!matchesName && !matchesDesc) return false
+    }
+
+    return true
+  }
+
   // Helper function to calculate final price after discount
   const getFinalPrice = (item) => {
     // If discount exists, calculate from originalPrice, otherwise use price directly
@@ -1187,40 +1266,7 @@ export default function RestaurantDetails() {
   // Filter menu items based on active filters
   const filterMenuItems = (items) => {
     if (!items) return items
-
-    return items.filter((item) => {
-      // Under 250 filter (when coming from Under 250 page)
-      if (showOnlyUnder250) {
-        const finalPrice = getFinalPrice(item);
-        if (finalPrice > 250) return false;
-      }
-
-      // Search filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim()
-        const itemName = item.name?.toLowerCase() || ""
-        if (!itemName.includes(query)) return false
-      }
-
-      // VegMode filter - when vegMode is ON, show only Veg items
-      // When vegMode is false/null/undefined, show all items (Veg and Non-Veg)
-      if (vegMode === true) {
-        if (item.foodType !== "Veg") return false
-      }
-
-      // Veg/Non-veg filter (local filter override)
-      if (filters.vegNonVeg === "veg") {
-        // Show only veg items
-        if (item.foodType !== "Veg") return false
-      }
-      if (filters.vegNonVeg === "non-veg") {
-        // Show only non-veg items
-        if (item.foodType !== "Non-Veg") return false
-      }
-
-
-      return true
-    })
+    return items.filter(doesItemMatchFilters)
   }
 
   // Sort items based on sortBy filter
@@ -1237,49 +1283,24 @@ export default function RestaurantDetails() {
     return sorted
   }
 
-  // Helper function to check if a section has any items under ₹250
-  const sectionHasItemsUnder250 = (section) => {
-    if (!showOnlyUnder250) return true; // If not filtering, show all sections
-
-    // Check direct items
-    if (section.items && section.items.length > 0) {
-      const hasUnder250Items = section.items.some(item => {
-        if (item.isAvailable === false) return false;
-        const finalPrice = getFinalPrice(item);
-        return finalPrice <= 250;
-      });
-      if (hasUnder250Items) return true;
-    }
-
-    // Check subsection items
-    if (section.subsections && section.subsections.length > 0) {
-      for (const subsection of section.subsections) {
-        if (subsection.items && subsection.items.length > 0) {
-          const hasUnder250Items = subsection.items.some(item => {
-            if (item.isAvailable === false) return false;
-            const finalPrice = getFinalPrice(item);
-            return finalPrice <= 250;
-          });
-          if (hasUnder250Items) return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  // Filter sections to only show those with items under ₹250
-  // Returns array of { section, originalIndex } to preserve original index for expanded sections
-  const getFilteredSections = () => {
+  // Filter sections based on search and other active filters
+  const getFilteredSections = useMemo(() => {
     if (!restaurant?.menuSections) return [];
-    if (!showOnlyUnder250) {
-      return restaurant.menuSections.map((section, index) => ({ section, originalIndex: index }));
-    }
 
     return restaurant.menuSections
       .map((section, index) => ({ section, originalIndex: index }))
-      .filter(({ section }) => sectionHasItemsUnder250(section));
-  }
+      .filter(({ section }) => {
+        // Check if any direct items match
+        const hasMatchingDirectItems = section.items?.some(doesItemMatchFilters)
+
+        // Check if any subsection items match
+        const hasMatchingSubsectionItems = section.subsections?.some(sub =>
+          sub.items?.some(doesItemMatchFilters)
+        )
+
+        return hasMatchingDirectItems || hasMatchingSubsectionItems
+      });
+  }, [restaurant?.menuSections, searchParams, vegMode, filters, searchQuery, showOnlyUnder250])
 
   // Highlight offers/texts for the blue offer line
   const highlightOffers = [
@@ -1564,9 +1585,9 @@ export default function RestaurantDetails() {
         </div>
 
         {/* Menu Items Section */}
-        {restaurant?.menuSections && Array.isArray(restaurant.menuSections) && restaurant.menuSections.length > 0 && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-6 sm:py-8 md:py-10 lg:py-12 space-y-6 md:space-y-8 lg:space-y-10">
-            {getFilteredSections().map(({ section, originalIndex }, sectionIndex) => {
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-6 sm:py-8 md:py-10 lg:py-12 space-y-6 md:space-y-8 lg:space-y-10 min-h-[300px]">
+          {getFilteredSections.length > 0 ? (
+            getFilteredSections.map(({ section, originalIndex }, sectionIndex) => {
               // Handle section name - check for valid non-empty string
               let sectionTitle = "Unnamed Section"
               if (originalIndex === 0) {
@@ -1578,40 +1599,53 @@ export default function RestaurantDetails() {
               }
               const sectionId = `menu-section-${originalIndex}`
 
-              const isExpanded = expandedSections.has(originalIndex)
+              // Auto-expand all sections that have results when searching
+              const isExpanded = searchQuery.trim() !== "" || expandedSections.has(originalIndex)
 
               return (
                 <div key={sectionIndex} id={sectionId} className="space-y-4 scroll-mt-20">
                   {/* Section Header */}
                   {sectionIndex === 0 && (
-                    <div className="flex items-center justify-between">
+                    <div
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => {
+                        setExpandedSections(prev => {
+                          const newSet = new Set(prev)
+                          if (newSet.has(originalIndex)) {
+                            newSet.delete(originalIndex)
+                          } else {
+                            newSet.add(originalIndex)
+                          }
+                          return newSet
+                        })
+                      }}
+                    >
                       <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                         Recommended for you
                       </h2>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setExpandedSections(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(originalIndex)) {
-                              newSet.delete(originalIndex)
-                            } else {
-                              newSet.add(originalIndex)
-                            }
-                            return newSet
-                          })
-                        }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                      >
+                      <div className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
                         <ChevronDown
                           className={`h-5 w-5 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'
                             }`}
                         />
-                      </button>
+                      </div>
                     </div>
                   )}
                   {sectionIndex > 0 && (
-                    <div className="flex items-center justify-between">
+                    <div
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => {
+                        setExpandedSections(prev => {
+                          const newSet = new Set(prev)
+                          if (newSet.has(originalIndex)) {
+                            newSet.delete(originalIndex)
+                          } else {
+                            newSet.add(originalIndex)
+                          }
+                          return newSet
+                        })
+                      }}
+                    >
                       <div className="space-y-1">
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                           {(section?.name && typeof section.name === 'string' && section.name.trim())
@@ -1621,36 +1655,25 @@ export default function RestaurantDetails() {
                               : "Unnamed Section"}
                         </h2>
                         {section.subtitle && (
-                          <button className="text-sm text-blue-600 dark:text-blue-400 underline">
+                          <button
+                            className="text-sm text-blue-600 dark:text-blue-400 underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {section.subtitle}
                           </button>
                         )}
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setExpandedSections(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(originalIndex)) {
-                              newSet.delete(originalIndex)
-                            } else {
-                              newSet.add(originalIndex)
-                            }
-                            return newSet
-                          })
-                        }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                      >
+                      <div className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
                         <ChevronDown
                           className={`h-5 w-5 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'
                             }`}
                         />
-                      </button>
+                      </div>
                     </div>
                   )}
 
                   {/* Direct Items */}
-                  {isExpanded && originalIndex === 0 && section.items && section.items.length === 0 && (
+                  {isExpanded && originalIndex === 0 && !searchQuery.trim() && section.items && section.items.length === 0 && (
                     <div className="text-center py-8">
                       <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base">
                         No dish recommended
@@ -1715,9 +1738,9 @@ export default function RestaurantDetails() {
                               </div>
 
                               {/* Item Size/Unit - Show if available */}
-                              {(item.itemSizeQuantity || item.itemSizeUnit) && (
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
-                                  {[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')}
+                              {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) && (
+                                <p className="text-xs font-bold text-[#ff8100] dark:text-[#ff9830] mt-1 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md inline-block">
+                                  {[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')}
                                 </p>
                               )}
 
@@ -2054,9 +2077,34 @@ export default function RestaurantDetails() {
                   )}
                 </div>
               )
-            })}
-          </div>
-        )}
+            })
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Search className="h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No items found</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mt-1">
+                {searchQuery.trim()
+                  ? `We couldn't find anything matching "${searchQuery}"`
+                  : "No items match your selected filters."}
+              </p>
+              <Button
+                variant="outline"
+                className="mt-6 rounded-full"
+                onClick={() => {
+                  setSearchQuery("")
+                  setFilters({
+                    sortBy: null,
+                    vegNonVeg: null,
+                    highlyReordered: false,
+                    spicy: false,
+                  })
+                }}
+              >
+                Clear all filters
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Menu Button - Sticky at page bottom right (hidden when filter or menu sheet open) */}
@@ -2107,6 +2155,12 @@ export default function RestaurantDetails() {
                           className="w-full flex items-center justify-between py-3 px-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors text-left"
                           onClick={() => {
                             setShowMenuSheet(false)
+                            // Auto-expand the section being navigated to
+                            setExpandedSections(prev => {
+                              const newSet = new Set(prev)
+                              newSet.add(category.sectionIndex)
+                              return newSet
+                            })
                             // Scroll to category section
                             setTimeout(() => {
                               const sectionId = `menu-section-${category.sectionIndex}`

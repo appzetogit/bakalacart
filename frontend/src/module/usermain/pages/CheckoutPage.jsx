@@ -15,13 +15,34 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { userAPI } from "@/lib/api"
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
   const [paymentMethod, setPaymentMethod] = useState("card")
-  const [additionalAddressDetails, setAdditionalAddressDetails] = useState("")
   const [userData, setUserData] = useState(null)
   const [addressLabel, setAddressLabel] = useState("Other")
+
+  const [addresses, setAddresses] = useState([])
+  const [addressesLoading, setAddressesLoading] = useState(true)
+  const [selectedAddressId, setSelectedAddressId] = useState(null)
+  const [isAddressSelectorOpen, setIsAddressSelectorOpen] = useState(false)
+  const [isAddressFormOpen, setIsAddressFormOpen] = useState(false)
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [defaultCityState, setDefaultCityState] = useState({
+    city: "Indore",
+    state: "Madhya Pradesh"
+  })
+  const [addressFormData, setAddressFormData] = useState({
+    flatRoom: "",
+    floor: "",
+    building: "",
+    landmark: "",
+    name: "",
+    phone: "",
+    pinCode: "",
+    addLocation: ""
+  })
 
   // Get order data from localStorage (set by CartPage) or use default
   const getOrderData = () => {
@@ -67,6 +88,20 @@ export default function CheckoutPage() {
 
   const orderSummary = getOrderData()
 
+  const formatAddress = (address) => {
+    if (!address) return orderSummary.deliveryAddress
+    const parts = [
+      address.street,
+      address.additionalDetails,
+      address.city,
+      address.state,
+      address.zipCode
+    ].filter(Boolean)
+    return parts.join(", ")
+  }
+
+  const selectedAddress = addresses.find(addr => (addr.id || addr._id) === selectedAddressId) || null
+
   // Get user data from localStorage
   useEffect(() => {
     const userStr = localStorage.getItem('user_user') || localStorage.getItem('userProfile')
@@ -74,24 +109,78 @@ export default function CheckoutPage() {
       try {
         const user = JSON.parse(userStr)
         setUserData(user)
+        setAddressFormData(prev => ({
+          ...prev,
+          name: user?.name || prev.name,
+          phone: user?.phone || prev.phone
+        }))
       } catch (error) {
         console.error('Error parsing user data:', error)
       }
     }
   }, [])
 
+  // Load default city/state and pincode from saved user location if available
+  useEffect(() => {
+    try {
+      const locationStr = localStorage.getItem("userLocation")
+      if (locationStr) {
+        const location = JSON.parse(locationStr)
+        setDefaultCityState(prev => ({
+          city: location.city || prev.city,
+          state: location.state || prev.state
+        }))
+        setAddressFormData(prev => ({
+          ...prev,
+          pinCode: location.zipCode || prev.pinCode,
+          addLocation: prev.addLocation || location.area || ""
+        }))
+      }
+    } catch (error) {
+      console.error("Error parsing userLocation:", error)
+    }
+  }, [])
+
+  // Fetch saved addresses from backend
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      try {
+        setAddressesLoading(true)
+        const response = await userAPI.getAddresses()
+        const addressesData = response?.data?.data?.addresses || response?.data?.addresses || []
+        setAddresses(addressesData)
+
+        const defaultAddress = addressesData.find(addr => addr.isDefault) || addressesData[0]
+        if (defaultAddress) {
+          const id = defaultAddress.id || defaultAddress._id
+          setSelectedAddressId(id)
+          setAddressLabel(defaultAddress.label || "Other")
+        }
+      } catch (error) {
+        console.error("Error fetching user addresses:", error)
+        setAddresses([])
+      } finally {
+        setAddressesLoading(false)
+      }
+    }
+
+    fetchAddresses()
+  }, [])
+
   // Save order data to localStorage before navigating to payment
   const handleProceedToPayment = () => {
-    // Validate additional address details is filled
-    if (!additionalAddressDetails.trim()) {
-      alert("Please add delivery address details")
+    if (!selectedAddress) {
+      alert("Please choose a delivery address")
       return
     }
 
+    const deliveryAddressText = formatAddress(selectedAddress)
+
     const orderDataWithDetails = {
       ...orderSummary,
-      additionalAddressDetails: additionalAddressDetails.trim(),
-      addressLabel: addressLabel,
+      deliveryAddress: deliveryAddressText,
+      additionalAddressDetails: selectedAddress.additionalDetails || "",
+      addressLabel: selectedAddress.label || addressLabel,
       customerName: userData?.name || "Guest",
       customerPhone: userData?.phone || ""
     }
@@ -101,6 +190,64 @@ export default function CheckoutPage() {
       navigate(`/usermain/payment?method=cash`)
     } else {
       navigate(`/usermain/payment?method=card`)
+    }
+  }
+
+  const handleAddressFieldChange = (field, value) => {
+    setAddressFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSaveAddress = async (e) => {
+    e.preventDefault()
+
+    const streetParts = [
+      addressFormData.flatRoom,
+      addressFormData.floor,
+      addressFormData.building
+    ].map(v => v && v.trim()).filter(Boolean)
+
+    if (streetParts.length === 0) {
+      alert("Please fill flat/room, floor or building name for the address")
+      return
+    }
+
+    const additionalParts = [
+      addressFormData.landmark,
+      addressFormData.addLocation
+    ].map(v => v && v.trim()).filter(Boolean)
+
+    setSavingAddress(true)
+    try {
+      const payload = {
+        label: addressLabel || "Other",
+        street: streetParts.join(", "),
+        additionalDetails: additionalParts.join(", "),
+        city: defaultCityState.city,
+        state: defaultCityState.state,
+        zipCode: (addressFormData.pinCode || "").trim()
+      }
+
+      const response = await userAPI.addAddress(payload)
+      const newAddress = response?.data?.data?.address || response?.data?.address
+
+      if (newAddress) {
+        const updated = [...addresses, newAddress]
+        setAddresses(updated)
+        const id = newAddress.id || newAddress._id
+        setSelectedAddressId(id)
+        setAddressLabel(newAddress.label || "Other")
+        setIsAddressFormOpen(false)
+        setIsAddressSelectorOpen(false)
+      }
+    } catch (error) {
+      console.error("Error saving address:", error)
+      const message = error?.response?.data?.message || "Failed to save address"
+      alert(message)
+    } finally {
+      setSavingAddress(false)
     }
   }
 
@@ -119,51 +266,43 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Delivery at Location */}
+      {/* Delivery Address - tap to choose */}
       <div className="px-4 py-4">
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <h3 className="text-sm font-bold text-gray-900">Delivery at Location</h3>
-            <button className="text-gray-400 hover:text-gray-600">
-              <ArrowLeft className="w-4 h-4 rotate-180" />
-            </button>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Delivery Address</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                Tap to choose where your order will be delivered
+              </p>
+            </div>
           </div>
-          <div className="flex items-start gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setIsAddressSelectorOpen(true)}
+            className="w-full flex items-start gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 hover:border-[#ff8100] hover:bg-[#fff7ed] transition-colors"
+          >
             <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 flex-1">{orderSummary.deliveryAddress}</p>
-          </div>
-          <div className="flex gap-2">
-            {["Home", "Office", "Other"].map((label) => (
-              <button
-                key={label}
-                onClick={() => setAddressLabel(label)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  addressLabel === label
-                    ? "bg-gray-200 text-gray-900 border border-gray-300"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Address Input Field */}
-      <div className="px-4 mb-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <Input
-            type="text"
-            placeholder="Enter address details (e.g., Flat number, Building name, Landmark)"
-            value={additionalAddressDetails}
-            onChange={(e) => setAdditionalAddressDetails(e.target.value)}
-            className="w-full h-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-[#ff8100] text-sm"
-            required
-          />
-          {!additionalAddressDetails.trim() && (
-            <p className="text-xs text-red-500 mt-1">This field is required</p>
-          )}
+            <div className="flex-1 text-left">
+              {selectedAddress ? (
+                <>
+                  <p className="text-xs text-gray-900">
+                    {formatAddress(selectedAddress)}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {selectedAddress.label || addressLabel}
+                  </p>
+                </>
+              ) : addressesLoading ? (
+                <p className="text-xs text-gray-500">Loading addresses...</p>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  No saved address found. Tap to add a new address.
+                </p>
+              )}
+            </div>
+            <ArrowLeft className="w-4 h-4 rotate-180 text-gray-400 flex-shrink-0" />
+          </button>
         </div>
       </div>
 
@@ -297,6 +436,162 @@ export default function CheckoutPage() {
           {paymentMethod === "cash" ? "Place Order" : "Proceed to Payment"}
         </Button>
       </div>
+
+      {/* Delivery Address Selector & Add New Address */}
+      {isAddressSelectorOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+          <div className="w-full max-w-md bg-white rounded-t-3xl p-4 pb-6">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAddressFormOpen) {
+                    setIsAddressFormOpen(false)
+                  } else {
+                    setIsAddressSelectorOpen(false)
+                  }
+                }}
+                className="p-2 -ml-2 rounded-full hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-800" />
+              </button>
+              <h2 className="flex-1 text-center text-sm font-semibold text-gray-900 -ml-2">
+                Delivery Address
+              </h2>
+              <div className="w-8" />
+            </div>
+
+            {!isAddressFormOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsAddressFormOpen(true)}
+                  className="w-full flex items-center justify-between bg-[#e9f9ee] border border-[#44c776] rounded-xl px-4 py-3 mb-4"
+                >
+                  <span className="text-sm font-semibold text-[#15803d]">+ Add New Address</span>
+                  <ArrowLeft className="w-4 h-4 rotate-180 text-[#15803d]" />
+                </button>
+
+                <p className="text-[10px] text-gray-500 mb-2 uppercase tracking-wide">
+                  Saved Addresses
+                </p>
+
+                {addressesLoading ? (
+                  <p className="text-xs text-gray-500">Loading addresses...</p>
+                ) : addresses.length === 0 ? (
+                  <p className="text-xs text-gray-500">No saved addresses found.</p>
+                ) : (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {addresses.map(address => {
+                      const id = address.id || address._id
+                      const isSelected = id === selectedAddressId
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAddressId(id)
+                            setAddressLabel(address.label || "Other")
+                            setIsAddressSelectorOpen(false)
+                          }}
+                          className={`w-full flex items-center justify-between rounded-xl border px-3 py-3 text-left ${
+                            isSelected ? "border-[#ff8100] bg-[#fff3e6]" : "border-gray-200"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-4 h-4 mt-0.5 text-[#ff8100]" />
+                            <div>
+                              <p className="text-xs font-semibold text-gray-900">
+                                {formatAddress(address)}
+                              </p>
+                              {address.label && (
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  {address.label}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={`w-4 h-4 rounded-full border ${
+                              isSelected
+                                ? "border-[#ff8100] bg-[#ff8100]"
+                                : "border-gray-300"
+                            }`}
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <form
+                onSubmit={handleSaveAddress}
+                className="space-y-3 max-h-[80vh] overflow-y-auto"
+              >
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Flat/Room No"
+                    value={addressFormData.flatRoom}
+                    onChange={(e) => handleAddressFieldChange("flatRoom", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Floor"
+                    value={addressFormData.floor}
+                    onChange={(e) => handleAddressFieldChange("floor", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Building/Chawl Name"
+                    value={addressFormData.building}
+                    onChange={(e) => handleAddressFieldChange("building", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Landmark"
+                    value={addressFormData.landmark}
+                    onChange={(e) => handleAddressFieldChange("landmark", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Your Name"
+                    value={addressFormData.name}
+                    onChange={(e) => handleAddressFieldChange("name", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Phone Number"
+                    value={addressFormData.phone}
+                    onChange={(e) => handleAddressFieldChange("phone", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Pin code"
+                    value={addressFormData.pinCode}
+                    onChange={(e) => handleAddressFieldChange("pinCode", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                  <Input
+                    placeholder="Add Location"
+                    value={addressFormData.addLocation}
+                    onChange={(e) => handleAddressFieldChange("addLocation", e.target.value)}
+                    className="h-11 bg-gray-50 border-gray-200 text-sm"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={savingAddress}
+                  className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold h-11 rounded-xl"
+                >
+                  {savingAddress ? "Saving..." : "Save Address"}
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">

@@ -493,10 +493,14 @@ export default function UserOrderDetails() {
                 <span className="text-sm text-gray-700 font-medium">
                   {item.quantity || item.qty || 1} x {item.name}
                   {/* Item Size/Unit - Show if available */}
-                  {(item.itemSizeQuantity || item.itemSizeUnit) && (
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
-                      {[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')}
+                  {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
+                    <p className="text-xs font-bold text-[#ff8100] dark:text-[#ff9830] mt-1">
+                      {[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')}
                     </p>
+                  )}
+                  {/* Item Description */}
+                  {item.description && (
+                    <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
                   )}
                 </span>
               </div>
@@ -594,7 +598,19 @@ export default function UserOrderDetails() {
             <div className="border-t border-gray-100 my-2 pt-2 flex justify-between items-center">
               <span className="font-bold text-gray-800">Paid</span>
               <span className="font-bold text-gray-800">
-                ₹{Number(pricing.total || 0).toFixed(2)}
+                ₹{(() => {
+                  const total = Number(pricing.total);
+                  if (total > 0) return total.toFixed(2);
+
+                  // Fallback: subtotal + delivery + platform + tax - discount
+                  const calculatedTotal = (Number(pricing.subtotal) || 0) +
+                    (Number(pricing.deliveryFee) || 0) +
+                    (Number(pricing.platformFee) || 0) +
+                    (Number(pricing.tax) || 0) -
+                    (Number(pricing.discount) || 0);
+
+                  return (calculatedTotal > 0 ? calculatedTotal : 0).toFixed(2);
+                })()}
               </span>
             </div>
           </div>

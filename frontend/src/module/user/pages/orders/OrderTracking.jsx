@@ -533,12 +533,13 @@ export default function OrderTracking() {
               price: item.price,
               isVeg: item.isVeg !== undefined ? item.isVeg : true
             })) || [],
-            total: apiOrder.pricing?.total || 0,
-            subtotal: apiOrder.pricing?.subtotal || 0,
-            deliveryFee: apiOrder.pricing?.deliveryFee || 0,
-            platformFee: apiOrder.pricing?.platformFee || 0,
-            tax: apiOrder.pricing?.tax || 0,
-            discount: apiOrder.pricing?.discount || 0,
+            total: apiOrder.pricing?.total || apiOrder.total || 0,
+            subtotal: apiOrder.pricing?.subtotal || apiOrder.subtotal ||
+              (apiOrder.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0) || 0),
+            deliveryFee: apiOrder.pricing?.deliveryFee || apiOrder.deliveryFee || 0,
+            platformFee: apiOrder.pricing?.platformFee || apiOrder.platformFee || 0,
+            tax: apiOrder.pricing?.tax || apiOrder.tax || 0,
+            discount: apiOrder.pricing?.discount || apiOrder.discount || 0,
             status: apiOrder.status || 'pending',
             createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
             deliveryPartner: apiOrder.deliveryPartnerId ? {
@@ -775,12 +776,13 @@ export default function OrderTracking() {
             price: item.price,
             isVeg: item.isVeg !== undefined ? item.isVeg : true
           })) || [],
-          total: apiOrder.pricing?.total || 0,
-          subtotal: apiOrder.pricing?.subtotal || 0,
-          deliveryFee: apiOrder.pricing?.deliveryFee || 0,
-          platformFee: apiOrder.pricing?.platformFee || 0,
-          tax: apiOrder.pricing?.tax || 0,
-          discount: apiOrder.pricing?.discount || 0,
+          total: apiOrder.pricing?.total || apiOrder.total || 0,
+          subtotal: apiOrder.pricing?.subtotal || apiOrder.subtotal ||
+            (apiOrder.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0) || 0),
+          deliveryFee: apiOrder.pricing?.deliveryFee || apiOrder.deliveryFee || 0,
+          platformFee: apiOrder.pricing?.platformFee || apiOrder.platformFee || 0,
+          tax: apiOrder.pricing?.tax || apiOrder.tax || 0,
+          discount: apiOrder.pricing?.discount || apiOrder.discount || 0,
           status: apiOrder.status || 'pending',
           createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
           deliveryPartner: apiOrder.deliveryPartnerId ? {
@@ -1428,7 +1430,20 @@ export default function OrderTracking() {
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between">
                       <span className="font-semibold text-gray-900">Total Amount</span>
-                      <span className="font-bold text-lg text-green-600">₹{order.total?.toFixed(2) || '0.00'}</span>
+                      <span className="font-bold text-lg text-green-600">
+                        ₹{(() => {
+                          const total = Number(order.total);
+                          if (total > 0) return total.toFixed(2);
+
+                          // Fallback calculation
+                          const calculatedTotal = (Number(order.subtotal) || 0) +
+                            (Number(order.deliveryFee) || 0) +
+                            (Number(order.platformFee) || 0) +
+                            (Number(order.tax) || 0) -
+                            (Number(order.discount) || 0);
+                          return (calculatedTotal > 0 ? calculatedTotal : 0).toFixed(2);
+                        })()}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   MessageCircle,
   Phone,
@@ -13,15 +13,15 @@ import {
   UtensilsCrossed,
   User
 } from "lucide-react"
-import { 
-  getDeliveryOrderStatus, 
+import {
+  getDeliveryOrderStatus,
   getDeliveryStatusMessage,
   saveDeliveryOrderStatus,
   normalizeDeliveryStatus,
   DELIVERY_ORDER_STATUS
 } from "../utils/deliveryOrderStatus"
-import { 
-  getDeliveryOrderPaymentStatus 
+import {
+  getDeliveryOrderPaymentStatus
 } from "../utils/deliveryWalletState"
 import { deliveryAPI } from "@/lib/api"
 import { Loader2 } from "lucide-react"
@@ -38,14 +38,14 @@ export default function AcceptedOrderDetails() {
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!orderId) return
-      
+
       try {
         setLoading(true)
         const response = await deliveryAPI.getOrderDetails(orderId)
-        
+
         if (response?.data?.success && response?.data?.data) {
           const order = response.data.data.order || response.data.data
-          
+
           // Format date helper
           const formatOrderDate = (dateString) => {
             if (!dateString) return 'N/A'
@@ -122,7 +122,12 @@ export default function AcceptedOrderDetails() {
               variation: item.variation || item.addons?.map(a => a.name).join(', ') || 'Standard',
               quantity: item.quantity || 1,
               type: item.isVeg ? 'Veg' : 'Non Veg',
-              image: item.image || "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=100&h=100&fit=crop&q=80"
+              image: item.image || "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=100&h=100&fit=crop&q=80",
+              itemSizeQuantity: item.itemSizeQuantity,
+              itemSizeUnit: item.itemSizeUnit,
+              unit: item.unit,
+              itemSize: item.itemSize,
+              description: item.description
             })),
             cutlery: order.sendCutlery ? "Yes" : "No",
             note: order.note || '', // Special instructions
@@ -142,7 +147,7 @@ export default function AcceptedOrderDetails() {
             statusMessage: getDeliveryStatusMessage(orderStatus).message,
             statusDescription: getDeliveryStatusMessage(orderStatus).description
           }
-          
+
           setOrderData(transformedOrder)
         }
       } catch (error) {
@@ -205,7 +210,7 @@ export default function AcceptedOrderDetails() {
     <div className="min-h-screen bg-[#f6e9dc] overflow-x-hidden pb-24">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4 md:py-3 flex items-center justify-between rounded-b-3xl md:rounded-b-none sticky top-0 z-10">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="p-2 -ml-2"
         >
@@ -341,7 +346,7 @@ export default function AcceptedOrderDetails() {
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button 
+                <button
                   onClick={() => {
                     navigate("/delivery/profile/conversation")
                   }}
@@ -349,7 +354,7 @@ export default function AcceptedOrderDetails() {
                 >
                   <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     const phone = orderData.restaurant.phone || orderData.customer.phone
                     if (phone) {
@@ -362,7 +367,7 @@ export default function AcceptedOrderDetails() {
                 >
                   <Phone className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     const address = encodeURIComponent(orderData.restaurant.address)
                     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
@@ -383,13 +388,23 @@ export default function AcceptedOrderDetails() {
             {orderData.items.map((item) => (
               <div key={item.id} className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-start gap-4">
-                  <img 
+                  <img
                     src={item.image}
                     alt={item.name}
                     className="w-16 h-16 rounded-lg object-cover"
                   />
                   <div className="flex-1">
-                    <p className="text-gray-900 font-medium mb-1">{item.name}</p>
+                    <p className="text-gray-900 font-medium mb-1">
+                      {item.name}
+                      {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
+                        <span className="text-xs font-bold ml-2 italic text-[#ff8100]">
+                          ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')})
+                        </span>
+                      )}
+                    </p>
+                    {item.description && (
+                      <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                    )}
                     <p className="text-gray-900 font-semibold mb-1">₹ {item.price.toFixed(2)}</p>
                     <p className="text-gray-600 text-sm">Variations: {item.variation}</p>
                   </div>
@@ -487,14 +502,14 @@ export default function AcceptedOrderDetails() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate("/delivery")}
             className="flex flex-col items-center gap-1 p-2 text-gray-600"
           >
             <Home className="w-6 h-6" />
             <span className="text-[10px] text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/delivery/requests")}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 relative"
           >
@@ -506,14 +521,14 @@ export default function AcceptedOrderDetails() {
             </div>
             <span className="text-[10px] text-gray-600 font-medium">Request</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/delivery/orders")}
             className="flex flex-col items-center gap-1 p-2 text-gray-600"
           >
             <UtensilsCrossed className="w-6 h-6" />
             <span className="text-[10px] text-gray-600 font-medium">Orders</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/delivery/profile")}
             className="flex flex-col items-center gap-1 p-2 text-gray-600"
           >
@@ -528,10 +543,10 @@ export default function AcceptedOrderDetails() {
         const normalizedStatus = normalizeDeliveryStatus(orderStatus)
         const isDelivered = normalizedStatus === DELIVERY_ORDER_STATUS.DELIVERED
         const isCancelled = normalizedStatus === DELIVERY_ORDER_STATUS.CANCELLED
-        
+
         // Don't show buttons if order is delivered or cancelled
         if (isDelivered || isCancelled) return null
-        
+
         return (
           <div className="fixed bottom-28 md:bottom-12 left-0 right-0 px-4 z-[60]">
             <div className="bg-white rounded-lg shadow-lg p-3 space-y-2">
@@ -546,7 +561,7 @@ export default function AcceptedOrderDetails() {
                   Mark as Picked Up
                 </button>
               )}
-              
+
               {normalizedStatus === DELIVERY_ORDER_STATUS.PICKED_UP && (
                 <button
                   onClick={() => {
@@ -558,7 +573,7 @@ export default function AcceptedOrderDetails() {
                   Mark as On the Way
                 </button>
               )}
-              
+
               {normalizedStatus === DELIVERY_ORDER_STATUS.ON_THE_WAY && (
                 <button
                   onClick={() => {

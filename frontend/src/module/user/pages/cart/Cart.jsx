@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Building2, Sparkles, Banknote } from "lucide-react"
+import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, X, Check, Settings, CreditCard, Building2, Sparkles, Banknote } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
 
@@ -53,6 +53,41 @@ const formatFullAddress = (address) => {
   }
 
   return ""
+}
+
+/**
+ * Derive delivery address details string that backend expects (non-empty),
+ * based on the selected/default address object.
+ * This keeps deliveryAddressDetails fully dynamic & in sync with DB addresses.
+ */
+const deriveDeliveryAddressDetails = (address) => {
+  if (!address) return ""
+
+  // Priority 1: If we have explicit additionalDetails/area + street, prefer that combo
+  const detail = address.additionalDetails || address.area
+  const street = address.street || address.address
+
+  if (detail && street && street !== detail && !street.includes(detail) && !detail.includes(street)) {
+    return `${detail}, ${street}`
+  }
+
+  // Priority 2: Use formattedAddress if available and meaningful
+  if (address.formattedAddress && address.formattedAddress !== "Select location") {
+    return address.formattedAddress
+  }
+
+  // Fallback: build from parts
+  const parts = []
+  if (address.street) parts.push(address.street)
+  if (address.city) parts.push(address.city)
+  if (address.state) parts.push(address.state)
+  if (address.zipCode) parts.push(address.zipCode)
+
+  if (parts.length > 0) {
+    return parts.join(", ")
+  }
+
+  return address.address || address.formattedAddress || ""
 }
 
 export default function Cart() {
@@ -134,23 +169,60 @@ export default function Cart() {
 
   const cartCount = getCartCount()
   const savedAddress = getDefaultAddress()
-  // Priority: Use live location if available, otherwise use saved address
-  const defaultAddress = currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location"
-    ? {
-      ...savedAddress,
-      formattedAddress: currentLocation.formattedAddress,
-      address: currentLocation.address || currentLocation.formattedAddress,
-      street: currentLocation.street || currentLocation.address,
-      city: currentLocation.city,
-      state: currentLocation.state,
-      zipCode: currentLocation.postalCode,
-      area: currentLocation.area,
-      location: currentLocation.latitude && currentLocation.longitude ? {
-        coordinates: [currentLocation.longitude, currentLocation.latitude]
-      } : savedAddress?.location
+
+  // Priority: Use manual selection if available, otherwise use default saved address
+  const defaultAddress = useMemo(() => {
+    // If we have a manual selection (from overlay or labels), prioritize it
+    if (currentLocation?.formattedAddress && currentLocation.formattedAddress !== "Select location") {
+      // Find matching saved address to enrich with label/ID if possible
+      const matchingSaved = addresses.find(addr =>
+        (currentLocation.id && (addr.id === currentLocation.id || addr._id === currentLocation.id)) ||
+        (currentLocation.addressId && (addr.id === currentLocation.addressId || addr._id === currentLocation.addressId)) ||
+        (addr.label && currentLocation.label && addr.label === currentLocation.label)
+      );
+
+      const combined = {
+        ...savedAddress,
+        ...matchingSaved,
+        ...currentLocation,
+        // Ensure core identifiers and labels are preserved from the best source
+        id: currentLocation.id || currentLocation.addressId || matchingSaved?.id || matchingSaved?._id || savedAddress?.id,
+        label: matchingSaved?.label || currentLocation.label || savedAddress?.label,
+        formattedAddress: currentLocation.formattedAddress,
+        address: currentLocation.address || currentLocation.formattedAddress,
+        street: currentLocation.street || currentLocation.address || matchingSaved?.street || savedAddress?.street || "",
+        city: currentLocation.city || matchingSaved?.city || savedAddress?.city || "",
+        state: currentLocation.state || matchingSaved?.state || savedAddress?.state || "",
+        zipCode: currentLocation.zipCode || currentLocation.postalCode || matchingSaved?.zipCode || savedAddress?.zipCode || "",
+        area: currentLocation.area || matchingSaved?.area || savedAddress?.area || "",
+        additionalDetails: currentLocation.additionalDetails || currentLocation.area || (currentLocation.isManual ? "" : (matchingSaved?.additionalDetails || savedAddress?.additionalDetails)),
+        location: currentLocation.latitude && currentLocation.longitude ? {
+          type: 'Point',
+          coordinates: [currentLocation.longitude, currentLocation.latitude]
+        } : (matchingSaved?.location || savedAddress?.location)
+      };
+      return combined;
     }
-    : savedAddress
+
+    return savedAddress
+  }, [currentLocation, savedAddress, addresses])
+
   const defaultPayment = getDefaultPaymentMethod()
+
+  // Identify which address label is active for visual feedback
+  const activeAddressLabel = useMemo(() => {
+    if (!defaultAddress) return null;
+    return defaultAddress.label || null;
+  }, [defaultAddress]);
+
+  // Keep delivery address details in sync with the active/default address.
+  useEffect(() => {
+    if (!defaultAddress) return
+
+    // Sync manualAddressDetails with the derived address string whenever defaultAddress changes
+    const autoDetails = deriveDeliveryAddressDetails(defaultAddress)
+    setManualAddressDetails(autoDetails || "")
+  }, [defaultAddress])
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
@@ -770,6 +842,12 @@ export default function Cart() {
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
 
+      // Keep deliveryAddressDetails in sync with the label-based selected address
+      const derivedDetails = deriveDeliveryAddressDetails(address)
+      if (derivedDetails) {
+        setManualAddressDetails(derivedDetails)
+      }
+
       toast.success(`${label} address selected!`)
 
       // Update context-based location instead of full page reload
@@ -918,7 +996,8 @@ export default function Cart() {
         isVeg: item.isVeg !== false,
         itemSize: item.itemSize || "",
         itemSizeQuantity: item.itemSizeQuantity || "",
-        itemSizeUnit: item.itemSizeUnit || ""
+        itemSizeUnit: item.itemSizeUnit || "",
+        unit: item.unit || ""
       }))
 
       console.log("📋 Order items to send:", orderItems)
@@ -1456,7 +1535,11 @@ export default function Cart() {
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">
-                          {item.name} {(item.itemSizeQuantity || item.itemSizeUnit) ? `(${[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')})` : ''}
+                          {item.name} {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) ? (
+                            <span className="text-[#ff8100] dark:text-[#ff9830] font-bold ml-1">
+                              ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')})
+                            </span>
+                          ) : ''}
                         </p>
                         <button
                           onClick={() => {
@@ -1722,7 +1805,7 @@ export default function Cart() {
                 >
                   <div className="flex items-center gap-3 md:gap-4">
                     <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-orange transition-colors" />
-                    <div className="flex-1">
+                    <div className="flex-1 pr-6">
                       <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 group-hover:text-primary-orange transition-colors">
                         Delivery at <span className="font-semibold">Location</span>
                       </p>
@@ -1736,18 +1819,22 @@ export default function Cart() {
                             addr.label === label ||
                             (label === "Office" && addr.label === "Work")
                           )
+                          // Check if this label is currently active
+                          const isActive = activeAddressLabel === label || (label === "Office" && activeAddressLabel === "Work");
+
                           return (
                             <button
                               key={label}
+                              type="button"
                               onClick={(e) => {
-                                e.preventDefault()
                                 e.stopPropagation()
-                                handleSelectAddressByLabel(label)
+                                if (addressExists) handleSelectAddressByLabel(label)
                               }}
-                              disabled={!addressExists}
-                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-colors ${addressExists
-                                ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-all duration-200 ${isActive
+                                ? 'bg-green-600 border-green-600 text-white font-semibold'
+                                : addressExists
+                                  ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
+                                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                                 }`}
                             >
                               {label}
@@ -1761,22 +1848,28 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Manual Address Input Field */}
+              {/* Delivery Address Details (auto-filled from selected address) */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
                 <div className="space-y-2">
                   <label className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                    Additional Address Details
+                    Delivery address details
                   </label>
-                  <Input
-                    type="text"
-                    placeholder="Enter address details (e.g., Flat number, Building name, Landmark)"
-                    value={manualAddressDetails}
-                    onChange={(e) => setManualAddressDetails(e.target.value)}
-                    className="w-full h-10 md:h-12 bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-primary-orange text-sm md:text-base"
-                  />
-                  {!manualAddressDetails.trim() && (
-                    <p className="text-xs text-red-500 dark:text-red-400">This field is required</p>
-                  )}
+                  <div
+                    className="relative"
+                    onClick={openLocationSelector}
+                  >
+                    <Input
+                      type="text"
+                      placeholder="Tap to choose or add delivery address"
+                      value={manualAddressDetails}
+                      readOnly
+                      className="w-full h-10 md:h-12 bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-primary-orange text-sm md:text-base cursor-pointer !pr-24 overflow-hidden text-ellipsis"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] md:text-xs text-gray-400 flex items-center gap-1">
+                      Change
+                      <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1915,24 +2008,24 @@ export default function Cart() {
                     </p>
                   </div>
                 </div>
-
-                <div
-                  className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  onClick={() => setShowPaymentSheet(true)}
-                >
-                  <span className="text-sm md:text-base font-medium">Change</span>
-                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                </div>
               </div>
 
               <Button
                 size="lg"
                 onClick={() => {
-                  if (selectedPaymentMethod === "razorpay" && !isPlacingOrder) {
-                    setShowPaymentSheet(true)
-                  } else {
-                    handlePlaceOrder()
+                  if (isPlacingOrder) return
+
+                  if (!defaultAddress) {
+                    alert("Please add a delivery address")
+                    return
                   }
+
+                  if (!manualAddressDetails.trim()) {
+                    alert("Please enter additional address details")
+                    return
+                  }
+
+                  setShowPaymentSheet(true)
                 }}
                 disabled={isPlacingOrder || (restaurantData && restaurantData.isAcceptingOrders === false)}
                 className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2209,6 +2302,7 @@ export default function Cart() {
                   onClick={() => {
                     setSelectedPaymentMethod("cash");
                     setShowPaymentSheet(false);
+                    setTimeout(() => handlePlaceOrder(), 300);
                   }}
                 >
                   <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">

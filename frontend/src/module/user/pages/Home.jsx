@@ -42,6 +42,15 @@ import exploreGourmet from "@/assets/explore more icons/gourmet.png"
 import exploreTop10 from "@/assets/explore more icons/top 10.png"
 import exploreCollection from "@/assets/explore more icons/collection.png"
 
+// Global memory cache to persist state across navigation
+const HOME_PAGE_CACHE = {
+  heroBanners: null,
+  realCategories: null,
+  landingConfig: null,
+  restaurants: new Map(), // Map of filter string -> restaurants data
+  lastRestaurantFetch: 0
+};
+
 // Banner images for hero carousel - will be fetched from API
 
 // Animated placeholder for search - moved outside component to prevent recreation
@@ -429,6 +438,17 @@ export default function Home() {
 
     const fetchHeroBanners = async () => {
       try {
+        // Check cache first
+        if (HOME_PAGE_CACHE.heroBanners && HOME_PAGE_CACHE.heroBanners.length > 0) {
+          console.log('🖼️ [Hero Banners] Using cached banners');
+          setHeroBannersData(HOME_PAGE_CACHE.heroBanners);
+          const imageUrls = HOME_PAGE_CACHE.heroBanners.map(b => b.imageUrl);
+          setHeroBannerImages(imageUrls);
+          setLoadingBanners(false);
+          // Background refresh if needed, or just return
+          return;
+        }
+
         console.log('🖼️ [Hero Banners] Starting to fetch banners...')
         console.log('🖼️ [Hero Banners] API Base URL:', API_BASE_URL)
         console.log('🖼️ [Hero Banners] Full API URL:', `${API_BASE_URL}/hero-banners/public`)
@@ -459,6 +479,8 @@ export default function Home() {
 
             if (validBanners.length > 0) {
               setHeroBannersData(validBanners)
+              // Update cache
+              HOME_PAGE_CACHE.heroBanners = validBanners;
               // Extract image URLs for display
               const imageUrls = validBanners.map(b => b.imageUrl)
               console.log('🖼️ [Hero Banners] Setting banner images:', imageUrls)
@@ -523,6 +545,13 @@ export default function Home() {
   useEffect(() => {
     const fetchRealCategories = async () => {
       try {
+        // Check cache first
+        if (HOME_PAGE_CACHE.realCategories && HOME_PAGE_CACHE.realCategories.length > 0) {
+          setRealCategories(HOME_PAGE_CACHE.realCategories);
+          setLoadingRealCategories(false);
+          return;
+        }
+
         setLoadingRealCategories(true)
         const response = await api.get('/categories/public')
         if (response.data.success && response.data.data.categories) {
@@ -543,6 +572,8 @@ export default function Home() {
           })
           console.log('📸 Categories with images:', adminCategories.map(c => ({ name: c.name, image: c.image })))
           setRealCategories(adminCategories)
+          // Update cache
+          HOME_PAGE_CACHE.realCategories = adminCategories;
         } else {
           setRealCategories([])
         }
@@ -561,6 +592,15 @@ export default function Home() {
   useEffect(() => {
     const fetchLandingConfig = async () => {
       try {
+        // Check cache
+        if (HOME_PAGE_CACHE.landingConfig) {
+          setLandingCategories(HOME_PAGE_CACHE.landingConfig.categories);
+          setLandingExploreMore(HOME_PAGE_CACHE.landingConfig.exploreMore);
+          setExploreMoreHeading(HOME_PAGE_CACHE.landingConfig.heading);
+          setLoadingLandingConfig(false);
+          return;
+        }
+
         setLoadingLandingConfig(true)
         const response = await api.get('/hero-banners/landing/public')
         if (response.data.success && response.data.data) {
@@ -579,6 +619,13 @@ export default function Home() {
               .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           )
           setExploreMoreHeading(response.data.data.settings?.exploreMoreHeading || "Explore More")
+
+          // Update Cache
+          HOME_PAGE_CACHE.landingConfig = {
+            categories: apiCategories.filter((c) => c.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+            exploreMore: apiExploreMore.filter((e) => e.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+            heading: response.data.data.settings?.exploreMoreHeading || "Explore More"
+          };
         }
       } catch (error) {
         console.error('Error fetching landing config:', error)
@@ -902,68 +949,35 @@ export default function Home() {
         params.trusted = 'true'
       }
 
-      // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
+      // Optional: Add zoneId if available
       if (zoneId) {
         params.zoneId = zoneId
       }
-      // Note: We show all restaurants regardless of zone, but apply grayscale styling if user is out of service
 
-      console.log('Fetching restaurants with params:', params)
+      // Generate cache key based on params
+      const cacheKey = JSON.stringify(params);
+
+      // Check global memory cache first (for fast back navigation)
+      if (useCache && HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
+        console.log('Using cached restaurants data for key:', cacheKey);
+        setRestaurantsData(HOME_PAGE_CACHE.restaurants.get(cacheKey));
+        setLoadingRestaurants(false);
+        // Optional: fetch in background to update
+        // return; 
+      }
+
+      // If we have cached data, we can still fetch to update, but don't show loading spinner if we have data
+      if (HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
+        setLoadingRestaurants(false);
+      } else {
+        setLoadingRestaurants(true)
+      }
+
+
       const response = await restaurantAPI.getRestaurants(params)
-      console.log('Restaurants API response:', response.data)
+      const restaurantsArray = response.data?.data?.restaurants || response.data?.data || []
 
-      if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
-        const restaurantsArray = response.data.data.restaurants
-        console.log(`Fetched ${restaurantsArray.length} restaurants from API`)
-
-        // Cache restaurant data in localStorage for faster loading
-        try {
-          const cacheKey = `restaurants_cache_${JSON.stringify(params)}`
-          const cacheData = {
-            restaurants: restaurantsArray,
-            timestamp: Date.now(),
-            filters: params
-          }
-          const cacheString = JSON.stringify(cacheData)
-
-          // Check localStorage quota and verify storage
-          try {
-            localStorage.setItem(cacheKey, cacheString)
-            const stored = localStorage.getItem(cacheKey)
-            if (stored === cacheString) {
-              const cacheSize = new Blob([cacheString]).size
-              console.log('✅ Restaurant data cached successfully', {
-                cacheKey: cacheKey.substring(0, 50) + '...',
-                restaurantsCount: restaurantsArray.length,
-                cacheSizeKB: (cacheSize / 1024).toFixed(2) + ' KB'
-              })
-            } else {
-              console.warn('⚠️ Cache verification failed - data not stored correctly')
-            }
-          } catch (quotaError) {
-            if (quotaError.name === 'QuotaExceededError') {
-              console.warn('⚠️ localStorage quota exceeded, clearing old cache entries')
-              // Clear old cache entries
-              try {
-                const keys = Object.keys(localStorage).filter(key => key.startsWith('restaurants_cache_'))
-                keys.forEach(key => localStorage.removeItem(key))
-                // Try storing again
-                localStorage.setItem(cacheKey, cacheString)
-                console.log('✅ Cache stored after cleanup')
-              } catch (cleanupError) {
-                console.error('❌ Failed to cleanup cache:', cleanupError)
-              }
-            } else {
-              throw quotaError
-            }
-          }
-        } catch (cacheError) {
-          console.error('❌ Failed to cache restaurant data:', cacheError)
-          console.error('Cache error details:', {
-            name: cacheError.name,
-            message: cacheError.message
-          })
-        }
+      if (response.data?.success) {
 
         // Debug: Check first restaurant's image data
         if (restaurantsArray.length > 0) {
@@ -1234,9 +1248,15 @@ export default function Home() {
 
         console.log('Transformed and sorted restaurants:', transformedRestaurants)
         setRestaurantsData(transformedRestaurants)
+
+        // Update global cache
+        HOME_PAGE_CACHE.restaurants.set(cacheKey, transformedRestaurants);
       } else {
         console.warn('Invalid API response structure:', response.data)
-        setRestaurantsData([])
+        // Only clear if we don't have cache to show
+        if (!HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
+          setRestaurantsData([])
+        }
       }
     } catch (error) {
       console.error('Error fetching restaurants:', error)
@@ -2354,7 +2374,7 @@ export default function Home() {
                     viewport={{ once: true, margin: "-50px" }}
                     transition={{
                       duration: 0.5,
-                      delay: index * 0.1,
+                      delay: 0, // Removed stagger delay to prevent empty screen on fast scroll
                       type: "spring",
                       stiffness: 100
                     }}

@@ -50,7 +50,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
   // Format address for display
   const formatAddress = (address) => {
     if (!address) return "N/A"
-    
+
     const parts = []
     if (address.label) parts.push(address.label)
     if (address.street) parts.push(address.street)
@@ -62,7 +62,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
       if (address.state) parts.push(address.state)
       if (address.zipCode) parts.push(address.zipCode)
     }
-    
+
     return parts.length > 0 ? parts.join(", ") : "Address not available"
   }
 
@@ -121,9 +121,9 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                     Delivered At
                   </p>
                   <p className="text-sm font-medium text-slate-900">
-                    {new Date(order.deliveredAt).toLocaleString('en-GB', { 
-                      day: '2-digit', 
-                      month: 'short', 
+                    {new Date(order.deliveredAt).toLocaleString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
                       year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
@@ -143,17 +143,17 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                   {order.cancellationReason && (
                     <p className="text-xs text-red-600 mt-1">
                       <span className="font-medium">
-                        {order.cancelledBy === 'user' ? 'Cancelled by User - ' : 
-                         order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' : 
-                         'Cancellation '}Reason:
+                        {order.cancelledBy === 'user' ? 'Cancelled by User - ' :
+                          order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' :
+                            'Cancellation '}Reason:
                       </span> {order.cancellationReason}
                     </p>
                   )}
                   {order.cancelledAt && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Cancelled: {new Date(order.cancelledAt).toLocaleString('en-GB', { 
-                        day: '2-digit', 
-                        month: 'short', 
+                      Cancelled: {new Date(order.cancelledAt).toLocaleString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
                         year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
@@ -249,7 +249,14 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                         <span className="text-xs font-bold text-slate-700 bg-white px-2 py-1 rounded">
                           {item.quantity || 1}x
                         </span>
-                        <p className="text-sm font-medium text-slate-900">{item.name || "Unknown Item"}</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {item.name || "Unknown Item"}
+                          {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
+                            <span className="text-xs font-bold text-[#ff8100] ml-2">
+                              ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')})
+                            </span>
+                          )}
+                        </p>
                         {item.isVeg !== undefined && (
                           <span className={`text-xs px-1.5 py-0.5 rounded ${item.isVeg ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {item.isVeg ? 'Veg' : 'Non-Veg'}
@@ -407,8 +414,8 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Platform Fee</span>
                 <span className="font-medium text-slate-900">
-                  {order.platformFee !== undefined && order.platformFee > 0 
-                    ? `₹${order.platformFee.toFixed(2)}` 
+                  {order.platformFee !== undefined && order.platformFee > 0
+                    ? `₹${order.platformFee.toFixed(2)}`
                     : <span className="text-slate-400">₹0.00</span>}
                 </span>
               </div>

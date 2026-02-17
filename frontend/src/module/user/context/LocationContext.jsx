@@ -53,6 +53,12 @@ export const LocationProvider = ({ children }) => {
             if (locationData.accuracy !== undefined) locationPayload.accuracy = locationData.accuracy
             if (locationData.postalCode) locationPayload.postalCode = locationData.postalCode
 
+            // Critical: Ensure we have coordinates before calling API
+            if (!locationPayload.latitude || !locationPayload.longitude) {
+                console.warn("⚠️ [LocationContext] Skipping DB update: Missing coordinates")
+                return
+            }
+
             console.log("💾 [LocationContext] Updating live location in DB")
             await userAPI.updateLocation(locationPayload)
         } catch (err) {

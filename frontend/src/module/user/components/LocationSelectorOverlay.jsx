@@ -45,7 +45,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
   const [searchValue, setSearchValue] = useState("")
-  const { location, loading, requestLocation } = useGeoLocation()
+  const { location, loading, requestLocation, updateLocation } = useGeoLocation()
   const { addresses = [], addAddress, updateAddress, userProfile } = useProfile()
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [mapPosition, setMapPosition] = useState([22.7196, 75.8577]) // Default Indore coordinates [lat, lng]
@@ -2163,36 +2163,53 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
   const handleSelectSavedAddress = async (address) => {
     try {
-      // Get coordinates from address location
-      const coordinates = address.location?.coordinates || []
-      const longitude = coordinates[0]
-      const latitude = coordinates[1]
+      console.log("📍 Selecting saved address:", address)
+
+      // Robust coordinate extraction
+      // 1. Try from GeoJSON location.coordinates [lng, lat]
+      // 2. Try from root level latitude/longitude
+      let longitude = address.location?.coordinates?.[0] || address.longitude
+      let latitude = address.location?.coordinates?.[1] || address.latitude
+
+      // If coordinates are [0, 0] or missing, try to use map position if it was just geocoded
+      if ((!latitude || !longitude || (latitude === 0 && longitude === 0)) && address.id) {
+        console.warn("⚠️ Address is missing coordinates, checking for fallback...")
+        // If we don't have coords, we can't accurately update the live location
+        // but we can still select the address for delivery
+      }
 
       // Construct location data from address
       const locationData = {
+        id: address.id || address._id, // Include ID for synchronization
+        addressId: address.id || address._id, // Explicit addressId field
         city: address.city || "",
         state: address.state || "",
         address: address.street || "",
         area: address.additionalDetails || "",
-        zipCode: address.zipCode || "",
-        latitude,
-        longitude,
-        formattedAddress: `${address.street}, ${address.city}, ${address.state}`,
+        zipCode: address.zipCode || address.postalCode || "",
+        latitude: latitude || 0,
+        longitude: longitude || 0,
+        formattedAddress: address.formattedAddress || `${address.street || ''}, ${address.city || ''}, ${address.state || ''}`.replace(/^, /, ''),
         isManual: true,
         timestamp: Date.now()
       }
 
-      // Update location in backend
-      await userAPI.updateLocation({
-        latitude,
-        longitude,
-        address: address.street,
-        city: address.city,
-        state: address.state,
-        area: address.additionalDetails || "",
-        zipCode: address.zipCode,
-        formattedAddress: `${address.street}, ${address.city}, ${address.state}`
-      })
+      // Only updating backend if we have valid coordinates
+      if (latitude && longitude && latitude !== 0 && longitude !== 0) {
+        console.log("💾 Updating backend location with:", { latitude, longitude })
+        await userAPI.updateLocation({
+          latitude,
+          longitude,
+          address: address.street,
+          city: address.city,
+          state: address.state,
+          area: address.additionalDetails || "",
+          zipCode: address.zipCode || address.postalCode || "",
+          formattedAddress: locationData.formattedAddress
+        })
+      } else {
+        console.warn("⏭️ Skipping backend location update due to missing coordinates")
+      }
 
       localStorage.setItem("userLocation", JSON.stringify(locationData))
       updateLocation(locationData)
@@ -2546,11 +2563,19 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
         <div className="max-w-7xl mx-auto w-full pb-6">
-          {/* Use Current Location */}
+          {/* Delivery Address + Use Current Location + Add New Address */}
           <div
             className="px-4 sm:px-6 lg:px-8 py-2 bg-white dark:bg-[#1a1a1a]"
             style={{ animation: 'slideDown 0.3s ease-out 0.1s both' }}
           >
+            {/* Section title to match Delivery Address popup visual */}
+            <div className="pb-2">
+              <p className="text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400 uppercase">
+                Delivery Address
+              </p>
+            </div>
+
+            {/* Use Current Location */}
             <button
               onClick={handleUseCurrentLocation}
               disabled={loading}
@@ -2561,8 +2586,8 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                   <Crosshair className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" strokeWidth={2.5} />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-green-700 dark:text-green-400">Use current location</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Use current location</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                     {loading ? "Getting location..." : currentLocationText}
                   </p>
                 </div>
@@ -2570,7 +2595,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
               <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </button>
 
-            {/* Add Address */}
+            {/* Add New Address (matches existing flow, only text/UI changed) */}
             <button
               onClick={handleAddAddress}
               className="w-full flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group border-t border-gray-100 dark:border-gray-800"
@@ -2579,7 +2604,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                 <div className="h-10 w-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors">
                   <Plus className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
-                <p className="font-semibold text-green-700 dark:text-green-400">Add Address</p>
+                <p className="font-semibold text-green-700 dark:text-green-400">
+                  + Add New Address
+                </p>
               </div>
               <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </button>
