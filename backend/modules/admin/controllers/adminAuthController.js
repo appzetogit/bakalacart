@@ -66,8 +66,8 @@ export const adminSignup = asyncHandler(async (req, res) => {
       adminRole: admin.role
     });
 
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    // Set refresh token in httpOnly cookie with admin-specific name
+    res.cookie('admin_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -135,8 +135,8 @@ export const adminLogin = asyncHandler(async (req, res) => {
     adminRole: admin.role
   });
 
-  // Set refresh token in httpOnly cookie
-  res.cookie('refreshToken', tokens.refreshToken, {
+  // Set refresh token in httpOnly cookie with admin-specific name
+  res.cookie('admin_refreshToken', tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -274,17 +274,64 @@ export const getCurrentAdmin = asyncHandler(async (req, res) => {
  * POST /api/admin/auth/logout
  */
 export const adminLogout = asyncHandler(async (req, res) => {
-  // Clear refresh token cookie
-  res.cookie('refreshToken', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 0
+  // Clear all refresh token cookies to ensure thorough logout
+  const cookieNames = ['admin_refreshToken', 'refreshToken'];
+  cookieNames.forEach(name => {
+    res.cookie(name, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0
+    });
   });
 
   logger.info(`Admin logged out: ${req.user?._id || req.user?.userId}`);
 
   return successResponse(res, 200, 'Logout successful');
+});
+
+/**
+ * Refresh Admin Access Token
+ * POST /api/admin/auth/refresh-token
+ */
+export const refreshToken = asyncHandler(async (req, res) => {
+  // Try to find the refresh token in admin-specific cookie or generic cookie
+  const refreshToken = req.cookies?.admin_refreshToken || req.cookies?.refreshToken;
+
+  if (!refreshToken) {
+    return errorResponse(res, 401, 'Refresh token not found');
+  }
+
+  try {
+    // Verify refresh token
+    const decoded = jwtService.verifyRefreshToken(refreshToken);
+
+    // Ensure it's an admin token
+    if (!['admin', 'super_admin', 'moderator'].includes(decoded.role)) {
+      return errorResponse(res, 401, 'Invalid token for admin');
+    }
+
+    // Get admin from database
+    const admin = await Admin.findById(decoded.userId);
+
+    if (!admin || !admin.isActive) {
+      return errorResponse(res, 401, 'Admin not found or inactive');
+    }
+
+    // Generate new access token
+    const tokens = jwtService.generateTokens({
+      userId: admin._id.toString(),
+      role: admin.role,
+      email: admin.email,
+      adminRole: admin.role
+    });
+
+    return successResponse(res, 200, 'Token refreshed successfully', {
+      accessToken: tokens.accessToken
+    });
+  } catch (error) {
+    return errorResponse(res, 401, error.message || 'Invalid refresh token');
+  }
 });
 
 /**

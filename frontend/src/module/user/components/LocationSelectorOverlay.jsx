@@ -2582,34 +2582,20 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
               className="w-full flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group"
             >
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors">
-                  <Crosshair className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" strokeWidth={2.5} />
+                <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-900/10 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
+                  <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Use current location</p>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    {loading ? "Getting location..." : currentLocationText}
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-tight">DELIVERY AT LOCATION</p>
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium line-clamp-1">
+                    {loading ? "Detecting live location..." : currentLocationText}
                   </p>
                 </div>
               </div>
               <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </button>
 
-            {/* Add New Address (matches existing flow, only text/UI changed) */}
-            <button
-              onClick={handleAddAddress}
-              className="w-full flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group border-t border-gray-100 dark:border-gray-800"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors">
-                  <Plus className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <p className="font-semibold text-green-700 dark:text-green-400">
-                  + Add New Address
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-            </button>
+            {/* Add New Address removed as per request */}
           </div>
 
           {/* Saved Addresses Section */}

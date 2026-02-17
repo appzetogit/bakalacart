@@ -19,17 +19,37 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
         name: userProfile?.name || "",
         phone: userProfile?.phone || "",
         pinCode: "",
-        label: "Home"
+        label: "Home",
+        autoAddress: "" // Hidden from typing, used for bottom box
     })
 
+    // Reset form when modal opens
     useEffect(() => {
-        if (location?.postalCode) {
-            setFormData(prev => ({ ...prev, pinCode: location.postalCode }))
+        if (isOpen) {
+            setFormData({
+                flatNo: "",
+                floor: "",
+                buildingName: "",
+                landmark: "",
+                name: "",
+                phone: "",
+                pinCode: "",
+                label: "Home",
+                autoAddress: ""
+            })
         }
-        if (location?.address || location?.area) {
-            setFormData(prev => ({ ...prev, landmark: location.address || location.area }))
+    }, [isOpen])
+
+    useEffect(() => {
+        if (isOpen) {
+            if (location?.postalCode) {
+                setFormData(prev => ({ ...prev, pinCode: location.postalCode }))
+            }
+            if (location?.address || location?.area) {
+                setFormData(prev => ({ ...prev, autoAddress: location.address || location.area, buildingName: "", landmark: "" }))
+            }
         }
-    }, [location])
+    }, [location, isOpen])
 
     const handleChange = (e) => {
         const { name, value } = e.target
@@ -49,7 +69,8 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
             const additionalDetails = [
                 formData.flatNo ? `Flat ${formData.flatNo}` : "",
                 formData.floor ? `Floor ${formData.floor}` : "",
-                formData.landmark ? `Landmark: ${formData.landmark}` : ""
+                formData.landmark ? `Landmark: ${formData.landmark}` : "",
+                formData.autoAddress ? `Location: ${formData.autoAddress}` : ""
             ].filter(Boolean).join(", ")
 
             const addressData = {
@@ -171,14 +192,23 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                         />
                     </div>
 
-                    {/* Add Location Button */}
-                    <button
-                        type="button"
-                        className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50"
-                    >
-                        <span className="text-gray-500">Add Location</span>
-                        <X className="h-4 w-4 text-gray-400" />
-                    </button>
+                    {/* Add Location (Static Box) */}
+                    <div className="space-y-2 relative">
+                        <div className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 min-h-[56px]">
+                            <span className="text-sm text-gray-400 truncate pr-4">
+                                {formData.autoAddress || "Add Location"}
+                            </span>
+                            {(formData.autoAddress || formData.buildingName || formData.landmark) && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, buildingName: "", landmark: "", autoAddress: "" }))}
+                                    className="text-gray-400 p-1 flex-shrink-0"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
                     {/* Save Address Button */}
                     <div className="pt-4 border-t dark:border-gray-800 pb-10">

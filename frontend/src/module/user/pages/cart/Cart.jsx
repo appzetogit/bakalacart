@@ -17,6 +17,8 @@ import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@/lib
 import { API_BASE_URL } from "@/lib/api/config"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
 import { toast } from "sonner"
+import AddressFormModal from "../../components/AddressFormModal"
+
 
 
 // Removed hardcoded suggested items - now fetching approved addons from backend
@@ -142,6 +144,7 @@ export default function Cart() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [placedOrderId, setPlacedOrderId] = useState(null)
   const [showPaymentSheet, setShowPaymentSheet] = useState(false)
+  const [showAddressForm, setShowAddressForm] = useState(false)
 
   // Restaurant and pricing state
   const [restaurantData, setRestaurantData] = useState(null)
@@ -780,17 +783,11 @@ export default function Cart() {
   // Restaurant name from data or cart
   const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant"
 
-  // Handler to select address by label (Home, Office, Other)
-  const handleSelectAddressByLabel = async (label) => {
+  // Handler to select an address object
+  const handleSelectAddress = async (address) => {
     try {
-      // Find address with matching label (handle Office/Work interchangeably)
-      const address = addresses.find(addr =>
-        addr.label === label ||
-        (label === "Office" && addr.label === "Work")
-      )
-
       if (!address) {
-        toast.error(`No ${label} address found. Please add an address first.`)
+        toast.error(`Invalid address selected`)
         return
       }
 
@@ -800,11 +797,11 @@ export default function Cart() {
       const latitude = coordinates[1]
 
       if (!latitude || !longitude) {
-        toast.error(`Invalid coordinates for ${label} address`)
+        toast.error(`Invalid coordinates for the selected address`)
         return
       }
 
-      // Format location data with comma before zipCode to ensure > 4 parts for useLocation hook compatibility
+      // Format location data
       const street = address.street || ""
       const city = address.city || ""
       const state = address.state || ""
@@ -837,24 +834,24 @@ export default function Cart() {
         latitude,
         longitude,
         formattedAddress: formattedAddr,
-        isManual: true, // Mark as manual selection to prevent GPS overwrite
+        id: address.id || address._id, // Store ID to keep selection active
+        label: address.label,
+        isManual: true,
         timestamp: Date.now()
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
 
-      // Keep deliveryAddressDetails in sync with the label-based selected address
+      // Sync details
       const derivedDetails = deriveDeliveryAddressDetails(address)
       if (derivedDetails) {
         setManualAddressDetails(derivedDetails)
       }
 
-      toast.success(`${label} address selected!`)
-
-      // Update context-based location instead of full page reload
+      toast.success(`Address selected!`)
       updateLocation(locationData)
     } catch (error) {
-      console.error(`Error selecting ${label} address:`, error)
-      toast.error(`Failed to select ${label} address. Please try again.`)
+      console.error(`Error selecting address:`, error)
+      toast.error(`Failed to select address. Please try again.`)
     }
   }
 
@@ -934,7 +931,9 @@ export default function Cart() {
   }
 
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = async (methodOverride = null) => {
+    const finalPaymentMethod = methodOverride || selectedPaymentMethod;
+
     if (!defaultAddress) {
       alert("Please add a delivery address")
       return
@@ -1176,7 +1175,7 @@ export default function Cart() {
         note: note || "",
         sendCutlery: sendCutlery !== false,
         deliveryAddressDetails: manualAddressDetails.trim(),
-        paymentMethod: selectedPaymentMethod,
+        paymentMethod: finalPaymentMethod,
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
       // Log final order details (including paymentMethod for COD debugging)
@@ -1185,7 +1184,7 @@ export default function Cart() {
         restaurantName: finalRestaurantName,
         itemCount: orderItems.length,
         totalAmount: orderPricing.total,
-        paymentMethod: orderPayload.paymentMethod
+        paymentMethod: finalPaymentMethod
       });
 
 
@@ -1196,7 +1195,7 @@ export default function Cart() {
 
       const { order, razorpay } = orderResponse.data.data
 
-      if (selectedPaymentMethod === "cash") {
+      if (finalPaymentMethod === "cash") {
         toast.success("Order placed with Cash on Delivery")
         setPlacedOrderId(order?.orderId || order?.id || null)
         setShowOrderSuccess(true)
@@ -1797,81 +1796,100 @@ export default function Cart() {
 
               {/* Delivery Fleet selection removed as per request - default 'standard' is used in background */}
 
-              {/* Delivery Address */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+              {/* Delivery Address Section */}
+              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">Delivery Address</h3>
+                </div>
+
+                {/* Live GPS Location - Keep As Is */}
                 <div
-                  className="flex items-center justify-between cursor-pointer group"
+                  className="mb-4 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-900/20 cursor-pointer group"
                   onClick={openLocationSelector}
                 >
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-orange transition-colors" />
-                    <div className="flex-1 pr-6">
-                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 group-hover:text-primary-orange transition-colors">
-                        Delivery at <span className="font-semibold">Location</span>
-                      </p>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
-                      </p>
-                      {/* Address Selection Buttons */}
-                      <div className="flex gap-2 mt-2">
-                        {["Home", "Office", "Other"].map((label) => {
-                          const addressExists = addresses.some(addr =>
-                            addr.label === label ||
-                            (label === "Office" && addr.label === "Work")
-                          )
-                          // Check if this label is currently active
-                          const isActive = activeAddressLabel === label || (label === "Office" && activeAddressLabel === "Work");
-
-                          return (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (addressExists) handleSelectAddressByLabel(label)
-                              }}
-                              className={`text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 rounded-md border transition-all duration-200 ${isActive
-                                ? 'bg-green-600 border-green-600 text-white font-semibold'
-                                : addressExists
-                                  ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 bg-white dark:bg-[#1a1a1a]'
-                                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                                }`}
-                            >
-                              {label}
-                            </button>
-                          )
-                        })}
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                      <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-tight">Delivery at Location</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-1 font-medium">
+                        {currentLocation?.formattedAddress || "Detecting live location..."}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-blue-400 group-hover:translate-x-1 transition-transform" />
                   </div>
-                  <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-primary-orange transition-colors" />
+                </div>
+
+                {/* Add New Address Button */}
+                <button
+                  onClick={() => setShowAddressForm(true)}
+                  className="w-full flex items-center justify-between p-4 mb-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30 rounded-2xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-full">
+                      <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">+ Add New Address</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-emerald-400 dark:text-emerald-600 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Saved Addresses List */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Saved Addresses</p>
+
+                  {addresses && addresses.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3">
+                      {addresses.map((address) => {
+                        const isSelected = currentLocation?.id === address.id || currentLocation?.addressId === address.id || currentLocation?.id === address._id || currentLocation?.addressId === address._id;
+
+                        return (
+                          <div
+                            key={address.id || address._id}
+                            onClick={() => handleSelectAddress(address)}
+                            className={`flex items-start gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${isSelected
+                              ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-900/10 shadow-sm'
+                              : 'border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800'
+                              }`}
+                          >
+                            {/* Selection Radio */}
+                            <div className="flex-shrink-0 mt-1">
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected
+                                ? 'border-emerald-500'
+                                : 'border-gray-300 dark:border-gray-600'
+                                }`}>
+                                {isSelected && <div className="w-3 h-3 rounded-full bg-emerald-500" />}
+                              </div>
+                            </div>
+
+                            {/* Map Icon */}
+                            <div className="bg-gray-100 dark:bg-gray-800 p-2.5 rounded-xl flex-shrink-0">
+                              <MapPin className={`h-5 w-5 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`} />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-800 dark:text-emerald-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                                  {address.street || address.label}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5 leading-relaxed font-medium">
+                                {[address.additionalDetails, address.city, address.zipCode].filter(Boolean).join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 bg-gray-50/50 dark:bg-gray-900/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-400 font-medium tracking-wide">No saved addresses found.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Delivery Address Details (auto-filled from selected address) */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <div className="space-y-2">
-                  <label className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                    Delivery address details
-                  </label>
-                  <div
-                    className="relative"
-                    onClick={openLocationSelector}
-                  >
-                    <Input
-                      type="text"
-                      placeholder="Tap to choose or add delivery address"
-                      value={manualAddressDetails}
-                      readOnly
-                      className="w-full h-10 md:h-12 bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-primary-orange text-sm md:text-base cursor-pointer !pr-24 overflow-hidden text-ellipsis"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] md:text-xs text-gray-400 flex items-center gap-1">
-                      Change
-                      <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
-                    </span>
-                  </div>
-                </div>
-              </div>
 
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
@@ -2279,7 +2297,7 @@ export default function Cart() {
                     setSelectedPaymentMethod("razorpay");
                     setShowPaymentSheet(false);
                     // Start payment process immediately for Online Payment
-                    setTimeout(() => handlePlaceOrder(), 300);
+                    setTimeout(() => handlePlaceOrder("razorpay"), 300);
                   }}
                 >
                   <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
@@ -2302,7 +2320,7 @@ export default function Cart() {
                   onClick={() => {
                     setSelectedPaymentMethod("cash");
                     setShowPaymentSheet(false);
-                    setTimeout(() => handlePlaceOrder(), 300);
+                    setTimeout(() => handlePlaceOrder("cash"), 300);
                   }}
                 >
                   <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
@@ -2510,6 +2528,18 @@ export default function Cart() {
           stroke-dashoffset: 0;
         }
       `}</style>
+      <AddressFormModal
+        isOpen={showAddressForm}
+        onClose={() => setShowAddressForm(false)}
+        onSaveSuccess={(newAddress) => {
+          // Automatically select the new address
+          if (newAddress) {
+            handleSelectAddress(newAddress)
+          }
+          setShowAddressForm(false)
+        }}
+      />
     </div>
   )
 }
+

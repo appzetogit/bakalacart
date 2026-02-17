@@ -33,24 +33,21 @@ export function ProfileProvider({ children }) {
 
   const [addresses, setAddresses] = useState([])
 
-  // Helper function to deduplicate addresses by ID and label
+  // Helper function to deduplicate addresses by ID
   const deduplicateAddresses = useCallback((addressList) => {
     if (!Array.isArray(addressList) || addressList.length === 0) return []
 
-    // First pass: Remove duplicates by ID (keep first occurrence)
+    // Remove duplicates by ID (keep first occurrence)
     const uniqueById = addressList.filter((address, index, self) => {
-      if (!address.id) return true // Keep addresses without ID
-      const firstIndex = self.findIndex(addr => addr.id === address.id)
+      // Find by _id or id
+      const addrId = address._id || address.id;
+      if (!addrId) return true; // Keep addresses without ID
+
+      const firstIndex = self.findIndex(addr => (addr._id || addr.id) === addrId)
       return index === firstIndex
     })
 
-    // Second pass: Remove duplicates by label (keep first occurrence)
-    const uniqueByLabel = uniqueById.filter((address, index, self) => {
-      const firstIndex = self.findIndex(addr => addr.label === address.label)
-      return index === firstIndex
-    })
-
-    return uniqueByLabel
+    return uniqueById
   }, [])
 
   // Memoized deduplicated addresses - always use this instead of raw addresses

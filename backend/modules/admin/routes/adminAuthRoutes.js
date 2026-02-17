@@ -5,6 +5,7 @@ import {
   adminSignupWithOTP,
   getCurrentAdmin,
   adminLogout,
+  refreshToken,
   saveFcmToken,
   removeFcmToken
 } from '../controllers/adminAuthController.js';
@@ -43,6 +44,7 @@ router.post('/login', validate(loginSchema), adminLogin);
 // Protected routes
 router.get('/me', authenticateAdmin, getCurrentAdmin);
 router.post('/logout', authenticateAdmin, adminLogout);
+router.post('/refresh-token', refreshToken);
 router.post('/fcm-token', authenticateAdmin, saveFcmToken);
 router.delete('/fcm-token', authenticateAdmin, removeFcmToken);
 

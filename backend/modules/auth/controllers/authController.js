@@ -1,4 +1,7 @@
 import User from '../models/User.js';
+import Admin from '../../admin/models/Admin.js';
+import Restaurant from '../../restaurant/models/Restaurant.js';
+import Delivery from '../../delivery/models/Delivery.js';
 import otpService from '../services/otpService.js';
 import jwtService from '../services/jwtService.js';
 import googleAuthService from '../services/googleAuthService.js';
@@ -155,7 +158,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       // Login (with optional auto-registration)
       // IMPORTANT: Verify OTP FIRST before checking if user exists
       // This ensures wrong OTPs are rejected before showing name input
-      
+
       // Handle reset-password purpose
       if (purpose === 'reset-password') {
         // Find user first for reset-password
@@ -163,7 +166,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           ? { phone, role: userRole }
           : { email, role: userRole };
         user = await User.findOne(findQuery);
-        
+
         if (!user) {
           return errorResponse(res, 404, `No ${userRole} account found with this email.`);
         }
@@ -278,8 +281,9 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       phone: user.phone
     });
 
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    // Set refresh token in httpOnly cookie with role-specific name
+    const cookieName = jwtService.getCookieName(user.role);
+    res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -311,8 +315,18 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  * POST /api/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Get refresh token from cookie
-  const refreshToken = req.cookies?.refreshToken;
+  // Try to find the refresh token in role-specific cookies or generic refreshToken cookie
+  const cookieNames = jwtService.getAllCookieNames();
+  let refreshToken = null;
+  let usedCookieName = 'refreshToken';
+
+  for (const name of cookieNames) {
+    if (req.cookies?.[name]) {
+      refreshToken = req.cookies[name];
+      usedCookieName = name;
+      break;
+    }
+  }
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -322,18 +336,35 @@ export const refreshToken = asyncHandler(async (req, res) => {
     // Verify refresh token
     const decoded = jwtService.verifyRefreshToken(refreshToken);
 
-    // Get user
-    const user = await User.findById(decoded.userId).select('-password');
+    // Get user based on role from token
+    let user;
+    const role = decoded.role;
+
+    if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
+      user = await Admin.findById(decoded.userId).select('-password');
+    } else if (role === 'restaurant') {
+      user = await Restaurant.findById(decoded.userId).select('-password');
+    } else if (role === 'delivery') {
+      user = await Delivery.findById(decoded.userId).select('-password +refreshToken');
+    } else {
+      user = await User.findById(decoded.userId).select('-password');
+    }
 
     if (!user || !user.isActive) {
       return errorResponse(res, 401, 'User not found or inactive');
     }
 
+    // For delivery partners, verify refresh token matches stored token (original behavior)
+    if (role === 'delivery' && user.refreshToken && user.refreshToken !== refreshToken) {
+      return errorResponse(res, 401, 'Invalid refresh token');
+    }
+
     // Generate new access token
     const accessToken = jwtService.generateAccessToken({
       userId: user._id.toString(),
-      role: user.role,
-      phone: user.phone
+      role: role || user.role,
+      phone: user.phone,
+      email: user.email
     });
 
     return successResponse(res, 200, 'Token refreshed successfully', {
@@ -349,11 +380,14 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
-  // Clear refresh token cookie
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+  // Clear all role-specific refresh token cookies
+  const cookieNames = jwtService.getAllCookieNames();
+  cookieNames.forEach(name => {
+    res.clearCookie(name, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
   });
 
   return successResponse(res, 200, 'Logged out successfully');

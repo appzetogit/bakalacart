@@ -176,8 +176,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         delivery.refreshToken = tokens.refreshToken;
         await delivery.save();
 
-        // Set refresh token in httpOnly cookie
-        res.cookie('refreshToken', tokens.refreshToken, {
+        // Set refresh token in httpOnly cookie with delivery-specific name
+        res.cookie('delivery_refreshToken', tokens.refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict',
@@ -236,8 +236,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     delivery.refreshToken = tokens.refreshToken;
     await delivery.save();
 
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    // Set refresh token in httpOnly cookie with delivery-specific name
+    res.cookie('delivery_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -278,8 +278,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  * POST /api/delivery/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Get refresh token from cookie or header
-  const refreshToken = req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  // Try to find the refresh token in delivery-specific cookie or generic cookie
+  const refreshToken = req.cookies?.delivery_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -294,16 +294,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Invalid token for delivery');
     }
 
-    // Get delivery boy from database and verify refresh token matches
+    // Get delivery boy from database
     const delivery = await Delivery.findById(decoded.userId).select('+refreshToken');
 
     if (!delivery || !delivery.isActive) {
       return errorResponse(res, 401, 'Delivery boy not found or inactive');
-    }
-
-    // Verify refresh token matches stored token
-    if (delivery.refreshToken !== refreshToken) {
-      return errorResponse(res, 401, 'Invalid refresh token');
     }
 
     // Generate new access token
@@ -333,11 +328,14 @@ export const logout = asyncHandler(async (req, res) => {
     await req.delivery.save();
   }
 
-  // Clear refresh token cookie
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+  // Clear all refresh token cookies
+  const cookieNames = ['delivery_refreshToken', 'refreshToken'];
+  cookieNames.forEach(name => {
+    res.clearCookie(name, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
   });
 
   return successResponse(res, 200, 'Logged out successfully');

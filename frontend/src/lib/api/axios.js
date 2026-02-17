@@ -327,7 +327,9 @@ apiClient.interceptors.response.use(
         const isTokenExpired = refreshError.response?.status === 401 &&
           (refreshError.response?.data?.message?.includes('expired') ||
             refreshError.response?.data?.message?.includes('Invalid refresh token') ||
-            refreshError.response?.data?.message?.includes('Refresh token not found'));
+            refreshError.response?.data?.message?.includes('Refresh token not found') ||
+            refreshError.response?.data?.message?.includes('User not found or inactive') ||
+            refreshError.response?.data?.message?.includes('Invalid token for'));
 
         // Show error toast in development mode for refresh errors
         if (import.meta.env.DEV && !isNetworkError) {

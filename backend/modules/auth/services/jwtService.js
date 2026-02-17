@@ -13,7 +13,7 @@ class JWTService {
     this.secret = secret;
     this.accessTokenExpiry = process.env.JWT_ACCESS_EXPIRY || '24h';
     this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRY || '7d';
-    
+
   }
 
   /**
@@ -76,7 +76,7 @@ class JWTService {
   verifyToken(token, type = 'access') {
     try {
       const decoded = jwt.verify(token, this.secret);
-      
+
       if (decoded.type !== type) {
         throw new Error(`Invalid token type. Expected ${type}, got ${decoded.type}`);
       }
@@ -109,6 +109,34 @@ class JWTService {
    */
   verifyRefreshToken(token) {
     return this.verifyToken(token, 'refresh');
+  }
+
+  /**
+   * Get cookie name for a specific role
+   * @param {string} role - User role
+   * @returns {string} - Cookie name
+   */
+  getCookieName(role) {
+    switch (role) {
+      case 'admin':
+      case 'super_admin':
+      case 'moderator':
+        return 'admin_refreshToken';
+      case 'restaurant':
+        return 'restaurant_refreshToken';
+      case 'delivery':
+        return 'delivery_refreshToken';
+      default:
+        return 'user_refreshToken';
+    }
+  }
+
+  /**
+   * Get all possible refresh token cookie names
+   * @returns {string[]}
+   */
+  getAllCookieNames() {
+    return ['admin_refreshToken', 'restaurant_refreshToken', 'delivery_refreshToken', 'user_refreshToken', 'refreshToken'];
   }
 }
 

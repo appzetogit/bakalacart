@@ -136,7 +136,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       // Check both normalized (with 91) and original formats
       const phoneForCheck = normalizedPhone?.replace(/^91/, '') || phone?.replace(/^\+?91/, '').replace(/\D/g, '').replace(/^91/, '');
       const shouldBypassOTP = phoneForCheck === DEFAULT_PHONE && otp === DEFAULT_OTP;
-      
+
       if (shouldBypassOTP) {
         // Bypass OTP verification for default phone/OTP combination
         logger.info('Default OTP used for restaurant registration', { phone: normalizedPhone, purpose });
@@ -590,8 +590,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
 
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    // Set refresh token in httpOnly cookie with restaurant-specific name
+    res.cookie('restaurant_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -684,7 +684,7 @@ export const register = asyncHandler(async (req, res) => {
   });
 
   // Set refresh token in httpOnly cookie
-  res.cookie('refreshToken', tokens.refreshToken, {
+  res.cookie('restaurant_refreshToken', tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -838,8 +838,8 @@ export const resetPassword = asyncHandler(async (req, res) => {
  * POST /api/restaurant/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Get refresh token from cookie
-  const refreshToken = req.cookies?.refreshToken;
+  // Try to find the refresh token in restaurant-specific cookie or generic cookie
+  const refreshToken = req.cookies?.restaurant_refreshToken || req.cookies?.refreshToken;
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -861,9 +861,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant not found');
     }
 
-    // Allow inactive restaurants to refresh tokens - they need access to complete onboarding
-    // The middleware will handle blocking inactive restaurants from accessing restricted routes
-
     // Generate new access token
     const accessToken = jwtService.generateAccessToken({
       userId: restaurant._id.toString(),
@@ -884,11 +881,14 @@ export const refreshToken = asyncHandler(async (req, res) => {
  * POST /api/restaurant/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
-  // Clear refresh token cookie
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+  // Clear all refresh token cookies to ensure thorough logout
+  const cookieNames = ['restaurant_refreshToken', 'refreshToken'];
+  cookieNames.forEach(name => {
+    res.clearCookie(name, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
   });
 
   return successResponse(res, 200, 'Logged out successfully');
@@ -1125,8 +1125,8 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
 
-    // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    // Set refresh token in httpOnly cookie with restaurant-specific name
+    res.cookie('restaurant_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

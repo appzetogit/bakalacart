@@ -1331,7 +1331,19 @@ export default function HubMenu() {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm font-medium text-gray-700 mb-2">₹{item.price}</p>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm font-bold text-gray-900">₹{item.price}</p>
+                                  {(item.itemSizeQuantity || item.itemSizeUnit) && (
+                                    <span className="text-xs font-bold text-[#ff8100] bg-orange-50 px-2 py-0.5 rounded">
+                                      {item.itemSizeQuantity} {item.itemSizeUnit}
+                                    </span>
+                                  )}
+                                  {item.servesInfo && (
+                                    <span className="text-xs text-gray-500 italic">
+                                      ({item.servesInfo})
+                                    </span>
+                                  )}
+                                </div>
                                 {/* Variations Display */}
                                 {item.variations && item.variations.length > 0 && (
                                   <div className="mt-2 space-y-1">

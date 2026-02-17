@@ -335,13 +335,17 @@ export default function ItemDetailsPage() {
 
   // Item size unit options
   const itemSizeUnits = [
-    "slices",
+    "piece",
+    "pcs",
+    "gram",
     "kg",
-    "litre",
     "ml",
+    "litre",
     "serves",
+    "slices",
     "cms",
-    "piece"
+    "pkt",
+    "box"
   ]
 
   // Item tags organized by categories
@@ -728,10 +732,10 @@ export default function ItemDetailsPage() {
         photoCount: allImageUrls.length,
         // Additional fields for complete item details
         subCategory: subCategory || "",
-        servesInfo: "",
-        itemSize: "",
-        itemSizeQuantity: "",
-        itemSizeUnit: "piece",
+        servesInfo: servesInfo || "",
+        itemSize: itemSizeQuantity && itemSizeUnit ? `${itemSizeQuantity} ${itemSizeUnit}` : (itemSizeQuantity || ""),
+        itemSizeQuantity: itemSizeQuantity || "",
+        itemSizeUnit: itemSizeUnit || "piece",
         gst: parseFloat(gst) || 0,
       }
 
@@ -996,6 +1000,53 @@ export default function ItemDetailsPage() {
                 {nameLength} / {maxNameLength}
               </span>
             </div>
+          </div>
+
+          {/* Item Size (Quantity & Unit) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Item size quantity
+              </label>
+              <input
+                type="text"
+                value={itemSizeQuantity}
+                onChange={(e) => setItemSizeQuantity(e.target.value)}
+                onFocus={handleInputFocus}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Eg: 500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Unit
+              </label>
+              <button
+                onClick={() => setIsItemSizePopupOpen(true)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm text-gray-900">
+                  {itemSizeUnit || "Select unit"}
+                </span>
+                <ChevronDown className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+          </div>
+
+          {/* Serves Info */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Serves info
+            </label>
+            <button
+              onClick={() => setIsServesPopupOpen(true)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-sm text-gray-900">
+                {servesInfo || "Select serves info"}
+              </span>
+              <ChevronDown className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
 
 
@@ -1366,7 +1417,103 @@ export default function ItemDetailsPage() {
         )}
       </AnimatePresence>
 
+      {/* Serves Selection Popup */}
+      <AnimatePresence>
+        {isServesPopupOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsServesPopupOpen(false)}
+              className="fixed inset-0 bg-black/50 z-50"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[60vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">Select serves info</h2>
+                <button
+                  onClick={() => setIsServesPopupOpen(false)}
+                  className="p-1 rounded-full hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2">
+                  {servesOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleServesSelect(option)}
+                      className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors ${servesInfo === option
+                        ? "bg-gray-900 text-white"
+                        : "bg-gray-50 text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
+      {/* Item Size Unit Popup */}
+      <AnimatePresence>
+        {isItemSizePopupOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsItemSizePopupOpen(false)}
+              className="fixed inset-0 bg-black/50 z-50"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[60vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">Select unit</h2>
+                <button
+                  onClick={() => setIsItemSizePopupOpen(false)}
+                  className="p-1 rounded-full hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {itemSizeUnits.map((unit) => (
+                    <button
+                      key={unit}
+                      onClick={() => handleItemSizeUnitSelect(unit)}
+                      className={`w-full text-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${itemSizeUnit === unit
+                        ? "bg-gray-900 text-white"
+                        : "bg-gray-50 text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       {/* GST Popup */}
       {/* <AnimatePresence>
         {isGstPopupOpen && (
