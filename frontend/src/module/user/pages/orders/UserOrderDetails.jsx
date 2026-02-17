@@ -339,7 +339,7 @@ export default function UserOrderDetails() {
 
       // Items table
       const tableData = items.map(item => [
-        item.name || 'Item',
+        `${item.name || 'Item'}${item.itemSizeQuantity || item.itemSizeUnit ? ` (${item.itemSizeQuantity} ${item.itemSizeUnit})` : ''}`,
         String(item.quantity || item.qty || 1),
         `Rs. ${Number(item.price || 0).toFixed(2)}`,
         `Rs. ${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`
@@ -492,6 +492,12 @@ export default function UserOrderDetails() {
                 </div>
                 <span className="text-sm text-gray-700 font-medium">
                   {item.quantity || item.qty || 1} x {item.name}
+                  {/* Item Size/Unit - Show if available */}
+                  {(item.itemSizeQuantity || item.itemSizeUnit) && (
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
+                      {[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')}
+                    </p>
+                  )}
                 </span>
               </div>
               <span className="text-sm text-gray-800 font-medium">

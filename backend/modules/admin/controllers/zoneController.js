@@ -9,8 +9,8 @@ import mongoose from 'mongoose';
  */
 export const getZones = asyncHandler(async (req, res) => {
   try {
-    const { 
-      page = 1, 
+    const {
+      page = 1,
       limit = 50,
       search,
       restaurantId,
@@ -179,7 +179,15 @@ export const createZone = asyncHandler(async (req, res) => {
     };
 
     const zone = new Zone(zoneData);
-    await zone.save();
+    try {
+      await zone.save();
+    } catch (saveError) {
+      console.error('Database error creating zone:', saveError);
+      if (saveError.message.includes('Can\'t extract geo keys') || saveError.message.includes('Loop is not valid')) {
+        return errorResponse(res, 400, 'Invalid zone coordinates: The polygon self-intersects or has an invalid shape. Please redraw the zone without crossing lines.');
+      }
+      throw saveError;
+    }
 
     // Populate before returning (only if restaurantId exists)
     if (zone.restaurantId) {
@@ -231,7 +239,16 @@ export const updateZone = asyncHandler(async (req, res) => {
 
     // Update zone
     Object.assign(zone, updateData);
-    await zone.save();
+
+    try {
+      await zone.save();
+    } catch (saveError) {
+      console.error('Database error updating zone:', saveError);
+      if (saveError.message.includes('Can\'t extract geo keys') || saveError.message.includes('Loop is not valid')) {
+        return errorResponse(res, 400, 'Invalid zone coordinates: The polygon self-intersects or has an invalid shape. Please redraw the zone without crossing lines.');
+      }
+      throw saveError;
+    }
 
     // Populate before returning (only if restaurantId exists)
     if (zone.restaurantId) {
@@ -249,6 +266,12 @@ export const updateZone = asyncHandler(async (req, res) => {
     if (error.name === 'ValidationError') {
       return errorResponse(res, 400, error.message);
     }
+
+    // Check for mongo error if not caught inside (though we added a try-catch above)
+    if (error.message.includes('Can\'t extract geo keys') || error.message.includes('Loop is not valid')) {
+      return errorResponse(res, 400, 'Invalid zone coordinates: The polygon self-intersects or has an invalid shape. Please redraw the zone without crossing lines.');
+    }
+
     return errorResponse(res, 500, 'Failed to update zone');
   }
 });
@@ -306,9 +329,9 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
   try {
     const { restaurantId } = req.params;
 
-    const zones = await Zone.find({ 
+    const zones = await Zone.find({
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
-      isActive: true 
+      isActive: true
     })
       .populate({
         path: 'restaurantId',
@@ -334,7 +357,7 @@ export const getZonesByRestaurant = asyncHandler(async (req, res) => {
 export const detectUserZone = asyncHandler(async (req, res) => {
   try {
     const { lat, lng, latitude, longitude } = req.query;
-    
+
     // Support both lat/lng and latitude/longitude
     const userLat = parseFloat(lat || latitude);
     const userLng = parseFloat(lng || longitude);
@@ -379,11 +402,11 @@ export const detectUserZone = asyncHandler(async (req, res) => {
           const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
           const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
           const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
-          
+
           if (xi === null || yi === null || xj === null || yj === null) continue;
-          
-          const intersect = ((yi > userLng) !== (yj > userLng)) && 
-                           (userLat < (xj - xi) * (userLng - yi) / (yj - yi) + xi);
+
+          const intersect = ((yi > userLng) !== (yj > userLng)) &&
+            (userLat < (xj - xi) * (userLng - yi) / (yj - yi) + xi);
           if (intersect) inside = !inside;
         }
         isInZone = inside;
@@ -393,7 +416,7 @@ export const detectUserZone = asyncHandler(async (req, res) => {
         // Calculate distance to zone centroid for buffer logic
         const centroid = calculateZoneCentroid(zone.coordinates);
         const distance = calculateDistance(userLat, userLng, centroid.lat, centroid.lng);
-        
+
         if (distance < minDistance) {
           minDistance = distance;
           userZone = zone;
@@ -404,13 +427,13 @@ export const detectUserZone = asyncHandler(async (req, res) => {
     // If user is not in any zone, check buffer area (50-100 meters)
     if (!userZone) {
       const BUFFER_DISTANCE = 0.1; // 100 meters in km
-      
+
       for (const zone of activeZones) {
         if (!zone.coordinates || zone.coordinates.length < 3) continue;
-        
+
         const centroid = calculateZoneCentroid(zone.coordinates);
         const distance = calculateDistance(userLat, userLng, centroid.lat, centroid.lng);
-        
+
         // Find nearest zone within buffer
         if (distance <= BUFFER_DISTANCE && distance < minDistance) {
           minDistance = distance;
@@ -477,7 +500,7 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng / 2) * Math.sin(dLng / 2);

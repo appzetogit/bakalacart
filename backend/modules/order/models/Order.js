@@ -27,6 +27,18 @@ const orderItemSchema = new mongoose.Schema({
   isVeg: {
     type: Boolean,
     default: true
+  },
+  itemSize: {
+    type: String,
+    default: ''
+  },
+  itemSizeQuantity: {
+    type: String,
+    default: ''
+  },
+  itemSizeUnit: {
+    type: String,
+    default: ''
   }
 }, { _id: true });
 

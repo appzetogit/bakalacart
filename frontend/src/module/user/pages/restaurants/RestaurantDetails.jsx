@@ -422,7 +422,9 @@ export default function RestaurantDetails() {
               || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop",
             priceRange: apiRestaurant?.priceRange || "$$",
             offers: Array.isArray(apiRestaurant?.offers) ? apiRestaurant.offers : [], // Will be populated from menu/offers API later
-            offerText: apiRestaurant?.offer || "FLAT 50% OFF",
+            offerText: (apiRestaurant?.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(apiRestaurant.offer.trim()))
+              ? apiRestaurant.offer
+              : "Flat ₹200 OFF above ₹500",
             offerCount: apiRestaurant?.offerCount ?? 0,
             restaurantOffers: {
               goldOffer: {
@@ -785,6 +787,11 @@ export default function RestaurantDetails() {
       return;
     }
 
+    if (restaurant && restaurant.isAcceptingOrders === false) {
+      toast.error('This restaurant is currently closed and not accepting orders.');
+      return;
+    }
+
     // Check if item has variants and user is adding (not removing)
     const hasVariants = Array.isArray(item?.variations) && item.variations.length > 0
     const isAdding = newQuantity > (quantities[item.id] || 0)
@@ -844,7 +851,10 @@ export default function RestaurantDetails() {
       restaurantId: validRestaurantId, // Use validated restaurantId
       description: item.description,
       originalPrice: item.originalPrice,
-      isVeg: item.isVeg !== false // Add isVeg property
+      isVeg: item.isVeg !== false, // Add isVeg property
+      itemSize: item.itemSize || "",
+      itemSizeQuantity: item.itemSizeQuantity || "",
+      itemSizeUnit: item.itemSizeUnit || ""
     }
 
     // Get source position for animation from event target
@@ -1360,7 +1370,7 @@ export default function RestaurantDetails() {
   }
 
   // Only show grayscale when user is out of service (not based on restaurant availability)
-  const shouldShowGrayscale = isOutOfService
+  const shouldShowGrayscale = isOutOfService || (restaurant && restaurant.isAcceptingOrders === false)
 
   return (
     <AnimatedPage
@@ -1444,6 +1454,11 @@ export default function RestaurantDetails() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h1>
+              {restaurant && restaurant.isAcceptingOrders === false && (
+                <Badge variant="destructive" className="ml-2 bg-red-600 animate-pulse uppercase tracking-widest font-bold">
+                  Currently Closed
+                </Badge>
+              )}
               <Info className="h-5 w-5 text-gray-400" />
             </div>
             <div className="flex flex-col items-end">
@@ -1698,6 +1713,13 @@ export default function RestaurantDetails() {
                                   </div>
                                 )}
                               </div>
+
+                              {/* Item Size/Unit - Show if available */}
+                              {(item.itemSizeQuantity || item.itemSizeUnit) && (
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
+                                  {[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')}
+                                </p>
+                              )}
 
                               {/* Description - Show if available */}
                               {item.description && (

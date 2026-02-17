@@ -1027,12 +1027,12 @@ export default function Home() {
         }
 
         // Transform API data to match expected format
-        // IMPORTANT: Filter out offline restaurants (isAcceptingOrders: false) before transforming
-        const onlineRestaurants = restaurantsArray.filter(restaurant =>
-          restaurant.isActive !== false && restaurant.isAcceptingOrders !== false
+        // Only show active restaurants
+        const activeRestaurants = restaurantsArray.filter(restaurant =>
+          restaurant.isActive !== false
         )
 
-        const transformedRestaurants = onlineRestaurants.map((restaurant, index) => {
+        const transformedRestaurants = activeRestaurants.map((restaurant, index) => {
           // Use restaurant data if available, otherwise use defaults
           const deliveryTime = restaurant.estimatedDeliveryTime || "25-30 mins"
 
@@ -1203,7 +1203,9 @@ export default function Home() {
               ? `${restaurant.cuisines[0]} Special`
               : "Special Dish"),
             featuredPrice: restaurant.featuredPrice || 249, // Use from API or default
-            offer: restaurant.offer || "Flat ₹50 OFF above ₹199", // Use from API or default
+            offer: (restaurant.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(restaurant.offer.trim()))
+              ? restaurant.offer
+              : "", // Clean "Na" or empty to blank first
             slug: restaurant.slug,
             restaurantId: restaurant.restaurantId,
             location: restaurant.location, // Store location for distance recalculation
@@ -1309,9 +1311,8 @@ export default function Home() {
   // Filter restaurants and foods based on active filters
   const filteredRestaurants = useMemo(() => {
     // Use only API data - no mock data fallback
-    // IMPORTANT: First filter out offline restaurants (isAcceptingOrders: false)
     let filtered = restaurantsData.filter(r =>
-      r.isActive !== false && r.isAcceptingOrders !== false
+      r.isActive !== false
     )
 
     // Apply filters
@@ -2387,7 +2388,7 @@ export default function Home() {
                       }}
                     >
                       <Link to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
-                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isOutOfService ? 'grayscale opacity-75' : ''
+                        <Card className={`overflow-hidden gap-0 cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] border-background transition-all duration-500 py-0 rounded-md flex flex-col h-full w-full relative ${isOutOfService || !restaurant.isAcceptingOrders ? 'grayscale opacity-75' : ''
                           }`}>
                           {/* Image Section with Carousel */}
                           <div className="relative">
@@ -2460,6 +2461,14 @@ export default function Home() {
                               </Button>
                             </motion.div>
 
+                            {/* Closed Badge */}
+                            {!restaurant.isAcceptingOrders && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                                <span className="bg-red-600 text-white px-4 py-2 rounded-md font-bold text-sm lg:text-base border-2 border-white shadow-xl transform -rotate-12 uppercase tracking-wider">
+                                  Currently Closed
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Content Section */}
@@ -2513,8 +2522,8 @@ export default function Home() {
                                 <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.distance}</span>
                               </motion.div>
 
-                              {/* Offer Badge */}
-                              {restaurant.offer && (
+                              {/* Offer Badge - Show if DB has offer OR if it's top 3 (for default offer) */}
+                              {(restaurant.offer || index < 3) && (
                                 <motion.div
                                   className="flex items-center gap-2 text-sm lg:text-base mt-auto"
                                   variants={{
@@ -2524,7 +2533,11 @@ export default function Home() {
                                   transition={{ duration: 0.3 }}
                                 >
                                   <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-black" strokeWidth={2} />
-                                  <span className="text-gray-700 dark:text-gray-300 font-medium">{restaurant.offer}</span>
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {(index < 3 && !restaurant.offer)
+                                      ? "Flat ₹200 OFF above ₹500"
+                                      : restaurant.offer}
+                                  </span>
                                 </motion.div>
                               )}
                             </CardContent>

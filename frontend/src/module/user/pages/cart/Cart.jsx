@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Building2, Sparkles } from "lucide-react"
+import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Truck, Leaf, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Building2, Sparkles, Banknote } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
 
@@ -86,7 +86,7 @@ export default function Cart() {
   const { cart, updateQuantity, addToCart, getCartCount, clearCart, cleanCartForRestaurant } = cartContext;
   const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile } = useProfile()
   const { createOrder } = useOrders()
-  const { location: currentLocation } = useUserLocation() // Get live location address
+  const { location: currentLocation, updateLocation } = useUserLocation() // Get live location address
   const { openLocationSelector } = useLocationSelector()
   const { zoneId } = useZone(currentLocation) // Get user's zone
 
@@ -106,6 +106,7 @@ export default function Cart() {
   const [orderProgress, setOrderProgress] = useState(0)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [placedOrderId, setPlacedOrderId] = useState(null)
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false)
 
   // Restaurant and pricing state
   const [restaurantData, setRestaurantData] = useState(null)
@@ -771,8 +772,8 @@ export default function Cart() {
 
       toast.success(`${label} address selected!`)
 
-      // Force page reload to update location
-      window.location.reload()
+      // Update context-based location instead of full page reload
+      updateLocation(locationData)
     } catch (error) {
       console.error(`Error selecting ${label} address:`, error)
       toast.error(`Failed to select ${label} address. Please try again.`)
@@ -831,7 +832,10 @@ export default function Cart() {
           quantity: item.quantity || 1,
           image: item.image,
           description: item.description,
-          isVeg: item.isVeg !== false
+          isVeg: item.isVeg !== false,
+          itemSize: item.itemSize || "",
+          itemSizeQuantity: item.itemSizeQuantity || "",
+          itemSizeUnit: item.itemSizeUnit || ""
         }))
 
         const response = await orderAPI.calculateOrder({
@@ -866,6 +870,14 @@ export default function Cart() {
     if (cart.length === 0) {
       alert("Your cart is empty")
       return
+    }
+
+    // Check if restaurant is accepting orders
+    if (restaurantData && restaurantData.isAcceptingOrders === false) {
+      console.error('❌ Cannot place order: Restaurant is currently closed!');
+      alert('This restaurant is currently closed and not accepting orders. Please try again during their business hours.');
+      setIsPlacingOrder(false);
+      return;
     }
 
     setIsPlacingOrder(true)
@@ -903,7 +915,10 @@ export default function Cart() {
         quantity: item.quantity || 1,
         image: item.image || "",
         description: item.description || "",
-        isVeg: item.isVeg !== false
+        isVeg: item.isVeg !== false,
+        itemSize: item.itemSize || "",
+        itemSizeQuantity: item.itemSizeQuantity || "",
+        itemSizeUnit: item.itemSizeUnit || ""
       }))
 
       console.log("📋 Order items to send:", orderItems)
@@ -1388,7 +1403,12 @@ export default function Cart() {
                 </Button>
               </Link>
               <div className="min-w-0">
-                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{restaurantName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{restaurantName}</p>
+                  {restaurantData && restaurantData.isAcceptingOrders === false && (
+                    <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase animate-pulse flex-shrink-0">Closed</span>
+                  )}
+                </div>
                 <p className="text-sm md:text-base font-medium text-gray-800 dark:text-white truncate">
                   {restaurantData?.estimatedDeliveryTime || "10-15 mins"} to <span className="font-semibold">Location</span>
                   <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs md:text-sm">{defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || defaultAddress?.city || "Select address") : "Select address"}</span>
@@ -1435,7 +1455,9 @@ export default function Cart() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">{item.name}</p>
+                        <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">
+                          {item.name} {(item.itemSizeQuantity || item.itemSizeUnit) ? `(${[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')})` : ''}
+                        </p>
                         <button
                           onClick={() => {
                             if (restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId) {
@@ -1894,31 +1916,31 @@ export default function Cart() {
                   </div>
                 </div>
 
-                <div className="relative">
-                  <select
-                    value={selectedPaymentMethod}
-                    onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                    className="appearance-none bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 pr-9 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500/40"
-                  >
-                    <option value="razorpay">Razorpay</option>
-                    <option value="cash">COD</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <div
+                  className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => setShowPaymentSheet(true)}
+                >
+                  <span className="text-sm md:text-base font-medium">Change</span>
+                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 </div>
               </div>
 
               <Button
                 size="lg"
-                onClick={handlePlaceOrder}
-                disabled={isPlacingOrder}
+                onClick={() => {
+                  if (selectedPaymentMethod === "razorpay" && !isPlacingOrder) {
+                    setShowPaymentSheet(true)
+                  } else {
+                    handlePlaceOrder()
+                  }
+                }}
+                disabled={isPlacingOrder || (restaurantData && restaurantData.isAcceptingOrders === false)}
                 className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {selectedPaymentMethod === "razorpay" && (
-                  <div className="text-left mr-3 md:mr-4">
-                    <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
-                    <p className="text-xs md:text-sm opacity-75">TOTAL</p>
-                  </div>
-                )}
+                <div className="text-left mr-3 md:mr-4">
+                  <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
+                  <p className="text-xs md:text-sm opacity-75">TOTAL</p>
+                </div>
                 <span className="font-bold text-base md:text-lg">
                   {isPlacingOrder
                     ? "Processing..."
@@ -2129,6 +2151,84 @@ export default function Cart() {
           </div>
         </div>
       )}
+
+      {/* Payment Method Sheet */}
+      <AnimatePresence>
+        {showPaymentSheet && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPaymentSheet(false)}
+              className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-sm"
+            />
+            {/* Sheet */}
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#1a1a1a] rounded-t-[32px] z-[101] px-6 pb-10 pt-4 shadow-2xl safe-area-inset-bottom"
+            >
+              {/* Handle */}
+              <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-6" />
+
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-1">Payment Method</h2>
+              <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-8">Choose your preferred payment option</p>
+
+              <div className="space-y-4">
+                {/* Online Payment Option */}
+                <div
+                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${selectedPaymentMethod === "razorpay" ? 'border-green-600 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'}`}
+                  onClick={() => {
+                    setSelectedPaymentMethod("razorpay");
+                    setShowPaymentSheet(false);
+                    // Start payment process immediately for Online Payment
+                    setTimeout(() => handlePlaceOrder(), 300);
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <CreditCard className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900 dark:text-white">Online Payment</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Pay with card, UPI, or wallet</p>
+                  </div>
+                  {selectedPaymentMethod === "razorpay" && (
+                    <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Cash on Delivery Option */}
+                <div
+                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${selectedPaymentMethod === "cash" ? 'border-green-600 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'}`}
+                  onClick={() => {
+                    setSelectedPaymentMethod("cash");
+                    setShowPaymentSheet(false);
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <Banknote className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900 dark:text-white">Cash on Delivery</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Pay when you receive your order</p>
+                  </div>
+                  {selectedPaymentMethod === "cash" && (
+                    <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Animation Styles */}
       <style>{`

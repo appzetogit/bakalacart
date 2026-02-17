@@ -34,20 +34,20 @@ export default function Checkout() {
   // Memoize filtered addresses with unique keys to prevent duplicate key errors
   const filteredAddressesWithKeys = useMemo(() => {
     if (!addresses || addresses.length === 0) return []
-    
+
     // First remove duplicates by ID (keep first occurrence)
     const uniqueById = addresses.filter((address, index, self) => {
       if (!address.id) return true // Keep addresses without ID
       const firstIndex = self.findIndex(addr => addr.id === address.id)
       return index === firstIndex
     })
-    
+
     // Then remove duplicates by label (keep first occurrence)
     const filteredAddresses = uniqueById.filter((address, index, self) => {
       const firstIndex = self.findIndex(addr => addr.label === address.label)
       return index === firstIndex
     })
-    
+
     // Create unique keys for each address
     return filteredAddresses.map((address, index) => {
       const addressContent = JSON.stringify({
@@ -65,7 +65,7 @@ export default function Checkout() {
         hash = hash & hash
       }
       const uniqueKey = `checkout-addr-${index}-${Math.abs(hash)}-${address.id || index}-${address.label || 'label'}`
-      
+
       return {
         address,
         uniqueKey
@@ -94,7 +94,10 @@ export default function Checkout() {
           name: item.name,
           price: item.price,
           quantity: item.quantity,
-          image: item.image
+          image: item.image,
+          itemSize: item.itemSize || "",
+          itemSizeQuantity: item.itemSizeQuantity || "",
+          itemSizeUnit: item.itemSizeUnit || ""
         })),
         address: defaultAddress,
         paymentMethod: defaultPayment,
@@ -173,11 +176,10 @@ export default function Checkout() {
                         return (
                           <div
                             key={uniqueKey}
-                            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                              isSelected
-                                ? "border-yellow-500 bg-yellow-50"
-                                : "border-gray-200 hover:border-yellow-300"
-                            }`}
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${isSelected
+                              ? "border-yellow-500 bg-yellow-50"
+                              : "border-gray-200 hover:border-yellow-300"
+                              }`}
                             onClick={() => setSelectedAddress(address.id)}
                           >
                             <div className="flex items-start justify-between">
@@ -226,11 +228,10 @@ export default function Checkout() {
                         return (
                           <div
                             key={payment.id}
-                            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                              isSelected
-                                ? "border-yellow-500 bg-yellow-50"
-                                : "border-gray-200 hover:border-yellow-300"
-                            }`}
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${isSelected
+                              ? "border-yellow-500 bg-yellow-50"
+                              : "border-gray-200 hover:border-yellow-300"
+                              }`}
                             onClick={() => setSelectedPayment(payment.id)}
                           >
                             <div className="flex items-start justify-between">
@@ -291,7 +292,9 @@ export default function Checkout() {
                           className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg"
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-sm md:text-base dark:text-gray-200">{item.name}</p>
+                          <p className="font-medium text-sm md:text-base dark:text-gray-200">
+                            {item.name} {(item.itemSizeQuantity || item.itemSizeUnit) ? `(${[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')})` : ''}
+                          </p>
                           <p className="text-xs md:text-sm text-muted-foreground">
                             ₹{(item.price * 83).toFixed(0)} × {item.quantity}
                           </p>
