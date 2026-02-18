@@ -264,16 +264,50 @@ if (!rootElement) {
 }
 
 // Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web
-const isNativeApp = !!window.Capacitor || window.location.protocol === 'file:' || /Capacitor/i.test(navigator.userAgent);
+// Improved detection for various mobile webview environments
+const isNativeApp =
+  !!window.Capacitor ||
+  window.location.protocol === 'file:' ||
+  window.location.protocol === 'capacitor:' ||
+  window.location.protocol === 'ionic:' ||
+  /Capacitor/i.test(navigator.userAgent) ||
+  /Ionic/i.test(navigator.userAgent) ||
+  // Catch Android/iOS webviews (wv is present in Chrome-based webviews for Android)
+  /wv\)/i.test(navigator.userAgent) ||
+  /WebView/i.test(navigator.userAgent) ||
+  // Many local webview servers use localhost without a port or with a fixed port
+  (window.location.hostname === 'localhost' && (window.location.port === '' || window.location.port === '8080' || window.location.port === '8100')) ||
+  // Check for specialized bridges
+  !!(window.webkit && window.webkit.messageHandlers) ||
+  !!window.androidBridge ||
+  !!window.AndroidBridge ||
+  !!window.JSBridge;
+
+// Log environment for troubleshooting - helps identify why refresh might be failing in webviews
+if (import.meta.env.DEV) {
+  console.log('[Router Type Detection]', {
+    isNativeApp,
+    protocol: window.location.protocol,
+    pathname: window.location.pathname,
+    hash: window.location.hash,
+    userAgent: navigator.userAgent
+  });
+}
 
 // Fix for mobile app refresh: Migrate pathname to hash if in native app and no hash exists
 // This ensures that refreshing http://localhost/orders becomes http://localhost/#/orders
-if (isNativeApp && window.location.pathname !== '/' && !window.location.hash) {
-  const path = window.location.pathname;
-  const search = window.location.search;
-  // Use replaceState to clear the pathname and then set the hash
-  window.history.replaceState({}, document.title, '/');
-  window.location.hash = path + search;
+if (isNativeApp && !window.location.hash) {
+  const currentPath = window.location.pathname;
+  // If we have a path that isn't root, migrate it to hash
+  if (currentPath !== '/' && currentPath !== '/index.html') {
+    const cleanPath = currentPath.replace(/\/index\.html$/, '') || '/';
+    const search = window.location.search;
+
+    // Use replaceState to clear the pathname and then set the hash
+    // This happens before React Router initialized, preventing double-renders
+    window.history.replaceState({}, document.title, '/');
+    window.location.hash = cleanPath + search;
+  }
 }
 
 const Router = isNativeApp ? HashRouter : BrowserRouter;
