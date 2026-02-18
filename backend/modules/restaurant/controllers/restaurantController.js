@@ -96,7 +96,7 @@ function getRestaurantZoneId(restaurantLat, restaurantLng, activeZones) {
 export const getRestaurants = async (req, res) => {
   try {
     const {
-      limit = 50,
+      limit,
       offset = 0,
       sortBy,
       cuisine,
@@ -188,10 +188,15 @@ export const getRestaurants = async (req, res) => {
 
     // Fetch restaurants - Show ALL restaurants regardless of zone
     // Fetch all fields (coverImages and menuImages are included by default)
-    let restaurants = await Restaurant.find(query)
+    let restaurantsQuery = Restaurant.find(query)
       .select('-owner -createdAt -updatedAt -password')
-      .sort(sortObj)
-      .limit(parseInt(limit))
+      .sort(sortObj);
+
+    if (limit) {
+      restaurantsQuery = restaurantsQuery.limit(parseInt(limit));
+    }
+
+    let restaurants = await restaurantsQuery
       .skip(parseInt(offset))
       .lean();
 
@@ -1031,8 +1036,7 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       isAcceptingOrders: true
     })
       .select('-owner -createdAt -updatedAt')
-      .lean()
-      .limit(100); // Limit to first 100 restaurants for performance
+      .lean();
 
     // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
     // Users in any zone will see all restaurants.

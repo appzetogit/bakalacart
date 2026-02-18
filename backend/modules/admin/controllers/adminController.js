@@ -1300,7 +1300,7 @@ export const getRestaurants = asyncHandler(async (req, res) => {
   try {
     const {
       page = 1,
-      limit = 50,
+      limit, // Removed default = 50
       search,
       status,
       cuisine,
@@ -1356,12 +1356,16 @@ export const getRestaurants = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Fetch restaurants
-    const restaurants = await Restaurant.find(query)
+    let restaurantsQuery = Restaurant.find(query)
       .select('-password')
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+      .skip(skip);
+
+    if (limit) {
+      restaurantsQuery = restaurantsQuery.limit(parseInt(limit));
+    }
+
+    const restaurants = await restaurantsQuery.lean();
 
     // Get total count
     const total = await Restaurant.countDocuments(query);
@@ -1432,14 +1436,14 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
     const {
       status = 'pending',
       page = 1,
-      limit = 50,
+      limit, // Removed default = 50
       search
     } = req.query;
 
     // Parse pagination params safely
     const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 50;
-    const skip = (pageNum - 1) * limitNum;
+    const limitNum = limit ? parseInt(limit) : null;
+    const skip = limitNum ? (pageNum - 1) * limitNum : 0;
 
     // Build query with simplified structure - start with base conditions
     const baseConditions = [];
@@ -1519,12 +1523,16 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
     // Fetch restaurants with error handling
     let restaurants = [];
     try {
-      restaurants = await Restaurant.find(query)
+      let restaurantsQuery = Restaurant.find(query)
         .select('-password')
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .lean();
+        .skip(skip);
+
+      if (limitNum) {
+        restaurantsQuery = restaurantsQuery.limit(limitNum);
+      }
+
+      restaurants = await restaurantsQuery.lean();
     } catch (queryError) {
       logger.error(`Error executing restaurant query: ${queryError.message}`, {
         error: queryError.stack,
