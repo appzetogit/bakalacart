@@ -1462,8 +1462,8 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
           {
             $and: [
               { name: { $exists: true, $ne: null, $ne: '' } },
-              { cuisines: { $exists: true, $ne: null, $not: { $size: 0 } } },
-              { openDays: { $exists: true, $ne: null, $not: { $size: 0 } } },
+              { 'cuisines.0': { $exists: true } }, // Check if at least one cuisine exists
+              { 'openDays.0': { $exists: true } }, // Check if at least one open day exists
               { estimatedDeliveryTime: { $exists: true, $ne: null, $ne: '' } },
               { featuredDish: { $exists: true, $ne: null, $ne: '' } }
             ]
@@ -1516,47 +1516,6 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
 
     query = { $and: baseConditions };
 
-    // Validate and log query structure
-    try {
-      const queryString = JSON.stringify(query, null, 2);
-      console.log('🔍 Restaurant Join Requests Query:', queryString);
-
-      // Validate query structure
-      if (!query || typeof query !== 'object') {
-        logger.warn('Invalid query object detected, returning empty results');
-        return successResponse(res, 200, 'Restaurant join requests retrieved successfully', {
-          requests: [],
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: 0,
-            pages: 0
-          }
-        });
-      }
-
-      // Validate $and array if it exists
-      if (query.$and) {
-        if (!Array.isArray(query.$and) || query.$and.length === 0) {
-          logger.warn('Invalid $and array in query, returning empty results');
-          return successResponse(res, 200, 'Restaurant join requests retrieved successfully', {
-            requests: [],
-            pagination: {
-              page: pageNum,
-              limit: limitNum,
-              total: 0,
-              pages: 0
-            }
-          });
-        }
-      }
-    } catch (queryValidationError) {
-      logger.error(`Error validating query structure: ${queryValidationError.message}`, {
-        error: queryValidationError.stack
-      });
-      return errorResponse(res, 500, 'Invalid query structure');
-    }
-
     // Fetch restaurants with error handling
     let restaurants = [];
     try {
@@ -1569,7 +1528,6 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
     } catch (queryError) {
       logger.error(`Error executing restaurant query: ${queryError.message}`, {
         error: queryError.stack,
-        query: JSON.stringify(query, null, 2),
         status,
         page,
         limit
@@ -1577,102 +1535,16 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
       throw queryError;
     }
 
-    // Debug: Log found restaurants with detailed info (safely)
-    try {
-      console.log(`📊 Found ${restaurants.length} restaurants matching query:`, {
-        status,
-        queryStructure: Object.keys(query).length,
-        restaurantsFound: restaurants.length,
-        sampleRestaurants: restaurants.slice(0, 5).map(r => ({
-          _id: r._id?.toString()?.substring(0, 10) + '...' || 'unknown',
-          name: r.name || 'N/A',
-          isActive: r.isActive,
-          completedSteps: r.onboarding?.completedSteps,
-          hasRejectionReason: !!r.rejectionReason,
-          hasName: !!r.name,
-          hasCuisines: !!r.cuisines && r.cuisines.length > 0,
-          hasOpenDays: !!r.openDays && r.openDays.length > 0,
-          hasEstimatedDeliveryTime: !!r.estimatedDeliveryTime,
-          hasFeaturedDish: !!r.featuredDish,
-        }))
-      });
-    } catch (logError) {
-      logger.warn(`Error logging restaurant query results: ${logError.message}`);
-    }
-
     // Get total count with error handling
     let total = 0;
     try {
       total = await Restaurant.countDocuments(query);
     } catch (countError) {
-      logger.error(`Error counting restaurants: ${countError.message}`, {
-        error: countError.stack,
-        query: JSON.stringify(query, null, 2)
-      });
-      // Use restaurants length as fallback
+      logger.error(`Error counting restaurants: ${countError.message}`);
       total = restaurants.length;
     }
 
-    console.log(`📊 Total count: ${total} restaurants`);
-
-    // Also log a sample of ALL inactive restaurants (for debugging) - wrapped in try-catch
-    if (status === 'pending' && restaurants.length === 0) {
-      try {
-        const allInactive = await Restaurant.find({
-          isActive: false,
-          $or: [
-            { 'rejectionReason': { $exists: false } },
-            { 'rejectionReason': null }
-          ]
-        })
-          .select('name isActive onboarding.completedSteps cuisines openDays estimatedDeliveryTime featuredDish')
-          .limit(10)
-          .lean();
-
-        const totalInactive = await Restaurant.countDocuments({
-          isActive: false,
-          $or: [
-            { 'rejectionReason': { $exists: false } },
-            { 'rejectionReason': null }
-          ]
-        });
-
-        console.log('⚠️ No restaurants found with query. Debugging inactive restaurants:', {
-          totalInactive,
-          queryUsed: JSON.stringify(query, null, 2),
-          samples: allInactive.map(r => ({
-            _id: r._id?.toString() || 'unknown',
-            name: r.name || 'N/A',
-            isActive: r.isActive,
-            completedSteps: r.onboarding?.completedSteps,
-            hasAllFields: {
-              hasName: !!r.name && r.name !== '',
-              hasCuisines: !!r.cuisines && Array.isArray(r.cuisines) && r.cuisines.length > 0,
-              hasOpenDays: !!r.openDays && Array.isArray(r.openDays) && r.openDays.length > 0,
-              hasEstimatedDeliveryTime: !!r.estimatedDeliveryTime && r.estimatedDeliveryTime !== '',
-              hasFeaturedDish: !!r.featuredDish && r.featuredDish !== '',
-            },
-            fieldValues: {
-              name: r.name || 'MISSING',
-              cuisinesCount: r.cuisines?.length || 0,
-              openDaysCount: r.openDays?.length || 0,
-              estimatedDeliveryTime: r.estimatedDeliveryTime || 'MISSING',
-              featuredDish: r.featuredDish || 'MISSING',
-            },
-            shouldMatch: (
-              (!!r.name && r.name !== '') &&
-              (!!r.cuisines && Array.isArray(r.cuisines) && r.cuisines.length > 0) &&
-              (!!r.openDays && Array.isArray(r.openDays) && r.openDays.length > 0) &&
-              (!!r.estimatedDeliveryTime && r.estimatedDeliveryTime !== '') &&
-              (!!r.featuredDish && r.featuredDish !== '')
-            ) || r.onboarding?.completedSteps === 4
-          }))
-        });
-      } catch (debugError) {
-        logger.warn(`Error in debug logging: ${debugError.message}`);
-        // Don't throw - just log and continue
-      }
-    }
+    console.log(`📊 Request stats: Found ${restaurants.length} / Total ${total} (Status: ${status})`);
 
     // Format response to match frontend expectations
     // Ensure restaurants is an array
@@ -3572,6 +3444,43 @@ export const getCustomerWalletReport = asyncHandler(async (req, res) => {
     console.error('❌ Error fetching customer wallet report:', error);
     console.error('Error stack:', error.stack);
     return errorResponse(res, 500, error.message || 'Failed to fetch customer wallet report');
+  }
+});
+
+/**
+ * Toggle Restaurant Open Status (Manual Override)
+ * PATCH /api/admin/restaurants/:id/open-status
+ */
+export const toggleRestaurantOpen = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isOpen } = req.body;
+
+    if (typeof isOpen !== 'boolean') {
+      return errorResponse(res, 400, 'isOpen must be a boolean value');
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    restaurant.isRestaurantOpen = isOpen;
+    await restaurant.save();
+
+    logger.info(`Restaurant open status toggled: ${id}`, {
+      isRestaurantOpen: isOpen,
+      updatedBy: req.user._id
+    });
+
+    return successResponse(res, 200, 'Restaurant open status updated successfully', {
+      id: restaurant._id.toString(),
+      isRestaurantOpen: restaurant.isRestaurantOpen
+    });
+  } catch (error) {
+    console.error(`Error toggling restaurant open status: ${error.message}`);
+    return errorResponse(res, 500, 'Failed to update restaurant open status');
   }
 });
 

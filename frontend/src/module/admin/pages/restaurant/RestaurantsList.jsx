@@ -208,6 +208,7 @@ export default function RestaurantsList() {
     return sortableItems
   }, [filteredRestaurants, sortConfig])
 
+  /* Existing handleToggleStatus code */
   const handleToggleStatus = async (id) => {
     try {
       // Optimistically update UI
@@ -216,12 +217,48 @@ export default function RestaurantsList() {
       )
       setRestaurants(updatedRestaurants)
 
-      // TODO: Call API to update restaurant status
-      // await adminAPI.updateRestaurantStatus(id, !restaurants.find(r => r.id === id).status)
+      // Call API to update restaurant status
+      await adminAPI.updateRestaurantStatus(id, !restaurants.find(r => r.id === id).status)
     } catch (err) {
       console.error("Error updating restaurant status:", err)
       // Revert on error
       setRestaurants(restaurants)
+      toast.error("Failed to update status")
+    }
+  }
+
+  const handleToggleOpen = async (id, currentOpenStatus) => {
+    try {
+      const newStatus = !currentOpenStatus;
+
+      // Optimistically update UI
+      setRestaurants(prevRestaurants =>
+        prevRestaurants.map(restaurant =>
+          (restaurant.id === id || restaurant._id === id)
+            ? { ...restaurant, isRestaurantOpen: newStatus }
+            : restaurant
+        )
+      );
+
+      // Call API
+      const response = await adminAPI.toggleRestaurantOpenStatus(id, newStatus);
+
+      if (response.data?.success) {
+        toast.success(`Restaurant ${newStatus ? 'Opened' : 'Closed'} successfully`);
+      } else {
+        throw new Error(response.data?.message || "Failed to update");
+      }
+    } catch (err) {
+      console.error("Error updating restaurant open status:", err);
+      // Revert UI on error
+      setRestaurants(prevRestaurants =>
+        prevRestaurants.map(restaurant =>
+          (restaurant.id === id || restaurant._id === id)
+            ? { ...restaurant, isRestaurantOpen: !(!currentOpenStatus) } // revert
+            : restaurant
+        )
+      );
+      toast.error("Failed to update store open status");
     }
   }
 
@@ -844,6 +881,12 @@ export default function RestaurantsList() {
                         <ArrowUpDown className="w-3 h-3 text-slate-400" />
                       </div>
                     </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('isRestaurantOpen')}>
+                      <div className="flex items-center gap-1">
+                        <span>Store Open</span>
+                        <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      </div>
+                    </th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
@@ -908,6 +951,19 @@ export default function RestaurantsList() {
                           >
                             <span
                               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${restaurant.status ? "translate-x-6" : "translate-x-1"
+                                }`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleToggleOpen(restaurant.id || restaurant._id, restaurant.isRestaurantOpen !== false)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${restaurant.isRestaurantOpen !== false ? "bg-green-600" : "bg-red-400"
+                              }`}
+                            title={restaurant.isRestaurantOpen !== false ? "Store is Open" : "Store is Closed (Manual Override)"}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${restaurant.isRestaurantOpen !== false ? "translate-x-6" : "translate-x-1"
                                 }`}
                             />
                           </button>

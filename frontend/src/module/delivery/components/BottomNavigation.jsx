@@ -54,10 +54,10 @@ export default function BottomNavigation() {
         }
       } catch (error) {
         // Skip logging network and timeout errors (handled by axios interceptor)
-        if (error.code !== 'ECONNABORTED' && 
-            error.code !== 'ERR_NETWORK' && 
-            error.message !== 'Network Error' &&
-            !error.message?.includes('timeout')) {
+        if (error.code !== 'ECONNABORTED' &&
+          error.code !== 'ERR_NETWORK' &&
+          error.message !== 'Network Error' &&
+          !error.message?.includes('timeout')) {
           console.error("Error fetching profile image for navigation:", error)
         }
       }
@@ -71,7 +71,7 @@ export default function BottomNavigation() {
     }
 
     window.addEventListener('deliveryProfileRefresh', handleProfileRefresh)
-    
+
     return () => {
       window.removeEventListener('deliveryProfileRefresh', handleProfileRefresh)
     }
@@ -81,14 +81,7 @@ export default function BottomNavigation() {
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
       <div className="flex items-center justify-around py-2 px-4">
 
-        {/* Feed */}
-        <button
-          onClick={() => navigate("/delivery")}
-          className="flex flex-col items-center gap-1 p-2"
-        >
-          {TabIcon(isActive("/delivery"), HomeOutline, HomeSolid)}
-          {TabLabel(isActive("/delivery"), "Feed")}
-        </button>
+
 
         {/* Orders */}
         <button
@@ -117,17 +110,15 @@ export default function BottomNavigation() {
             <img
               src={profileImage}
               alt="Profile"
-              className={`w-7 h-7 rounded-full border-2 object-cover ${
-                isActive("/delivery/profile") ? "border-black" : "border-gray-300"
-              }`}
+              className={`w-7 h-7 rounded-full border-2 object-cover ${isActive("/delivery/profile") ? "border-black" : "border-gray-300"
+                }`}
               onError={() => {
                 setImageError(true)
               }}
             />
           ) : (
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${
-              isActive("/delivery/profile") ? "border-black" : "border-gray-300"
-            }`}>
+            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center bg-gray-200 ${isActive("/delivery/profile") ? "border-black" : "border-gray-300"
+              }`}>
               <User className="w-4 h-4 text-gray-500" />
             </div>
           )}

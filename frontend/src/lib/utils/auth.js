@@ -19,7 +19,7 @@ export function decodeToken(token) {
     // Decode base64url encoded payload
     const payload = parts[1];
     const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    
+
     return decoded;
   } catch (error) {
     console.error('Error decoding token:', error);
@@ -45,7 +45,7 @@ export function getRoleFromToken(token) {
 export function isTokenExpired(token) {
   const decoded = decodeToken(token);
   if (!decoded || !decoded.exp) return true;
-  
+
   // exp is in seconds, Date.now() is in milliseconds
   return decoded.exp * 1000 < Date.now();
 }
@@ -96,16 +96,16 @@ export function getCurrentUserRole(module = null) {
   if (module) {
     const token = getModuleToken(module);
     if (!token) return null;
-    
+
     if (isTokenExpired(token)) {
-      // Token expired, clear it
-      clearModuleAuth(module);
-      return null;
+      // Token technically expired, but we return the role anyway 
+      // to allow the UI to mount and the API interceptor to handle refresh.
+      return getRoleFromToken(token);
     }
-    
+
     return getRoleFromToken(token);
   }
-  
+
   // Legacy: check all modules and return the first valid role found
   // This is for backward compatibility but should be avoided
   const modules = ['user', 'restaurant', 'delivery', 'admin'];
@@ -115,7 +115,7 @@ export function getCurrentUserRole(module = null) {
       return getRoleFromToken(token);
     }
   }
-  
+
   return null;
 }
 
@@ -127,12 +127,14 @@ export function getCurrentUserRole(module = null) {
 export function isModuleAuthenticated(module) {
   const token = getModuleToken(module);
   if (!token) return false;
-  
+
   if (isTokenExpired(token)) {
-    clearModuleAuth(module);
-    return false;
+    // If token is expired, we still return true to allow the ProtectedRoute to render.
+    // The axios interceptor or App.jsx refresh logic will handle the actual refresh.
+    // This prevents the synchronous 'flicker' logout.
+    return true;
   }
-  
+
   return true;
 }
 
@@ -169,11 +171,11 @@ export function clearAuthData() {
 export function getTokenExpirationTime(token) {
   const decoded = decodeToken(token);
   if (!decoded || !decoded.exp) return null;
-  
+
   // exp is in seconds, Date.now() is in milliseconds
   const expirationTime = decoded.exp * 1000;
   const now = Date.now();
-  
+
   return expirationTime - now;
 }
 
@@ -185,10 +187,10 @@ export function getTokenExpirationTime(token) {
  */
 export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
   if (!token) return false;
-  
+
   const timeUntilExpiry = getTokenExpirationTime(token);
   if (timeUntilExpiry === null) return true; // Invalid token, should refresh
-  
+
   // Refresh if token expires within threshold
   return timeUntilExpiry <= thresholdMs;
 }
@@ -201,12 +203,12 @@ export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
 export async function proactiveTokenRefresh(module) {
   const token = getModuleToken(module);
   if (!token) return false;
-  
+
   // Check if token needs refresh (expires within 5 minutes)
   if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
     return true; // Token is still valid, no refresh needed
   }
-  
+
   try {
     // Determine refresh endpoint based on module
     const refreshEndpoints = {
@@ -215,26 +217,26 @@ export async function proactiveTokenRefresh(module) {
       'delivery': '/delivery/auth/refresh-token',
       'user': '/auth/refresh-token'
     };
-    
+
     const refreshEndpoint = refreshEndpoints[module];
     if (!refreshEndpoint) {
       console.warn(`No refresh endpoint for module: ${module}`);
       return false;
     }
-    
+
     // Import axios and API_BASE_URL dynamically
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
-    
+
     // Call refresh endpoint with credentials
     const response = await axios.post(
       `${API_BASE_URL}${refreshEndpoint}`,
       {},
       { withCredentials: true }
     );
-    
+
     const { accessToken } = response.data.data || response.data;
-    
+
     if (accessToken) {
       // Verify role matches
       const role = getRoleFromToken(accessToken);
@@ -248,7 +250,7 @@ export async function proactiveTokenRefresh(module) {
         return false;
       }
     }
-    
+
     return false;
   } catch (error) {
     // Don't log network errors as they're expected when offline
@@ -291,7 +293,7 @@ export function setAuthData(module, token, user) {
 
     localStorage.setItem(tokenKey, token);
     localStorage.setItem(authKey, 'true');
-    
+
     if (user) {
       try {
         localStorage.setItem(userKey, JSON.stringify(user));
@@ -304,7 +306,7 @@ export function setAuthData(module, token, user) {
     // Verify the token was stored correctly
     const storedToken = localStorage.getItem(tokenKey);
     const storedAuth = localStorage.getItem(authKey);
-    
+
     if (storedToken !== token) {
       console.error(`[setAuthData] Token mismatch:`, {
         expected: token?.substring(0, 20) + '...',
@@ -336,7 +338,7 @@ export function setAuthData(module, token, user) {
         if (user) {
           localStorage.setItem(`${module}_user`, JSON.stringify(user));
         }
-        
+
         // Verify again after retry
         const storedToken = localStorage.getItem(`${module}_accessToken`);
         if (storedToken !== token) {

@@ -25,10 +25,21 @@ export default function AuthRedirect({ children, module, redirectTo = null }) {
   }
 
   // If authenticated, redirect to module home page or the page they came from
+  // We prioritize:
+  // 1. location.state.from (React Router state)
+  // 2. returnTo query parameter (URL fallback)
+  // 3. redirectTo prop (explicit override)
+  // 4. module home page (default)
   if (isAuthenticated) {
-    const from = location.state?.from?.pathname || location.state?.from;
-    const homePath = from || redirectTo || moduleHomePages[module] || "/"
-    return <Navigate to={homePath} replace />
+    const params = new URLSearchParams(location.search);
+    const returnTo = params.get('returnTo');
+    const from = location.state?.from?.pathname || location.state?.from || returnTo;
+
+    // Ensure we don't redirect to the current login page itself (infinite loop)
+    const currentPath = location.pathname;
+    const finalPath = (from && from !== currentPath) ? from : (redirectTo || moduleHomePages[module] || "/");
+
+    return <Navigate to={finalPath} replace />
   }
 
   // If not authenticated, show the auth page

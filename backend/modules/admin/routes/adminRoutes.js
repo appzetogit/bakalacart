@@ -27,7 +27,8 @@ import {
   sendRestaurantEmail,
   getAllOffers,
   getRestaurantAnalytics,
-  getCustomerWalletReport
+  getCustomerWalletReport,
+  toggleRestaurantOpen
 } from '../controllers/adminController.js';
 import {
   getBusinessSettings,
@@ -307,15 +308,16 @@ router.get('/customer-wallet-report', getCustomerWalletReport);
 
 // Restaurant Management
 router.get('/restaurants', getRestaurants);
+router.get('/restaurants/requests', getRestaurantJoinRequests);
 router.get('/restaurants/:id', getRestaurantById);
 router.post('/restaurants', createRestaurant);
 router.put('/restaurants/:id', updateRestaurant);
-router.get('/restaurants/requests', getRestaurantJoinRequests);
 router.get('/restaurant-analytics/:restaurantId', getRestaurantAnalytics);
 router.post('/restaurants/:id/approve', approveRestaurant);
 router.post('/restaurants/:id/reject', rejectRestaurant);
 router.post('/restaurants/:id/reverify', reverifyRestaurant);
 router.put('/restaurants/:id/status', updateRestaurantStatus);
+router.patch('/restaurants/:id/open-status', toggleRestaurantOpen); // Manual store open/close
 router.post('/restaurants/:id/send-credentials', sendRestaurantCredentialsEmail);
 router.post('/restaurants/:id/send-email', sendRestaurantEmail);
 router.delete('/restaurants/:id', deleteRestaurant);

@@ -54,9 +54,7 @@ export default function DeliveryRouter() {
         path="/"
         element={
           <ProtectedRoute>
-            <DeliveryLayout showGig={true}>
-              <DeliveryHome />
-            </DeliveryLayout>
+            <Navigate to="/delivery/orders" replace />
           </ProtectedRoute>
         }
       />
@@ -478,9 +476,12 @@ export default function DeliveryRouter() {
 // Component to preserve current location on refresh
 function PreserveLocation() {
   const location = useLocation()
-  // If we're on a valid delivery route, just show nothing (or a 404)
-  // This prevents redirect to home on refresh
-  // The route should have been matched above, so this should rarely be hit
-  // But if it is, we'll just show the home page as fallback
-  return <Navigate to="/delivery" replace />
+  // Instead of redirecting to home, we render a 404 to avoid disrupting the user's flow
+  // This helps when routes are valid but might be matching late, or simply shows a correct 404
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+      <h2 className="text-xl font-bold mb-2">Page Not Found</h2>
+      <p className="text-gray-500 mb-4">The requested page {location.pathname} could not be found.</p>
+    </div>
+  )
 }

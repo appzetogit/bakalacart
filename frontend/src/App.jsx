@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { initializePushNotifications } from "@/services/pushNotificationService"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
+import { proactiveTokenRefresh } from "@/lib/utils/auth"
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (
@@ -176,6 +177,25 @@ function UserPathRedirect() {
 export default function App() {
   useEffect(() => {
     initializePushNotifications();
+
+    // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
+    const modules = ['user', 'restaurant', 'delivery', 'admin'];
+    const refreshAllTokens = () => {
+      modules.forEach(module => {
+        proactiveTokenRefresh(module).catch(err => {
+          // Silent catch for network errors
+          if (import.meta.env.DEV) console.debug(`[Background Refresh] Skipping ${module}:`, err.message);
+        });
+      });
+    };
+
+    // Run once on mount
+    refreshAllTokens();
+
+    // Set interval for periodic refresh
+    const interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   return (

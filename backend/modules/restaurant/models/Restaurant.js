@@ -281,6 +281,10 @@ const restaurantSchema = new mongoose.Schema(
       type: [String],
       default: []
     },
+    isRestaurantOpen: {
+      type: Boolean,
+      default: true, // Manual override for open/close status
+    },
   },
   {
     timestamps: true,

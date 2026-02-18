@@ -207,11 +207,15 @@ export const getRestaurants = async (req, res) => {
         ? restaurant.coverImages
         : (hasMenuImages ? restaurant.menuImages : [])
 
+      // Override isAcceptingOrders if admin has manually closed the restaurant
+      const isAcceptingOrders = restaurant.isAcceptingOrders && (restaurant.isRestaurantOpen !== false);
+
       return {
         ...restaurant,
         coverImages: coverImages, // This will be used by frontend for restaurant cards
         menuImages: restaurant.menuImages || [], // Keep original menuImages separate
-        profileImage: restaurant.profileImage || null
+        profileImage: restaurant.profileImage || null,
+        isAcceptingOrders // Override the status
       }
     });
 
@@ -299,6 +303,11 @@ export const getRestaurantById = async (req, res) => {
 
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    // Override isAcceptingOrders if admin has manually closed the restaurant
+    if (restaurant.isRestaurantOpen === false) {
+      restaurant.isAcceptingOrders = false;
     }
 
     return successResponse(res, 200, 'Restaurant retrieved successfully', {

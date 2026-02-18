@@ -955,6 +955,11 @@ export const adminAPI = {
     return apiClient.put(API_ENDPOINTS.ADMIN.RESTAURANT_STATUS.replace(':id', id), { isActive });
   },
 
+  // Manual toggle restaurant open/close status
+  toggleRestaurantOpenStatus: (id, isOpen) => {
+    return apiClient.patch(`/admin/restaurants/${id}/open-status`, { isOpen });
+  },
+
   // Get restaurant join requests
   getRestaurantJoinRequests: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.RESTAURANT_REQUESTS, { params });

@@ -9,11 +9,11 @@ import MaintenanceModeScreen from "./MaintenanceModeScreen";
  */
 export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   const location = useLocation();
-  
+
   // Check maintenance mode for user and restaurant roles
   const userMaintenance = useMaintenanceMode("user");
   const restaurantMaintenance = useMaintenanceMode("restaurantDelivery");
-  
+
   // Determine which maintenance mode to check based on role
   let maintenanceCheck = null;
   if (requiredRole === "user") {
@@ -38,9 +38,9 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   // If not authenticated for this module, redirect to login
   if (!isAuthenticated) {
     if (loginPath) {
-      return <Navigate to={loginPath} state={{ from: location.pathname }} replace />;
+      return <Navigate to={`${loginPath}?returnTo=${encodeURIComponent(location.pathname)}`} state={{ from: location.pathname }} replace />;
     }
-    
+
     // Fallback: redirect to appropriate login page
     const roleLoginPaths = {
       'admin': '/admin/login',
@@ -48,7 +48,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
       'delivery': '/delivery/sign-in',
       'user': '/user/auth/sign-in'
     };
-    
+
     const redirectPath = roleLoginPaths[requiredRole] || '/';
     return <Navigate to={redirectPath} replace />;
   }

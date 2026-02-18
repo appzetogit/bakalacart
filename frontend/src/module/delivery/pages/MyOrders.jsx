@@ -47,7 +47,14 @@ export default function MyOrders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("pending")
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('delivery_active_order_tab') || "pending"
+  })
+
+  // Persist active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('delivery_active_order_tab', activeTab)
+  }, [activeTab])
   const [activeBillUploadOrder, setActiveBillUploadOrder] = useState(null)
   const [showBillImageSourceMenu, setShowBillImageSourceMenu] = useState(null) // orderId or null
 

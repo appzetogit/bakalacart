@@ -40,7 +40,7 @@ export const sendPushNotification = async (tokens, payload) => {
     try {
         const tag = payload.data?.tag || payload.data?.orderId || payload.data?.notificationId || Date.now().toString();
         const iconUrl = payload.data?.icon || 'https://bakalacart.com/bakalalogo.png';
-        
+
         // Determine if this is a new order notification that needs sound
         const isNewOrder = payload.data?.type === 'new_order' || payload.data?.orderId;
         // Get base URL for sound file (should match your frontend domain)
@@ -96,7 +96,7 @@ export const sendPushNotification = async (tokens, payload) => {
                     tag: tag, // Deduplication for Web
                     icon: iconUrl,
                     badge: iconUrl,
-                    image: payload.image || null,
+                    image: payload.image || undefined,
                     requireInteraction: true,
                     sound: soundUrl || undefined // Include sound for web push notifications (especially for new orders)
                 },
@@ -127,11 +127,14 @@ export const sendPushNotification = async (tokens, payload) => {
         response.responses.forEach((resp, idx) => {
             if (!resp.success) {
                 const token = uniqueTokens[idx];
+                console.error(`❌ [FCM Error] Token failed: ${token.substring(0, 15)}... Error Code: ${resp.error?.code}, Message: ${resp.error?.message}`);
+
                 failedTokensList.push({ token, error: resp.error?.code });
 
                 if (['messaging/registration-token-not-registered',
                     'messaging/invalid-registration-token',
-                    'messaging/invalid-argument'].includes(resp.error?.code)) {
+                    'messaging/invalid-argument',
+                    'messaging/mismatched-credential'].includes(resp.error?.code)) {
                     cleanupTokens.push(token);
                 }
             }

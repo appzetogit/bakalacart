@@ -369,8 +369,14 @@ export default function UserRouter() {
             }
           />
           {/* Redirect for legacy /user prefixed routes */}
-          <Route path="/user" element={<Navigate to="/" replace />} />
-          <Route path="/user/*" element={<Navigate to="/" replace />} />
+          {/* Catch-all for unmatched routes in UserRouter - prevent redirect loop to home */}
+          <Route path="*" element={
+            <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center">
+              <h2 className="text-xl font-bold mb-2">Page Not Found</h2>
+              <p className="text-gray-500">The requested page could not be found.</p>
+              <a href="/" className="mt-4 px-4 py-2 bg-black text-white rounded-lg inline-block">Go Home</a>
+            </div>
+          } />
         </Route>
       </Routes>
     </LocationProvider>

@@ -301,7 +301,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Delivery boy not found or inactive');
     }
 
-    // Generate new access token
+    // For delivery partners, allow multiple devices by skipping the database token match check
+    // if (role === 'delivery' && delivery.refreshToken && delivery.refreshToken !== refreshToken) {
+    //   return errorResponse(res, 401, 'Invalid refresh token');
+    // }
     const accessToken = jwtService.generateAccessToken({
       userId: delivery._id.toString(),
       role: 'delivery',
