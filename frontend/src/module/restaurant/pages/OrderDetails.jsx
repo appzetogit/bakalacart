@@ -635,13 +635,15 @@ export default function OrderDetails() {
 
             {/* Customer Note */}
             {orderData.customer.note && (
-              <div className="flex items-start gap-3 mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg">
-                <div className="w-5 h-5 flex items-center justify-center mt-0.5">
-                  <span className="text-orange-500 font-bold text-lg">!</span>
+              <div className="flex items-start gap-3 mt-2 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg shadow-sm">
+                <div className="w-8 h-8 flex items-center justify-center bg-blue-100 rounded-full shrink-0">
+                  <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-orange-600 font-bold uppercase tracking-wider mb-1">Customer Note</p>
-                  <p className="text-sm text-gray-900 font-medium italic">"{orderData.customer.note}"</p>
+                  <p className="text-xs text-blue-800 font-bold uppercase tracking-wider mb-1">IMPORTANT: Customer Instructions</p>
+                  <p className="text-sm text-gray-900 font-medium italic leading-relaxed bg-white/50 p-2 rounded border border-blue-100">
+                    "{orderData.customer.note}"
+                  </p>
                 </div>
               </div>
             )}
@@ -681,7 +683,9 @@ export default function OrderDetails() {
                       )}
                     </p>
                     {item.description && (
-                      <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                      <p className="text-[11px] text-gray-600 mt-1 pl-2 border-l-2 border-gray-200 leading-tight">
+                        {item.description}
+                      </p>
                     )}
                     <p className="text-sm font-semibold text-gray-900">₹{item.price}</p>
                   </div>

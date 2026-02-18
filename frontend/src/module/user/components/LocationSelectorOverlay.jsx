@@ -2575,25 +2575,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
               </p>
             </div>
 
-            {/* Use Current Location */}
-            <button
-              onClick={handleUseCurrentLocation}
-              disabled={loading}
-              className="w-full flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-900/10 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20 transition-colors">
-                  <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-tight">DELIVERY AT LOCATION</p>
-                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium line-clamp-1">
-                    {loading ? "Detecting live location..." : currentLocationText}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-            </button>
+
 
             {/* Add New Address removed as per request */}
           </div>

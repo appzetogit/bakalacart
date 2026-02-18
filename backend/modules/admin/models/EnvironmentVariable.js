@@ -14,7 +14,7 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // Cloudinary
     CLOUDINARY_CLOUD_NAME: {
       type: String,
@@ -31,7 +31,7 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // Firebase
     FIREBASE_API_KEY: {
       type: String,
@@ -78,7 +78,7 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // SMTP
     SMTP_HOST: {
       type: String,
@@ -100,7 +100,7 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // SMS Hub India
     SMSINDIAHUB_API_KEY: {
       type: String,
@@ -112,7 +112,7 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // MSG91
     MSG91_AUTH_KEY: {
       type: String,
@@ -129,14 +129,14 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
-    
+
     // Google Maps
     VITE_GOOGLE_MAPS_API_KEY: {
       type: String,
       default: '',
       trim: true
     },
-    
+
     // Metadata
     lastUpdatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -155,7 +155,7 @@ const environmentVariableSchema = new mongoose.Schema(
 );
 
 // Create a single document instance (singleton pattern)
-environmentVariableSchema.statics.getOrCreate = async function() {
+environmentVariableSchema.statics.getOrCreate = async function () {
   let envVars = await this.findOne();
   if (!envVars) {
     envVars = await this.create({});
@@ -164,7 +164,7 @@ environmentVariableSchema.statics.getOrCreate = async function() {
 };
 
 // Method to get all variables as plain object (with decryption)
-environmentVariableSchema.methods.toEnvObject = function() {
+environmentVariableSchema.methods.toEnvObject = function () {
   const obj = this.toObject();
   delete obj._id;
   delete obj.__v;
@@ -172,7 +172,7 @@ environmentVariableSchema.methods.toEnvObject = function() {
   delete obj.updatedAt;
   delete obj.lastUpdatedBy;
   delete obj.lastUpdatedAt;
-  
+
   // Decrypt all sensitive fields
   const sensitiveFields = [
     'RAZORPAY_API_KEY',
@@ -190,23 +190,22 @@ environmentVariableSchema.methods.toEnvObject = function() {
     'MSG91_DLT_TE_ID',
     'VITE_GOOGLE_MAPS_API_KEY'
   ];
-  
+
   sensitiveFields.forEach(field => {
     if (obj[field] && isEncrypted(obj[field])) {
       try {
         obj[field] = decrypt(obj[field]);
       } catch (error) {
-        console.error(`Error decrypting ${field}:`, error);
         obj[field] = ''; // Return empty on decryption error
       }
     }
   });
-  
+
   return obj;
 };
 
 // Pre-save hook to encrypt sensitive fields
-environmentVariableSchema.pre('save', function(next) {
+environmentVariableSchema.pre('save', function (next) {
   const sensitiveFields = [
     'RAZORPAY_API_KEY',
     'RAZORPAY_SECRET_KEY',
@@ -223,7 +222,7 @@ environmentVariableSchema.pre('save', function(next) {
     'MSG91_DLT_TE_ID',
     'VITE_GOOGLE_MAPS_API_KEY'
   ];
-  
+
   // Process each field safely
   for (const field of sensitiveFields) {
     try {
@@ -231,22 +230,22 @@ environmentVariableSchema.pre('save', function(next) {
       if (!this.isModified(field)) {
         continue; // Skip if not modified
       }
-      
+
       let fieldValue = this[field];
-      
+
       // Convert to string if it's not already a string
       if (fieldValue !== null && fieldValue !== undefined && typeof fieldValue !== 'string') {
         fieldValue = String(fieldValue);
         this[field] = fieldValue;
       }
-      
+
       // Handle null, undefined, or empty strings
       if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
         // Set to empty string if null/undefined
         this[field] = '';
         continue; // Skip encryption for empty values
       }
-      
+
       // Only encrypt if value is a string and not already encrypted
       if (typeof fieldValue === 'string' && !isEncrypted(fieldValue)) {
         try {
@@ -269,7 +268,7 @@ environmentVariableSchema.pre('save', function(next) {
       // Continue processing other fields even if one fails
     }
   }
-  
+
   // Always call next() to allow save to proceed
   // Never pass error to next() - we want save to succeed even if encryption fails
   next();

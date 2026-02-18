@@ -315,18 +315,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  * POST /api/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Try to find the refresh token in role-specific cookies or generic refreshToken cookie
-  const cookieNames = jwtService.getAllCookieNames();
-  let refreshToken = null;
-  let usedCookieName = 'refreshToken';
-
-  for (const name of cookieNames) {
-    if (req.cookies?.[name]) {
-      refreshToken = req.cookies[name];
-      usedCookieName = name;
-      break;
-    }
-  }
+  // Prioritize user-specific refresh token cookie or generic refreshToken cookie
+  const refreshToken = req.cookies?.user_refreshToken || req.cookies?.refreshToken;
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -337,9 +327,16 @@ export const refreshToken = asyncHandler(async (req, res) => {
     const decoded = jwtService.verifyRefreshToken(refreshToken);
 
     // Get user based on role from token
-    let user;
     const role = decoded.role;
 
+    // Ensure this generic refresh endpoint is only used for user role
+    // or properly identifies the user from the token. 
+    // Mismatch here causes frontend logouts.
+    if (role !== 'user') {
+      return errorResponse(res, 401, 'Invalid token role for user module');
+    }
+
+    let user;
     if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
       user = await Admin.findById(decoded.userId).select('-password');
     } else if (role === 'restaurant') {
@@ -449,7 +446,8 @@ export const register = asyncHandler(async (req, res) => {
   });
 
   // Set refresh token in httpOnly cookie
-  res.cookie('refreshToken', tokens.refreshToken, {
+  const cookieName = jwtService.getCookieName(user.role);
+  res.cookie(cookieName, tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -545,7 +543,8 @@ export const login = asyncHandler(async (req, res) => {
   });
 
   // Set refresh token in httpOnly cookie
-  res.cookie('refreshToken', tokens.refreshToken, {
+  const cookieName = jwtService.getCookieName(user.role);
+  res.cookie(cookieName, tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -819,7 +818,8 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     });
 
     // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', tokens.refreshToken, {
+    const cookieName = jwtService.getCookieName(user.role);
+    res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -1043,7 +1043,8 @@ export const googleCallback = asyncHandler(async (req, res) => {
     });
 
     // Set refresh token in httpOnly cookie
-    res.cookie('refreshToken', jwtTokens.refreshToken, {
+    const cookieName = jwtService.getCookieName(user.role);
+    res.cookie(cookieName, jwtTokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

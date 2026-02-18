@@ -725,6 +725,9 @@ export const deliveryAPI = {
   verifyDepositPayment: (data) => {
     return apiClient.post(API_ENDPOINTS.DELIVERY.WALLET_DEPOSIT_VERIFY, data);
   },
+  createCashDeposit: (amount) => {
+    return apiClient.post(API_ENDPOINTS.DELIVERY.WALLET_DEPOSIT_CASH, { amount });
+  },
   getOrderStats: (period = 'all') => {
     return apiClient.get(API_ENDPOINTS.DELIVERY.ORDER_STATS, { params: { period } });
   },

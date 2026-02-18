@@ -8,7 +8,8 @@ import {
   claimJoiningBonus,
   getWalletStats,
   createDepositOrder,
-  verifyDepositPayment
+  verifyDepositPayment,
+  createCashDepositRequest
 } from '../controllers/deliveryWalletController.js';
 import { authenticate } from '../middleware/deliveryAuth.js';
 
@@ -27,6 +28,7 @@ router.post('/collect-payment', collectPayment); // POST /api/delivery/wallet/co
 router.post('/claim-joining-bonus', claimJoiningBonus); // POST /api/delivery/wallet/claim-joining-bonus
 router.post('/deposit/create-order', createDepositOrder); // POST /api/delivery/wallet/deposit/create-order
 router.post('/deposit/verify', verifyDepositPayment); // POST /api/delivery/wallet/deposit/verify
+router.post('/deposit/cash', createCashDepositRequest); // POST /api/delivery/wallet/deposit/cash
 
 export default router;
 

@@ -42,11 +42,12 @@ async function initializeCloudinary() {
       if (!cloudName) missing.push('CLOUDINARY_CLOUD_NAME');
       if (!apiKey) missing.push('CLOUDINARY_API_KEY');
       if (!apiSecret) missing.push('CLOUDINARY_API_SECRET');
-      
-      console.error(
-        `❌ Cloudinary is not fully configured. Missing: ${missing.join(', ')}. Set these in ENV Setup or backend .env`
+
+      console.warn(
+        `⚠️ Cloudinary is not fully configured. Missing: ${missing.join(', ')}. Image uploads will not work.`
       );
-      throw new Error(`Cloudinary configuration incomplete. Missing: ${missing.join(', ')}`);
+      // specific return to indicated failure but not crash
+      return null;
     }
 
     cloudinary.config({
@@ -63,7 +64,8 @@ async function initializeCloudinary() {
       stack: error.stack
     });
     cloudinaryInitialized = false;
-    throw error; // Re-throw to let caller handle
+    // Do not throw, just return null so server can continue
+    return null;
   }
 
   return cloudinary;

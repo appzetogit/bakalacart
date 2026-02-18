@@ -343,7 +343,7 @@ export const getUserAddresses = asyncHandler(async (req, res) => {
  */
 export const addUserAddress = asyncHandler(async (req, res) => {
   try {
-    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault } = req.body;
+    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault, receiverName, phone } = req.body;
 
     if (!street || !city || !state) {
       return errorResponse(res, 400, 'Street, city, and state are required');
@@ -363,6 +363,8 @@ export const addUserAddress = asyncHandler(async (req, res) => {
       city,
       state,
       zipCode: zipCode || '',
+      receiverName: receiverName || '',
+      phone: phone || '',
       isDefault: isDefault === true || (user.addresses || []).length === 0
     };
 
@@ -416,7 +418,7 @@ export const addUserAddress = asyncHandler(async (req, res) => {
 export const updateUserAddress = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault } = req.body;
+    const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault, receiverName, phone } = req.body;
 
     const user = await User.findById(req.user._id);
 
@@ -436,6 +438,8 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     if (city !== undefined) address.city = city;
     if (state !== undefined) address.state = state;
     if (zipCode !== undefined) address.zipCode = zipCode;
+    if (receiverName !== undefined) address.receiverName = receiverName;
+    if (phone !== undefined) address.phone = phone;
 
     // Update location coordinates if provided
     if (latitude !== undefined && longitude !== undefined) {

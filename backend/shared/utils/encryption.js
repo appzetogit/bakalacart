@@ -3,43 +3,49 @@ import crypto from 'crypto';
 // Encryption key - should be stored in environment variable
 // Fallback to a default key (change in production!)
 // Use a 32-byte key for AES-256
+// Encryption key initialization
+let cachedEncryptionKey = null;
+
 const getEncryptionKey = () => {
-  if (process.env.ENCRYPTION_KEY) {
-    const key = process.env.ENCRYPTION_KEY.trim();
+  if (cachedEncryptionKey) return cachedEncryptionKey;
 
-    // Check if it's a hex string (64 hex characters = 32 bytes)
-    if (/^[0-9a-fA-F]{64}$/.test(key)) {
-      // Convert hex string to buffer (32 bytes)
-      return Buffer.from(key, 'hex');
-    }
+  try {
+    let key;
+    if (process.env.ENCRYPTION_KEY) {
+      key = process.env.ENCRYPTION_KEY.trim();
 
-    // If it's a hex string but not exactly 64 chars, try to use it
-    if (/^[0-9a-fA-F]+$/i.test(key)) {
-      // Pad or truncate to 64 hex chars (32 bytes)
-      const hexKey = key.padEnd(64, '0').slice(0, 64);
-      return Buffer.from(hexKey, 'hex');
-    }
+      // Check if it's a hex string (64 hex characters = 32 bytes)
+      if (/^[0-9a-fA-F]{64}$/.test(key)) {
+        cachedEncryptionKey = Buffer.from(key, 'hex');
+        return cachedEncryptionKey;
+      }
 
-    // If it's a regular string, derive 32-byte key from it
-    if (key.length >= 32) {
-      // Use first 32 bytes as UTF-8
-      return Buffer.from(key.slice(0, 32), 'utf8');
+      // If it's a hex string but not exactly 64 chars, try to use it
+      if (/^[0-9a-fA-F]+$/i.test(key)) {
+        const hexKey = key.padEnd(64, '0').slice(0, 64);
+        cachedEncryptionKey = Buffer.from(hexKey, 'hex');
+        return cachedEncryptionKey;
+      }
+
+      // If it's a regular string, derive 32-byte key from it
+      if (key.length >= 32) {
+        cachedEncryptionKey = Buffer.from(key.slice(0, 32), 'utf8');
+        return cachedEncryptionKey;
+      }
+    } else {
+      key = 'appzeto-food-encryption-key-change-in-production-2024';
     }
 
     // Derive key using scrypt
-    return crypto.scryptSync(key, 'salt', 32);
+    cachedEncryptionKey = crypto.scryptSync(key, 'salt', 32);
+    return cachedEncryptionKey;
+  } catch (error) {
+    console.error('❌ Failed to initialize encryption key:', error);
+    // last resort fallback
+    cachedEncryptionKey = Buffer.alloc(32, 'a');
+    return cachedEncryptionKey;
   }
-  // Fallback: generate a key from a default string (CHANGE IN PRODUCTION!)
-  return crypto.scryptSync('appzeto-food-encryption-key-change-in-production-2024', 'salt', 32);
 };
-
-const ENCRYPTION_KEY = getEncryptionKey();
-
-// Validate encryption key
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
-  console.warn('⚠️  WARNING: Encryption key is invalid or not 32 bytes. Encryption may fail.');
-  console.warn('Please set ENCRYPTION_KEY in .env file (64 hex characters = 32 bytes)');
-}
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // GCM standard IV length
@@ -71,7 +77,8 @@ export function encrypt(text) {
 
   try {
     // Validate encryption key
-    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+    const encryptionKey = getEncryptionKey();
+    if (!encryptionKey || encryptionKey.length !== 32) {
       throw new Error('Invalid encryption key: must be 32 bytes');
     }
 
@@ -79,7 +86,7 @@ export function encrypt(text) {
     const salt = crypto.randomBytes(SALT_LENGTH);
 
     // Derive key from encryption key and salt
-    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
+    const key = crypto.scryptSync(encryptionKey, salt, 32);
 
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -99,8 +106,9 @@ export function encrypt(text) {
     return result;
   } catch (error) {
     console.error('Encryption error:', error);
+    const encryptionKey = getEncryptionKey();
     console.error('Text to encrypt length:', text?.length);
-    console.error('Encryption key length:', ENCRYPTION_KEY?.length);
+    console.error('Encryption key length:', encryptionKey?.length);
     throw new Error(`Failed to encrypt data: ${error.message}`);
   }
 }
@@ -131,7 +139,14 @@ export function decrypt(encryptedText) {
     const encrypted = encryptedText.slice(ENCRYPTED_POSITION * 2);
 
     // Derive key from encryption key and salt
-    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
+    const encryptionKey = getEncryptionKey();
+
+    // Safety check for scryptSync inputs to prevent "Deriving bits failed"
+    if (!encryptionKey || encryptionKey.length === 0 || !salt || salt.length === 0) {
+      throw new Error('Invalid encryption key or salt for derivation');
+    }
+
+    const key = crypto.scryptSync(encryptionKey, salt, 32);
 
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
@@ -141,8 +156,7 @@ export function decrypt(encryptedText) {
 
     return decrypted;
   } catch (error) {
-    console.error('Decryption error:', error);
-    // If decryption fails, return empty string (might be unencrypted legacy data)
+    // If decryption fails, return empty string (might be unencrypted legacy data or wrong key)
     return '';
   }
 }

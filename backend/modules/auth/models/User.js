@@ -68,6 +68,8 @@ const userSchema = new mongoose.Schema({
     city: String,
     state: String,
     zipCode: String,
+    receiverName: String,
+    phone: String,
     location: {
       type: {
         type: String,

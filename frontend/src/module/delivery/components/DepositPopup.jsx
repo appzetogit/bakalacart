@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { IndianRupee, Loader2 } from "lucide-react"
+import { IndianRupee, Loader2, Banknote, CreditCard, Info } from "lucide-react"
 import { deliveryAPI } from "@/lib/api"
 import { initRazorpayPayment } from "@/lib/utils/razorpay"
 import { toast } from "sonner"
@@ -8,6 +8,7 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
   const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [paymentMode, setPaymentMode] = useState('online') // 'online' | 'cash'
 
   const cashInHandNum = Number(cashInHand) || 0
 
@@ -31,8 +32,24 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
       return
     }
 
+    setLoading(true)
+
     try {
-      setLoading(true)
+      if (paymentMode === 'cash') {
+        const res = await deliveryAPI.createCashDeposit(amt)
+        if (res?.data?.success) {
+          toast.success(res.data.message || "Cash deposit request submitted")
+          setAmount("")
+          window.dispatchEvent(new CustomEvent("deliveryWalletStateUpdated"))
+          if (onSuccess) onSuccess()
+        } else {
+          toast.error(res?.data?.message || "Failed to submit request")
+        }
+        setLoading(false)
+        return
+      }
+
+      // Online Payment Logic
       const orderRes = await deliveryAPI.createDepositOrder(amt)
       const data = orderRes?.data?.data
       const rp = data?.razorpay
@@ -47,7 +64,7 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
       try {
         const pr = await deliveryAPI.getProfile()
         profile = pr?.data?.data?.profile || pr?.data?.profile || {}
-      } catch (_) {}
+      } catch (_) { }
 
       const phone = (profile?.phone || "").replace(/\D/g, "").slice(-10)
       const email = profile?.email || ""
@@ -99,6 +116,31 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
 
   return (
     <div className="flex flex-col p-4 space-y-4">
+      {/* Payment Mode Selection */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => setPaymentMode('online')}
+          className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 ${paymentMode === 'online'
+              ? 'border-black bg-black text-white shadow-md'
+              : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+            }`}
+        >
+          <CreditCard className={`w-6 h-6 mb-2 ${paymentMode === 'online' ? 'text-white' : 'text-slate-400'}`} />
+          <span className="text-xs font-bold">Online Pay</span>
+        </button>
+
+        <button
+          onClick={() => setPaymentMode('cash')}
+          className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 ${paymentMode === 'cash'
+              ? 'border-black bg-black text-white shadow-md'
+              : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+            }`}
+        >
+          <Banknote className={`w-6 h-6 mb-2 ${paymentMode === 'cash' ? 'text-white' : 'text-slate-400'}`} />
+          <span className="text-xs font-bold">Cash Deposit</span>
+        </button>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">Amount (₹)</label>
         <div className="relative">
@@ -111,25 +153,41 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
             placeholder="0.00"
             value={amount}
             onChange={handleAmountChange}
-            className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all"
           />
         </div>
+
         {cashInHandNum > 0 && (
-          <p className="text-xs text-slate-500 mt-1">
-            Cash in hand: ₹{cashInHandNum.toFixed(2)}. Deposit cannot exceed this.
+          <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+            <Info className="w-3 h-3" />
+            Cash in hand: ₹{cashInHandNum.toFixed(2)}
           </p>
         )}
+
+        {paymentMode === 'cash' && (
+          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-xs text-yellow-800 leading-relaxed">
+              <strong>Note:</strong> Visit the office to handover the cash after submitting this request. Admin approval is required.
+            </p>
+          </div>
+        )}
       </div>
+
       <button
         type="button"
         onClick={handleDeposit}
         disabled={loading || processing || !amount || parseFloat(amount) < 1}
-        className="w-full py-2.5 rounded-lg bg-black text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-3 rounded-lg bg-black text-white font-bold text-sm tracking-wide flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-800 transition-colors shadow-lg active:scale-[0.98]"
       >
         {loading || processing ? (
           <Loader2 className="w-4 h-4 animate-spin" />
         ) : null}
-        {loading ? "Creating…" : processing ? "Complete payment…" : "Deposit"}
+        {loading
+          ? "Processing..."
+          : processing
+            ? "Completing..."
+            : `Deposit ${paymentMode === 'cash' ? 'Cash' : 'Online'}`
+        }
       </button>
     </div>
   )

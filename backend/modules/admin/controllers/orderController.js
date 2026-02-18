@@ -411,6 +411,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         deliveryPartnerPhone: order.deliveryPartnerId?.phone || null,
         estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
         deliveredAt: order.deliveredAt,
+        note: order.note || null,
         cancellationReason: order.cancellationReason || null,
         cancelledAt: order.cancelledAt || null,
         cancelledBy: order.cancelledBy || null,
@@ -683,7 +684,8 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
         status: order.status,
-        pricing: order.pricing || {}
+        pricing: order.pricing || {},
+        note: order.note || null
       };
     });
 
@@ -915,7 +917,8 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         status: order.status,
         pricing: order.pricing || {},
         deliveryPartnerName: order.deliveryPartnerId?.name || null,
-        deliveryPartnerPhone: order.deliveryPartnerId?.phone || null
+        deliveryPartnerPhone: order.deliveryPartnerId?.phone || null,
+        note: order.note || null
       };
     });
 
@@ -1165,6 +1168,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         vatTax: vatTax,
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
+        note: order.note || null
       };
     });
 

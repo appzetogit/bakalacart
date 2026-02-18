@@ -100,7 +100,8 @@ import {
 } from '../controllers/deliveryWithdrawalController.js';
 import {
   getDeliveryBoyWallets,
-  addWalletAdjustment
+  addWalletAdjustment,
+  approveTransaction
 } from '../controllers/deliveryBoyWalletController.js';
 import {
   getEmergencyHelp,
@@ -282,6 +283,7 @@ router.post('/delivery-withdrawal/:id/reject', rejectDeliveryWithdrawal);
 
 router.get('/delivery-boy-wallet', getDeliveryBoyWallets);
 router.post('/delivery-boy-wallet/adjustment', addWalletAdjustment);
+router.post('/delivery-boy-wallet/approve-transaction', approveTransaction);
 
 // Admin Management
 router.get('/admins', getAdmins);

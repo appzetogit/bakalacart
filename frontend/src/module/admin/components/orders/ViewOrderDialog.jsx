@@ -1,4 +1,4 @@
-import { Eye, MapPin, Package, User, Phone, Mail, Calendar, Clock, Truck, CreditCard, X, Receipt } from "lucide-react"
+import { Eye, MapPin, Package, User, Phone, Mail, Calendar, Clock, Truck, CreditCard, X, Receipt, FileText } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -264,7 +264,9 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                         )}
                       </div>
                       {item.description && (
-                        <p className="text-xs text-slate-500 mt-1 ml-8">{item.description}</p>
+                        <p className="text-xs text-slate-600 mt-1.5 ml-8 pl-2 border-l-2 border-slate-200 leading-relaxed font-medium italic">
+                          {item.description}
+                        </p>
                       )}
                     </div>
                     <p className="text-sm font-semibold text-slate-900">
@@ -273,6 +275,19 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                   </div>
                 ))}
               </div>
+              {order.note && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-xl border-2 border-blue-100 flex items-start gap-4 shadow-sm">
+                  <div className="bg-blue-100 p-2 rounded-full shrink-0">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">CUSTOMER INSTRUCTIONS</p>
+                    <p className="text-sm text-blue-900 leading-relaxed font-medium italic bg-white/50 p-2 rounded border border-blue-50">
+                      "{order.note}"
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

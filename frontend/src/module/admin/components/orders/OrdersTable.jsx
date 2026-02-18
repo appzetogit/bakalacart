@@ -195,22 +195,38 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
                     <div className="flex flex-col gap-2 min-w-[200px] max-w-md">
                       {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
                         order.items.map((item, idx) => (
-                          <div key={idx || item.itemId || idx} className="flex items-center gap-2 text-sm">
-                            <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded min-w-[2.5rem] text-center">
-                              {item.quantity || 1}x
-                            </span>
-                            <span className="text-slate-800 font-medium flex-1">
-                              {item.name || 'Unknown Item'}
-                            </span>
-                            {item.price && (
-                              <span className="text-xs text-slate-500">
-                                ₹{item.price}
+                          <div key={idx || item.itemId || idx} className="flex flex-col">
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded min-w-[2.5rem] text-center">
+                                {item.quantity || 1}x
                               </span>
+                              <span className="text-slate-800 font-medium flex-1">
+                                {item.name || 'Unknown Item'}
+                              </span>
+                              {item.price && (
+                                <span className="text-xs text-slate-500">
+                                  ₹{item.price}
+                                </span>
+                              )}
+                            </div>
+                            {item.description && (
+                              <p className="text-[11px] text-slate-600 italic ml-10 mt-1 pl-2 border-l-2 border-slate-200 leading-tight font-medium">
+                                {item.description}
+                              </p>
                             )}
                           </div>
                         ))
                       ) : (
                         <span className="text-sm text-slate-400 italic">No items found</span>
+                      )}
+                      {order.note && (
+                        <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-100 shadow-sm flex items-start gap-2">
+                          <FileText className="w-3 h-3 text-blue-600 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-bold text-blue-800 uppercase tracking-tight mb-0.5">Note from Customer:</p>
+                            <p className="text-xs text-blue-900 leading-tight italic font-medium">"{order.note}"</p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -253,8 +269,8 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
 
                       return (
                         <span className={`text-sm font-medium ${isCod ? 'text-amber-600' :
-                            isWallet ? 'text-purple-600' :
-                              'text-emerald-600'
+                          isWallet ? 'text-purple-600' :
+                            'text-emerald-600'
                           }`}>
                           {paymentTypeDisplay}
                         </span>
@@ -359,8 +375,8 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
                           <>
                             {order.refundStatus === 'processed' || order.refundStatus === 'initiated' ? (
                               <span className={`px-3 py-1.5 rounded-md text-xs font-medium ${order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-emerald-100 text-emerald-700"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-emerald-100 text-emerald-700"
                                 }`}>
                                 {order.paymentType === "Wallet" || order.payment?.method === "wallet"
                                   ? "Wallet Refunded"
@@ -370,8 +386,8 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
                               <button
                                 onClick={() => onRefund(order)}
                                 className={`px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors shadow-sm flex items-center gap-1.5 ${order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                    ? "bg-purple-600 hover:bg-purple-700"
-                                    : "bg-blue-600 hover:bg-blue-700"
+                                  ? "bg-purple-600 hover:bg-purple-700"
+                                  : "bg-blue-600 hover:bg-blue-700"
                                   }`}
                                 title={order.paymentType === "Wallet" || order.payment?.method === "wallet"
                                   ? "Process Wallet Refund (Add to user wallet)"
@@ -393,58 +409,60 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <div className="text-sm text-slate-600">
-            Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-            <span className="font-semibold">{Math.min(currentPage * itemsPerPage, orders.length)}</span> of{" "}
-            <span className="font-semibold">{orders.length}</span> orders
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Previous
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum
-                if (totalPages <= 5) {
-                  pageNum = i + 1
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i
-                } else {
-                  pageNum = currentPage - 2 + i
-                }
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${currentPage === pageNum
+      {
+        totalPages > 1 && (
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+              <span className="font-semibold">{Math.min(currentPage * itemsPerPage, orders.length)}</span> of{" "}
+              <span className="font-semibold">{orders.length}</span> orders
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${currentPage === pageNum
                         ? "bg-emerald-500 text-white shadow-md"
                         : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                      }`}
-                  >
-                    {pageNum}
-                  </button>
-                )
-              })}
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+              </button>
             </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Next
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   )
 }
 

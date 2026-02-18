@@ -216,6 +216,7 @@ export const API_ENDPOINTS = {
     CLAIM_JOINING_BONUS: '/delivery/wallet/claim-joining-bonus',
     WALLET_DEPOSIT_CREATE_ORDER: '/delivery/wallet/deposit/create-order',
     WALLET_DEPOSIT_VERIFY: '/delivery/wallet/deposit/verify',
+    WALLET_DEPOSIT_CASH: '/delivery/wallet/deposit/cash',
     ORDER_STATS: '/delivery/orders/stats',
     PROFILE: '/delivery/profile',
     ORDERS: '/delivery/orders',

@@ -486,7 +486,9 @@ export default function OrderDetailsPage() {
                         )}
                       </p>
                       {item.description && (
-                        <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                        <p className="text-[11px] text-gray-600 mt-1 pl-1 border-l-2 border-gray-200 leading-tight">
+                          {item.description}
+                        </p>
                       )}
                       {item.variation && (
                         <p className="text-xs text-gray-500 mt-0.5">{item.variation}</p>
@@ -621,12 +623,14 @@ export default function OrderDetailsPage() {
 
         {/* Special Instructions */}
         {orderData.note && orderData.note.trim() && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-yellow-600" />
-              <h3 className="text-sm font-semibold text-yellow-900">Special Instructions</h3>
+              <FileText className="w-5 h-5 text-blue-600" />
+              <h3 className="text-base font-bold text-blue-900">CUSTOMER INSTRUCTIONS</h3>
             </div>
-            <p className="text-sm text-yellow-800">{orderData.note}</p>
+            <p className="text-sm text-blue-900 font-medium leading-relaxed bg-white/50 p-2 rounded border border-blue-100 italic">
+              "{orderData.note}"
+            </p>
           </div>
         )}
 

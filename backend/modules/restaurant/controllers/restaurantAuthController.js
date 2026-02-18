@@ -768,8 +768,8 @@ export const login = asyncHandler(async (req, res) => {
     email: restaurant.email || restaurant.phone || restaurant.restaurantId
   });
 
-  // Set refresh token in httpOnly cookie
-  res.cookie('refreshToken', tokens.refreshToken, {
+  // Set refresh token in httpOnly cookie with restaurant-specific name
+  res.cookie('restaurant_refreshToken', tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

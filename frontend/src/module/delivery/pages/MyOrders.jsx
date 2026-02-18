@@ -24,7 +24,8 @@ import {
   MessageSquare,
   Send,
   Plus,
-  Phone
+  Phone,
+  FileText
 } from "lucide-react"
 import { deliveryAPI, uploadAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
@@ -1851,19 +1852,36 @@ export default function MyOrders() {
                     <div className="px-4 py-2">
                       {order.items && order.items.length > 0 ? (
                         order.items.map((item, idx) => (
-                          <div key={item._id || item.itemId || idx} className="flex items-center justify-between gap-2 mt-2 first:mt-0">
-                            <div className="flex items-center gap-2 flex-1">
+                          <div key={item._id || item.itemId || idx} className="mt-2 first:mt-0">
+                            <div className="flex items-center gap-2">
                               <div className={`w-4 h-4 border ${item.isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-[2px] shrink-0`}>
                                 <div className={`w-full h-full rounded-full ${item.isVeg ? 'bg-green-600' : 'bg-red-600'}`}></div>
                               </div>
-                              <span className="text-sm text-gray-700 font-medium">
+                              <span className="text-sm text-gray-700 font-medium flex-1">
                                 {item.quantity || 1} x {item.name}
                               </span>
                             </div>
+                            {item.description && (
+                              <p className="text-[10px] text-gray-500 italic mt-0.5 ml-6 leading-tight border-l border-gray-200 pl-1">
+                                {item.description}
+                              </p>
+                            )}
                           </div>
                         ))
                       ) : (
                         <p className="text-sm text-gray-500">No items listed</p>
+                      )}
+
+                      {order.note && (
+                        <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100 flex items-start gap-2">
+                          <div className="bg-blue-100 p-1 rounded-full shrink-0">
+                            <FileText className="w-3 h-3 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[10px] font-bold text-blue-800 uppercase tracking-tight mb-0.5">Instructions from Customer:</p>
+                            <p className="text-xs text-blue-900 leading-tight">{order.note}</p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

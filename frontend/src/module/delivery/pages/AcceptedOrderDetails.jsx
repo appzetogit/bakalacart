@@ -403,7 +403,9 @@ export default function AcceptedOrderDetails() {
                       )}
                     </p>
                     {item.description && (
-                      <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
+                      <p className="text-[11px] text-gray-600 mt-1 pl-1 border-l-2 border-gray-200 leading-tight">
+                        {item.description}
+                      </p>
                     )}
                     <p className="text-gray-900 font-semibold mb-1">₹ {item.price.toFixed(2)}</p>
                     <p className="text-gray-600 text-sm">Variations: {item.variation}</p>
@@ -428,12 +430,14 @@ export default function AcceptedOrderDetails() {
 
         {/* Special Instructions */}
         {orderData.note && orderData.note.trim() && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h3 className="text-gray-900 font-semibold mb-2 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-yellow-600" />
-              Special Instructions
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 shadow-sm">
+            <h3 className="text-blue-900 font-bold mb-2 flex items-center gap-2 text-base">
+              <FileText className="w-5 h-5 text-blue-600" />
+              CUSTOMER INSTRUCTIONS
             </h3>
-            <p className="text-gray-700 text-sm">{orderData.note}</p>
+            <p className="text-blue-900 text-sm font-medium leading-relaxed bg-white/50 p-2 rounded border border-blue-100 italic">
+              "{orderData.note}"
+            </p>
           </div>
         )}
 

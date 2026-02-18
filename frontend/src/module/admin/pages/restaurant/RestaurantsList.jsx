@@ -41,7 +41,9 @@ export default function RestaurantsList() {
     email: "",
     ownerName: "",
     ownerPhone: "",
-    ownerEmail: ""
+    ownerEmail: "",
+    openingTime: "",
+    closingTime: ""
   })
   const [savingEdit, setSavingEdit] = useState(false)
 
@@ -536,7 +538,9 @@ export default function RestaurantsList() {
       email: data.email || data.ownerEmail || "",
       ownerName: data.ownerName || "",
       ownerPhone: data.ownerPhone || data.phone || "",
-      ownerEmail: data.ownerEmail || data.email || ""
+      ownerEmail: data.ownerEmail || data.email || "",
+      openingTime: data.deliveryTimings?.openingTime || data.onboarding?.step2?.deliveryTimings?.openingTime || "09:00",
+      closingTime: data.deliveryTimings?.closingTime || data.onboarding?.step2?.deliveryTimings?.closingTime || "22:00"
     })
   }
 
@@ -559,9 +563,22 @@ export default function RestaurantsList() {
 
     try {
       setSavingEdit(true)
-      console.log(`📤 Sending update for restaurant ${restaurantId}:`, editingData)
 
-      const response = await adminAPI.updateRestaurant(restaurantId, editingData)
+      // Prepare payload with deliveryTimings structure
+      const updatePayload = { ...editingData }
+      if (updatePayload.openingTime || updatePayload.closingTime) {
+        updatePayload.deliveryTimings = {
+          openingTime: updatePayload.openingTime,
+          closingTime: updatePayload.closingTime
+        }
+        // Remove individual fields so they don't pollute the root object
+        delete updatePayload.openingTime
+        delete updatePayload.closingTime
+      }
+
+      console.log(`📤 Sending update for restaurant ${restaurantId}:`, updatePayload)
+
+      const response = await adminAPI.updateRestaurant(restaurantId, updatePayload)
 
       if (response?.data?.success) {
         toast.success("Restaurant updated successfully", { id: loadingToastId })
@@ -571,12 +588,23 @@ export default function RestaurantsList() {
         setRestaurants(prev => prev.map(r => {
           const rId = r._id || r.id
           if (rId === restaurantId) {
+            // New delivery timings object
+            const newDeliveryTimings = {
+              openingTime: editingData.openingTime,
+              closingTime: editingData.closingTime
+            }
+
             // Merge changes into the existing mapped restaurant object
             return {
               ...r,
               name: editingData.name,
               ownerName: editingData.ownerName,
               ownerPhone: editingData.ownerPhone || editingData.phone,
+              // Update deliveryTimings at root if it exists or needs to be added
+              deliveryTimings: {
+                ...(r.deliveryTimings || {}),
+                ...newDeliveryTimings
+              },
               originalData: {
                 ...r.originalData,
                 ...editingData,
@@ -586,7 +614,23 @@ export default function RestaurantsList() {
                 ownerPhone: editingData.ownerPhone,
                 ownerEmail: editingData.ownerEmail,
                 ownerName: editingData.ownerName,
-                email: editingData.email
+                email: editingData.email,
+                // Explicitly update deliveryTimings in originalData
+                deliveryTimings: {
+                  ...(r.originalData?.deliveryTimings || {}),
+                  ...newDeliveryTimings
+                },
+                // Also update onboarding step 2 if present for consistency
+                onboarding: r.originalData?.onboarding ? {
+                  ...r.originalData.onboarding,
+                  step2: r.originalData.onboarding.step2 ? {
+                    ...r.originalData.onboarding.step2,
+                    deliveryTimings: {
+                      ...(r.originalData.onboarding.step2.deliveryTimings || {}),
+                      ...newDeliveryTimings
+                    }
+                  } : r.originalData.onboarding.step2
+                } : r.originalData?.onboarding
               }
             }
           }
@@ -2098,6 +2142,38 @@ export default function RestaurantsList() {
                   placeholder="Enter owner email"
                   value={editingData.ownerEmail}
                   onChange={(e) => setEditingData({ ...editingData, ownerEmail: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Opening Time */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-opening-time" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-500" />
+                  Opening Time
+                </Label>
+                <Input
+                  id="edit-opening-time"
+                  type="time"
+                  value={editingData.openingTime || ''}
+                  onChange={(e) => setEditingData({ ...editingData, openingTime: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Closing Time */}
+              <div className="space-y-2.5">
+                <Label htmlFor="edit-closing-time" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-500" />
+                  Closing Time
+                </Label>
+                <Input
+                  id="edit-closing-time"
+                  type="time"
+                  value={editingData.closingTime || ''}
+                  onChange={(e) => setEditingData({ ...editingData, closingTime: e.target.value })}
                   disabled={savingEdit}
                   className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
                 />

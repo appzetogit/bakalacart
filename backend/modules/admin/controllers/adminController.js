@@ -1513,14 +1513,14 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
         }
       });
     }
-    
+
     query = { $and: baseConditions };
 
     // Validate and log query structure
     try {
       const queryString = JSON.stringify(query, null, 2);
       console.log('🔍 Restaurant Join Requests Query:', queryString);
-      
+
       // Validate query structure
       if (!query || typeof query !== 'object') {
         logger.warn('Invalid query object detected, returning empty results');
@@ -1534,7 +1534,7 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
           }
         });
       }
-      
+
       // Validate $and array if it exists
       if (query.$and) {
         if (!Array.isArray(query.$and) || query.$and.length === 0) {
@@ -1799,11 +1799,11 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
   } catch (error) {
     // Safely log error with query info if available
     try {
-      const queryInfo = query && typeof query === 'object' 
-        ? JSON.stringify(query, null, 2).substring(0, 500) 
+      const queryInfo = query && typeof query === 'object'
+        ? JSON.stringify(query, null, 2).substring(0, 500)
         : 'Query not built yet';
-      
-      logger.error(`Error fetching restaurant join requests: ${error.message}`, { 
+
+      logger.error(`Error fetching restaurant join requests: ${error.message}`, {
         error: error.stack,
         message: error.message,
         name: error.name,
@@ -1815,7 +1815,7 @@ export const getRestaurantJoinRequests = asyncHandler(async (req, res) => {
       console.error('Error fetching restaurant join requests:', error.message);
       console.error('Stack:', error.stack);
     }
-    
+
     return errorResponse(res, 500, `Failed to fetch restaurant join requests: ${error.message || 'Unknown error'}`);
   }
 });
@@ -2059,6 +2059,29 @@ export const updateRestaurant = asyncHandler(async (req, res) => {
       };
       restaurant.onboarding = mergedOnboarding;
       restaurant.markModified('onboarding');
+    }
+
+    // Handle deliveryTimings update if provided
+    if (updateData.deliveryTimings) {
+      restaurant.deliveryTimings = {
+        ...restaurant.deliveryTimings ? (typeof restaurant.deliveryTimings.toObject === 'function' ? restaurant.deliveryTimings.toObject() : restaurant.deliveryTimings) : {},
+        ...updateData.deliveryTimings
+      };
+
+      // Sync with onboarding step 2 if it exists
+      if (restaurant.onboarding) {
+        if (!restaurant.onboarding.step2) {
+          restaurant.onboarding.step2 = {};
+        }
+
+        restaurant.onboarding.step2.deliveryTimings = restaurant.deliveryTimings;
+
+        // Explicitly mark as modified
+        restaurant.markModified('onboarding');
+        restaurant.markModified('onboarding.step2');
+      }
+
+      restaurant.markModified('deliveryTimings');
     }
 
     // Save will trigger the pre-save hook for normalized phone and slug generation

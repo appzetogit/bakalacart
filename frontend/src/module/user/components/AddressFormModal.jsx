@@ -7,8 +7,8 @@ import { useProfile } from "../context/ProfileContext"
 import { useLocation } from "../context/LocationContext"
 import { toast } from "sonner"
 
-export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
-    const { addAddress, userProfile } = useProfile()
+export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editAddress = null }) {
+    const { addAddress, updateAddress, userProfile } = useProfile()
     const { location } = useLocation()
 
     const [formData, setFormData] = useState({
@@ -16,43 +16,76 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
         floor: "",
         buildingName: "",
         landmark: "",
-        name: userProfile?.name || "",
-        phone: userProfile?.phone || "",
+        name: "",
+        phone: "",
         pinCode: "",
         label: "Home",
         autoAddress: "" // Hidden from typing, used for bottom box
     })
 
-    // Reset form when modal opens
+    // Reset or pre-fill form when modal opens or editAddress changes
     useEffect(() => {
         if (isOpen) {
-            setFormData({
-                flatNo: "",
-                floor: "",
-                buildingName: "",
-                landmark: "",
-                name: "",
-                phone: "",
-                pinCode: "",
-                label: "Home",
-                autoAddress: ""
-            })
+            if (editAddress) {
+                // Parse additionalDetails to extract flat, floor, landmark
+                // Format: "Flat 123, Floor 3, Landmark: near temple, Location: XYZ"
+                const details = editAddress.additionalDetails || ""
+                const flatMatch = details.match(/Flat ([^,]*)/)
+                const floorMatch = details.match(/Floor ([^,]*)/)
+                const landmarkMatch = details.match(/Landmark: ([^,]*)/)
+                const locationMatch = details.match(/Location: (.*)/)
+
+                setFormData({
+                    flatNo: flatMatch ? flatMatch[1].trim() : "",
+                    floor: floorMatch ? floorMatch[1].trim() : "",
+                    buildingName: editAddress.street || "",
+                    landmark: landmarkMatch ? landmarkMatch[1].trim() : "",
+                    name: editAddress.receiverName || editAddress.name || "",
+                    phone: (editAddress.phone || "").replace(/^\+91\s?/, "").replace(/\D/g, "").slice(0, 10),
+                    pinCode: editAddress.zipCode || "",
+                    label: editAddress.label || "Home",
+                    autoAddress: locationMatch ? locationMatch[1].trim() : ""
+                })
+            } else {
+                setFormData({
+                    flatNo: "",
+                    floor: "",
+                    buildingName: "",
+                    landmark: "",
+                    name: "",
+                    phone: "",
+                    pinCode: "",
+                    label: "Home",
+                    autoAddress: ""
+                })
+            }
         }
-    }, [isOpen])
+    }, [isOpen, editAddress])
 
     useEffect(() => {
-        if (isOpen) {
-            if (location?.postalCode) {
-                setFormData(prev => ({ ...prev, pinCode: location.postalCode }))
-            }
-            if (location?.address || location?.area) {
-                setFormData(prev => ({ ...prev, autoAddress: location.address || location.area, buildingName: "", landmark: "" }))
-            }
+        if (isOpen && location?.postalCode && !editAddress) {
+            setFormData(prev => ({ ...prev, pinCode: location.postalCode }))
         }
-    }, [location, isOpen])
+    }, [location?.postalCode, isOpen, editAddress])
 
     const handleChange = (e) => {
         const { name, value } = e.target
+
+        // Validation for phone number
+        if (name === "phone") {
+            // Only allow numbers and max 10 digits
+            const cleanValue = value.replace(/\D/g, "").slice(0, 10)
+            setFormData(prev => ({ ...prev, [name]: cleanValue }))
+            return
+        }
+
+        // Validation for pin code
+        if (name === "pinCode") {
+            const cleanValue = value.replace(/\D/g, "").slice(0, 6)
+            setFormData(prev => ({ ...prev, [name]: cleanValue }))
+            return
+        }
+
         setFormData(prev => ({ ...prev, [name]: value }))
     }
 
@@ -61,6 +94,11 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
 
         if (!formData.buildingName || !formData.name || !formData.phone) {
             toast.error("Please fill in required fields")
+            return
+        }
+
+        if (formData.phone.length !== 10) {
+            toast.error("Please enter a valid 10-digit phone number")
             return
         }
 
@@ -77,18 +115,24 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                 label: formData.label,
                 street: formData.buildingName,
                 additionalDetails: additionalDetails,
-                city: location?.city || "Indore",
-                state: location?.state || "Madhya Pradesh",
-                zipCode: formData.pinCode || location?.postalCode || "",
-                latitude: location?.latitude || 22.7196,
-                longitude: location?.longitude || 75.8577,
+                city: location?.city || editAddress?.city || "Indore",
+                state: location?.state || editAddress?.state || "Madhya Pradesh",
+                zipCode: formData.pinCode || location?.postalCode || editAddress?.zipCode || "",
+                latitude: location?.latitude || editAddress?.latitude || 22.7196,
+                longitude: location?.longitude || editAddress?.longitude || 75.8577,
                 phone: formData.phone,
                 receiverName: formData.name
             }
 
-            const newAddress = await addAddress(addressData)
-            toast.success("Address saved successfully!")
-            if (onSaveSuccess) onSaveSuccess(newAddress)
+            if (editAddress) {
+                const addressId = editAddress.id || editAddress._id
+                await updateAddress(addressId, addressData)
+                toast.success("Address updated successfully!")
+            } else {
+                const newAddress = await addAddress(addressData)
+                toast.success("Address saved successfully!")
+                if (onSaveSuccess) onSaveSuccess(newAddress)
+            }
             onClose()
         } catch (error) {
             console.error("Error saving address:", error)
@@ -105,7 +149,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                 <button onClick={onClose} className="p-1">
                     <ChevronLeft className="h-6 w-6" />
                 </button>
-                <h1 className="ml-4 text-lg font-bold">Enter your address</h1>
+                <h1 className="ml-4 text-lg font-bold">{editAddress ? "Edit address" : "Enter your address"}</h1>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
@@ -163,23 +207,28 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                     </div>
 
                     <div className="space-y-2 relative">
-                        <Input
-                            name="phone"
-                            placeholder="Phone Number"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            required
-                            className="h-12 rounded-xl bg-gray-50 border-gray-200 pr-10 dark:bg-gray-900/50 dark:border-gray-700"
-                        />
-                        {formData.phone && (
-                            <button
-                                type="button"
-                                onClick={() => setFormData(prev => ({ ...prev, phone: "" }))}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        )}
+                        <div className="flex items-center h-12 rounded-xl bg-gray-50 border border-gray-200 dark:bg-gray-900/50 dark:border-gray-700 overflow-hidden px-4">
+                            <span className="text-gray-500 font-medium mr-2 border-r pr-2 dark:border-gray-700">+91</span>
+                            <input
+                                name="phone"
+                                type="tel"
+                                maxLength={10}
+                                placeholder="Phone Number"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                required
+                                className="flex-1 bg-transparent border-none outline-none text-sm md:text-base"
+                            />
+                            {formData.phone && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, phone: "" }))}
+                                    className="text-gray-400 p-1"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -196,7 +245,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                     <div className="space-y-2 relative">
                         <div className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 min-h-[56px]">
                             <span className="text-sm text-gray-400 truncate pr-4">
-                                {formData.autoAddress || "Add Location"}
+                                Add Location
                             </span>
                             {(formData.autoAddress || formData.buildingName || formData.landmark) && (
                                 <button
@@ -216,7 +265,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess }) {
                             type="submit"
                             className="w-full h-14 bg-[#01522c] hover:bg-[#014022] text-white rounded-xl text-lg font-semibold"
                         >
-                            Save Address
+                            {editAddress ? "Update Address" : "Save Address"}
                         </Button>
                     </div>
                 </form>

@@ -128,3 +128,49 @@ export const addWalletAdjustment = asyncHandler(async (req, res) => {
     newCashCollected: Number(wallet.cashInHand) || 0
   });
 });
+
+/**
+ * Approve transaction (e.g., cash deposit)
+ * POST /api/admin/delivery-boy-wallet/approve-transaction
+ * Body: { walletId, transactionId }
+ */
+export const approveTransaction = asyncHandler(async (req, res) => {
+  const admin = req.admin;
+  const { walletId, transactionId } = req.body;
+
+  if (!walletId || !transactionId) {
+    return errorResponse(res, 400, 'walletId and transactionId are required');
+  }
+
+  const wallet = await DeliveryWallet.findById(walletId);
+  if (!wallet) {
+    return errorResponse(res, 404, 'Wallet not found');
+  }
+
+  const transaction = wallet.transactions.id(transactionId);
+  if (!transaction) {
+    return errorResponse(res, 404, 'Transaction not found');
+  }
+
+  if (transaction.status !== 'Pending') {
+    return errorResponse(res, 400, `Transaction is already ${transaction.status}`);
+  }
+
+  // Update status to Completed using the schema method (handles balance updates)
+  wallet.updateTransactionStatus(transactionId, 'Completed');
+
+  // Set processed metadata
+  transaction.processedBy = admin._id;
+  transaction.processedAt = new Date();
+
+  await wallet.save();
+
+  return successResponse(res, 200, 'Transaction approved successfully', {
+    transactionId,
+    status: 'Completed',
+    type: transaction.type,
+    amount: transaction.amount,
+    newCashInHand: Number(wallet.cashInHand) || 0,
+    newTotalBalance: Number(wallet.totalBalance) || 0
+  });
+});

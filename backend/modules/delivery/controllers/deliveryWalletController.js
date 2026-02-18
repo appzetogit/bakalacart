@@ -164,7 +164,7 @@ export const getWallet = asyncHandler(async (req, res) => {
     // Calculate bonus amount from transactions for logging
     const bonusTransactions = transactions.filter(t => t.type === 'bonus' && t.status === 'Completed');
     const totalBonus = bonusTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    
+
     const walletData = {
       totalBalance: wallet.totalBalance || 0,
       cashInHand: cashInHandForLimit,
@@ -849,7 +849,7 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
   try {
     const settings = await BusinessSettings.getSettings();
     limit = Number(settings?.deliveryCashLimit) || 0;
-  } catch (_) {}
+  } catch (_) { }
   const cashInHandNow = Math.max(0, Number(wallet.cashInHand) || 0);
   const availableCashLimit = Math.max(0, limit - cashInHandNow);
 
@@ -857,6 +857,73 @@ export const verifyDepositPayment = asyncHandler(async (req, res) => {
     amount: amt,
     cashInHand: cashInHandNow,
     availableCashLimit
+  });
+});
+
+const createCashDepositSchema = Joi.object({
+  amount: Joi.number().positive().required()
+});
+
+/**
+ * Create Cash Deposit Request
+ * POST /api/delivery/wallet/deposit/cash
+ */
+export const createCashDepositRequest = asyncHandler(async (req, res) => {
+  const delivery = req.delivery;
+  if (!delivery?._id) {
+    return errorResponse(res, 401, 'Delivery authentication required');
+  }
+
+  const { error: ve } = createCashDepositSchema.validate(req.body || {});
+  if (ve) {
+    return errorResponse(res, 400, ve.details[0].message || 'Amount is required');
+  }
+
+  const amount = Number(req.body.amount);
+  if (isNaN(amount) || amount < 1) {
+    return errorResponse(res, 400, 'Minimum deposit amount is ₹1');
+  }
+
+  let wallet = await DeliveryWallet.findOrCreateByDeliveryId(delivery._id);
+  const cashInHand = Number(wallet.cashInHand) || 0;
+
+  if (cashInHand < amount) {
+    return errorResponse(res, 400, `Insufficient cash in hand (₹${cashInHand.toFixed(2)}). Deposit amount cannot exceed cash in hand.`);
+  }
+
+  // Check if there is already a pending deposit request
+  const pendingDeposit = (wallet.transactions || []).find(
+    t => t.type === 'deposit' && t.status === 'Pending' && t.paymentMethod === 'cash'
+  );
+
+  if (pendingDeposit) {
+    return errorResponse(res, 400, 'You already have a pending cash deposit request. Please wait for admin approval.');
+  }
+
+  // Add pending transaction
+  const transaction = wallet.addTransaction({
+    amount: amount,
+    type: 'deposit',
+    status: 'Pending',
+    paymentMethod: 'cash',
+    description: 'Cash deposit request',
+    processedAt: new Date(),
+    metadata: {
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  await wallet.save();
+
+  return successResponse(res, 201, 'Cash deposit request submitted successfully. Please visit office to handover cash.', {
+    transaction: {
+      id: transaction._id,
+      amount: transaction.amount,
+      type: transaction.type,
+      status: transaction.status,
+      description: transaction.description,
+      date: transaction.createdAt
+    }
   });
 });
 

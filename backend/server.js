@@ -14,8 +14,8 @@ import mongoose from 'mongoose';
 dotenv.config({ override: true });
 
 // Manual cleanup for Razorpay keys (in case of quotes in .env)
-// Manual cleanup for Razorpay keys (in case of quotes or whitespace in .env)
-['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'].forEach(key => {
+// Manual cleanup for Razorpay and Encryption keys (in case of quotes or whitespace in .env)
+['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'ENCRYPTION_KEY'].forEach(key => {
   if (process.env[key]) {
     // Remove quotes if present
     if (process.env[key].startsWith('"') || process.env[key].startsWith("'")) {
