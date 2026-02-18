@@ -3,6 +3,7 @@ import { Pencil, Settings, Search, Download, ChevronDown, FileText, FileSpreadsh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { exportSEOPagesToCSV, exportSEOPagesToExcel, exportSEOPagesToPDF, exportSEOPagesToJSON } from "../../components/seo/seoExportUtils"
 
@@ -48,7 +49,7 @@ export default function PageMetaDataPageMetaData() {
     if (!searchQuery.trim()) {
       return seoPages
     }
-    
+
     const query = searchQuery.toLowerCase().trim()
     return seoPages.filter(page =>
       page.name.toLowerCase().includes(query)
@@ -76,7 +77,7 @@ export default function PageMetaDataPageMetaData() {
 
   const handleSaveSEO = () => {
     if (!editingPage) return
-    
+
     // In real app, this would save to API
     console.log("Saving SEO data for:", editingPage.name, seoData)
     alert(`SEO data saved successfully for ${editingPage.name}!`)
@@ -180,7 +181,7 @@ export default function PageMetaDataPageMetaData() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button 
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
             >

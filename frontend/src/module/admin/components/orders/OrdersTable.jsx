@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Eye, Printer, ArrowUpDown, Loader2, Trash2, Check } from "lucide-react"
+import { Eye, Printer, ArrowUpDown, Loader2, Trash2, Check, FileText } from "lucide-react"
 
 const getStatusColor = (orderStatus) => {
   const colors = {
