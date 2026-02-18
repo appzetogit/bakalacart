@@ -49,21 +49,24 @@ const apiClient = axios.create({
  * @returns {Object} - Module info object
  */
 function getModuleInfo(path) {
-  if (path.startsWith('/admin')) {
+  // Normalize path by removing /api prefix if present for API calls
+  const normalizedPath = path.startsWith('/api') ? path.substring(4) : path;
+
+  if (normalizedPath.startsWith('/admin')) {
     return {
       tokenKey: 'admin_accessToken',
       expectedRole: 'admin',
       refreshEndpoint: '/admin/auth/refresh-token',
       loginPath: '/admin/login'
     };
-  } else if (path.startsWith('/restaurant') && !path.startsWith('/restaurants') && !path.startsWith('/restaurant/list') && !path.startsWith('/restaurant/under-250')) {
+  } else if (normalizedPath.startsWith('/restaurant') && !normalizedPath.startsWith('/restaurants') && !normalizedPath.startsWith('/restaurant/list') && !normalizedPath.startsWith('/restaurant/under-250')) {
     return {
       tokenKey: 'restaurant_accessToken',
       expectedRole: 'restaurant',
       refreshEndpoint: '/restaurant/auth/refresh-token',
       loginPath: '/restaurant/login'
     };
-  } else if (path.startsWith('/delivery')) {
+  } else if (normalizedPath.startsWith('/delivery')) {
     return {
       tokenKey: 'delivery_accessToken',
       expectedRole: 'delivery',
@@ -76,7 +79,7 @@ function getModuleInfo(path) {
       tokenKey: 'user_accessToken',
       expectedRole: 'user',
       refreshEndpoint: '/auth/refresh-token',
-      loginPath: '/user/auth/sign-in'
+      loginPath: '/auth/sign-in'
     };
   }
 }
@@ -91,12 +94,13 @@ function getTokenForCurrentRoute() {
 
   let token = localStorage.getItem(tokenKey);
 
-  // Fallback to user_accessToken or legacy accessToken if module token not found
-  if (!token && tokenKey !== 'user_accessToken') {
-    token = localStorage.getItem('user_accessToken');
+  // If module-specific token not found, fallback to legacy 'accessToken'
+  // But DO NOT fallback to 'user_accessToken' if we are on another module's route
+  if (!token) {
+    token = localStorage.getItem('accessToken');
   }
 
-  return token || localStorage.getItem('accessToken');
+  return token;
 }
 
 /**
@@ -275,9 +279,9 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Determine which module's refresh endpoint to use based on current route
-        const currentPath = window.location.pathname;
-        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(currentPath);
+        // Determine which module's refresh endpoint to use based on the REQUEST URL
+        const requestUrl = originalRequest.url || '';
+        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(requestUrl);
 
         // Try to refresh the token
         // The refresh token is sent via httpOnly cookie automatically
@@ -351,20 +355,35 @@ apiClient.interceptors.response.use(
           // For landing page management and onboarding, don't auto-logout - let component handle it
           // Only auto-logout for other pages when token is truly expired
           if (!isOnboardingPage && !isLandingPageManagement) {
-            const { loginPath, tokenKey } = getModuleInfo(currentPath);
-            const returnToParam = `?returnTo=${encodeURIComponent(currentPath)}`;
+            const currentPath = window.location.pathname;
+            const requestUrl = originalRequest.url || '';
 
-            const moduleName = tokenKey.replace('_accessToken', '');
-            localStorage.removeItem(`${moduleName}_accessToken`);
-            localStorage.removeItem(`${moduleName}_authenticated`);
-            localStorage.removeItem(`${moduleName}_user`);
+            // Get module info for the current page and the failed request
+            const pageModule = getModuleInfo(currentPath);
+            const requestModule = getModuleInfo(requestUrl);
 
-            // Also clear generic user keys if it's the user module
-            if (moduleName === 'user' || moduleName === 'accessToken') {
-              localStorage.removeItem('user');
+            // ONLY REDIRECT if the failed request's module matches the current page's module
+            // This prevents a background 'user' request from logging out someone in the 'delivery' app
+            if (requestModule.expectedRole === pageModule.expectedRole) {
+              const { loginPath, tokenKey } = pageModule;
+              const returnToParam = `?returnTo=${encodeURIComponent(currentPath)}`;
+
+              const moduleName = tokenKey.replace('_accessToken', '');
+              localStorage.removeItem(`${moduleName}_accessToken`);
+              localStorage.removeItem(`${moduleName}_authenticated`);
+              localStorage.removeItem(`${moduleName}_user`);
+
+              // Also clear generic user keys if it's the user module
+              if (moduleName === 'user' || moduleName === 'accessToken') {
+                localStorage.removeItem('user');
+              }
+
+              window.location.href = `${loginPath}${returnToParam}`;
+            } else {
+              if (import.meta.env.DEV) {
+                console.warn(`[API Interceptor] Token expired for background module '${requestModule.expectedRole}', but keeping current session for '${pageModule.expectedRole}' active.`);
+              }
             }
-
-            window.location.href = `${loginPath}${returnToParam}`;
           }
         }
 

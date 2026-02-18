@@ -83,11 +83,7 @@ export function hasModuleAccess(role, module) {
  * @returns {string|null} - Access token or null
  */
 export function getModuleToken(module) {
-  const token = localStorage.getItem(`${module}_accessToken`);
-  if (token) return token;
-
-  // Fallback to generic accessToken for backward compatibility and transient states
-  return localStorage.getItem('accessToken');
+  return localStorage.getItem(`${module}_accessToken`) || localStorage.getItem('accessToken');
 }
 
 /**

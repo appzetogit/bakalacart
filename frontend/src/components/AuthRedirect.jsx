@@ -27,12 +27,19 @@ export default function AuthRedirect({ children, module, redirectTo = null }) {
     const currentPath = location.pathname;
 
     // Sanitize destination to avoid infinite redirect loops
-    // If no specific 'from' or 'returnTo' exists, we default to the root '/'
-    let finalPath = (from && from !== currentPath) ? from : (redirectTo || "/");
+    // If no specific 'from' or 'returnTo' exists, we default to the module's home page
+    const moduleHomePaths = {
+      'admin': '/admin',
+      'restaurant': '/restaurant',
+      'delivery': '/delivery',
+      'user': '/'
+    };
+
+    let finalPath = (from && from !== currentPath) ? from : (redirectTo || moduleHomePaths[module] || "/");
 
     // Final check to prevent redirecting to another auth page
     if (finalPath.includes('/login') || finalPath.includes('/sign-in') || finalPath.includes('/otp')) {
-      finalPath = "/";
+      finalPath = moduleHomePaths[module] || "/";
     }
 
     return <Navigate to={finalPath} replace />
