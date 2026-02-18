@@ -305,6 +305,21 @@ export default function FoodsList() {
     }
   }
 
+  const handleToggleAvailability = async (food) => {
+    try {
+      // Use the restaurantId stored in the food object during fetch
+      const response = await adminAPI.toggleRestaurantMenuItem(food.restaurantId, food.id);
+      if (response.data?.success) {
+        toast.success(response.data.message);
+        // Update local state
+        setFoods(foods.map(f => f.id === food.id ? { ...f, isAvailable: response.data.data.isAvailable } : f));
+      }
+    } catch (error) {
+      console.error("Toggle availability error:", error);
+      toast.error("Failed to update availability status");
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'approved':
@@ -509,6 +524,9 @@ export default function FoodsList() {
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  Available
+                </th>
                 <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   Action
                 </th>
@@ -517,7 +535,7 @@ export default function FoodsList() {
             <tbody className="bg-white divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
                       <p className="text-sm text-slate-500">Loading foods from restaurants...</p>
@@ -526,7 +544,7 @@ export default function FoodsList() {
                 </tr>
               ) : filteredFoods.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                       <p className="text-sm text-slate-500">No food items match your search</p>
@@ -574,6 +592,17 @@ export default function FoodsList() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(food.approvalStatus)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleToggleAvailability(food)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${food.isAvailable !== false ? "bg-blue-600" : "bg-gray-300"}`}
+                        title={food.isAvailable !== false ? "Click to set as unavailable" : "Click to set as available"}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${food.isAvailable !== false ? "translate-x-5" : "translate-x-1"}`}
+                        />
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">

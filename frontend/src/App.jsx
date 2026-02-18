@@ -171,7 +171,8 @@ const DeliveryTermsAndConditionsPublic = lazy(() => import("@/module/delivery/pa
 function UserPathRedirect() {
   const location = useLocation()
   const newPath = location.pathname.replace(/^\/user/, "") || "/"
-  return <Navigate to={newPath} replace />
+  // Preserve search parameters (like ?returnTo=...) and navigation state
+  return <Navigate to={`${newPath}${location.search}`} state={location.state} replace />
 }
 
 export default function App() {

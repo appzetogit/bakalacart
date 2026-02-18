@@ -44,27 +44,59 @@ const apiClient = axios.create({
 });
 
 /**
+ * Get module information (token key, expected role, and refresh endpoint) based on a path
+ * @param {string} path - URL path
+ * @returns {Object} - Module info object
+ */
+function getModuleInfo(path) {
+  if (path.startsWith('/admin')) {
+    return {
+      tokenKey: 'admin_accessToken',
+      expectedRole: 'admin',
+      refreshEndpoint: '/admin/auth/refresh-token',
+      loginPath: '/admin/login'
+    };
+  } else if (path.startsWith('/restaurant') && !path.startsWith('/restaurants') && !path.startsWith('/restaurant/list') && !path.startsWith('/restaurant/under-250')) {
+    return {
+      tokenKey: 'restaurant_accessToken',
+      expectedRole: 'restaurant',
+      refreshEndpoint: '/restaurant/auth/refresh-token',
+      loginPath: '/restaurant/login'
+    };
+  } else if (path.startsWith('/delivery')) {
+    return {
+      tokenKey: 'delivery_accessToken',
+      expectedRole: 'delivery',
+      refreshEndpoint: '/delivery/auth/refresh-token',
+      loginPath: '/delivery/sign-in'
+    };
+  } else {
+    // Default to user module for all other paths (home, profile, usermain, cart, etc.)
+    return {
+      tokenKey: 'user_accessToken',
+      expectedRole: 'user',
+      refreshEndpoint: '/auth/refresh-token',
+      loginPath: '/user/auth/sign-in'
+    };
+  }
+}
+
+/**
  * Get the appropriate module token based on the current route
  * @returns {string|null} - Access token for the current module or null
  */
 function getTokenForCurrentRoute() {
   const path = window.location.pathname;
+  const { tokenKey } = getModuleInfo(path);
 
-  if (path.startsWith('/admin')) {
-    return localStorage.getItem('admin_accessToken');
-  } else if (path.startsWith('/restaurant') && !path.startsWith('/restaurants') && !path.startsWith('/restaurant/list') && !path.startsWith('/restaurant/under-250')) {
-    // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-    // Exclude public routes like /restaurant/list and /restaurant/under-250
-    return localStorage.getItem('restaurant_accessToken');
-  } else if (path.startsWith('/delivery')) {
-    return localStorage.getItem('delivery_accessToken');
-  } else if (path.startsWith('/user') || path.startsWith('/usermain') || path === '/' || (!path.startsWith('/admin') && !(path.startsWith('/restaurant') && !path.startsWith('/restaurants')) && !path.startsWith('/delivery'))) {
-    // User module includes /restaurants/* and /usermain/* paths
-    return localStorage.getItem('user_accessToken');
+  let token = localStorage.getItem(tokenKey);
+
+  // Fallback to user_accessToken or legacy accessToken if module token not found
+  if (!token && tokenKey !== 'user_accessToken') {
+    token = localStorage.getItem('user_accessToken');
   }
 
-  // Fallback to legacy token for backward compatibility
-  return localStorage.getItem('accessToken');
+  return token || localStorage.getItem('accessToken');
 }
 
 /**
@@ -220,33 +252,17 @@ apiClient.interceptors.response.use(
     // If response contains new access token, store it for the current module
     if (response.data?.accessToken) {
       const currentPath = window.location.pathname;
-      let tokenKey = 'accessToken'; // fallback
-      let expectedRole = 'user';
-
-      if (currentPath.startsWith('/admin')) {
-        tokenKey = 'admin_accessToken';
-        expectedRole = 'admin';
-      } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
-        // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-        tokenKey = 'restaurant_accessToken';
-        expectedRole = 'restaurant';
-      } else if (currentPath.startsWith('/delivery')) {
-        tokenKey = 'delivery_accessToken';
-        expectedRole = 'delivery';
-      } else if (currentPath.startsWith('/user') || currentPath.startsWith('/usermain') || currentPath === '/' || currentPath.startsWith('/restaurants')) {
-        // User module includes /restaurants/* and /usermain/* paths
-        tokenKey = 'user_accessToken';
-        expectedRole = 'user';
-      }
+      const { tokenKey, expectedRole } = getModuleInfo(currentPath);
 
       const token = response.data.accessToken;
       const role = getRoleFromToken(token);
 
-      // Only store the token if the role matches the current module
-      if (!role || role !== expectedRole) {
-        clearModuleAuth(tokenKey.replace('_accessToken', ''));
-      } else {
+      // Only store the token if the role matches the current module or is a valid fallback
+      if (role && role === expectedRole) {
         localStorage.setItem(tokenKey, token);
+      } else if (role === 'user' && tokenKey === 'accessToken') {
+        // Handle legacy case
+        localStorage.setItem('user_accessToken', token);
       }
     }
     return response;
@@ -261,16 +277,7 @@ apiClient.interceptors.response.use(
       try {
         // Determine which module's refresh endpoint to use based on current route
         const currentPath = window.location.pathname;
-        let refreshEndpoint = '/auth/refresh-token'; // default to user auth
-
-        if (currentPath.startsWith('/admin')) {
-          refreshEndpoint = '/admin/auth/refresh-token';
-        } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
-          // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-          refreshEndpoint = '/restaurant/auth/refresh-token';
-        } else if (currentPath.startsWith('/delivery')) {
-          refreshEndpoint = '/delivery/auth/refresh-token';
-        }
+        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(currentPath);
 
         // Try to refresh the token
         // The refresh token is sent via httpOnly cookie automatically
@@ -285,27 +292,6 @@ apiClient.interceptors.response.use(
         const { accessToken } = response.data.data || response.data;
 
         if (accessToken) {
-          // Determine which module's token to update based on current route
-          const currentPath = window.location.pathname;
-          let tokenKey = 'accessToken'; // fallback
-          let expectedRole = 'user';
-
-          if (currentPath.startsWith('/admin')) {
-            tokenKey = 'admin_accessToken';
-            expectedRole = 'admin';
-          } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
-            // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-            tokenKey = 'restaurant_accessToken';
-            expectedRole = 'restaurant';
-          } else if (currentPath.startsWith('/delivery')) {
-            tokenKey = 'delivery_accessToken';
-            expectedRole = 'delivery';
-          } else if (currentPath.startsWith('/user') || currentPath === '/' || currentPath.startsWith('/restaurants')) {
-            // User module includes /restaurants/* paths
-            tokenKey = 'user_accessToken';
-            expectedRole = 'user';
-          }
-
           const role = getRoleFromToken(accessToken);
 
           // Only store token if role matches expected module; otherwise treat as invalid for this module
@@ -365,29 +351,20 @@ apiClient.interceptors.response.use(
           // For landing page management and onboarding, don't auto-logout - let component handle it
           // Only auto-logout for other pages when token is truly expired
           if (!isOnboardingPage && !isLandingPageManagement) {
-            if (currentPath.startsWith('/admin')) {
-              localStorage.removeItem('admin_accessToken');
-              localStorage.removeItem('admin_authenticated');
-              localStorage.removeItem('admin_user');
-              window.location.href = '/admin/login';
-            } else if (currentPath.startsWith('/restaurant') && !currentPath.startsWith('/restaurants')) {
-              // /restaurant/* is for restaurant module, /restaurants/* is for user module viewing restaurants
-              localStorage.removeItem('restaurant_accessToken');
-              localStorage.removeItem('restaurant_authenticated');
-              localStorage.removeItem('restaurant_user');
-              window.location.href = '/restaurant/login';
-            } else if (currentPath.startsWith('/delivery')) {
-              localStorage.removeItem('delivery_accessToken');
-              localStorage.removeItem('delivery_authenticated');
-              localStorage.removeItem('delivery_user');
-              window.location.href = '/delivery/sign-in';
-            } else {
-              // User module includes /restaurants/* paths
-              localStorage.removeItem('user_accessToken');
-              localStorage.removeItem('user_authenticated');
+            const { loginPath, tokenKey } = getModuleInfo(currentPath);
+            const returnToParam = `?returnTo=${encodeURIComponent(currentPath)}`;
+
+            const moduleName = tokenKey.replace('_accessToken', '');
+            localStorage.removeItem(`${moduleName}_accessToken`);
+            localStorage.removeItem(`${moduleName}_authenticated`);
+            localStorage.removeItem(`${moduleName}_user`);
+
+            // Also clear generic user keys if it's the user module
+            if (moduleName === 'user' || moduleName === 'accessToken') {
               localStorage.removeItem('user');
-              window.location.href = '/user/auth/sign-in';
             }
+
+            window.location.href = `${loginPath}${returnToParam}`;
           }
         }
 

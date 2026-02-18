@@ -553,6 +553,55 @@ export default function MenuAdd() {
     }
   }
 
+  const handleToggleSection = async (sectionId) => {
+    if (!selectedRestaurant?._id) return;
+    try {
+      const response = await adminAPI.toggleRestaurantMenuSection(selectedRestaurant._id, sectionId);
+      if (response.data?.success) {
+        toast.success(response.data.message);
+        // Update local state
+        setMenu(prevMenu => {
+          const updatedSections = (prevMenu.sections || []).map(sec => {
+            if (String(sec.id) === String(sectionId)) {
+              return { ...sec, isEnabled: response.data.data.isEnabled };
+            }
+            return sec;
+          });
+          return { ...prevMenu, sections: updatedSections };
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling section:", error);
+      toast.error("Failed to toggle section status");
+    }
+  };
+
+  const handleToggleItem = async (itemId) => {
+    if (!selectedRestaurant?._id) return;
+    try {
+      const response = await adminAPI.toggleRestaurantMenuItem(selectedRestaurant._id, itemId);
+      if (response.data?.success) {
+        toast.success(response.data.message);
+        // Update local state
+        setMenu(prevMenu => {
+          const updatedSections = (prevMenu.sections || []).map(sec => {
+            const updatedItems = (sec.items || []).map(item => {
+              if (String(item.id) === String(itemId)) {
+                return { ...item, isAvailable: response.data.data.isAvailable };
+              }
+              return item;
+            });
+            return { ...sec, items: updatedItems };
+          });
+          return { ...prevMenu, sections: updatedSections };
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling item:", error);
+      toast.error("Failed to toggle item status");
+    }
+  };
+
   const filteredRestaurants = restaurants.filter(restaurant =>
     restaurant.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
     restaurant.ownerName?.toLowerCase().includes(searchQuery.trim().toLowerCase())
@@ -649,9 +698,9 @@ export default function MenuAdd() {
               <div className="space-y-2">
                 {menu.sections.map((section) => (
                   <div key={section.id} className="border border-gray-200 rounded-lg">
-                    <button
+                    <div
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
                       onClick={() => toggleSection(section.id)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         {expandedSections[section.id] ? (
@@ -665,17 +714,35 @@ export default function MenuAdd() {
                           ({section.items?.length || 0} items)
                         </span>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleAddDish(section)
-                        }}
-                        className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Dish
-                      </button>
-                    </button>
+                      <div className="flex items-center gap-4">
+                        {/* Category Status Toggle */}
+                        <div className="flex items-center gap-2 mr-2" onClick={(e) => e.stopPropagation()}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${section.isEnabled !== false ? "text-blue-600" : "text-gray-400"}`}>
+                            {section.isEnabled !== false ? "Active" : "Disabled"}
+                          </span>
+                          <button
+                            onClick={() => handleToggleSection(section.id)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${section.isEnabled !== false ? "bg-blue-600" : "bg-gray-300"}`}
+                            title={section.isEnabled !== false ? "Click to disable category" : "Click to enable category"}
+                          >
+                            <span
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${section.isEnabled !== false ? "translate-x-5" : "translate-x-1"}`}
+                            />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddDish(section)
+                          }}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Dish
+                        </button>
+                      </div>
+                    </div>
 
                     {expandedSections[section.id] && (
                       <div className="px-4 pb-4 border-t border-gray-200">
@@ -716,7 +783,23 @@ export default function MenuAdd() {
                                     </div>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
+                                  {/* Item Availability Toggle */}
+                                  <div className="flex flex-col items-center gap-1">
+                                    <button
+                                      onClick={() => handleToggleItem(item.id)}
+                                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${item.isAvailable !== false ? "bg-blue-600" : "bg-gray-300"}`}
+                                      title={item.isAvailable !== false ? "Available - Click to set as unavailable" : "Unavailable - Click to set as available"}
+                                    >
+                                      <span
+                                        className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${item.isAvailable !== false ? "translate-x-4" : "translate-x-0.5"}`}
+                                      />
+                                    </button>
+                                    <span className={`text-[8px] font-bold uppercase tracking-tight ${item.isAvailable !== false ? "text-blue-600" : "text-gray-400"}`}>
+                                      {item.isAvailable !== false ? "On" : "Off"}
+                                    </span>
+                                  </div>
+
                                   <div className="text-sm font-semibold text-gray-900">
                                     ₹{item.price}
                                   </div>

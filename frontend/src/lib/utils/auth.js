@@ -83,7 +83,11 @@ export function hasModuleAccess(role, module) {
  * @returns {string|null} - Access token or null
  */
 export function getModuleToken(module) {
-  return localStorage.getItem(`${module}_accessToken`);
+  const token = localStorage.getItem(`${module}_accessToken`);
+  if (token) return token;
+
+  // Fallback to generic accessToken for backward compatibility and transient states
+  return localStorage.getItem('accessToken');
 }
 
 /**
@@ -122,15 +126,20 @@ export function getCurrentUserRole(module = null) {
 /**
  * Check if user is authenticated for a specific module
  * @param {string} module - Module name (admin, restaurant, delivery, user)
+ * @param {boolean} strict - If true, returns false if token is expired. If false (default), returns true if token exists even if expired (to allow background refresh).
  * @returns {boolean} - True if authenticated
  */
-export function isModuleAuthenticated(module) {
+export function isModuleAuthenticated(module, strict = false) {
   const token = getModuleToken(module);
   if (!token) return false;
 
   if (isTokenExpired(token)) {
-    // If token is expired, we still return true to allow the ProtectedRoute to render.
-    // The axios interceptor or App.jsx refresh logic will handle the actual refresh.
+    // If strict is true, we return false for expired tokens.
+    // This is used for AuthRedirect (away from login pages).
+    if (strict) return false;
+
+    // If not strict, we return true to allow the ProtectedRoute to stay mounted
+    // while the axios interceptor or App.jsx refresh logic handles the refresh.
     // This prevents the synchronous 'flicker' logout.
     return true;
   }

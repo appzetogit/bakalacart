@@ -13,8 +13,8 @@ import { isModuleAuthenticated } from "@/lib/utils/auth"
  */
 export default function AuthRedirect({ children, module, redirectTo = null }) {
   const location = useLocation()
-  // Check if user is authenticated for this module
-  const isAuthenticated = isModuleAuthenticated(module)
+  // Check if user is authenticated for this module (Strict check)
+  const isAuthenticated = isModuleAuthenticated(module, true)
 
   // Define default home pages for each module
   const moduleHomePages = {

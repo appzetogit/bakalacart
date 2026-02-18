@@ -134,7 +134,9 @@ import {
 } from '../controllers/foodApprovalController.js';
 import {
   getRestaurantMenu,
-  updateRestaurantMenu
+  updateRestaurantMenu,
+  toggleRestaurantMenuSection,
+  toggleRestaurantMenuItem
 } from '../controllers/menuController.js';
 import {
   getAllComplaints,
@@ -418,6 +420,8 @@ router.post('/food-approvals/:id/reject', rejectFoodItem);
 // Restaurant Menu Management (Admin)
 router.get('/restaurants/:restaurantId/menu', getRestaurantMenu);
 router.put('/restaurants/:restaurantId/menu', updateRestaurantMenu);
+router.patch('/restaurants/:restaurantId/menu/category/:sectionId/toggle', toggleRestaurantMenuSection);
+router.patch('/restaurants/:restaurantId/menu/item/:itemId/toggle', toggleRestaurantMenuItem);
 
 // Offers Management
 router.get('/offers', getAllOffers);

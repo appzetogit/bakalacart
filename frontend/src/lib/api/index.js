@@ -1585,6 +1585,14 @@ export const adminAPI = {
     return apiClient.put(API_ENDPOINTS.ADMIN.RESTAURANT_MENU.replace(':restaurantId', restaurantId), menuData);
   },
 
+  toggleRestaurantMenuSection: (restaurantId, sectionId) => {
+    return apiClient.patch(`/admin/restaurants/${restaurantId}/menu/category/${sectionId}/toggle`);
+  },
+
+  toggleRestaurantMenuItem: (restaurantId, itemId) => {
+    return apiClient.patch(`/admin/restaurants/${restaurantId}/menu/item/${itemId}/toggle`);
+  },
+
   // Feedback Experience Management
   createFeedbackExperience: (data) => {
     return apiClient.post(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE, data);

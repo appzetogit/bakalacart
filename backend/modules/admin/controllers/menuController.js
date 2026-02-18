@@ -73,14 +73,14 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
   const normalizedSections = Array.isArray(sections) ? sections.map((section, index) => {
     // Find existing section to preserve data
     const existingSection = existingMenu?.sections?.find(s => s.id === section.id || s.name === section.name);
-    
+
     return {
       id: section.id || existingSection?.id || `section-${index}`,
       name: section.name || "Unnamed Section",
       items: Array.isArray(section.items) ? section.items.map(item => {
         // Find existing item to preserve approval status and other fields
         const existingItem = existingSection?.items?.find(i => String(i.id) === String(item.id));
-        
+
         // Check if variations is explicitly provided (even if empty array)
         // If item.variations is explicitly provided (not undefined), use it (even if empty)
         // Otherwise, preserve existing variations
@@ -102,7 +102,7 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
           // Variations not provided - preserve existing
           variations = existingItem?.variations || [];
         }
-        
+
         return {
           id: String(item.id || Date.now() + Math.random()),
           name: item.name || "Unnamed Item",
@@ -162,14 +162,14 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
       subsections: Array.isArray(section.subsections) ? section.subsections.map(subsection => {
         // Find existing subsection
         const existingSubsection = existingSection?.subsections?.find(sub => sub.id === subsection.id || sub.name === subsection.name);
-        
+
         return {
           id: subsection.id || existingSubsection?.id || `subsection-${Date.now()}`,
           name: subsection.name || "Unnamed Subsection",
           items: Array.isArray(subsection.items) ? subsection.items.map(item => {
             // Find existing item
             const existingItem = existingSubsection?.items?.find(i => String(i.id) === String(item.id));
-            
+
             // Check if variations is explicitly provided (even if empty array)
             // If item.variations is explicitly provided (not undefined), use it (even if empty)
             // Otherwise, preserve existing variations
@@ -191,7 +191,7 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
               // Variations not provided - preserve existing
               variations = existingItem?.variations || [];
             }
-            
+
             return {
               id: String(item.id || Date.now() + Math.random()),
               name: item.name || "Unnamed Item",
@@ -278,3 +278,104 @@ export const updateRestaurantMenu = asyncHandler(async (req, res) => {
     },
   });
 });
+
+// Toggle menu section (category) status (admin)
+export const toggleRestaurantMenuSection = asyncHandler(async (req, res) => {
+  const { restaurantId, sectionId } = req.params;
+
+  if (!restaurantId || !sectionId) {
+    return errorResponse(res, 400, 'Restaurant ID and Section ID are required');
+  }
+
+  // Use a simple retry mechanism for VersionError
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      const menu = await Menu.findOne({ restaurant: restaurantId });
+      if (!menu) return errorResponse(res, 404, 'Menu not found');
+
+      const section = menu.sections.find(s => String(s.id) === String(sectionId));
+      if (!section) return errorResponse(res, 404, 'Section not found');
+
+      section.isEnabled = !section.isEnabled;
+      menu.markModified('sections');
+      await menu.save();
+
+      return successResponse(res, 200, `Section ${section.isEnabled ? 'enabled' : 'disabled'} successfully`, {
+        isEnabled: section.isEnabled,
+        sectionId: section.id
+      });
+    } catch (error) {
+      if (error.name === 'VersionError' && attempts < maxAttempts - 1) {
+        attempts++;
+        continue;
+      }
+      throw error;
+    }
+  }
+});
+
+// Toggle menu item status (admin)
+export const toggleRestaurantMenuItem = asyncHandler(async (req, res) => {
+  const { restaurantId, itemId } = req.params;
+
+  if (!restaurantId || !itemId) {
+    return errorResponse(res, 400, 'Restaurant ID and Item ID are required');
+  }
+
+  // Use a simple retry mechanism for VersionError
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      const menu = await Menu.findOne({ restaurant: restaurantId });
+      if (!menu) return errorResponse(res, 404, 'Menu not found');
+
+      let itemFound = false;
+      let newStatus = false;
+
+      menu.sections.forEach(section => {
+        // Check items in section
+        const item = section.items?.find(i => String(i.id) === String(itemId));
+        if (item) {
+          item.isAvailable = !item.isAvailable;
+          newStatus = item.isAvailable;
+          itemFound = true;
+        }
+
+        // Check items in subsections
+        if (!itemFound && section.subsections) {
+          section.subsections.forEach(subsection => {
+            const subItem = subsection.items?.find(i => String(i.id) === String(itemId));
+            if (subItem) {
+              subItem.isAvailable = !subItem.isAvailable;
+              newStatus = subItem.isAvailable;
+              itemFound = true;
+            }
+          });
+        }
+      });
+
+      if (!itemFound) return errorResponse(res, 404, 'Item not found');
+
+      menu.markModified('sections');
+      await menu.save();
+
+      return successResponse(res, 200, `Item ${newStatus ? 'enabled' : 'disabled'} successfully`, {
+        isAvailable: newStatus,
+        itemId
+      });
+    } catch (error) {
+      if (error.name === 'VersionError' && attempts < maxAttempts - 1) {
+        attempts++;
+        continue;
+      }
+      throw error;
+    }
+  }
+});
+
+
