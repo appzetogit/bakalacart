@@ -30,14 +30,24 @@ export default function AuthRedirect({ children, module, redirectTo = null }) {
   // 2. returnTo query parameter (URL fallback)
   // 3. redirectTo prop (explicit override)
   // 4. module home page (default)
+  // If authenticated, redirect to module home page or the page they came from
   if (isAuthenticated) {
     const params = new URLSearchParams(location.search);
     const returnTo = params.get('returnTo');
-    const from = location.state?.from?.pathname || location.state?.from || returnTo;
+    const fromState = location.state?.from?.pathname || location.state?.from;
+    const from = fromState || returnTo;
 
-    // Ensure we don't redirect to the current login page itself (infinite loop)
+    // Ensure we don't redirect to the current login page itself or OTP pages (infinite loop)
     const currentPath = location.pathname;
-    const finalPath = (from && from !== currentPath) ? from : (redirectTo || moduleHomePages[module] || "/");
+    const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-in') || currentPath.includes('/otp');
+
+    // Sanitize destination to avoid infinite redirect loops
+    let finalPath = (from && from !== currentPath) ? from : (redirectTo || moduleHomePages[module] || "/");
+
+    // Final check to prevent redirecting to another auth page
+    if (finalPath.includes('/login') || finalPath.includes('/sign-in') || finalPath.includes('/otp')) {
+      finalPath = moduleHomePages[module] || "/";
+    }
 
     return <Navigate to={finalPath} replace />
   }

@@ -36,7 +36,7 @@ export default function AdminLogin() {
             setLogoUrl(cached.logo.url)
           }
         }
-        
+
         // Always try to load fresh data to ensure we have the latest
         const settings = await loadBusinessSettings()
         if (settings) {
@@ -48,9 +48,9 @@ export default function AdminLogin() {
         console.error('Error loading logo:', error)
       }
     }
-    
+
     loadLogo()
-    
+
     // Listen for business settings updates
     const handleSettingsUpdate = () => {
       const cached = getCachedSettings()
@@ -61,7 +61,7 @@ export default function AdminLogin() {
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    
+
     return () => {
       window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
     }
@@ -70,7 +70,10 @@ export default function AdminLogin() {
   // Redirect to admin dashboard if already authenticated
   useEffect(() => {
     if (isModuleAuthenticated("admin")) {
-      navigate("/admin", { replace: true })
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get('returnTo');
+      const finalPath = returnTo || "/admin";
+      navigate(finalPath, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -91,13 +94,16 @@ export default function AdminLogin() {
       // Use admin-specific login endpoint
       const response = await adminAPI.login(email, password)
       const data = response?.data?.data || response?.data
-      
+
       if (data.accessToken && data.admin) {
         // Store admin token and data
         setAuthData("admin", data.accessToken, data.admin)
-        
-        // Navigate to admin dashboard after successful login
-        navigate("/admin", { replace: true })
+
+        // Navigate to intended destination or admin dashboard after successful login
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = params.get('returnTo');
+        const finalPath = returnTo || "/admin";
+        navigate(finalPath, { replace: true })
       } else {
         throw new Error("Login failed. Please try again.")
       }

@@ -49,7 +49,9 @@ export default function SignIn() {
   const isSignUp = searchParams.get("mode") === "signup"
 
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/";
 
   const [authMethod, setAuthMethod] = useState("phone") // "phone" or "email"
   const [formData, setFormData] = useState({
@@ -659,7 +661,7 @@ export default function SignIn() {
       sessionStorage.setItem("userAuthData", JSON.stringify(authData))
 
       // Navigate to OTP page
-      navigate("/user/auth/otp")
+      navigate("/user/auth/otp", { state: { from } })
     } catch (error) {
       const message =
         error?.response?.data?.message ||

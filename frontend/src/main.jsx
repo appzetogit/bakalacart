@@ -3,7 +3,7 @@
 import React from 'react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './index.css'
 import App from './App.jsx'
@@ -263,19 +263,34 @@ if (!rootElement) {
   throw new Error('Root element not found')
 }
 
+// Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web
+const isNativeApp = !!window.Capacitor || window.location.protocol === 'file:' || /Capacitor/i.test(navigator.userAgent);
+
+// Fix for mobile app refresh: Migrate pathname to hash if in native app and no hash exists
+// This ensures that refreshing http://localhost/orders becomes http://localhost/#/orders
+if (isNativeApp && window.location.pathname !== '/' && !window.location.hash) {
+  const path = window.location.pathname;
+  const search = window.location.search;
+  // Use replaceState to clear the pathname and then set the hash
+  window.history.replaceState({}, document.title, '/');
+  window.location.hash = path + search;
+}
+
+const Router = isNativeApp ? HashRouter : BrowserRouter;
+
 // Render React immediately - don't wait for anything
 // StrictMode disabled in production to reduce double renders and improve performance
 const AppWrapper = import.meta.env.PROD ? (
-  <BrowserRouter>
+  <Router>
     <App />
     <Toaster position="top-center" richColors offset="80px" />
-  </BrowserRouter>
+  </Router>
 ) : (
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <App />
       <Toaster position="top-center" richColors offset="80px" />
-    </BrowserRouter>
+    </Router>
   </StrictMode>
 )
 

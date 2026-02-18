@@ -13,7 +13,9 @@ export default function OTP() {
   const location = useLocation()
 
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/";
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")

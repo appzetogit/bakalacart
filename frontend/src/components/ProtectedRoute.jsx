@@ -37,8 +37,9 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
   // If not authenticated for this module, redirect to login
   if (!isAuthenticated) {
+    const currentPath = location.pathname + location.search;
     if (loginPath) {
-      return <Navigate to={`${loginPath}?returnTo=${encodeURIComponent(location.pathname)}`} state={{ from: location.pathname }} replace />;
+      return <Navigate to={`${loginPath}?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />;
     }
 
     // Fallback: redirect to appropriate login page
@@ -50,7 +51,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     };
 
     const redirectPath = roleLoginPaths[requiredRole] || '/';
-    return <Navigate to={redirectPath} replace />;
+    return <Navigate to={`${redirectPath}?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />;
   }
 
   return children;

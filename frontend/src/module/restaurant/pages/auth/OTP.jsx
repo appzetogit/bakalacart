@@ -11,9 +11,11 @@ import { checkOnboardingStatus } from "../../utils/onboardingUtils"
 export default function RestaurantOTP() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/restaurant"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/restaurant";
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -232,11 +234,12 @@ export default function RestaurantOTP() {
       try {
         const onboardingStep = await checkOnboardingStatus()
         console.log("✅ [Restaurant OTP] Onboarding status check:", onboardingStep)
-        
+
         if (onboardingStep === null) {
           // Onboarding is complete, navigate to restaurant home
           console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
-          navigate("/restaurant", { replace: true })
+          const finalPath = (from && from !== "/restaurant/otp" && from !== "/restaurant/login") ? from : "/restaurant";
+          navigate(finalPath, { replace: true })
         } else {
           // Onboarding not complete, navigate to onboarding with appropriate step
           console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
@@ -376,11 +379,12 @@ export default function RestaurantOTP() {
       try {
         const onboardingStep = await checkOnboardingStatus()
         console.log("✅ [Restaurant OTP] Onboarding status check:", onboardingStep)
-        
+
         if (onboardingStep === null) {
           // Onboarding is complete, navigate to restaurant home
           console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
-          navigate("/restaurant", { replace: true })
+          const finalPath = (from && from !== "/restaurant/otp" && from !== "/restaurant/login") ? from : "/restaurant";
+          navigate(finalPath, { replace: true })
         } else {
           // Onboarding not complete, navigate to onboarding with appropriate step
           console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
@@ -472,36 +476,35 @@ export default function RestaurantOTP() {
 
               {/* OTP Input Fields - Square Borders */}
               <div className="flex justify-center gap-3">
-            {otp.map((digit, index) => {
-              const hasValue = digit !== ""
-              const isFocused = focusedIndex === index
+                {otp.map((digit, index) => {
+                  const hasValue = digit !== ""
+                  const isFocused = focusedIndex === index
 
-              return (
-                <div key={index} className="relative">
-                  <input
-                    ref={(el) => (inputRefs.current[index] = el)}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit || ""}
-                    onChange={(e) => handleChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    onPaste={index === 0 ? handlePaste : undefined}
-                    onFocus={() => setFocusedIndex(index)}
-                    onBlur={() => setFocusedIndex(null)}
-                    disabled={isLoading}
-                    className={`w-12 h-12 text-center text-2xl font-semibold border-2 rounded-md transition-colors ${
-                      isFocused
-                        ? "border-blue-600 bg-blue-50"
-                        : hasValue
-                        ? "border-blue-600 bg-white"
-                        : "border-gray-300 bg-white"
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    aria-label={`OTP digit ${index + 1}`}
-                  />
-                </div>
-              )
-            })}
+                  return (
+                    <div key={index} className="relative">
+                      <input
+                        ref={(el) => (inputRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit || ""}
+                        onChange={(e) => handleChange(index, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(index, e)}
+                        onPaste={index === 0 ? handlePaste : undefined}
+                        onFocus={() => setFocusedIndex(index)}
+                        onBlur={() => setFocusedIndex(null)}
+                        disabled={isLoading}
+                        className={`w-12 h-12 text-center text-2xl font-semibold border-2 rounded-md transition-colors ${isFocused
+                          ? "border-blue-600 bg-blue-50"
+                          : hasValue
+                            ? "border-blue-600 bg-white"
+                            : "border-gray-300 bg-white"
+                          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        aria-label={`OTP digit ${index + 1}`}
+                      />
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Error Message */}

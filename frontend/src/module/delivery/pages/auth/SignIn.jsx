@@ -38,9 +38,11 @@ const countryCodes = [
 export default function DeliverySignIn() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/delivery"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/delivery";
   const [formData, setFormData] = useState({
     phone: "",
     countryCode: "+91",
@@ -59,17 +61,17 @@ export default function DeliverySignIn() {
           // Extract country code and phone number from stored data
           // Format is like "+91 7610416911" or "+91-7610416911" or "+917610416911"
           const phoneStr = authData.phone.replace(/\s/g, "").replace(/-/g, "")
-          
+
           // Find matching country code (try longest codes first to avoid partial matches)
           const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length)
-          const matchedCountry = sortedCodes.find(country => 
+          const matchedCountry = sortedCodes.find(country =>
             phoneStr.startsWith(country.code)
           )
-          
+
           if (matchedCountry) {
             // Extract phone number (remove country code)
             const phoneNumber = phoneStr.slice(matchedCountry.code.length).replace(/\D/g, "").slice(0, 10)
-            
+
             if (phoneNumber.length === 10) {
               setFormData({
                 phone: phoneNumber,
@@ -97,7 +99,7 @@ export default function DeliverySignIn() {
         // Keep default "Bakalaa" if fetch fails
       }
     }
-    
+
     fetchBusinessSettings()
   }, [])
 
@@ -154,7 +156,7 @@ export default function DeliverySignIn() {
       sessionStorage.setItem("deliveryAuthData", JSON.stringify(authData))
 
       // Navigate to OTP page
-      navigate("/delivery/otp")
+      navigate("/delivery/otp", { state: { from } })
     } catch (err) {
       console.error("Send OTP Error:", err)
       const message =
@@ -198,7 +200,7 @@ export default function DeliverySignIn() {
             {companyName}
           </h1>
         </div>
-        
+
         {/* DELIVERY Badge */}
         <div className="bg-black px-6 py-2 rounded mt-2">
           <span className="text-white font-semibold text-sm uppercase tracking-wide">
@@ -254,9 +256,8 @@ export default function DeliverySignIn() {
                 onChange={handlePhoneChange}
                 autoComplete="off"
                 autoFocus={false}
-                className={`flex-1 h-12 px-4 text-gray-900 placeholder-gray-400 focus:outline-none text-base border rounded-lg min-w-0 ${
-                  error ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`flex-1 h-12 px-4 text-gray-900 placeholder-gray-400 focus:outline-none text-base border rounded-lg min-w-0 ${error ? "border-red-500" : "border-gray-300"
+                  }`}
               />
             </div>
 
@@ -281,11 +282,10 @@ export default function DeliverySignIn() {
           <button
             onClick={handleSendOTP}
             disabled={!isValid || isSending}
-            className={`w-full py-4 rounded-lg font-bold text-base transition-colors ${
-              isValid && !isSending
+            className={`w-full py-4 rounded-lg font-bold text-base transition-colors ${isValid && !isSending
                 ? "bg-[#00B761] hover:bg-[#00A055] active:bg-[#009049] text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+              }`}
           >
             {isSending ? "Sending OTP..." : "Continue"}
           </button>

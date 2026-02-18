@@ -11,9 +11,11 @@ import { registerFCMToken, getFCMToken, getPlatform } from "@/services/pushNotif
 export default function DeliveryOTP() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/delivery"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/delivery";
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")

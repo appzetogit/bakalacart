@@ -43,9 +43,11 @@ const countryCodes = [
 export default function RestaurantLogin() {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Get the page user was trying to access before login
-  const from = location.state?.from || "/restaurant"
+  const searchParamsInURL = new URLSearchParams(location.search);
+  const returnTo = searchParamsInURL.get('returnTo');
+  const from = location.state?.from || returnTo || "/restaurant";
   const [loginMethod, setLoginMethod] = useState("phone") // "phone" or "email"
   const [formData, setFormData] = useState({
     phone: "",
@@ -74,17 +76,17 @@ export default function RestaurantLogin() {
           // Extract country code and phone number from stored data
           // Format is like "+91 7610416911" or "+91-7610416911"
           const phoneStr = authData.phone.replace(/\s/g, "").replace(/-/g, "")
-          
+
           // Find matching country code (try longest codes first to avoid partial matches)
           const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length)
-          const matchedCountry = sortedCodes.find(country => 
+          const matchedCountry = sortedCodes.find(country =>
             phoneStr.startsWith(country.code)
           )
-          
+
           if (matchedCountry) {
             // Extract phone number (remove country code)
             const phoneNumber = phoneStr.slice(matchedCountry.code.length).replace(/\D/g, "").slice(0, 10)
-            
+
             if (phoneNumber.length === 10) {
               setFormData(prev => ({
                 ...prev,
@@ -113,7 +115,7 @@ export default function RestaurantLogin() {
         // Keep default "Bakalaa" if fetch fails
       }
     }
-    
+
     fetchBusinessSettings()
   }, [])
 
@@ -180,7 +182,7 @@ export default function RestaurantLogin() {
       sessionStorage.setItem("restaurantAuthData", JSON.stringify(authData))
 
       // Navigate to OTP page
-      navigate("/restaurant/otp")
+      navigate("/restaurant/otp", { state: { from } })
     } catch (error) {
       // Extract backend error message if available
       const message =
@@ -264,7 +266,7 @@ export default function RestaurantLogin() {
       sessionStorage.setItem("restaurantAuthData", JSON.stringify(authData))
 
       // Navigate to OTP page
-      navigate("/restaurant/otp")
+      navigate("/restaurant/otp", { state: { from } })
     } catch (error) {
       const message =
         error?.response?.data?.message ||
