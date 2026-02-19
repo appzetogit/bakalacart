@@ -322,7 +322,7 @@ export const createOrder = async (req, res) => {
         couponCode: pricing.couponCode || null
       },
       deliveryFleet: deliveryFleet || 'standard',
-      note: note || '',
+      note: note ? note.trim() : '',
       sendCutlery: sendCutlery !== false,
       deliveryAddressDetails: deliveryAddressDetails.trim(),
       status: (normalizedPaymentMethod === 'wallet' || normalizedPaymentMethod === 'cash') ? 'confirmed' : 'pending',

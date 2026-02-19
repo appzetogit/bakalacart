@@ -444,11 +444,11 @@ export default function OrderAssign() {
                                 toast.success("ID Copied");
                               }} />
                             </div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <div className="text-sm text-gray-500 flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {order.date} · {order.time}
                             </div>
-                            <Badge variant="outline" className="text-[10px] font-bold bg-gray-50 dark:bg-gray-900 border-none">
+                            <Badge variant="outline" className="text-xs font-bold bg-gray-50 dark:bg-gray-900 border-none">
                               ₹{order.totalAmount?.toFixed(2)}
                             </Badge>
                           </div>
@@ -456,18 +456,18 @@ export default function OrderAssign() {
                         <td className="p-4 align-top max-w-[250px]">
                           <div className="space-y-3">
                             <div className="flex flex-col">
-                              <span className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                              <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
                                 <User className="w-3 h-3 text-blue-500" /> {order.customerName}
                               </span>
-                              <span className="text-[10px] text-gray-500 ml-4">{order.customerPhone}</span>
+                              <span className="text-xs text-gray-500 ml-4">{order.customerPhone}</span>
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                              <span className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
                                 <Package className="w-3 h-3 text-orange-500" /> {order.restaurant}
                               </span>
                               <div className="ml-4 flex flex-wrap gap-1">
                                 {order.items?.slice(0, 1).map((item, i) => (
-                                  <span key={i} className="text-[10px] text-gray-500">
+                                  <span key={i} className="text-xs text-gray-500">
                                     {item.name} (x{item.quantity})
                                   </span>
                                 ))}
@@ -483,28 +483,28 @@ export default function OrderAssign() {
                             <div className="flex items-start gap-2">
                               <MapPin className="w-3.5 h-3.5 mt-0.5 text-red-500 shrink-0" />
                               <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
                                 <span
-                                  className="text-[11px] font-medium text-gray-700 dark:text-gray-300 leading-normal"
+                                  className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-normal"
                                   title={order.address?.formattedAddress}
                                 >
                                   {order.address?.formattedAddress || "No customer address"}
                                 </span>
-                                {order.deliveryAddressDetails && (
+                                {order.note && order.note.trim() && (
                                   <div className="mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
-                                    <p className="text-[9px] text-blue-600 dark:text-blue-400 font-medium">
-                                      Note: {order.deliveryAddressDetails}
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                      Note: {order.note}
                                     </p>
                                   </div>
                                 )}
                               </div>
                             </div>
                             <div className="flex items-start gap-2">
-                              <Navigation className="w-3.5 h-3.5 mt-0.5 text-blue-500 shrink-0" />
+                              <IndianRupee className="w-3.5 h-3.5 mt-0.5 text-blue-500 shrink-0" />
                               <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Restaurant Zone</span>
-                                <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                                  {order.restaurantZoneName || "Not Assigned"}
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Payment Mode</span>
+                                <span className={`text-sm font-bold uppercase ${order.paymentMethod === 'cash' ? 'text-orange-600' : 'text-green-600'}`}>
+                                  {order.paymentMethod === 'cash' ? 'COD' : order.paymentMethod === 'razorpay' || order.paymentMethod === 'online' ? 'Online' : order.paymentMethod}
                                 </span>
                               </div>
                             </div>
@@ -513,14 +513,14 @@ export default function OrderAssign() {
                         <td className="p-4 align-top">
                           <div className="flex flex-col gap-2">
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase font-bold text-gray-400">Restaurant</span>
+                              <span className="text-xs uppercase font-bold text-gray-400">Restaurant</span>
                               {order.restaurantAccepted ? (
-                                <Badge className="w-fit bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[10px]">
+                                <Badge className="w-fit bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-xs">
                                   Accepted
                                 </Badge>
                               ) : (
                                 <div className="flex flex-col gap-1">
-                                  <Badge variant="outline" className="w-fit text-orange-600 border-orange-200 text-[10px] bg-orange-50">
+                                  <Badge variant="outline" className="w-fit text-orange-600 border-orange-200 text-xs bg-orange-50">
                                     Pending
                                   </Badge>
                                   <div className="flex gap-1">
@@ -543,9 +543,9 @@ export default function OrderAssign() {
                               )}
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase font-bold text-gray-400">Delivery</span>
+                              <span className="text-xs uppercase font-bold text-gray-400">Delivery</span>
                               {order.isAssigned || order.deliveryPartnerId ? (
-                                <Badge className={`w-fit border-none text-[10px] ${order.isDeliveryBoyAccepted
+                                <Badge className={`w-fit border-none text-xs ${order.isDeliveryBoyAccepted
                                   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                   : order.isDeliveryBoyPending
                                     ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
@@ -554,7 +554,7 @@ export default function OrderAssign() {
                                   {order.isDeliveryBoyAccepted ? "Accepted" : order.isDeliveryBoyPending ? "Pending" : "Assigned"}
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="w-fit text-gray-400 border-gray-200 text-[10px]">
+                                <Badge variant="outline" className="w-fit text-gray-400 border-gray-200 text-xs">
                                   Unassigned
                                 </Badge>
                               )}
@@ -565,7 +565,7 @@ export default function OrderAssign() {
                           <Button
                             onClick={() => handleAssignClick(order)}
                             disabled={assigningOrderId === orderId}
-                            className={`h-8 px-4 text-xs ${order.isAssigned ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                            className={`h-9 px-4 text-sm ${order.isAssigned ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
                               }`}
                           >
                             {assigningOrderId === orderId ? (
@@ -606,12 +606,12 @@ export default function OrderAssign() {
                           </button>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900 dark:text-white">{shortenOrderId(order.orderId)}</span>
-                              <Badge className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold">
+                              <span className="text-base font-bold text-gray-900 dark:text-white">{shortenOrderId(order.orderId)}</span>
+                              <Badge className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none text-sm font-bold">
                                 ₹{order.totalAmount?.toFixed(2)}
                               </Badge>
                             </div>
-                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                            <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                               <Clock className="w-3 h-3" /> {order.date} · {order.time}
                             </div>
                           </div>
@@ -621,7 +621,7 @@ export default function OrderAssign() {
                           disabled={assigningOrderId === orderId}
                           size="sm"
                           variant={order.isAssigned ? "outline" : "default"}
-                          className={`h-8 px-3 text-xs ${!order.isAssigned ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                          className={`h-9 px-3 text-sm ${!order.isAssigned ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
                         >
                           {order.isAssigned ? "Reassign" : "Assign"}
                         </Button>
@@ -629,20 +629,29 @@ export default function OrderAssign() {
 
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 dark:border-gray-700">
                         <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Customer</span>
-                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.customerName}</p>
-                          <p className="text-[10px] text-gray-500">{order.customerPhone}</p>
+                          <span className="text-xs uppercase font-bold text-gray-400 block">Customer</span>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{order.customerName}</p>
+                          <p className="text-xs text-gray-500">{order.customerPhone}</p>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Restaurant</span>
-                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.restaurant}</p>
+                          <span className="text-xs uppercase font-bold text-gray-400 block">Restaurant</span>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{order.restaurant}</p>
                           <div className="flex items-center gap-1">
                             {order.restaurantAccepted ? (
-                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[8px] px-1.5 h-4">Accepted</Badge>
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[10px] px-1.5 h-4">Accepted</Badge>
                             ) : (
-                              <Badge className="bg-orange-100 text-orange-700 border-none text-[8px] px-1.5 h-4">Pending</Badge>
+                              <Badge className="bg-orange-100 text-orange-700 border-none text-[10px] px-1.5 h-4">Pending</Badge>
                             )}
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 dark:border-gray-700">
+                        <div className="space-y-1">
+                          <span className="text-xs uppercase font-bold text-gray-400 block">Payment Mode</span>
+                          <p className={`text-sm font-bold uppercase ${order.paymentMethod === 'cash' ? 'text-orange-600' : 'text-green-600'}`}>
+                            {order.paymentMethod === 'cash' ? 'COD' : order.paymentMethod === 'razorpay' || order.paymentMethod === 'online' ? 'Online' : order.paymentMethod}
+                          </p>
                         </div>
                       </div>
 
@@ -650,13 +659,13 @@ export default function OrderAssign() {
                         <div className="flex items-start gap-2">
                           <MapPin className="w-3.5 h-3.5 mt-0.5 text-red-500 shrink-0" />
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
-                            <p className="text-[11px] text-gray-700 dark:text-gray-300 leading-normal">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 leading-normal">
                               {order.address?.formattedAddress || "No address provided"}
                             </p>
-                            {order.deliveryAddressDetails && (
-                              <p className="mt-1 text-[10px] text-blue-600 dark:text-blue-400 italic">
-                                "{order.deliveryAddressDetails}"
+                            {order.note && order.note.trim() && (
+                              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
+                                "{order.note}"
                               </p>
                             )}
                           </div>
@@ -668,40 +677,43 @@ export default function OrderAssign() {
               })}
             </div>
           </div>
-        )}
+        )
+        }
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-xl">
-            <div className="text-xs text-gray-500">
-              Page <span className="font-bold text-gray-900 dark:text-white">{page}</span> of {totalPages}
+        {
+          totalPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-xl">
+              <div className="text-xs text-gray-500">
+                Page <span className="font-bold text-gray-900 dark:text-white">{page}</span> of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="h-8 px-3 text-xs"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="h-8 px-3 text-xs"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="h-8 px-3 text-xs"
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="h-8 px-3 text-xs"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+          )
+        }
+      </div >
 
       {/* Assign Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+      < Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen} >
         <DialogContent className="sm:max-w-[420px] max-h-[85vh] overflow-y-auto p-4">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -903,10 +915,10 @@ export default function OrderAssign() {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Bulk Assign Dialog */}
-      <Dialog open={bulkAssignDialogOpen} onOpenChange={setBulkAssignDialogOpen}>
+      < Dialog open={bulkAssignDialogOpen} onOpenChange={setBulkAssignDialogOpen} >
         <DialogContent className="sm:max-w-[400px] p-4">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1078,7 +1090,7 @@ export default function OrderAssign() {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
     </div >
   )
 }

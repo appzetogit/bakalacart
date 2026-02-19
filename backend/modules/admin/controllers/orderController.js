@@ -2116,6 +2116,8 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
         items: order.items || [],
         address: order.address || {},
         deliveryAddressDetails: order.deliveryAddressDetails || '',
+        note: order.note || '',
+        paymentMethod: order.payment?.method || 'unknown',
         deliveryPartnerId: order.deliveryPartnerId?.toString() || null,
         isAssigned: !!order.deliveryPartnerId,
         deliveryStateStatus: deliveryStateStatus,

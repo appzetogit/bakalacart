@@ -63,7 +63,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           // Use viewport units for absolute centering
           const viewportHeight = window.innerHeight;
           const viewportWidth = window.innerWidth;
-          
+
           modalContainerRef.current.style.position = 'fixed';
           modalContainerRef.current.style.top = '50vh'; // Use viewport height units
           modalContainerRef.current.style.left = '50vw'; // Use viewport width units
@@ -74,24 +74,24 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           modalContainerRef.current.style.isolation = 'isolate';
         }
       };
-      
+
       // Set position immediately and after a small delay to ensure DOM is ready
       maintainPosition();
       setTimeout(maintainPosition, 0);
       requestAnimationFrame(maintainPosition);
-      
+
       // Maintain position on window resize
       const handleResize = () => {
         maintainPosition();
       };
       window.addEventListener('resize', handleResize);
-      
+
       // Also maintain position on scroll (in case body scroll is somehow enabled)
       const handleScroll = () => {
         maintainPosition();
       };
       window.addEventListener('scroll', handleScroll, true);
-      
+
       return () => {
         window.removeEventListener('resize', handleResize);
         window.removeEventListener('scroll', handleScroll, true);
@@ -155,11 +155,11 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
     // Lock position immediately
     lockPosition();
-    
+
     // Use requestAnimationFrame to ensure position is locked before any re-renders
     requestAnimationFrame(() => {
       lockPosition();
-      
+
       // Lock again after a microtask to catch any async updates
       setTimeout(() => {
         lockPosition();
@@ -213,7 +213,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
     // Lock position after cart operations
     requestAnimationFrame(() => {
       lockPosition();
-      
+
       // Final lock before closing
       setTimeout(() => {
         lockPosition();
@@ -340,8 +340,8 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div 
-          className="flex-1 overflow-y-auto pb-24" 
+        <div
+          className="flex-1 overflow-y-auto pb-24"
           data-modal-content
           style={{
             // Prevent scroll from affecting modal position
@@ -456,9 +456,14 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
           {/* Stepper (Minus - Plus) */}
           <div className="flex items-center border border-rose-100 bg-rose-50 rounded-lg px-2 py-1.5 gap-3">
             <button
-              onClick={() => quantity > 1 && setQuantity(q => q - 1)}
+              onClick={() => {
+                if (quantity > 1) {
+                  setQuantity(q => q - 1)
+                } else {
+                  onClose()
+                }
+              }}
               className="text-[#ff3f6c] font-bold text-xl px-2 hover:bg-rose-100 rounded transition-colors"
-              disabled={quantity <= 1}
             >
               <Minus size={18} />
             </button>
@@ -487,7 +492,7 @@ const FoodCustomizationModal = ({ item, restaurant, isOpen, onClose, onAddToCart
 
   // Use React Portal to render modal at document.body level
   // This ensures modal is always centered regardless of parent element position
-  return typeof document !== 'undefined' 
+  return typeof document !== 'undefined'
     ? createPortal(modalContent, document.body)
     : null;
 };

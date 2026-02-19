@@ -959,7 +959,7 @@ export default function RestaurantDetails() {
           }
         }
         // If decreasing quantity, trigger removal animation with sourcePosition
-        else if (newQuantity < (quantities[item.id] || 0) && sourcePosition) {
+        else if (newQuantity < (quantities[item.id] || 0)) {
           // Find variations for this base item
           const variationsInCart = cart.filter(c => (c.id === item.id || c.originalItemId === item.id))
           if (variationsInCart.length > 0) {
@@ -971,9 +971,16 @@ export default function RestaurantDetails() {
             }
           }
         }
-        // Otherwise just update quantity without animation
+        // Otherwise just update quantity
         else {
-          updateQuantity(item.id, newQuantity)
+          // For variant items, find the most recently added variant to update
+          const variationsInCart = cart.filter(c => (c.id === item.id || c.originalItemId === item.id))
+          if (variationsInCart.length > 0) {
+            const latestVar = variationsInCart[variationsInCart.length - 1]
+            updateQuantity(latestVar.id, newQuantity)
+          } else {
+            updateQuantity(item.id, newQuantity)
+          }
         }
       } else {
         // Add to cart first (adds with quantity 1), then update to desired quantity
