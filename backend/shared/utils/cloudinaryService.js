@@ -18,7 +18,9 @@ const fileFilter = (req, file, cb) => {
     'video/mp4',
     'video/quicktime',
     'video/x-msvideo',
-    'video/x-matroska'
+    'video/x-matroska',
+    // documents
+    'application/pdf'
   ];
 
   if (allowedMimeTypes.includes(file.mimetype)) {
