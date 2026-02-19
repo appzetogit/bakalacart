@@ -1513,6 +1513,9 @@ export const adminAPI = {
   getCashLimitSettlements: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.CASH_LIMIT_SETTLEMENT, { params });
   },
+  approveCashLimitSettlement: (id) => {
+    return apiClient.post(`${API_ENDPOINTS.ADMIN.CASH_LIMIT_SETTLEMENT}/${id}/approve`);
+  },
 
   getDeliveryWithdrawalRequests: (params = {}) => {
     return apiClient.get(API_ENDPOINTS.ADMIN.DELIVERY_WITHDRAWAL_REQUESTS, { params });

@@ -173,7 +173,7 @@ export const sidebarMenuData = [
         type: "link",
         label: "Cash limit settlement",
         path: "/admin/cash-limit-settlement",
-        icon: "Receipt",
+        icon: "Banknote",
       },
       {
         type: "link",

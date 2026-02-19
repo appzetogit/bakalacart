@@ -82,3 +82,40 @@ export const getCashLimitSettlements = asyncHandler(async (req, res) => {
     return errorResponse(res, 500, err?.message || 'Failed to fetch cash limit settlements');
   }
 });
+/**
+ * Approve cash limit settlement (deposit) transaction
+ * POST /api/admin/cash-limit-settlement/:id/approve
+ */
+export const approveCashLimitSettlement = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the wallet that contains this transaction
+    const wallet = await DeliveryWallet.findOne({ 'transactions._id': id });
+
+    if (!wallet) {
+      return errorResponse(res, 404, 'Transaction not found');
+    }
+
+    // Find the transaction in the wallet
+    const transaction = wallet.transactions.id(id);
+    if (!transaction || transaction.type !== 'deposit') {
+      return errorResponse(res, 404, 'Deposit transaction not found');
+    }
+
+    if (transaction.status === 'Completed') {
+      return errorResponse(res, 400, 'Transaction is already completed');
+    }
+
+    // Update status to Completed
+    // This will automatically update cashInHand via model methods if use updateTransactionStatus
+    wallet.updateTransactionStatus(id, 'Completed');
+    wallet.markModified('transactions');
+    await wallet.save();
+
+    return successResponse(res, 200, 'Settlement approved successfully');
+  } catch (err) {
+    console.error('Approve settlement error:', err?.message || err);
+    return errorResponse(res, 500, err?.message || 'Failed to approve settlement');
+  }
+});

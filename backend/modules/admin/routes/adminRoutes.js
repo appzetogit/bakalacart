@@ -93,7 +93,7 @@ import {
   getDeliveryCashLimit,
   updateDeliveryCashLimit
 } from '../controllers/deliveryCashLimitController.js';
-import { getCashLimitSettlements } from '../controllers/cashLimitSettlementController.js';
+import { getCashLimitSettlements, approveCashLimitSettlement } from '../controllers/cashLimitSettlementController.js';
 import {
   getDeliveryWithdrawalRequests,
   approveDeliveryWithdrawal,
@@ -278,6 +278,7 @@ router.get('/dashboard/stats', getDashboardStats);
 router.get('/delivery-cash-limit', getDeliveryCashLimit);
 router.put('/delivery-cash-limit', updateDeliveryCashLimit);
 router.get('/cash-limit-settlement', getCashLimitSettlements);
+router.post('/cash-limit-settlement/:id/approve', approveCashLimitSettlement);
 
 // Delivery withdrawal requests (admin)
 router.get('/delivery-withdrawal/requests', getDeliveryWithdrawalRequests);
