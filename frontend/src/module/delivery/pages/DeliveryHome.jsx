@@ -724,7 +724,7 @@ export default function DeliveryHome() {
     }
 
     const orderId = selectedRestaurant.orderId || selectedRestaurant._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       console.error('❌ No orderId available to send message');
       toast.error('Unable to send message. Order ID not found.');
       return;
@@ -768,7 +768,7 @@ export default function DeliveryHome() {
     if (!chatOpen || !selectedRestaurant) return
 
     const orderId = selectedRestaurant.orderId || selectedRestaurant._id
-    if (!orderId) return
+    if (orderId === null || orderId === undefined || orderId === "") return
 
     let socket = null
 
@@ -2600,7 +2600,7 @@ export default function DeliveryHome() {
           finalOrderId: orderId
         })
 
-        if (!orderId) {
+        if (orderId === null || orderId === undefined || orderId === "") {
           console.error('❌ No order ID found to accept')
           toast.error('Order ID not found. Please try again.')
           return
@@ -4250,7 +4250,7 @@ export default function DeliveryHome() {
           return
         }
 
-        if (!orderId) {
+        if (orderId === null || orderId === undefined || orderId === "") {
           console.error('❌ No order ID found to confirm')
           toast.error('Order ID not found. Please try again.')
           return
@@ -8320,7 +8320,7 @@ export default function DeliveryHome() {
         // Get order ID from saved data
         const orderId = activeOrderData.orderId || activeOrderData.restaurantInfo?.id || activeOrderData.restaurantInfo?.orderId;
 
-        if (!orderId) {
+        if (orderId === null || orderId === undefined || orderId === "") {
           console.log('⚠️ No order ID found in saved data, removing from localStorage');
           localStorage.removeItem('deliveryActiveOrder');
           setSelectedRestaurant(null);
@@ -9239,7 +9239,7 @@ export default function DeliveryHome() {
     }
 
     const orderId = selectedRestaurant?.orderId || selectedRestaurant?.id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       console.log('⏭️ Skipping fetch - no orderId or id found')
       return
     }

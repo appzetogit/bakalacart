@@ -787,7 +787,7 @@ export default function MyOrders() {
   // Handle accept order
   const handleAcceptOrder = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
@@ -878,7 +878,7 @@ export default function MyOrders() {
   // Handle reject order
   const handleRejectOrder = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
@@ -912,7 +912,7 @@ export default function MyOrders() {
     const [progress, setProgress] = useState(0)
     const [isAnimating, setIsAnimating] = useState(false)
     const buttonRef = useRef(null)
-    const startX = useRef(0)
+    const startX = useRef(null)
     const startY = useRef(0)
     const isSwiping = useRef(false)
 
@@ -925,7 +925,7 @@ export default function MyOrders() {
     }
 
     const handleMove = (clientX, clientY) => {
-      if (!startX.current) return
+      if (startX.current === null) return
       const deltaX = clientX - startX.current
       const deltaY = clientY - startY.current
 
@@ -942,8 +942,7 @@ export default function MyOrders() {
 
     const handleEnd = () => {
       if (!isSwiping.current) {
-        setProgress(0)
-        startX.current = 0
+        startX.current = null
         return
       }
       if (progress > 0.75) {
@@ -960,7 +959,7 @@ export default function MyOrders() {
         setProgress(0)
       }
       isSwiping.current = false
-      startX.current = 0
+      startX.current = null
     }
 
     return (
@@ -1047,7 +1046,7 @@ export default function MyOrders() {
   // Handle reached pickup
   const handleReachedPickup = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
@@ -1152,7 +1151,7 @@ export default function MyOrders() {
     }
 
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       console.error('❌ No order ID found')
       return
     }
@@ -1194,7 +1193,7 @@ export default function MyOrders() {
   // Handle order pickup (bill upload requirement removed)
   const handleOrderPickup = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
@@ -1224,7 +1223,7 @@ export default function MyOrders() {
   // Handle reached drop
   const handleReachedDrop = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
@@ -1254,7 +1253,7 @@ export default function MyOrders() {
   // Handle order delivered
   const handleOrderDelivered = async (order) => {
     const orderId = order.orderId || order._id
-    if (!orderId) {
+    if (orderId === null || orderId === undefined || orderId === "") {
       toast.error('Order ID not found')
       return
     }
