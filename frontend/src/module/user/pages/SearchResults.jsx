@@ -470,9 +470,10 @@ export default function SearchResults() {
     if (query.trim()) {
       const lowerQuery = query.toLowerCase()
       filtered = filtered.filter(r =>
-        r.name?.toLowerCase().includes(lowerQuery) ||
-        r.cuisine?.toLowerCase().includes(lowerQuery) ||
-        r.featuredDish?.toLowerCase().includes(lowerQuery) ||
+        (r.name || "").toLowerCase().includes(lowerQuery) ||
+        (r.cuisine || "").toLowerCase().includes(lowerQuery) ||
+        (r.featuredDish || "").toLowerCase().includes(lowerQuery) ||
+        (r.description || "").toLowerCase().includes(lowerQuery) ||
         r.category === selectedCategory
       )
     }
@@ -557,9 +558,10 @@ export default function SearchResults() {
     if (query.trim()) {
       const lowerQuery = query.toLowerCase()
       filtered = filtered.filter(r => {
-        const nameMatch = r.name?.toLowerCase().includes(lowerQuery)
-        const cuisineMatch = r.cuisine?.toLowerCase().includes(lowerQuery)
-        const dishMatch = r.featuredDish?.toLowerCase().includes(lowerQuery)
+        const nameMatch = (r.name || "").toLowerCase().includes(lowerQuery)
+        const cuisineMatch = (r.cuisine || "").toLowerCase().includes(lowerQuery)
+        const dishMatch = (r.featuredDish || "").toLowerCase().includes(lowerQuery)
+        const descriptionMatch = (r.description || "").toLowerCase().includes(lowerQuery)
 
         // Also search in menu items if menu is available
         let menuMatch = false
@@ -567,8 +569,9 @@ export default function SearchResults() {
           for (const section of r.menu.sections) {
             if (section.items) {
               for (const item of section.items) {
-                if (item.name?.toLowerCase().includes(lowerQuery) ||
-                  item.category?.toLowerCase().includes(lowerQuery)) {
+                if ((item.name || "").toLowerCase().includes(lowerQuery) ||
+                  (item.category || "").toLowerCase().includes(lowerQuery) ||
+                  (item.description || "").toLowerCase().includes(lowerQuery)) {
                   menuMatch = true
                   break
                 }
@@ -578,7 +581,7 @@ export default function SearchResults() {
           }
         }
 
-        return nameMatch || cuisineMatch || dishMatch || menuMatch || r.category === selectedCategory
+        return nameMatch || cuisineMatch || dishMatch || descriptionMatch || menuMatch || r.category === selectedCategory
       })
     }
 

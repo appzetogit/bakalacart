@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
-import { Package, Search, CheckCircle2, XCircle, Loader2, User, Phone, IndianRupee, CheckSquare, Square, MapPin, Navigation } from "lucide-react"
+import { Package, Search, CheckCircle2, XCircle, Loader2, User, Phone, IndianRupee, CheckSquare, Square, MapPin, Navigation, Clock, Copy } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -18,6 +20,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+
+const shortenOrderId = (id) => {
+  if (!id) return ""
+  const parts = id.split("-")
+  if (parts.length >= 3) {
+    return `${parts[0]}-${parts[parts.length - 1]}`
+  }
+  return id
+}
 
 export default function OrderAssign() {
   const [orders, setOrders] = useState([])
@@ -302,406 +313,368 @@ export default function OrderAssign() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 flex-1 h-full overflow-hidden flex flex-col p-4 md:p-6 bg-gray-50/50 dark:bg-gray-900/50">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Package className="w-8 h-8" />
-            Order Assign
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+              <Package className="w-6 h-6 md:w-8 md:h-8 text-blue-600 dark:text-blue-400" />
+            </div>
+            Order Assignment
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Assign delivery boys to orders (single or multiple)
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Dispatch orders to available delivery partners
           </p>
         </div>
-        {selectedOrders.size > 0 && (
-          <Button
-            onClick={() => setBulkAssignDialogOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <User className="w-4 h-4 mr-2" />
-            Assign {selectedOrders.size} Order{selectedOrders.size > 1 ? 's' : ''}
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {selectedOrders.size > 0 && (
+            <Button
+              onClick={() => setBulkAssignDialogOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+            >
+              <User className="w-4 h-4 mr-2" />
+              Assign {selectedOrders.size} Order{selectedOrders.size > 1 ? 's' : ''}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 items-center">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search by order ID, customer name, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select
-          value={restaurantAcceptedFilter}
-          onValueChange={setRestaurantAcceptedFilter}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by acceptance" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Orders</SelectItem>
-            <SelectItem value="true">Restaurant Accepted</SelectItem>
-            <SelectItem value="false">Restaurant Not Accepted</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card className="border-none shadow-sm bg-white dark:bg-gray-800">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="flex-1 w-full relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search by ID, customer, or phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-10 bg-gray-50 dark:bg-gray-900 border-none focus-visible:ring-1"
+              />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <Select
+                value={restaurantAcceptedFilter}
+                onValueChange={setRestaurantAcceptedFilter}
+              >
+                <SelectTrigger className="w-full md:w-[200px] h-10 bg-gray-50 dark:bg-gray-900 border-none">
+                  <SelectValue placeholder="All Orders" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Orders</SelectItem>
+                  <SelectItem value="true">Restaurant Accepted</SelectItem>
+                  <SelectItem value="false">Restaurant Not Accepted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Orders Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+      <div className="flex-1 overflow-hidden min-h-0">
         {isLoading ? (
-          <div className="flex items-center justify-center p-12">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          <div className="flex flex-col items-center justify-center h-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="mt-2 text-sm text-gray-500">Loading orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center p-12">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">No orders found</p>
+          <div className="flex flex-col items-center justify-center h-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-full mb-4">
+              <Package className="w-10 h-10 text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-medium">No orders to assign</p>
+            <p className="text-sm text-gray-400">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900 border-b">
-                <tr>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button
-                      onClick={toggleSelectAll}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      {selectedOrders.size === orders.length && orders.length > 0 ? (
-                        <CheckSquare className="w-3 h-3" />
-                      ) : (
-                        <Square className="w-3 h-3" />
-                      )}
-                      Select
-                    </button>
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Order ID
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Restaurant
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Customer Location
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Restaurant Zone & Pin
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Food Items
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Restaurant Status
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Delivery Boy Status
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date & Time
-                  </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {orders.map((order) => {
-                  const orderId = order.id || order._id
-                  const isSelected = selectedOrders.has(orderId)
-                  return (
-                    <tr key={orderId} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <button
-                          onClick={() => toggleOrderSelection(orderId)}
-                          className="flex items-center justify-center"
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="w-3 h-3 text-blue-600" />
-                          ) : (
-                            <Square className="w-3 h-3 text-gray-400" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <div className="text-xs font-medium text-gray-900 dark:text-white">
-                          {order.orderId}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <div className="text-xs text-gray-900 dark:text-white">
-                          {order.customerName}
-                        </div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                          {order.customerPhone}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <div className="text-xs text-gray-900 dark:text-white">
-                          {order.restaurant}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="text-xs text-gray-900 dark:text-white max-w-[300px]">
-                          {order.address ? (
-                            <div className="space-y-0.5">
-                              {order.address.formattedAddress ? (
-                                <div className="flex items-start gap-1">
-                                  <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
-                                  <span className="text-[10px] break-words">{order.address.formattedAddress}</span>
-                                </div>
+          <div className="h-full flex flex-col">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-auto rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+                    <th className="p-4 text-left">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="transition-colors hover:text-blue-600"
+                      >
+                        {selectedOrders.size === orders.length && orders.length > 0 ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-gray-300" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Order Info</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Parties</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Logistics</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="p-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                  {orders.map((order) => {
+                    const orderId = order.id || order._id
+                    const isSelected = selectedOrders.has(orderId)
+                    return (
+                      <tr key={orderId} className={`group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}>
+                        <td className="p-4 align-top">
+                          <button
+                            onClick={() => toggleOrderSelection(orderId)}
+                            className="transition-colors hover:text-blue-600"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-5 h-5 text-blue-600" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-200" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="p-4 align-top">
+                          <div className="space-y-1">
+                            <div
+                              className="flex items-center gap-2 font-bold text-gray-900 dark:text-white cursor-help"
+                              title={order.orderId}
+                            >
+                              {shortenOrderId(order.orderId)}
+                              <Copy className="w-3 h-3 text-gray-400 hover:text-blue-600 cursor-pointer" onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(order.orderId);
+                                toast.success("ID Copied");
+                              }} />
+                            </div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {order.date} · {order.time}
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-bold bg-gray-50 dark:bg-gray-900 border-none">
+                              ₹{order.totalAmount?.toFixed(2)}
+                            </Badge>
+                          </div>
+                        </td>
+                        <td className="p-4 align-top max-w-[250px]">
+                          <div className="space-y-3">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                                <User className="w-3 h-3 text-blue-500" /> {order.customerName}
+                              </span>
+                              <span className="text-[10px] text-gray-500 ml-4">{order.customerPhone}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                <Package className="w-3 h-3 text-orange-500" /> {order.restaurant}
+                              </span>
+                              <div className="ml-4 flex flex-wrap gap-1">
+                                {order.items?.slice(0, 1).map((item, i) => (
+                                  <span key={i} className="text-[10px] text-gray-500">
+                                    {item.name} (x{item.quantity})
+                                  </span>
+                                ))}
+                                {order.items?.length > 1 && (
+                                  <span className="text-[10px] text-blue-500">+{order.items.length - 1} more</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4 align-top min-w-[220px]">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-3.5 h-3.5 mt-0.5 text-red-500 shrink-0" />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
+                                <span
+                                  className="text-[11px] font-medium text-gray-700 dark:text-gray-300 leading-normal"
+                                  title={order.address?.formattedAddress}
+                                >
+                                  {order.address?.formattedAddress || "No customer address"}
+                                </span>
+                                {order.deliveryAddressDetails && (
+                                  <div className="mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                    <p className="text-[9px] text-blue-600 dark:text-blue-400 font-medium">
+                                      Note: {order.deliveryAddressDetails}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Navigation className="w-3.5 h-3.5 mt-0.5 text-blue-500 shrink-0" />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Restaurant Zone</span>
+                                <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                  {order.restaurantZoneName || "Not Assigned"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4 align-top">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-400">Restaurant</span>
+                              {order.restaurantAccepted ? (
+                                <Badge className="w-fit bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[10px]">
+                                  Accepted
+                                </Badge>
                               ) : (
-                                <>
-                                  {order.address.street && (
-                                    <div className="text-[10px]">{order.address.street}</div>
-                                  )}
-                                  {(order.address.area || order.address.city) && (
-                                    <div className="text-[10px] text-gray-500">
-                                      {[order.address.area, order.address.city].filter(Boolean).join(', ')}
-                                    </div>
-                                  )}
-                                  {(order.address.state || order.address.zipCode || order.address.pincode) && (
-                                    <div className="text-[10px] text-gray-500">
-                                      {[order.address.state, order.address.zipCode || order.address.pincode].filter(Boolean).join(' - ')}
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                              {order.address.additionalDetails && (
-                                <div className="text-[10px] text-gray-400 italic">
-                                  {order.address.additionalDetails}
-                                </div>
-                              )}
-                              {order.deliveryAddressDetails && (
-                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium mt-1">
-                                  <span className="font-semibold">Additional:</span> {order.deliveryAddressDetails}
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="outline" className="w-fit text-orange-600 border-orange-200 text-[10px] bg-orange-50">
+                                    Pending
+                                  </Badge>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleRestaurantAccept(order.id || order._id)}
+                                      className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 transition-colors"
+                                      title="Accept Order"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRestaurantReject(order.id || order._id)}
+                                      className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors"
+                                      title="Reject Order"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not available</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="text-xs text-gray-900 dark:text-white max-w-[200px]">
-                          <div className="space-y-0.5">
-                            {order.restaurantZoneName ? (
-                              <div className="flex items-center gap-1">
-                                <Navigation className="w-2.5 h-2.5 text-blue-600" />
-                                <span className="text-[10px] font-medium">{order.restaurantZoneName}</span>
-                              </div>
-                            ) : null}
-                            {order.restaurantLocation ? (
-                              <div className="text-[10px] text-gray-500">
-                                <div className="flex items-start gap-1">
-                                  <MapPin className="w-2.5 h-2.5 mt-0.5 text-gray-500 flex-shrink-0" />
-                                  <span className="break-words line-clamp-2">
-                                    {/* Priority 1: formattedAddress (live location from Google Maps) */}
-                                    {order.restaurantLocation.formattedAddress &&
-                                      order.restaurantLocation.formattedAddress.trim() !== '' &&
-                                      order.restaurantLocation.formattedAddress.trim() !== 'Select location' &&
-                                      !/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(order.restaurantLocation.formattedAddress.trim())
-                                      ? order.restaurantLocation.formattedAddress.trim()
-                                      : null}
-
-                                    {/* Priority 2: address field */}
-                                    {!order.restaurantLocation.formattedAddress &&
-                                      order.restaurantLocation.address &&
-                                      order.restaurantLocation.address.trim() !== '' &&
-                                      order.restaurantLocation.address.trim() !== 'Location not available'
-                                      ? order.restaurantLocation.address.trim()
-                                      : null}
-
-                                    {/* Priority 3: Build from components */}
-                                    {!order.restaurantLocation.formattedAddress &&
-                                      !order.restaurantLocation.address &&
-                                      (order.restaurantLocation.area || order.restaurantLocation.city || order.restaurantLocation.addressLine1)
-                                      ? [
-                                        order.restaurantLocation.addressLine1,
-                                        order.restaurantLocation.addressLine2,
-                                        order.restaurantLocation.area,
-                                        order.restaurantLocation.city,
-                                        order.restaurantLocation.state
-                                      ].filter(Boolean).join(', ')
-                                      : null}
-
-                                    {/* Pincode */}
-                                    {(order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode) && (
-                                      <span className="ml-1 font-medium">
-                                        - {order.restaurantLocation.pincode || order.restaurantLocation.zipCode || order.restaurantLocation.postalCode}
-                                      </span>
-                                    )}
-
-                                    {/* Fallback if nothing found */}
-                                    {!order.restaurantLocation.formattedAddress &&
-                                      !order.restaurantLocation.address &&
-                                      !order.restaurantLocation.area &&
-                                      !order.restaurantLocation.city &&
-                                      !order.restaurantLocation.addressLine1
-                                      ? 'Location not available'
-                                      : null}
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-gray-400">Pin location not set</div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="text-xs text-gray-900 dark:text-white max-w-[150px]">
-                          {order.items && order.items.length > 0 ? (
-                            <div className="space-y-0.5">
-                              {order.items.slice(0, 2).map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-1">
-                                  <span className="font-medium text-[10px]">{item.name || 'Item'}</span>
-                                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                    (Qty: {item.quantity || 1})
-                                  </span>
-                                </div>
-                              ))}
-                              {order.items.length > 2 && (
-                                <div className="text-[10px] text-gray-500">+{order.items.length - 2} more</div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-400">Delivery</span>
+                              {order.isAssigned || order.deliveryPartnerId ? (
+                                <Badge className={`w-fit border-none text-[10px] ${order.isDeliveryBoyAccepted
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                  : order.isDeliveryBoyPending
+                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                  }`}>
+                                  {order.isDeliveryBoyAccepted ? "Accepted" : order.isDeliveryBoyPending ? "Pending" : "Assigned"}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="w-fit text-gray-400 border-gray-200 text-[10px]">
+                                  Unassigned
+                                </Badge>
                               )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-[10px]">No items</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <div className="text-xs font-medium text-gray-900 dark:text-white">
-                          ₹{order.totalAmount?.toFixed(2) || "0.00"}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {order.restaurantAccepted ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            <CheckCircle2 className="w-2.5 h-2.5" />
-                            Accepted
-                          </span>
-                        ) : (
-                          <div className="flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 w-fit">
-                              <XCircle className="w-2.5 h-2.5" />
-                              Not Accepted
-                            </span>
-                            <div className="flex gap-1 mt-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRestaurantAccept(order.id || order._id)}
-                                className="h-6 px-2 text-[10px] bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRestaurantReject(order.id || order._id)}
-                                className="h-6 px-2 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-                              >
-                                Reject
-                              </Button>
                             </div>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {order.isAssigned || order.deliveryPartnerId ? (
-                          order.isDeliveryBoyAccepted ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              <CheckCircle2 className="w-2.5 h-2.5" />
-                              Accepted
-                            </span>
-                          ) : order.isDeliveryBoyPending ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              Pending
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              <CheckCircle2 className="w-2.5 h-2.5" />
-                              Assigned
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500 text-[10px]">Not Assigned</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <div className="text-xs text-gray-900 dark:text-white">
-                          {order.date}
-                        </div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                          {order.time}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {order.canReassign ? (
+                        </td>
+                        <td className="p-4 align-top text-right">
                           <Button
                             onClick={() => handleAssignClick(order)}
-                            disabled={assigningOrderId === order.id}
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
+                            disabled={assigningOrderId === orderId}
+                            className={`h-8 px-4 text-xs ${order.isAssigned ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                              }`}
                           >
-                            {assigningOrderId === order.id ? (
-                              <>
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                Assigning...
-                              </>
-                            ) : (
+                            {assigningOrderId === orderId ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : order.isAssigned ? (
                               "Reassign"
-                            )}
-                          </Button>
-                        ) : order.isAssigned && !order.canReassign ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            <CheckCircle2 className="w-2.5 h-2.5" />
-                            Accepted
-                          </span>
-                        ) : (
-                          <Button
-                            onClick={() => handleAssignClick(order)}
-                            disabled={assigningOrderId === order.id}
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-1 h-6"
-                          >
-                            {assigningOrderId === order.id ? (
-                              <>
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                Assigning...
-                              </>
                             ) : (
-                              "Assign"
+                              "Assign Now"
                             )}
                           </Button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile/Tablet Card View */}
+            <div className="lg:hidden space-y-4 overflow-auto pb-4">
+              {orders.map((order) => {
+                const orderId = order.id || order._id
+                const isSelected = selectedOrders.has(orderId)
+                return (
+                  <Card key={orderId} className={`border-none shadow-sm transition-all ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : 'bg-white dark:bg-gray-800'}`}>
+                    <CardContent className="p-4 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => toggleOrderSelection(orderId)}
+                            className="mt-1 transition-colors hover:text-blue-600"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-5 h-5 text-blue-600" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-200 hover:text-gray-400" />
+                            )}
+                          </button>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-900 dark:text-white">{shortenOrderId(order.orderId)}</span>
+                              <Badge className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold">
+                                ₹{order.totalAmount?.toFixed(2)}
+                              </Badge>
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> {order.date} · {order.time}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleAssignClick(order)}
+                          disabled={assigningOrderId === orderId}
+                          size="sm"
+                          variant={order.isAssigned ? "outline" : "default"}
+                          className={`h-8 px-3 text-xs ${!order.isAssigned ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                        >
+                          {order.isAssigned ? "Reassign" : "Assign"}
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 dark:border-gray-700">
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Customer</span>
+                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.customerName}</p>
+                          <p className="text-[10px] text-gray-500">{order.customerPhone}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Restaurant</span>
+                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.restaurant}</p>
+                          <div className="flex items-center gap-1">
+                            {order.restaurantAccepted ? (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[8px] px-1.5 h-4">Accepted</Badge>
+                            ) : (
+                              <Badge className="bg-orange-100 text-orange-700 border-none text-[8px] px-1.5 h-4">Pending</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-3 border-t border-gray-50 dark:border-gray-700">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 text-red-500 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
+                            <p className="text-[11px] text-gray-700 dark:text-gray-300 leading-normal">
+                              {order.address?.formattedAddress || "No address provided"}
+                            </p>
+                            {order.deliveryAddressDetails && (
+                              <p className="mt-1 text-[10px] text-blue-600 dark:text-blue-400 italic">
+                                "{order.deliveryAddressDetails}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-            <div className="text-sm text-gray-700 dark:text-gray-300">
-              Page {page} of {totalPages}
+          <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-xl">
+            <div className="text-xs text-gray-500">
+              Page <span className="font-bold text-gray-900 dark:text-white">{page}</span> of {totalPages}
             </div>
             <div className="flex gap-2">
               <Button
@@ -709,6 +682,7 @@ export default function OrderAssign() {
                 size="sm"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
+                className="h-8 px-3 text-xs"
               >
                 Previous
               </Button>
@@ -717,6 +691,7 @@ export default function OrderAssign() {
                 size="sm"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
+                className="h-8 px-3 text-xs"
               >
                 Next
               </Button>

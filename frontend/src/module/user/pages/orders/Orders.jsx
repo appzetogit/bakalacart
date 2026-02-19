@@ -518,17 +518,7 @@ Order again from this restaurant in the Bakalaa app.`
             type="text"
             placeholder="Search by restaurant or dish"
             value={searchQuery}
-            onChange={(e) => {
-              // Remove spaces from input
-              const value = e.target.value.replace(/\s/g, '')
-              setSearchQuery(value)
-            }}
-            onKeyDown={(e) => {
-              // Prevent space key from being entered
-              if (e.key === ' ' || e.key === 'Spacebar') {
-                e.preventDefault()
-              }
-            }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 ml-3 outline-none text-gray-600 placeholder-gray-400"
           />
         </div>
@@ -754,9 +744,9 @@ Order again from this restaurant in the Bakalaa app.`
                         </span>
                         {order.payment.status && (
                           <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${order.payment.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              order.payment.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-gray-100 text-gray-700'
+                            order.payment.status === 'failed' ? 'bg-red-100 text-red-700' :
+                              order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
                             }`}>
                             {order.payment.status}
                           </span>
@@ -906,8 +896,8 @@ Order again from this restaurant in the Bakalaa app.`
                       >
                         <Star
                           className={`w-10 h-10 transition-all ${isActive
-                              ? "text-yellow-400 fill-yellow-400 drop-shadow-lg"
-                              : "text-gray-300 hover:text-yellow-200"
+                            ? "text-yellow-400 fill-yellow-400 drop-shadow-lg"
+                            : "text-gray-300 hover:text-yellow-200"
                             }`}
                         />
                       </button>

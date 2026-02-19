@@ -53,26 +53,26 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   useEffect(() => {
     const fetchAllDishes = async () => {
       if (!isOpen) return
-      
+
       try {
         setLoadingDishes(true)
-        
+
         // Fetch all restaurants
         const restaurantsResponse = await restaurantAPI.getRestaurants()
-        
+
         if (restaurantsResponse?.data?.success && restaurantsResponse?.data?.data?.restaurants) {
           const restaurants = restaurantsResponse.data.data.restaurants
-          
+
           // Fetch menus for all restaurants in parallel (limit to first 50 for performance)
           const menuPromises = restaurants.slice(0, 50).map(async (restaurant) => {
             try {
               const restaurantId = restaurant.restaurantId || restaurant._id
               const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
-              
+
               if (menuResponse?.data?.success && menuResponse?.data?.data?.menu) {
                 const menu = menuResponse.data.data.menu
                 const dishes = []
-                
+
                 // Extract all dishes from menu sections and subsections
                 if (menu.sections && Array.isArray(menu.sections)) {
                   menu.sections.forEach((section) => {
@@ -83,15 +83,15 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                           // Calculate final price
                           const originalPrice = item.originalPrice || item.price || 0
                           const discountPercent = item.discountPercent || 0
-                          const finalPrice = discountPercent > 0 
+                          const finalPrice = discountPercent > 0
                             ? Math.round(originalPrice * (1 - discountPercent / 100))
                             : originalPrice
-                          
+
                           // Get image
-                          const image = item.image?.url || item.image || 
-                                       section.image?.url || section.image || 
-                                       restaurant.profileImage?.url || ''
-                          
+                          const image = item.image?.url || item.image ||
+                            section.image?.url || section.image ||
+                            restaurant.profileImage?.url || ''
+
                           dishes.push({
                             id: item._id || item.id || `${restaurantId}-${item.name}`,
                             name: item.name,
@@ -108,7 +108,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                         }
                       })
                     }
-                    
+
                     // Items in subsections
                     if (section.subsections && Array.isArray(section.subsections)) {
                       section.subsections.forEach((subsection) => {
@@ -118,16 +118,16 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                               // Calculate final price
                               const originalPrice = item.originalPrice || item.price || 0
                               const discountPercent = item.discountPercent || 0
-                              const finalPrice = discountPercent > 0 
+                              const finalPrice = discountPercent > 0
                                 ? Math.round(originalPrice * (1 - discountPercent / 100))
                                 : originalPrice
-                              
+
                               // Get image
-                              const image = item.image?.url || item.image || 
-                                           subsection.image?.url || subsection.image ||
-                                           section.image?.url || section.image || 
-                                           restaurant.profileImage?.url || ''
-                              
+                              const image = item.image?.url || item.image ||
+                                subsection.image?.url || subsection.image ||
+                                section.image?.url || section.image ||
+                                restaurant.profileImage?.url || ''
+
                               dishes.push({
                                 id: item._id || item.id || `${restaurantId}-${item.name}`,
                                 name: item.name,
@@ -148,7 +148,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                     }
                   })
                 }
-                
+
                 return dishes
               }
               return []
@@ -157,10 +157,10 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
               return []
             }
           })
-          
+
           // Wait for all menu fetches to complete
           const allDishesArrays = await Promise.all(menuPromises)
-          
+
           // Flatten and deduplicate dishes by name (keep first occurrence)
           const dishesMap = new Map()
           allDishesArrays.flat().forEach(dish => {
@@ -169,7 +169,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
               dishesMap.set(key, dish)
             }
           })
-          
+
           const uniqueDishes = Array.from(dishesMap.values())
           setAllDishes(uniqueDishes)
           setFilteredDishes(uniqueDishes)
@@ -182,7 +182,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
         setLoadingDishes(false)
       }
     }
-    
+
     fetchAllDishes()
   }, [isOpen])
 
@@ -193,11 +193,11 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     } else {
       const lowerSearch = searchValue.toLowerCase().trim()
       const filtered = allDishes.filter((dish) => {
-        const nameMatch = dish.name.toLowerCase().includes(lowerSearch)
-        const categoryMatch = dish.category.toLowerCase().includes(lowerSearch)
-        const restaurantMatch = dish.restaurantName.toLowerCase().includes(lowerSearch)
-        const descriptionMatch = dish.description.toLowerCase().includes(lowerSearch)
-        
+        const nameMatch = (dish.name || "").toLowerCase().includes(lowerSearch)
+        const categoryMatch = (dish.category || "").toLowerCase().includes(lowerSearch)
+        const restaurantMatch = (dish.restaurantName || "").toLowerCase().includes(lowerSearch)
+        const descriptionMatch = (dish.description || "").toLowerCase().includes(lowerSearch)
+
         return nameMatch || categoryMatch || restaurantMatch || descriptionMatch
       })
       setFilteredDishes(filtered)
@@ -261,148 +261,148 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
         animation: 'fadeIn 0.3s ease-out'
       }}
     >
-        {/* Header with Search Bar */}
-        <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <form onSubmit={handleSearchSubmit} className="flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground dark:text-gray-400 z-10" />
-                <Input
-                  ref={inputRef}
-                  value={searchValue}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder="Search for food, restaurants..."
-                  aria-label="Search for food and restaurants"
-                  className="pl-12 pr-4 h-12 w-full bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 focus:border-primary-orange dark:focus:border-primary-orange rounded-full text-lg dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                aria-label="Close search"
-                className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <X className="h-5 w-5 text-gray-700 dark:text-gray-300" aria-hidden="true" />
-              </Button>
-            </form>
-          </div>
-        </div>
-
-          <div className="flex-1 overflow-y-auto max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 scrollbar-hide bg-white dark:bg-[#0a0a0a]">
-          {/* Recent Searches Section */}
-          {recentSearches.length > 0 && (
-            <div
-              className="mb-6"
-              style={{
-                animation: 'slideDown 0.3s ease-out 0.1s both'
-              }}
+      {/* Header with Search Bar */}
+      <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground dark:text-gray-400 z-10" />
+              <Input
+                ref={inputRef}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search for food, restaurants..."
+                aria-label="Search for food and restaurants"
+                className="pl-12 pr-4 h-12 w-full bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 focus:border-primary-orange dark:focus:border-primary-orange rounded-full text-lg dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close search"
+              className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
             >
-              <h3 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary-orange" />
-                Recent Searches
-              </h3>
-              <div className="flex gap-2 sm:gap-3 flex-wrap">
-                {recentSearches.map((suggestion, index) => (
-                  <button
-                    key={`${suggestion}-${index}`}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-primary-orange dark:hover:text-orange-400 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+              <X className="h-5 w-5 text-gray-700 dark:text-gray-300" aria-hidden="true" />
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 scrollbar-hide bg-white dark:bg-[#0a0a0a]">
+        {/* Recent Searches Section */}
+        {recentSearches.length > 0 && (
+          <div
+            className="mb-6"
+            style={{
+              animation: 'slideDown 0.3s ease-out 0.1s both'
+            }}
+          >
+            <h3 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary-orange" />
+              Recent Searches
+            </h3>
+            <div className="flex gap-2 sm:gap-3 flex-wrap">
+              {recentSearches.map((suggestion, index) => (
+                <button
+                  key={`${suggestion}-${index}`}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-primary-orange dark:hover:text-orange-400 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+                  style={{
+                    animation: `scaleIn 0.3s ease-out ${0.1 + index * 0.02}s both`
+                  }}
+                >
+                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary-orange flex-shrink-0" />
+                  <span>{suggestion}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loadingDishes && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-orange mb-4" />
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Loading dishes...</p>
+          </div>
+        )}
+
+        {/* Dishes Grid */}
+        {!loadingDishes && (
+          <div
+            style={{
+              animation: 'fadeIn 0.3s ease-out 0.2s both'
+            }}
+          >
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
+              {searchValue.trim() === ""
+                ? `All Dishes (${filteredDishes.length})`
+                : `Search Results (${filteredDishes.length})`}
+            </h3>
+            {filteredDishes.length > 0 ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                {filteredDishes.map((dish, index) => (
+                  <div
+                    key={dish.id}
+                    className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
                     style={{
-                      animation: `scaleIn 0.3s ease-out ${0.1 + index * 0.02}s both`
+                      animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`
                     }}
+                    onClick={() => handleFoodClick(dish)}
                   >
-                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary-orange flex-shrink-0" />
-                    <span>{suggestion}</span>
-                  </button>
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 shadow-md group-hover:shadow-lg bg-white dark:bg-[#1a1a1a] p-1 sm:p-1.5">
+                      {dish.image ? (
+                        <img
+                          src={dish.image}
+                          alt={dish.name}
+                          className="w-full h-full object-cover rounded-full"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                            e.target.nextElementSibling?.classList.remove('hidden')
+                          }}
+                        />
+                      ) : null}
+                      {!dish.image && (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full">
+                          <span className="text-2xl">🍽️</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-1 sm:px-2 text-center w-full">
+                      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-orange dark:group-hover:text-orange-400 transition-colors line-clamp-2">
+                        {dish.name}
+                      </span>
+                      {dish.price > 0 && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          ₹{dish.price}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {loadingDishes && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-orange mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-sm">Loading dishes...</p>
-            </div>
-          )}
-
-          {/* Dishes Grid */}
-          {!loadingDishes && (
-            <div
-              style={{
-                animation: 'fadeIn 0.3s ease-out 0.2s both'
-              }}
-            >
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-                {searchValue.trim() === "" 
-                  ? `All Dishes (${filteredDishes.length})` 
-                  : `Search Results (${filteredDishes.length})`}
-              </h3>
-              {filteredDishes.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                  {filteredDishes.map((dish, index) => (
-                    <div
-                      key={dish.id}
-                      className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
-                      style={{
-                        animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`
-                      }}
-                      onClick={() => handleFoodClick(dish)}
-                    >
-                      <div className="relative w-full aspect-square rounded-full overflow-hidden transition-all duration-200 shadow-md group-hover:shadow-lg bg-white dark:bg-[#1a1a1a] p-1 sm:p-1.5">
-                        {dish.image ? (
-                          <img
-                            src={dish.image}
-                            alt={dish.name}
-                            className="w-full h-full object-cover rounded-full"
-                            loading="lazy"
-                            onError={(e) => {
-                              e.target.style.display = 'none'
-                              e.target.nextElementSibling?.classList.remove('hidden')
-                            }}
-                          />
-                        ) : null}
-                        {!dish.image && (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full">
-                            <span className="text-2xl">🍽️</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="px-1 sm:px-2 text-center w-full">
-                        <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-orange dark:group-hover:text-orange-400 transition-colors line-clamp-2">
-                          {dish.name}
-                        </span>
-                        {dish.price > 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            ₹{dish.price}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 sm:py-16">
-                  <Search className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg font-semibold">
-                    {searchValue.trim() 
-                      ? `No results found for "${searchValue}"` 
-                      : "No dishes available"}
-                  </p>
-                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500 mt-2">
-                    {searchValue.trim() 
-                      ? "Try a different search term" 
-                      : "Please check back later"}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <style>{`
+            ) : (
+              <div className="text-center py-12 sm:py-16">
+                <Search className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg font-semibold">
+                  {searchValue.trim()
+                    ? `No results found for "${searchValue}"`
+                    : "No dishes available"}
+                </p>
+                <p className="text-sm sm:text-base text-gray-500 dark:text-gray-500 mt-2">
+                  {searchValue.trim()
+                    ? "Try a different search term"
+                    : "Please check back later"}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <style>{`
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -438,7 +438,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
             }
           }
         `}</style>
-      </div>
+    </div>
   )
 }
 
