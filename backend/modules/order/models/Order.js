@@ -333,6 +333,7 @@ const orderSchema = new mongoose.Schema({
 orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ restaurantId: 1, status: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ deliveredAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
 
 // Generate order ID before saving (fallback if not provided)
