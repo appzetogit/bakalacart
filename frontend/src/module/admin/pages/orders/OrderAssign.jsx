@@ -312,6 +312,42 @@ export default function OrderAssign() {
     }
   }
 
+  // Handle delivery boy accept
+  const handleDeliveryBoyAccept = async (orderId) => {
+    try {
+      const response = await adminAPI.acceptOrderOnBehalfOfDeliveryBoy(orderId)
+      if (response?.data?.success) {
+        toast.success("Order accepted on behalf of delivery boy")
+        fetchOrders()
+      } else {
+        toast.error(response?.data?.message || "Failed to accept order")
+      }
+    } catch (error) {
+      console.error("Error accepting order:", error)
+      toast.error(error.response?.data?.message || "Failed to accept order")
+    }
+  }
+
+  // Handle delivery boy reject
+  const handleDeliveryBoyReject = async (orderId) => {
+    // Prompt for rejection reason
+    const reason = window.prompt("Enter rejection reason:", "Rejected by Admin")
+    if (reason === null) return; // User cancelled
+
+    try {
+      const response = await adminAPI.rejectOrderOnBehalfOfDeliveryBoy(orderId, reason)
+      if (response?.data?.success) {
+        toast.success("Order rejected on behalf of delivery boy")
+        fetchOrders()
+      } else {
+        toast.error(response?.data?.message || "Failed to reject order")
+      }
+    } catch (error) {
+      console.error("Error rejecting order:", error)
+      toast.error(error.response?.data?.message || "Failed to reject order")
+    }
+  }
+
   return (
     <div className="space-y-6 flex-1 h-full overflow-hidden flex flex-col p-4 md:p-6 bg-gray-50/50 dark:bg-gray-900/50">
       {/* Header */}
@@ -488,7 +524,7 @@ export default function OrderAssign() {
                                   className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-normal"
                                   title={order.address?.formattedAddress}
                                 >
-                                  {order.address?.formattedAddress || "No customer address"}
+                                  {order.address?.formattedAddress?.replace(/, Madhya Pradesh/g, "")?.replace(/Madhya Pradesh/g, "") || "No customer address"}
                                 </span>
                                 {order.note && order.note.trim() && (
                                   <div className="mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
@@ -545,14 +581,41 @@ export default function OrderAssign() {
                             <div className="flex flex-col gap-1">
                               <span className="text-xs uppercase font-bold text-gray-400">Delivery</span>
                               {order.isAssigned || order.deliveryPartnerId ? (
-                                <Badge className={`w-fit border-none text-xs ${order.isDeliveryBoyAccepted
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : order.isDeliveryBoyPending
-                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                                  }`}>
-                                  {order.isDeliveryBoyAccepted ? "Accepted" : order.isDeliveryBoyPending ? "Pending" : "Assigned"}
-                                </Badge>
+                                <div className="flex flex-col gap-1">
+                                  {order.deliveryPartnerName && (
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{order.deliveryPartnerName}</span>
+                                  )}
+                                  {order.isDeliveryBoyAccepted ? (
+                                    <Badge className="w-fit bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-xs">
+                                      Accepted
+                                    </Badge>
+                                  ) : (
+                                    <div className="flex flex-col gap-1">
+                                      {/* Only show Assigned badge if pending */}
+                                      {order.isDeliveryBoyPending && (
+                                        <Badge className="w-fit bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-none text-xs">
+                                          Assigned
+                                        </Badge>
+                                      )}
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={() => handleDeliveryBoyAccept(order.id || order._id)}
+                                          className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 transition-colors"
+                                          title="Accept Order"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeliveryBoyReject(order.id || order._id)}
+                                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors"
+                                          title="Reject Order"
+                                        >
+                                          <XCircle className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <Badge variant="outline" className="w-fit text-gray-400 border-gray-200 text-xs">
                                   Unassigned
@@ -640,7 +703,31 @@ export default function OrderAssign() {
                             {order.restaurantAccepted ? (
                               <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[10px] px-1.5 h-4">Accepted</Badge>
                             ) : (
-                              <Badge className="bg-orange-100 text-orange-700 border-none text-[10px] px-1.5 h-4">Pending</Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-orange-100 text-orange-700 border-none text-[10px] px-1.5 h-4">Pending</Badge>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRestaurantAccept(order.id || order._id);
+                                    }}
+                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 transition-colors"
+                                    title="Accept Order"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRestaurantReject(order.id || order._id);
+                                    }}
+                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors"
+                                    title="Reject Order"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -653,6 +740,49 @@ export default function OrderAssign() {
                             {order.paymentMethod === 'cash' ? 'COD' : order.paymentMethod === 'razorpay' || order.paymentMethod === 'online' ? 'Online' : order.paymentMethod}
                           </p>
                         </div>
+                        <div className="space-y-1">
+                          <span className="text-xs uppercase font-bold text-gray-400 block">Delivery Partner</span>
+                          {order.isAssigned || order.deliveryPartnerId ? (
+                            <div className="flex flex-col gap-1">
+                              {order.deliveryPartnerName && (
+                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{order.deliveryPartnerName}</p>
+                              )}
+                              <div className="flex items-center gap-2">
+                                {order.isDeliveryBoyAccepted ? (
+                                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none text-[10px] px-1.5 h-4">Accepted</Badge>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-none text-[10px] px-1.5 h-4">Assigned</Badge>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeliveryBoyAccept(order.id || order._id);
+                                        }}
+                                        className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 transition-colors"
+                                        title="Accept Order"
+                                      >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeliveryBoyReject(order.id || order._id);
+                                        }}
+                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors"
+                                        title="Reject Order"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="w-fit text-gray-400 border-gray-200 text-xs text-[10px] px-1.5 h-4">Unassigned</Badge>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-3 pt-3 border-t border-gray-50 dark:border-gray-700">
@@ -661,7 +791,7 @@ export default function OrderAssign() {
                           <div className="flex flex-col">
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
                             <p className="text-sm text-gray-700 dark:text-gray-300 leading-normal">
-                              {order.address?.formattedAddress || "No address provided"}
+                              {order.address?.formattedAddress?.replace(/, Madhya Pradesh/g, "")?.replace(/Madhya Pradesh/g, "") || "No address provided"}
                             </p>
                             {order.note && order.note.trim() && (
                               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">

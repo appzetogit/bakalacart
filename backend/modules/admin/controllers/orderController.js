@@ -2039,6 +2039,7 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
     // Fetch orders with population
     const orders = await Order.find(query)
       .populate('userId', 'name email phone')
+      .populate('deliveryPartnerId', 'name phone')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
@@ -2118,7 +2119,8 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
         deliveryAddressDetails: order.deliveryAddressDetails || '',
         note: order.note || '',
         paymentMethod: order.payment?.method || 'unknown',
-        deliveryPartnerId: order.deliveryPartnerId?.toString() || null,
+        deliveryPartnerName: order.deliveryPartnerId?.name || null,
+        deliveryPartnerId: order.deliveryPartnerId?._id?.toString() || order.deliveryPartnerId?.toString() || null,
         isAssigned: !!order.deliveryPartnerId,
         deliveryStateStatus: deliveryStateStatus,
         isDeliveryBoyAccepted: isDeliveryBoyAccepted,
@@ -2681,5 +2683,141 @@ export const reassignOrderToRestaurant = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error('Error reassigning order to restaurant:', error);
     return errorResponse(res, 500, 'Failed to reassign order');
+  }
+});
+
+/**
+ * Accept order on behalf of delivery boy
+ * POST /api/admin/orders/:orderId/accept-delivery-boy
+ */
+export const acceptOrderOnBehalfOfDeliveryBoy = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Find order
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+      order = await Order.findById(orderId);
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: orderId });
+    }
+
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Check if delivery partner is assigned
+    if (!order.deliveryPartnerId) {
+      return errorResponse(res, 400, 'No delivery partner assigned to this order');
+    }
+
+    // Update delivery state
+    if (!order.deliveryState) {
+      order.deliveryState = {};
+    }
+    order.deliveryState.status = 'accepted';
+    order.deliveryState.acceptedAt = new Date();
+    // Valid currentPhase values: ['assigned', 'en_route_to_pickup', 'at_pickup', 'en_route_to_delivery', 'at_delivery', 'completed']
+    // When accepted, it's typically 'en_route_to_pickup' or remains 'assigned' until they start moving
+    order.deliveryState.currentPhase = 'assigned';
+
+    // Mark as accepted by admin (for audit)
+    order.assignmentInfo = {
+      ...order.assignmentInfo,
+      assignedBy: 'manual',
+      acceptedByAdmin: true,
+      acceptedByAdminAt: new Date(),
+      acceptedByAdminId: req.user?._id?.toString() || req.admin?._id?.toString() || null
+    };
+
+    await order.save();
+
+    return successResponse(res, 200, 'Order accepted successfully on behalf of delivery boy', {
+      order
+    });
+  } catch (error) {
+    console.error('Error accepting order on behalf of delivery boy:', error);
+    return errorResponse(res, 500, 'Failed to accept order on behalf of delivery boy');
+  }
+});
+
+/**
+ * Reject order on behalf of delivery boy
+ * POST /api/admin/orders/:orderId/reject-delivery-boy
+ */
+export const rejectOrderOnBehalfOfDeliveryBoy = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+
+    // Find order
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+      order = await Order.findById(orderId);
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: orderId });
+    }
+
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    if (!order.deliveryPartnerId) {
+      return errorResponse(res, 400, 'No delivery partner assigned to this order to reject');
+    }
+
+    const deliveryPartnerId = order.deliveryPartnerId;
+
+    // Add to denied list
+    order.deniedDeliveryPartners = order.deniedDeliveryPartners || [];
+    order.deniedDeliveryPartners.push({
+      deliveryPartnerId: deliveryPartnerId,
+      reason: reason || 'Rejected by admin on behalf of delivery boy',
+      timestamp: new Date()
+    });
+
+    // Unassign
+    order.deliveryPartnerId = null;
+
+    // Reset delivery state to initial pending state
+    order.deliveryState = {
+      status: 'pending',
+      currentPhase: 'assigned', // Default enum value
+      acceptedAt: null,
+      reachedPickupAt: null,
+      orderIdConfirmedAt: null,
+      routeToPickup: undefined,
+      routeToDelivery: undefined
+    };
+
+    // Clear assignment info but keep some history if needed
+    // However, schema structure suggests keeping assignmentInfo for current assignment
+    // So we should probably clear relevant fields
+    order.assignmentInfo = {
+      // keep existing fields like restaurantId, zoneId etc if they are relevant for next assignment
+      restaurantId: order.assignmentInfo?.restaurantId,
+      zoneId: order.assignmentInfo?.zoneId,
+      zoneName: order.assignmentInfo?.zoneName,
+      distance: order.assignmentInfo?.distance,
+
+      assignedBy: undefined,
+      deliveryPartnerId: undefined,
+      assignedAt: undefined,
+
+      // Add unassignment info (though not explicitly in schema assignmentInfo, Mongoose might ignore extra fields or we can add to metadata if schema allows)
+      unassignedAt: new Date(),
+      unassignedReason: 'admin_rejected_on_behalf'
+    };
+
+    await order.save();
+
+    return successResponse(res, 200, 'Order rejected successfully on behalf of delivery boy', {
+      order
+    });
+  } catch (error) {
+    console.error('Error rejecting order on behalf of delivery boy:', error);
+    return errorResponse(res, 500, 'Failed to reject order on behalf of delivery boy');
   }
 });

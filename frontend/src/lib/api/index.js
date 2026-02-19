@@ -1205,9 +1205,18 @@ export const adminAPI = {
     return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_ACCEPT_RESTAURANT.replace(':orderId', orderId));
   },
 
-  // Reject order on behalf of restaurant
   rejectOrderOnBehalfOfRestaurant: (orderId, reason) => {
-    return apiClient.post(`/admin/orders/${orderId}/reject-restaurant`, { reason });
+    return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_REJECT_RESTAURANT.replace(':orderId', orderId), { reason });
+  },
+
+  // Accept order on behalf of delivery boy
+  acceptOrderOnBehalfOfDeliveryBoy: (orderId) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_ACCEPT_DELIVERY_BOY.replace(':orderId', orderId));
+  },
+
+  // Reject order on behalf of delivery boy
+  rejectOrderOnBehalfOfDeliveryBoy: (orderId, reason) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_REJECT_DELIVERY_BOY.replace(':orderId', orderId), { reason });
   },
 
   // Reassign order to same restaurant
