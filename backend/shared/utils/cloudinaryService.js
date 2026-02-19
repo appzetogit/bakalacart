@@ -14,6 +14,8 @@ const fileFilter = (req, file, cb) => {
     'image/webp',
     'image/gif',
     'image/svg+xml',
+    'image/heic',
+    'image/heif',
     // videos
     'video/mp4',
     'video/quicktime',
@@ -34,7 +36,7 @@ export const uploadMiddleware = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 20 * 1024 * 1024 // 20MB
+    fileSize: 50 * 1024 * 1024 // 50MB
   }
 });
 
