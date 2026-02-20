@@ -1,4 +1,4 @@
-import { Eye, MapPin, Package, User, Phone, Mail, Calendar, Clock, Truck, CreditCard, X, Receipt, FileText } from "lucide-react"
+import { Eye, MapPin, Package, User, Phone, Mail, Calendar, Clock, Truck, CreditCard, X, Receipt, FileText, Navigation, CheckCircle2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ const getPaymentStatusColor = (paymentStatus) => {
   return "text-slate-600"
 }
 
-export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
+export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPickedUp, onMarkDelivered }) {
   if (!order) return null
 
   // Debug: Log order data to check billImageUrl
@@ -450,6 +450,42 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
               </div>
             </div>
           </div>
+
+          {/* Admin Manual Override Actions */}
+          {(onMarkPickedUp || onMarkDelivered) && (
+            <div className="border-t border-slate-200 pt-4 flex flex-wrap gap-3 pb-4">
+              <h3 className="text-sm font-semibold text-slate-700 w-full mb-1 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-orange-500" />
+                Admin Manual Overrides (Fallback)
+              </h3>
+              <p className="text-xs text-slate-500 w-full mb-2">Use these only if the rider app is failing to update the status.</p>
+
+              {onMarkPickedUp && ["Accepted", "Processing", "Ready to Pick"].includes(order.orderStatus) && (
+                <button
+                  onClick={() => {
+                    onMarkPickedUp(order);
+                    // Optionally close dialog on success, but onMarkPickedUp is async and handles its own UI
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-200 active:scale-95"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Mark as Picked Up
+                </button>
+              )}
+
+              {onMarkDelivered && (order.orderStatus === "Food On The Way" || order.orderStatus === "Ready to Pick") && (
+                <button
+                  onClick={() => {
+                    onMarkDelivered(order);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md shadow-emerald-200 active:scale-95"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Mark as Delivered
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

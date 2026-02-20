@@ -230,7 +230,9 @@ import {
   reassignOrderToRestaurant,
   deleteOrder,
   acceptOrderOnBehalfOfDeliveryBoy,
-  rejectOrderOnBehalfOfDeliveryBoy
+  rejectOrderOnBehalfOfDeliveryBoy,
+  markOrderAsPickedUp,
+  markOrderAsDelivered
 } from '../controllers/orderController.js';
 import {
   getAllReviews,
@@ -498,6 +500,8 @@ router.post('/orders/:orderId/reject-restaurant', rejectOrderOnBehalfOfRestauran
 router.post('/orders/:orderId/accept-delivery-boy', acceptOrderOnBehalfOfDeliveryBoy);
 router.post('/orders/:orderId/reject-delivery-boy', rejectOrderOnBehalfOfDeliveryBoy);
 router.post('/orders/:orderId/reassign-restaurant', reassignOrderToRestaurant);
+router.post('/orders/:orderId/mark-picked-up', markOrderAsPickedUp);
+router.post('/orders/:orderId/mark-delivered', markOrderAsDelivered);
 router.get('/delivery-boys/for-assignment', getDeliveryBoysForAssignment);
 
 // Order Refund - MUST be before /orders/:id to avoid route conflicts

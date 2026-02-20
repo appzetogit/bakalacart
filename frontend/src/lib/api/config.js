@@ -321,6 +321,8 @@ export const API_ENDPOINTS = {
     ORDER_ACCEPT_DELIVERY_BOY: '/admin/orders/:orderId/accept-delivery-boy',
     ORDER_REJECT_DELIVERY_BOY: '/admin/orders/:orderId/reject-delivery-boy',
     ORDER_REASSIGN_RESTAURANT: '/admin/orders/:orderId/reassign-restaurant',
+    ORDER_MARK_PICKED_UP: '/admin/orders/:orderId/mark-picked-up',
+    ORDER_MARK_DELIVERED: '/admin/orders/:orderId/mark-delivered',
     DELIVERY_BOYS_FOR_ASSIGNMENT: '/admin/delivery-boys/for-assignment',
     CUSTOMER_WALLET_REPORT: '/admin/customer-wallet-report',
     WITHDRAWAL_REQUESTS: '/admin/withdrawal/requests',

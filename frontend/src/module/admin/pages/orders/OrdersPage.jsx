@@ -38,40 +38,92 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
 
   // Fetch orders from backend API
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true)
-        const params = {
-          page: 1,
-          limit: 1000, // Fetch all orders for now (can be optimized with pagination later)
-          status: statusKey === "all" ? undefined :
-            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
-        }
-
-        const response = await adminAPI.getOrders(params)
-
-        if (response.data?.success && response.data?.data?.orders) {
-          const fetchedOrders = response.data.data.orders;
-          setOrders(fetchedOrders)
-          setTotalCount(fetchedOrders.length)
-        } else {
-          console.error("Failed to fetch orders:", response.data)
-          toast.error("Failed to fetch orders")
-          setOrders([])
-        }
-      } catch (error) {
-        console.error("Error fetching orders:", error)
-        toast.error(error.response?.data?.message || "Failed to fetch orders")
-        setOrders([])
-      } finally {
-        setIsLoading(false)
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true)
+      const params = {
+        page: 1,
+        limit: 1000, // Fetch all orders for now (can be optimized with pagination later)
+        status: statusKey === "all" ? undefined :
+          statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
+        cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
       }
-    }
 
+      const response = await adminAPI.getOrders(params)
+
+      if (response.data?.success && response.data?.data?.orders) {
+        const fetchedOrders = response.data.data.orders;
+        setOrders(fetchedOrders)
+        setTotalCount(fetchedOrders.length)
+      } else {
+        console.error("Failed to fetch orders:", response.data)
+        toast.error("Failed to fetch orders")
+        setOrders([])
+      }
+    } catch (error) {
+      console.error("Error fetching orders:", error)
+      toast.error(error.response?.data?.message || "Failed to fetch orders")
+      setOrders([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchOrders()
   }, [statusKey])
+
+  // Handle mark picked up by admin
+  const handleMarkPickedUp = async (order) => {
+    const orderIdToUse = order.id || order._id || order.orderId
+    if (!orderIdToUse) {
+      toast.error('Order ID not found')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to mark order ${order.orderId} as PICKED UP? \n\nThis should only be used if the rider is unable to update the status via the app.`)) {
+      return
+    }
+
+    try {
+      const response = await adminAPI.markOrderAsPickedUp(orderIdToUse)
+      if (response.data?.success) {
+        toast.success(response.data?.message || `Order ${order.orderId} marked as picked up`)
+        fetchOrders()
+      } else {
+        toast.error(response.data?.message || "Failed to update order status")
+      }
+    } catch (error) {
+      console.error("❌ Error marking order as picked up:", error)
+      toast.error(error.response?.data?.message || "Failed to update order status")
+    }
+  }
+
+  // Handle mark delivered by admin
+  const handleMarkDelivered = async (order) => {
+    const orderIdToUse = order.id || order._id || order.orderId
+    if (!orderIdToUse) {
+      toast.error('Order ID not found')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to mark order ${order.orderId} as DELIVERED? \n\nThis should only be used if the rider is unable to update the status via the app.`)) {
+      return
+    }
+
+    try {
+      const response = await adminAPI.markOrderAsDelivered(orderIdToUse)
+      if (response.data?.success) {
+        toast.success(response.data?.message || `Order ${order.orderId} marked as delivered`)
+        fetchOrders()
+      } else {
+        toast.error(response.data?.message || "Failed to update order status")
+      }
+    } catch (error) {
+      console.error("❌ Error marking order as delivered:", error)
+      toast.error(error.response?.data?.message || "Failed to update order status")
+    }
+  }
 
   // Handle refund button click - show modal for wallet payments, confirm dialog for others
   const handleRefund = (order) => {
@@ -145,19 +197,7 @@ export default function OrdersPage({ statusKey = "all" }) {
           )
         )
         // Refresh the orders list to get updated data
-        const params = {
-          page: 1,
-          limit: 1000,
-          status: statusKey === "all" ? undefined :
-            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
-        }
-        const refreshResponse = await adminAPI.getOrders(params)
-        if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
-          const fetchedRefreshOrders = refreshResponse.data.data.orders;
-          setOrders(fetchedRefreshOrders)
-          setTotalCount(fetchedRefreshOrders.length)
-        }
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to process refund")
       }
@@ -279,18 +319,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       if (response.data?.success) {
         toast.success(response.data?.message || `Order ${order.orderId} accepted successfully on behalf of restaurant`)
         // Refresh the orders list
-        const params = {
-          page: 1,
-          limit: 1000,
-          status: statusKey === "all" ? undefined :
-            statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-          cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
-        }
-        const refreshResponse = await adminAPI.getOrders(params)
-        if (refreshResponse.data?.success && refreshResponse.data?.data?.orders) {
-          setOrders(refreshResponse.data.data.orders)
-          setTotalCount(refreshResponse.data.data.orders.length)
-        }
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to accept order")
       }
@@ -369,6 +398,8 @@ export default function OrdersPage({ statusKey = "all" }) {
         isOpen={isViewOrderOpen}
         onOpenChange={setIsViewOrderOpen}
         order={selectedOrder}
+        onMarkPickedUp={handleMarkPickedUp}
+        onMarkDelivered={handleMarkDelivered}
       />
       <RefundModal
         isOpen={refundModalOpen}
@@ -385,6 +416,8 @@ export default function OrdersPage({ statusKey = "all" }) {
         onRefund={handleRefund}
         onDeleteOrder={handleDeleteOrder}
         onAcceptOrder={handleAcceptOrder}
+        onMarkPickedUp={handleMarkPickedUp}
+        onMarkDelivered={handleMarkDelivered}
       />
     </div>
   )

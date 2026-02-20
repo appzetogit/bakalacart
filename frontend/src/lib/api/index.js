@@ -1223,7 +1223,12 @@ export const adminAPI = {
   reassignOrderToRestaurant: (orderId) => {
     return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_REASSIGN_RESTAURANT.replace(':orderId', orderId));
   },
-
+  markOrderAsPickedUp: (orderId) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_MARK_PICKED_UP.replace(':orderId', orderId));
+  },
+  markOrderAsDelivered: (orderId) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.ORDER_MARK_DELIVERED.replace(':orderId', orderId));
+  },
   // Get delivery boys for assignment dropdown
   getDeliveryBoysForAssignment: () => {
     return apiClient.get(API_ENDPOINTS.ADMIN.DELIVERY_BOYS_FOR_ASSIGNMENT);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Eye, Printer, ArrowUpDown, Loader2, Trash2, Check, FileText } from "lucide-react"
+import { Eye, Printer, ArrowUpDown, Loader2, Trash2, Check, FileText, Navigation, CheckCircle2 } from "lucide-react"
 
 const getStatusColor = (orderStatus) => {
   const colors = {
@@ -26,7 +26,7 @@ const getPaymentStatusColor = (paymentStatus) => {
   return "text-slate-600"
 }
 
-export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPrintOrder, onRefund, onDeleteOrder, onAcceptOrder }) {
+export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPrintOrder, onRefund, onDeleteOrder, onAcceptOrder, onMarkPickedUp, onMarkDelivered }) {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const totalPages = Math.ceil(orders.length / itemsPerPage)
@@ -337,6 +337,24 @@ export default function OrdersTable({ orders, visibleColumns, onViewOrder, onPri
                           title="Accept Order"
                         >
                           <Check className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onMarkPickedUp && ["Accepted", "Processing", "Ready to Pick"].includes(order.orderStatus) && (
+                        <button
+                          onClick={() => onMarkPickedUp(order)}
+                          className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Mark as Picked Up (Admin Override)"
+                        >
+                          <Navigation className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onMarkDelivered && (order.orderStatus === "Food On The Way" || order.orderStatus === "Ready to Pick") && (
+                        <button
+                          onClick={() => onMarkDelivered(order)}
+                          className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          title="Mark as Delivered (Admin Override)"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
                       {onDeleteOrder && (

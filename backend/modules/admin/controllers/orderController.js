@@ -2821,3 +2821,215 @@ export const rejectOrderOnBehalfOfDeliveryBoy = asyncHandler(async (req, res) =>
     return errorResponse(res, 500, 'Failed to reject order on behalf of delivery boy');
   }
 });
+
+/**
+ * Mark order as picked up by admin (fallback for rider app)
+ * POST /api/admin/orders/:orderId/mark-picked-up
+ */
+export const markOrderAsPickedUp = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Find order
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+      order = await Order.findById(orderId);
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: orderId });
+    }
+
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Allow picking up orders with status 'preparing' or 'ready'
+    if (!['preparing', 'ready'].includes(order.status)) {
+      // Also allow if it's already 'out_for_delivery' (idempotent)
+      if (order.status === 'out_for_delivery') {
+        return successResponse(res, 200, 'Order is already out for delivery', { order });
+      }
+      return errorResponse(res, 400, `Order cannot be marked as picked up. Current status: ${order.status}`);
+    }
+
+    // Update status to 'out_for_delivery'
+    order.status = 'out_for_delivery';
+    order.tracking.outForDelivery = { status: true, timestamp: new Date() };
+
+    // Update delivery state
+    if (!order.deliveryState) {
+      order.deliveryState = {
+        status: 'picked_up',
+        currentPhase: 'en_route_to_delivery'
+      };
+    } else {
+      order.deliveryState.status = 'picked_up';
+      order.deliveryState.currentPhase = 'en_route_to_delivery';
+      order.deliveryState.orderIdConfirmedAt = new Date();
+    }
+
+    // Mark as updated by admin
+    order.assignmentInfo = {
+      ...(order.assignmentInfo || {}),
+      pickedUpByAdmin: true,
+      pickedUpByAdminAt: new Date(),
+      pickedUpByAdminId: req.user?._id?.toString() || req.admin?._id?.toString() || null
+    };
+
+    await order.save();
+
+    // Notify user
+    try {
+      const { notifyUserOrderUpdate } = await import('../../order/services/userNotificationService.js');
+      await notifyUserOrderUpdate(order._id, 'out_for_delivery');
+    } catch (e) {
+      console.error('Error notifying user:', e);
+    }
+
+    // Trigger Socket.IO notification if possible
+    try {
+      const serverModule = await import('../../../server.js');
+      const getIO = serverModule.getIO;
+      const io = getIO ? getIO() : null;
+
+      if (io) {
+        io.to(`order:${order._id.toString()}`).emit('order_status_update', {
+          title: "Order Update",
+          message: "Your order is on the way! 🏍️",
+          status: 'out_for_delivery',
+          orderId: order.orderId,
+          timestamp: new Date()
+        });
+      }
+    } catch (socketError) {
+      console.warn('⚠️ Failed to send Socket.IO notification:', socketError.message);
+    }
+
+    return successResponse(res, 200, 'Order marked as picked up successfully', {
+      order
+    });
+  } catch (error) {
+    console.error('Error marking order as picked up:', error);
+    return errorResponse(res, 500, 'Failed to mark order as picked up');
+  }
+});
+
+/**
+ * Mark order as delivered by admin (fallback for rider app)
+ * POST /api/admin/orders/:orderId/mark-delivered
+ */
+export const markOrderAsDelivered = asyncHandler(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Find order doc
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId) && orderId.length === 24) {
+      order = await Order.findById(orderId);
+    }
+    if (!order) {
+      order = await Order.findOne({ orderId: orderId });
+    }
+
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Check if already delivered
+    if (order.status === 'delivered') {
+      return successResponse(res, 200, 'Order is already delivered', { order });
+    }
+
+    // Update status to 'delivered'
+    order.status = 'delivered';
+    order.deliveredAt = new Date();
+    order.tracking.delivered = { status: true, timestamp: new Date() };
+
+    // Update delivery state
+    if (!order.deliveryState) {
+      order.deliveryState = {
+        status: 'delivered',
+        currentPhase: 'completed'
+      };
+    } else {
+      order.deliveryState.status = 'delivered';
+      order.deliveryState.currentPhase = 'completed';
+      order.deliveryState.reachedDropAt = new Date();
+    }
+
+    // Mark as delivered by admin
+    order.assignmentInfo = {
+      ...(order.assignmentInfo || {}),
+      deliveredByAdmin: true,
+      deliveredByAdminAt: new Date(),
+      deliveredByAdminId: req.user?._id?.toString() || req.admin?._id?.toString() || null
+    };
+
+    await order.save();
+
+    const orderMongoId = order._id;
+
+    // Handle payment status for COD
+    if (order.payment?.method === 'cash' || order.payment?.method === 'cod') {
+      try {
+        const Payment = (await import('../../payment/models/Payment.js')).default;
+        await Payment.updateOne(
+          { orderId: orderMongoId },
+          { $set: { status: 'completed', completedAt: new Date() } }
+        );
+      } catch (paymentError) {
+        console.warn('⚠️ Failed to update Payment record:', paymentError.message);
+      }
+    }
+
+    // Calculate settlement
+    try {
+      const { calculateOrderSettlement } = await import('../../order/services/orderSettlementService.js');
+      await calculateOrderSettlement(orderMongoId);
+    } catch (settlementError) {
+      console.error('Error calculating settlement:', settlementError);
+    }
+
+    // Release escrow
+    try {
+      const { releaseEscrow } = await import('../../order/services/escrowWalletService.js');
+      await releaseEscrow(orderMongoId);
+    } catch (escrowError) {
+      console.error('Error releasing escrow:', escrowError);
+    }
+
+    // Notify user via Push
+    try {
+      const { notifyUserOrderUpdate } = await import('../../order/services/userNotificationService.js');
+      await notifyUserOrderUpdate(orderMongoId, 'delivered');
+    } catch (e) {
+      console.error('Error notifying user:', e);
+    }
+
+    // Trigger Socket.IO notification
+    try {
+      const serverModule = await import('../../../server.js');
+      const getIO = serverModule.getIO;
+      const io = getIO ? getIO() : null;
+
+      if (io) {
+        io.to(`order:${order._id.toString()}`).emit('order_status_update', {
+          title: "Order Delivered",
+          message: "Enjoy your food! 🍱",
+          status: 'delivered',
+          orderId: order.orderId,
+          timestamp: new Date()
+        });
+      }
+    } catch (socketError) {
+      console.warn('⚠️ Failed to send Socket.IO notification:', socketError.message);
+    }
+
+    return successResponse(res, 200, 'Order marked as delivered successfully', {
+      order
+    });
+  } catch (error) {
+    console.error('Error marking order as delivered:', error);
+    return errorResponse(res, 500, 'Failed to mark order as delivered');
+  }
+});
