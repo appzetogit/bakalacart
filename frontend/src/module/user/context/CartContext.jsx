@@ -143,7 +143,7 @@ export function CartProvider({ children }) {
           }
         }
 
-        const existing = prev.find((i) => i.id === item.id)
+        const existing = prev.find((i) => String(i.id) === String(item.id))
         if (existing) {
           // Set last add event for animation when incrementing existing item
           if (sourcePosition) {
@@ -159,7 +159,7 @@ export function CartProvider({ children }) {
             setTimeout(() => setLastAddEvent(null), 1500)
           }
           return prev.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+            String(i.id) === String(item.id) ? { ...i, quantity: i.quantity + 1 } : i
           )
         }
 
@@ -201,7 +201,7 @@ export function CartProvider({ children }) {
 
   const removeFromCart = (itemId, sourcePosition = null, productInfo = null) => {
     setCart((prev) => {
-      const itemToRemove = prev.find((i) => i.id === itemId)
+      const itemToRemove = prev.find((i) => String(i.id) === String(itemId))
       if (itemToRemove && sourcePosition && productInfo) {
         // Set last remove event for animation
         setLastRemoveEvent({
@@ -215,14 +215,14 @@ export function CartProvider({ children }) {
         // Clear after animation completes
         setTimeout(() => setLastRemoveEvent(null), 1500)
       }
-      return prev.filter((i) => i.id !== itemId)
+      return prev.filter((i) => String(i.id) !== String(itemId))
     })
   }
 
   const updateQuantity = (itemId, quantity, sourcePosition = null, productInfo = null) => {
     if (quantity <= 0) {
       setCart((prev) => {
-        const itemToRemove = prev.find((i) => i.id === itemId)
+        const itemToRemove = prev.find((i) => String(i.id) === String(itemId))
         if (itemToRemove && sourcePosition && productInfo) {
           // Set last remove event for animation
           setLastRemoveEvent({
@@ -236,14 +236,14 @@ export function CartProvider({ children }) {
           // Clear after animation completes
           setTimeout(() => setLastRemoveEvent(null), 1500)
         }
-        return prev.filter((i) => i.id !== itemId)
+        return prev.filter((i) => String(i.id) !== String(itemId))
       })
       return
     }
 
     // When quantity decreases (but not to 0), also trigger removal animation
     setCart((prev) => {
-      const existingItem = prev.find((i) => i.id === itemId)
+      const existingItem = prev.find((i) => String(i.id) === String(itemId))
       if (existingItem && quantity < existingItem.quantity && sourcePosition && productInfo) {
         // Set last remove event for animation when decreasing quantity
         setLastRemoveEvent({
@@ -257,16 +257,16 @@ export function CartProvider({ children }) {
         // Clear after animation completes
         setTimeout(() => setLastRemoveEvent(null), 1500)
       }
-      return prev.map((i) => (i.id === itemId ? { ...i, quantity } : i))
+      return prev.map((i) => (String(i.id) === String(itemId) ? { ...i, quantity } : i))
     })
   }
 
   const getCartCount = () =>
     cart.reduce((total, item) => total + (item.quantity || 0), 0)
 
-  const isInCart = (itemId) => cart.some((i) => i.id === itemId)
+  const isInCart = (itemId) => cart.some((i) => String(i.id) === String(itemId))
 
-  const getCartItem = (itemId) => cart.find((i) => i.id === itemId)
+  const getCartItem = (itemId) => cart.find((i) => String(i.id) === String(itemId))
 
   const clearCart = () => {
     setCart([])

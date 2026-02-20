@@ -494,7 +494,7 @@ export default function UserOrderDetails() {
                   {item.quantity || item.qty || 1} x {item.name}
                   {/* Item Size/Unit - Show if available */}
                   {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
-                    <p className="text-xs font-bold text-[#ff8100] dark:text-[#ff9830] mt-1">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
                       {[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')}
                     </p>
                   )}

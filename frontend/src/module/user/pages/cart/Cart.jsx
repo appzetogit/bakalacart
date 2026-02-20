@@ -1558,7 +1558,7 @@ export default function Cart() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">
                           {item.name} {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) ? (
-                            <span className="text-[#ff8100] dark:text-[#ff9830] font-bold ml-1">
+                            <span className="text-gray-500 dark:text-gray-400 font-bold ml-1">
                               ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')})
                             </span>
                           ) : ''}

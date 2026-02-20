@@ -2671,6 +2671,13 @@ export default function DeliveryHome() {
               alertAudioRef.current = null
               console.log('[NewOrder] 🔇 Audio stopped (order accepted successfully)')
             }
+            // Play delivery accept ringtone
+            try {
+              const audio = new Audio(originalSound)
+              audio.play().catch(e => console.log('Audio play failed', e))
+            } catch (e) {
+              console.log('Audio init failed', e)
+            }
 
             const orderData = response.data.data
             const order = orderData.order || orderData // Backend returns { order, route }
@@ -2679,6 +2686,15 @@ export default function DeliveryHome() {
             console.log('✅ Order accepted successfully')
             console.log('📍 Route data:', routeData)
             console.log('📋 Full order data from backend:', JSON.stringify(order, null, 2))
+
+            // AUTOMATICALLY CALL REACHED PICKUP (Simulate 1st step: Accept -> Reached Pickup)
+            try {
+              await deliveryAPI.confirmReachedPickup(orderId)
+              console.log('✅ Automatically confirmed Reached Pickup')
+            } catch (e) {
+              console.log('⚠️ Auto-reach pickup failed', e)
+            }
+
             console.log('🏪 Restaurant name from backend:', {
               restaurantName: order.restaurantName,
               restaurantIdName: order.restaurantId?.name,
@@ -2989,15 +3005,17 @@ export default function DeliveryHome() {
                 orderStatus: order.status || 'preparing', // Store order status (pending, preparing, ready, out_for_delivery, delivered)
                 deliveryState: {
                   ...(order.deliveryState || {}),
-                  currentPhase: 'en_route_to_pickup', // CRITICAL: Set to en_route_to_pickup after order acceptance
-                  status: 'accepted' // Set status to accepted
+                  currentPhase: 'at_pickup', // CRITICAL: Set to at_pickup directly to show Pickup button
+                  status: 'reached_pickup' // Set status to reached_pickup
                 }, // Store delivery state (currentPhase, status, etc.)
-                deliveryPhase: 'en_route_to_pickup' // CRITICAL: Set to en_route_to_pickup after order acceptance so Reached Pickup popup can show
+                deliveryPhase: 'at_pickup' // CRITICAL: Set to at_pickup directly
               }
 
-              console.log('🏪 Updated restaurant info from backend:', restaurantInfo)
+              console.log('🏪 Updated restaurant info from backend (Simplified Flow):', restaurantInfo)
               // Update state immediately
               setSelectedRestaurant(restaurantInfo)
+              // Show Pickup Popup Immediately
+              setShowOrderIdConfirmationPopup(true)
             }
 
             // Ensure we have restaurantInfo before proceeding
@@ -4250,11 +4268,8 @@ export default function DeliveryHome() {
           return
         }
 
-        if (orderId === null || orderId === undefined || orderId === "") {
-          console.error('❌ No order ID found to confirm')
-          toast.error('Order ID not found. Please try again.')
-          return
-        }
+        // REMOVED NULL CHECKS FOR ORDER ID AS REQUESTED
+        // if (orderId === null || orderId === undefined || orderId === "") { ... }
 
         // Get current LIVE location
         let currentLocation = riderLocation
@@ -4492,21 +4507,33 @@ export default function DeliveryHome() {
 
                     // CRITICAL: Update selectedRestaurant state FIRST before calling polyline
                     // This ensures the delivery phase check in updateLiveTrackingPolyline works correctly
+
+                    // SIMPLIFIED FLOW: Show Delivered Button (at_delivery)
                     setSelectedRestaurant(prev => ({
                       ...prev,
                       orderStatus: 'out_for_delivery',
                       status: 'out_for_delivery',
-                      deliveryPhase: 'en_route_to_delivery',
+                      deliveryPhase: 'at_delivery', // Show Delivered Button
                       deliveryState: {
-                        ...prev.deliveryState,
-                        currentPhase: 'en_route_to_delivery',
-                        status: 'picked_up'
-                      },
-                      customerLat,
-                      customerLng,
-                      customerName: order.userId?.name || prev.customerName,
-                      customerAddress: order.address?.formattedAddress || prev.customerAddress
-                    }));
+                        ...(prev?.deliveryState || {}),
+                        currentPhase: 'at_delivery',
+                        status: 'reached_drop_location'
+                      }
+                    }))
+
+                    // Play audio
+                    try {
+                      const audio = new Audio(originalSound)
+                      audio.play().catch(e => console.log('Audio play failed', e))
+                    } catch (e) {
+                      console.log('Audio init failed', e)
+                    }
+
+                    // Force show Delivered UI interaction
+                    setTimeout(() => {
+                      // Assuming at_delivery triggers the Delivered slider/button
+                      // No specific popup needed if main UI handles it
+                    }, 100)
 
                     // CRITICAL: Initialize / update live tracking polyline for customer delivery route
                     // This should happen AUTOMATICALLY after order pickup
@@ -4699,13 +4726,8 @@ export default function DeliveryHome() {
 
             toast.success('Order is out for delivery. Route to customer is on the map.', { duration: 4000 })
 
-            // Show Reached Drop popup instantly after Order Picked Up is confirmed
-            // Use setTimeout to ensure state updates are processed and useEffect doesn't block it
-            console.log('✅ Showing Reached Drop popup instantly after Order Picked Up confirmation')
-            setTimeout(() => {
-              setShowReachedDropPopup(true)
-              console.log('✅ Reached Drop popup state set to true')
-            }, 100) // Small delay to ensure showOrderIdConfirmationPopup state is updated
+            // SKIP REACHED DROP POPUP, SHOW DELIVERED BUTTON DIRECTLY by setting state above (at_delivery)
+            console.log('✅ Skipped Reached Drop popup, showing Delivered button via state update')
 
           } else {
             console.error('❌ Failed to confirm order ID:', response.data)
@@ -4844,10 +4866,28 @@ export default function DeliveryHome() {
       setOrderDeliveredIsAnimatingToComplete(true)
       setOrderDeliveredButtonProgress(1)
 
-      // Summary page button action: Navigate to completed page
-      setTimeout(() => {
+      // SIMPLIFIED FLOW: Call APIs and Complete Delivery
+      setTimeout(async () => {
         const orderId = selectedRestaurant?.orderId || selectedRestaurant?.id || 'N/A';
         const earnings = orderEarnings || selectedRestaurant?.estimatedEarnings || 0;
+
+        try {
+          // 1. Confirm Reached Drop
+          await deliveryAPI.confirmReachedDrop(orderId);
+          // 2. Complete Delivery
+          await deliveryAPI.completeDelivery(orderId, null, '');
+
+          // Play Audio
+          try {
+            const audio = new Audio(originalSound)
+            audio.play().catch(e => console.log('Audio play failed', e))
+          } catch (e) {
+            console.log('Audio init failed', e)
+          }
+        } catch (e) {
+          console.error('Error completing delivery flow:', e);
+          toast.error('Error completing delivery');
+        }
 
         setShowOrderDeliveredAnimation(false);
 

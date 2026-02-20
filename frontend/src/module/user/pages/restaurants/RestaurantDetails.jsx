@@ -947,9 +947,11 @@ export default function RestaurantDetails() {
         // If incrementing quantity, trigger add animation with sourcePosition
         if (newQuantity > existingCartItem.quantity && sourcePosition) {
           try {
-            addToCart(cartItem, sourcePosition)
+            // CRITICAL: Use existingCartItem.id to avoid duplication if it's a variant
+            // This ensures we increment the existing item in the cart.
+            addToCart({ ...cartItem, id: existingCartItem.id }, sourcePosition)
             if (newQuantity > existingCartItem.quantity + 1) {
-              updateQuantity(item.id, newQuantity)
+              updateQuantity(existingCartItem.id, newQuantity)
             }
           } catch (error) {
             // Handle restaurant mismatch error
@@ -1746,7 +1748,7 @@ export default function RestaurantDetails() {
 
                               {/* Item Size/Unit - Show if available */}
                               {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) && (
-                                <p className="text-xs font-bold text-[#ff8100] dark:text-[#ff9830] mt-1 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md inline-block">
+                                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
                                   {[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')}
                                 </p>
                               )}
@@ -3119,10 +3121,11 @@ export default function RestaurantDetails() {
                 addToCart(finalCartItem, sourcePosition)
               }
 
-              // Update local quantities state
+              // Update local quantities state using the base item ID
+              const baseId = cartItem.originalItemId || cartItem.id
               setQuantities((prev) => ({
                 ...prev,
-                [cartItem.id]: (prev[cartItem.id] || 0) + quantity,
+                [baseId]: (prev[baseId] || 0) + quantity,
               }))
 
               toast.success(`${quantity} ${cartItem.name} added to cart`)
