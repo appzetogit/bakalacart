@@ -98,10 +98,7 @@ export default function PushNotification() {
       return
     }
 
-    // Prevent double submission
-    if (sending) {
-      return
-    }
+    if (sending) return
 
     try {
       setSending(true)
@@ -219,6 +216,7 @@ export default function PushNotification() {
                   onChange={(e) => handleInputChange("sendTo", e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
+                  <option value="All">All Roles</option>
                   <option value="Customer">Customer</option>
                   <option value="Delivery Man">Delivery Man</option>
                   <option value="Restaurant">Restaurant</option>

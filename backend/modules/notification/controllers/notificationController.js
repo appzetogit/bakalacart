@@ -7,6 +7,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { sendPushNotification } from '../../../shared/services/firebaseAdmin.js';
 import { cloudinary } from '../../../config/cloudinary.js';
+import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 
 /**
  * Send notification from admin dashboard
@@ -14,8 +15,22 @@ import { cloudinary } from '../../../config/cloudinary.js';
  */
 export const sendAdminNotification = asyncHandler(async (req, res) => {
     try {
-        const { title, description, sendTo, zone, image } = req.body;
+        const { title, description, sendTo, zone } = req.body;
+        let { image } = req.body;
         console.log(`🔔 [Admin Notification] Request:`, { title, sendTo, zone });
+
+        // Handle Image Upload if file exists
+        if (req.file) {
+            try {
+                const uploadResult = await uploadToCloudinary(req.file.buffer, {
+                    folder: 'notifications'
+                });
+                image = uploadResult.secure_url;
+                console.log(`📸 [Admin Notification] Image uploaded: ${image}`);
+            } catch (uploadError) {
+                console.error(`❌ [Admin Notification] Image upload failed:`, uploadError);
+            }
+        }
 
         // Debug: Check total counts visible to this controller
         try {
