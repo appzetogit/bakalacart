@@ -833,13 +833,20 @@ export const acceptOrder = asyncHandler(async (req, res) => {
 
     // Resolve payment method for delivery boy (COD vs Online) - use Payment collection if order.payment is wrong
     let paymentMethod = updatedOrder.payment?.method || 'razorpay';
-    if (paymentMethod !== 'cash') {
+    if (paymentMethod !== 'cash' && paymentMethod !== 'cod') {
       try {
         const paymentRecord = await Payment.findOne({ orderId: updatedOrder._id }).select('method').lean();
-        if (paymentRecord?.method === 'cash') paymentMethod = 'cash';
+        if (paymentRecord?.method === 'cash' || paymentRecord?.method === 'cod') {
+          paymentMethod = 'cash';
+        }
       } catch (e) { /* ignore */ }
     }
-    const orderWithPayment = { ...updatedOrder, paymentMethod };
+    const orderWithPayment = {
+      ...updatedOrder,
+      paymentMethod,
+      restaurantName: updatedOrder.restaurantId?.name || order.restaurantId?.name || 'Restaurant',
+      restaurantPhone: updatedOrder.restaurantId?.phone || updatedOrder.restaurantId?.ownerPhone || order.restaurantId?.phone || 'N/A'
+    };
 
     return successResponse(res, 200, 'Order accepted successfully', {
       order: orderWithPayment,

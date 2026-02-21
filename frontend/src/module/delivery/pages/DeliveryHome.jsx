@@ -2785,173 +2785,25 @@ export default function DeliveryHome() {
               });
 
               // Format restaurant address - check multiple possible locations
-              let restaurantAddress = 'Restaurant Address'
-              const restaurantLocation = order.restaurantId?.location
+              let restaurantAddress = order.restaurantAddress || order.restaurantId?.address || restaurantLocation?.formattedAddress || restaurantLocation?.address || 'Restaurant Address';
 
-              // Debug: Log order structure to understand data format
-              console.log('🔍 Order structure for address extraction:', {
-                hasRestaurantId: !!order.restaurantId,
-                restaurantIdType: typeof order.restaurantId,
-                restaurantIdKeys: order.restaurantId ? Object.keys(order.restaurantId) : [],
-                hasLocation: !!restaurantLocation,
-                locationKeys: restaurantLocation ? Object.keys(restaurantLocation) : [],
-                restaurantIdAddress: order.restaurantId?.address,
-                locationFormattedAddress: restaurantLocation?.formattedAddress,
-                locationAddress: restaurantLocation?.address,
-                locationStreet: restaurantLocation?.street,
-                orderRestaurantAddress: order.restaurantAddress
-              })
-
-              // Priority 1: Direct address fields on restaurantId
-              if (order.restaurantId?.address) {
-                restaurantAddress = order.restaurantId.address
-                console.log('✅ Using restaurantId.address:', restaurantAddress)
-              }
-              // Priority 2: formattedAddress from location
-              else if (restaurantLocation?.formattedAddress) {
-                restaurantAddress = restaurantLocation.formattedAddress
-                console.log('✅ Using location.formattedAddress:', restaurantAddress)
-              }
-              // Priority 3: address from location
-              else if (restaurantLocation?.address) {
-                restaurantAddress = restaurantLocation.address
-                console.log('✅ Using location.address:', restaurantAddress)
-              }
-              // Priority 4: Build from addressLine1 (with zone and pin code)
-              else if (restaurantLocation?.addressLine1) {
+              if (restaurantAddress === 'Restaurant Address' && (restaurantLocation?.addressLine1 || restaurantLocation?.street)) {
                 const addressParts = [
-                  restaurantLocation.addressLine1,
+                  restaurantLocation.addressLine1 || restaurantLocation.street,
                   restaurantLocation.addressLine2,
                   restaurantLocation.area, // Zone
                   restaurantLocation.city,
                   restaurantLocation.state,
                   restaurantLocation.pincode || restaurantLocation.zipCode || restaurantLocation.postalCode
-                ].filter(Boolean)
-                restaurantAddress = addressParts.join(', ')
-                console.log('✅ Built address from addressLine1 with zone and pin:', restaurantAddress)
+                ].filter(Boolean);
+                restaurantAddress = addressParts.join(', ');
               }
-              // Priority 5: Build from street components (with zone and pin code)
-              else if (restaurantLocation?.street) {
-                const addressParts = [
-                  restaurantLocation.street,
-                  restaurantLocation.area, // Zone
-                  restaurantLocation.city,
-                  restaurantLocation.state,
-                  restaurantLocation.pincode || restaurantLocation.zipCode || restaurantLocation.postalCode
-                ].filter(Boolean)
-                restaurantAddress = addressParts.join(', ')
-                console.log('✅ Built address from street components with zone and pin:', restaurantAddress)
-              }
-              // Priority 6: Check restaurantId directly for address fields
-              else if (order.restaurantId?.street || order.restaurantId?.city) {
-                const addressParts = [
-                  order.restaurantId.street,
-                  order.restaurantId.area,
-                  order.restaurantId.city,
-                  order.restaurantId.state,
-                  order.restaurantId.zipCode || order.restaurantId.pincode || order.restaurantId.postalCode
-                ].filter(Boolean)
-                restaurantAddress = addressParts.join(', ')
-                console.log('✅ Built address from restaurantId fields:', restaurantAddress)
-              }
-              // Priority 7: Check order.restaurantAddress (if exists)
-              else if (order.restaurantAddress) {
-                restaurantAddress = order.restaurantAddress
-                console.log('✅ Using order.restaurantAddress:', restaurantAddress)
-              }
-              // Priority 8: Use coordinates if address not available
-              else if (restaurantLat && restaurantLng) {
-                restaurantAddress = `${restaurantLat}, ${restaurantLng}`
-                console.log('⚠️ Using coordinates as address:', restaurantAddress)
-              } else {
-                console.warn('⚠️ Restaurant address not found in order, will try to fetch from restaurant API')
-                // Try to fetch restaurant address by ID if available
-                const restaurantId = order.restaurantId
-                if (restaurantId) {
-                  // Handle both string and object restaurantId
-                  const restaurantIdString = typeof restaurantId === 'string'
-                    ? restaurantId
-                    : (restaurantId._id || restaurantId.id || restaurantId.toString())
 
-                  if (restaurantIdString) {
-                    try {
-                      console.log('🔄 Fetching restaurant address by ID:', restaurantIdString)
-                      const restaurantResponse = await restaurantAPI.getRestaurantById(restaurantIdString)
-                      if (restaurantResponse.data?.success && restaurantResponse.data.data) {
-                        const restaurant = restaurantResponse.data.data.restaurant || restaurantResponse.data.data
-                        const restLocation = restaurant.location
-                        console.log('✅ Fetched restaurant data:', { restaurant, restLocation })
-
-                        // Priority: location.formattedAddress (this is what user wants)
-                        if (restLocation?.formattedAddress) {
-                          restaurantAddress = restLocation.formattedAddress
-                          console.log('✅ Fetched restaurant.location.formattedAddress:', restaurantAddress)
-                        } else if (restaurant.address) {
-                          restaurantAddress = restaurant.address
-                          console.log('✅ Fetched restaurant.address:', restaurantAddress)
-                        } else if (restLocation?.address) {
-                          restaurantAddress = restLocation.address
-                          console.log('✅ Fetched restaurant.location.address:', restaurantAddress)
-                        } else if (restLocation?.addressLine1) {
-                          const addressParts = [
-                            restLocation.addressLine1,
-                            restLocation.addressLine2,
-                            restLocation.area, // Zone
-                            restLocation.city,
-                            restLocation.state,
-                            restLocation.pincode || restLocation.zipCode || restLocation.postalCode
-                          ].filter(Boolean)
-                          restaurantAddress = addressParts.join(', ')
-                          console.log('✅ Built address from restaurant location addressLine1 with zone and pin:', restaurantAddress)
-                        } else if (restLocation?.street) {
-                          const addressParts = [
-                            restLocation.street,
-                            restLocation.area, // Zone
-                            restLocation.city,
-                            restLocation.state,
-                            restLocation.pincode || restLocation.zipCode || restLocation.postalCode
-                          ].filter(Boolean)
-                          restaurantAddress = addressParts.join(', ')
-                          console.log('✅ Built address from restaurant location components with zone and pin:', restaurantAddress)
-                        }
-                      }
-                    } catch (restaurantError) {
-                      console.error('❌ Error fetching restaurant address:', restaurantError)
-                    }
-                  }
-                }
-
-                if (restaurantAddress === 'Restaurant Address') {
-                  console.warn('⚠️ Restaurant address not found in any location, using default')
-                }
-              }
+              console.log('✅ Final extracted restaurant address:', restaurantAddress);
 
               // Extract restaurant name - priority: restaurantName field > restaurantId.name > fallback
-              // Backend returns restaurantName as a direct field on order, and restaurantId is populated with name
-              let restaurantName = null
-
-              // Priority 1: Direct restaurantName field from order (stored in Order model)
-              if (order.restaurantName && typeof order.restaurantName === 'string' && order.restaurantName.trim()) {
-                restaurantName = order.restaurantName.trim()
-                console.log('✅ Using restaurantName from order:', restaurantName)
-              }
-              // Priority 2: Name from populated restaurantId object
-              else if (order.restaurantId && typeof order.restaurantId === 'object' && order.restaurantId.name) {
-                restaurantName = order.restaurantId.name.trim()
-                console.log('✅ Using restaurantId.name:', restaurantName)
-              }
-              // Priority 3: Fallback to existing selectedRestaurant name
-              else if (selectedRestaurant?.name) {
-                restaurantName = selectedRestaurant.name
-                console.warn('⚠️ Restaurant name not found in order, using selectedRestaurant.name:', restaurantName)
-              }
-              // Final fallback
-              else {
-                restaurantName = 'Restaurant'
-                console.error('❌ Restaurant name not found anywhere, using default:', restaurantName)
-              }
-
-              console.log('🏪 Final extracted restaurant name:', restaurantName)
+              let restaurantName = order.restaurantName || order.restaurantId?.name || selectedRestaurant?.name || 'Restaurant';
+              console.log('🏪 Final extracted restaurant name:', restaurantName);
 
               // Extract earnings from backend response
               const backendEarnings = orderData.estimatedEarnings || response.data.data.estimatedEarnings;
@@ -3014,6 +2866,48 @@ export default function DeliveryHome() {
               console.log('🏪 Updated restaurant info from backend (Simplified Flow):', restaurantInfo)
               // Update state immediately
               setSelectedRestaurant(restaurantInfo)
+
+              // ============================================
+              // SMOOTH CAMERA TRANSITION: Driver → Restaurant
+              // ============================================
+              if (window.deliveryMapInstance && restaurantLat && restaurantLng) {
+                const restaurantPosition = new window.google.maps.LatLng(restaurantLat, restaurantLng);
+
+                // Smoothly pan camera to restaurant
+                window.deliveryMapInstance.panTo(restaurantPosition);
+
+                // Fit bounds to show both driver and restaurant with padding
+                if (currentLocation) {
+                  const bounds = new window.google.maps.LatLngBounds();
+                  bounds.extend(new window.google.maps.LatLng(currentLocation[0], currentLocation[1]));
+                  bounds.extend(restaurantPosition);
+                  window.deliveryMapInstance.fitBounds(bounds, {
+                    padding: { top: 100, right: 100, bottom: 100, left: 100 }
+                  });
+                }
+
+                console.log('📹 Camera smoothly transitioned to restaurant');
+              }
+
+              // CRITICAL: Update localStorage to mark that polyline should be shown
+              try {
+                const activeOrderData = {
+                  restaurantInfo: restaurantInfo,
+                  shouldShowPolyline: true, // Enable polyline for Delivery Boy → Restaurant route
+                  navigationMode: 'restaurant',
+                  currentLocation: currentLocation,
+                  showMap: true,
+                  showRoute: true,
+                  showRoutePath: true,
+                  hasDirectionsAPI: true,
+                  enableLiveTracking: true
+                };
+                localStorage.setItem('deliveryActiveOrder', JSON.stringify(activeOrderData));
+                console.log('✅ Updated localStorage - polyline enabled for restaurant route');
+              } catch (e) {
+                console.warn('⚠️ Error updating localStorage:', e);
+              }
+
               // Show Pickup Popup Immediately
               setShowOrderIdConfirmationPopup(true)
             }
@@ -3933,73 +3827,70 @@ export default function DeliveryHome() {
       setReachedDropIsAnimatingToComplete(true)
       setReachedDropButtonProgress(1)
 
-      // CloseReached drop popup
+      // Close Reached drop popup
       setShowReachedDropPopup(false)
 
-      // NEW FLOW: Show Review popup first
-      console.log('✅ Showing Review popup after Reached Drop confirmation')
-      setShowCustomerReviewPopup(true)
+      // SIMPLIFIED 3-STEP FLOW: Call Both APIs in background
+      console.log('✅ Combined status update: Reach Door + Delivered')
 
-        // API call in background (async, doesn't block popup)
+        // API call in background (async)
         ; (async () => {
           // Get order ID - prioritize MongoDB _id over orderId string for API call
-          const orderIdForApi = newOrder?.orderMongoId ||
-            selectedRestaurant?.orderMongoId ||
+          const orderIdForApi = selectedRestaurant?.orderMongoId ||
             selectedRestaurant?.id ||
+            newOrder?.orderMongoId ||
             newOrder?._id ||
             selectedRestaurant?._id ||
             selectedRestaurant?.orderId ||
             newOrder?.orderId
 
-          console.log('🔍 Order ID lookup for reached drop:', {
-            selectedRestaurantId: selectedRestaurant?.id,
-            selectedRestaurantOrderId: selectedRestaurant?.orderId,
-            newOrderMongoId: newOrder?.orderMongoId,
-            newOrderId: newOrder?.orderId,
-            finalOrderIdForApi: orderIdForApi
-          })
-
           if (orderIdForApi) {
             try {
-              // Call backend API to confirm reached drop (in background, don't block popup)
-              // Use MongoDB _id for API call to avoid ObjectId casting errors
-              console.log('📦 Confirming reached drop for order:', orderIdForApi)
-              const response = await deliveryAPI.confirmReachedDrop(orderIdForApi)
+              // 1. Confirm Reached Drop (Reach Door)
+              console.log('📦 Background: Confirming reached door for order:', orderIdForApi)
+              await deliveryAPI.confirmReachedDrop(orderIdForApi)
+              console.log('✅ Reached door confirmed in background')
+              // 2. Complete Delivery (Delivered)
+              console.log('📦 Background: Completing delivery for order:', orderIdForApi)
+              const response = await deliveryAPI.completeDelivery(orderIdForApi, null, '')
 
-              if (response.data?.success) {
-                console.log('✅ Reached drop confirmed')
+                if (response.data?.success) {
+                  console.log('✅ Delivery completed successfully in background')
+                  
+                  // Play Audio
+                  try {
+                    const audio = new Audio(originalSound)
+                    audio.play().catch(e => console.log('Audio play failed', e))
+                  } catch (e) {
+                    console.log('Audio init failed', e)
+                  }
 
-                // CRITICAL: Clear all polylines immediately after reached drop is confirmed
-                console.log('🚫 Reached drop confirmed, clearing all route polylines')
-                if (routePolylineRef.current) {
-                  routePolylineRef.current.setMap(null);
-                  routePolylineRef.current = null;
-                }
-                if (directionsRendererRef.current) {
-                  directionsRendererRef.current.setMap(null);
-                }
-                if (liveTrackingPolylineRef.current) {
-                  liveTrackingPolylineRef.current.setMap(null);
-                  liveTrackingPolylineRef.current = null;
-                }
-                if (liveTrackingPolylineShadowRef.current) {
-                  liveTrackingPolylineShadowRef.current.setMap(null);
-                  liveTrackingPolylineShadowRef.current = null;
-                }
+                  // CRITICAL: Clear all polylines
+                  if (routePolylineRef.current) { routePolylineRef.current.setMap(null); routePolylineRef.current = null; }
+                  if (directionsRendererRef.current) { directionsRendererRef.current.setMap(null); }
+                  if (liveTrackingPolylineRef.current) { liveTrackingPolylineRef.current.setMap(null); liveTrackingPolylineRef.current = null; }
+                  if (liveTrackingPolylineShadowRef.current) {
+                    liveTrackingPolylineShadowRef.current.setMap(null);
+                    liveTrackingPolylineShadowRef.current = null;
+                  }
 
-                // Update selectedRestaurant state to reflect arrived_drop status
-                if (selectedRestaurant) {
-                  setSelectedRestaurant(prev => ({
-                    ...prev,
-                    deliveryState: {
-                      ...prev.deliveryState,
-                      status: 'arrived_drop',
-                      currentPhase: 'at_delivery'
-                    },
-                    deliveryPhase: 'at_delivery'
-                  }))
+                  // Navigate to completed page directly for the 3rd step
+                  const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || 0;
+                  navigate('/delivery/order-completed', {
+                    state: {
+                      earnings: earnings,
+                      orderId: orderIdForApi
+                    }
+                  });
+
+                  // Clear states
+                  setSelectedRestaurant(null);
+                  localStorage.removeItem('deliveryActiveOrder');
+                  setShowreachedPickupPopup(false);
+                  setShowOrderIdConfirmationPopup(false);
+                  setShowReachedDropPopup(false);
                 }
-              } else {
+ else {
                 console.error('❌ Failed to confirm reached drop:', response.data)
                 toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.')
               }
@@ -4724,10 +4615,11 @@ export default function DeliveryHome() {
             // Close Order ID confirmation popup
             setShowOrderIdConfirmationPopup(false)
 
-            toast.success('Order is out for delivery. Route to customer is on the map.', { duration: 4000 })
+            // SHOW DELIVERED BUTTON DIRECTLY (Which is the Reached Drop popup)
+            console.log('✅ Showing Delivered button (Reached Drop popup) after Pickup')
+            setShowReachedDropPopup(true)
 
-            // SKIP REACHED DROP POPUP, SHOW DELIVERED BUTTON DIRECTLY by setting state above (at_delivery)
-            console.log('✅ Skipped Reached Drop popup, showing Delivered button via state update')
+            toast.success('Order is out for delivery. Route to customer is on the map.', { duration: 4000 })
 
           } else {
             console.error('❌ Failed to confirm order ID:', response.data)
@@ -13224,7 +13116,7 @@ export default function DeliveryHome() {
                       damping: 25
                     } : { duration: 0 }}
                   >
-                    {reachedDropButtonProgress > 0.5 ? 'Release to Confirm' : 'Reached Drop'}
+                    {reachedDropButtonProgress > 0.5 ? 'Release to Confirm' : 'Order Delivered'}
                   </motion.span>
                 </div>
               </div>

@@ -236,10 +236,10 @@ export default function OrderDetectDelivery() {
         setError(null)
         const params = {
           page: 1,
-          limit: 1000, // Fetch all orders for now
+          limit: 500, // Reduced from 1000 for better performance
         }
 
-        const response = await adminAPI.getOrders(params)
+        const response = await adminAPI.getOrders(params, { timeout: 60000 })
 
         if (response.data?.success && response.data?.data?.orders) {
           const transformedOrders = response.data.data.orders.map((order, index) =>

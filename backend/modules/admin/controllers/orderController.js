@@ -2,6 +2,7 @@ import Order from '../../order/models/Order.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
+import fs from 'fs';
 
 /**
  * Get all orders for admin
@@ -26,6 +27,7 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     // Build query
     const query = {};
+
 
     // Status filter
     if (status && status !== 'all') {
@@ -125,7 +127,10 @@ export const getOrders = asyncHandler(async (req, res) => {
       }).select('_id name').lean();
 
       if (zoneDoc) {
-        query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
+        query['assignmentInfo.zoneId'] = zoneDoc._id;
+      } else {
+        // If zone is selected but not found, force empty results
+        query['assignmentInfo.zoneId'] = new mongoose.Types.ObjectId();
       }
     }
 
@@ -193,6 +198,9 @@ export const getOrders = asyncHandler(async (req, res) => {
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    // Fetch total count first
+    const total = await Order.countDocuments(query);
+
     // Fetch orders with population
     const orders = await Order.find(query)
       .populate('userId', 'name email phone')
@@ -202,9 +210,6 @@ export const getOrders = asyncHandler(async (req, res) => {
       .limit(parseInt(limit))
       .skip(skip)
       .lean();
-
-    // Get total count
-    const total = await Order.countDocuments(query);
 
     // Batch fetch settlements and payments (more efficient than individual queries)
     let settlementMap = new Map();
@@ -434,7 +439,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {

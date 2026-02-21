@@ -1154,8 +1154,8 @@ export const adminAPI = {
   },
 
   // Get orders
-  getOrders: (params = {}) => {
-    return apiClient.get(API_ENDPOINTS.ADMIN.ORDERS, { params });
+  getOrders: (params = {}, config = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.ORDERS, { params, ...config });
   },
 
   // Get order by ID

@@ -533,6 +533,19 @@ export default function OrderAssign() {
                                     </p>
                                   </div>
                                 )}
+                                {order.items && order.items.length > 0 && (
+                                  <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight block mb-1">Order Items</span>
+                                    <div className="space-y-1">
+                                      {order.items.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-[11px]">
+                                          <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
+                                          <span className="font-bold text-gray-900 dark:text-white">x{item.quantity}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-start gap-2">
@@ -797,6 +810,19 @@ export default function OrderAssign() {
                               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
                                 "{order.note}"
                               </p>
+                            )}
+                            {order.items && order.items.length > 0 && (
+                              <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight block mb-1">Order Items</span>
+                                <div className="space-y-1.5">
+                                  {order.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm">
+                                      <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
+                                      <span className="text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[10px] font-bold">x{item.quantity}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>

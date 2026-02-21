@@ -43,13 +43,13 @@ export default function OrdersPage({ statusKey = "all" }) {
       setIsLoading(true)
       const params = {
         page: 1,
-        limit: 1000, // Fetch all orders for now (can be optimized with pagination later)
+        limit: 500, // Reduced from 1000 for better performance
         status: statusKey === "all" ? undefined :
           statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
         cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
       }
 
-      const response = await adminAPI.getOrders(params)
+      const response = await adminAPI.getOrders(params, { timeout: 60000 })
 
       if (response.data?.success && response.data?.data?.orders) {
         const fetchedOrders = response.data.data.orders;

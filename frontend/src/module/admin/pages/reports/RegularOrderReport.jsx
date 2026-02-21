@@ -119,7 +119,7 @@ export default function RegularOrderReport() {
         const { fromDate, toDate } = getDateRange()
         const params = {
           page: 1,
-          limit: 10000, // Fetch all orders for report (can be optimized later)
+          limit: 1000, // Reduced from 10000 for better performance
           search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
@@ -128,7 +128,7 @@ export default function RegularOrderReport() {
           toDate: toDate ? toDate.toISOString().split('T')[0] : undefined,
         }
 
-        const response = await adminAPI.getOrders(params)
+        const response = await adminAPI.getOrders(params, { timeout: 120000 })
 
         if (response.data?.success) {
           // Transform backend orders to match frontend format
@@ -605,8 +605,8 @@ export default function RegularOrderReport() {
                   key={idx + 1}
                   onClick={() => handlePageChange(idx + 1)}
                   className={`w-6 h-6 text-[10px] rounded border ${currentPage === idx + 1
-                      ? "bg-blue-600 border-blue-600 text-white"
-                      : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "border-slate-300 text-slate-700 hover:bg-slate-50"
                     }`}
                 >
                   {idx + 1}
