@@ -264,7 +264,7 @@ export default function RestaurantFinanceReport() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-slate-900">{totals.totalOrders}</div>
-                            <p className="text-xs text-slate-500 mt-1">Total pending orders</p>
+                            <p className="text-xs text-slate-500 mt-1">Total delivered orders</p>
                         </CardContent>
                     </Card>
 
@@ -340,7 +340,15 @@ export default function RestaurantFinanceReport() {
                                             <TableCell className="text-right text-red-500/80">₹{s.restaurantEarning.commission.toLocaleString()}</TableCell>
                                             <TableCell className="text-right font-bold text-blue-600">₹{s.restaurantEarning.netEarning.toLocaleString()}</TableCell>
                                             <TableCell className="text-center">
-                                                <Badge className="bg-orange-50 text-orange-600 border-none font-semibold">Pending</Badge>
+                                                {(() => {
+                                                    const status = s.orderId?.status || 'delivered';
+                                                    const isDelivered = status === 'delivered';
+                                                    return (
+                                                        <Badge className={isDelivered ? "bg-green-50 text-green-600 border-none font-semibold" : "bg-orange-50 text-orange-600 border-none font-semibold"}>
+                                                            {isDelivered ? 'Delivered' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                                        </Badge>
+                                                    );
+                                                })()}
                                             </TableCell>
                                         </TableRow>
                                     ))}

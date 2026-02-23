@@ -41,7 +41,13 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
       .sort({ createdAt: -1 })
       .lean();
 
-    return settlements;
+    // Only show settlements where the order is delivered
+    const deliveredSettlements = settlements.filter(s => {
+      const orderStatus = s.orderId?.status;
+      return orderStatus === 'delivered';
+    });
+
+    return deliveredSettlements;
   } catch (error) {
     console.error('Error getting pending restaurant settlements:', error);
     throw error;
