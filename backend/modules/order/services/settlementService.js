@@ -1,4 +1,5 @@
 import OrderSettlement from '../models/OrderSettlement.js';
+import Order from '../models/Order.js';
 import RestaurantWallet from '../../restaurant/models/RestaurantWallet.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import mongoose from 'mongoose';
@@ -8,46 +9,101 @@ import mongoose from 'mongoose';
  */
 export const getPendingRestaurantSettlements = async (restaurantId = null, startDate = null, endDate = null) => {
   try {
-    const query = {
-      'restaurantEarning.status': { $ne: 'cancelled' },
-      restaurantSettled: false
-    };
+    // Build date range
+    let start = null;
+    let end = null;
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    // Step 1: Query Order model directly for all delivered orders in the date range
+    // Use createdAt on Order (order placement date) to match what user selects in UI
+    const orderQuery = { status: 'delivered' };
 
     if (restaurantId && mongoose.Types.ObjectId.isValid(restaurantId)) {
-      query.restaurantId = new mongoose.Types.ObjectId(restaurantId);
+      orderQuery.restaurantId = new mongoose.Types.ObjectId(restaurantId);
     } else if (restaurantId) {
-      query.restaurantId = restaurantId;
+      orderQuery.restaurantId = restaurantId;
     }
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-
-      const end = new Date(endDate);
-      // If endDate is just a date string, set it to end of day
-      if (end.getHours() === 0 && end.getMinutes() === 0) {
-        end.setHours(23, 59, 59, 999);
-      }
-
-      query.createdAt = {
-        $gte: start,
-        $lte: end
-      };
+    if (start && end) {
+      // Filter by order createdAt date range (when order was placed)
+      orderQuery.createdAt = { $gte: start, $lte: end };
     }
 
-    const settlements = await OrderSettlement.find(query)
-      .populate('orderId', 'orderId status deliveredAt')
+    const deliveredOrders = await Order.find(orderQuery)
       .populate('restaurantId', 'name restaurantId')
       .sort({ createdAt: -1 })
       .lean();
 
-    // Only show settlements where the order is delivered
-    const deliveredSettlements = settlements.filter(s => {
-      const orderStatus = s.orderId?.status;
-      return orderStatus === 'delivered';
+    if (deliveredOrders.length === 0) return [];
+
+    // Step 2: Find matching OrderSettlement records for these orders
+    const orderObjectIds = deliveredOrders.map(o => o._id);
+    const settlements = await OrderSettlement.find({
+      orderId: { $in: orderObjectIds },
+      'restaurantEarning.status': { $ne: 'cancelled' }
+    }).lean();
+
+    // Map settlements by orderId for quick lookup
+    const settlementMap = {};
+    settlements.forEach(s => {
+      settlementMap[s.orderId.toString()] = s;
     });
 
-    return deliveredSettlements;
+    // Step 3: Build response - use settlement data when available, fallback for orders without settlements
+    const result = deliveredOrders.map(order => {
+      const settlement = settlementMap[order._id.toString()];
+      const restaurantName = order.restaurantName || order.restaurantId?.name || 'N/A';
+      const foodPrice = (order.pricing?.subtotal || 0) - (order.pricing?.discount || 0);
+
+      if (settlement) {
+        // Return existing settlement data enriched with order status
+        return {
+          ...settlement,
+          orderId: {
+            _id: order._id,
+            orderId: order.orderId,
+            status: order.status,
+            deliveredAt: order.deliveredAt
+          },
+          restaurantName: settlement.restaurantName || restaurantName,
+          orderNumber: settlement.orderNumber || order.orderId,
+          createdAt: settlement.createdAt || order.createdAt
+        };
+      }
+
+      // No settlement record — construct from Order data with default commission
+      const defaultCommissionPct = 15;
+      const commission = Math.round((foodPrice * defaultCommissionPct) / 100 * 100) / 100;
+      const netEarning = Math.round((foodPrice - commission) * 100) / 100;
+
+      return {
+        _id: order._id,
+        orderId: {
+          _id: order._id,
+          orderId: order.orderId,
+          status: order.status,
+          deliveredAt: order.deliveredAt
+        },
+        orderNumber: order.orderId,
+        restaurantId: order.restaurantId,
+        restaurantName,
+        restaurantSettled: false,
+        restaurantEarning: {
+          foodPrice,
+          commission,
+          netEarning,
+          status: 'pending'
+        },
+        createdAt: order.createdAt
+      };
+    });
+
+    return result;
   } catch (error) {
     console.error('Error getting pending restaurant settlements:', error);
     throw error;

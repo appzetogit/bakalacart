@@ -88,18 +88,22 @@ export default function RestaurantFinanceReport() {
     }
 
     const handleMarkAsPaid = async () => {
-        if (settlements.length === 0) {
+        // Only process settlements that are NOT yet settled (have a real settlement record with restaurantSettled: false)
+        const pendingSettlements = settlements.filter(s => s.restaurantSettled === false && s.restaurantEarning?.status !== 'settled')
+
+        if (pendingSettlements.length === 0) {
             toast.error("No pending settlements to mark as paid")
             return
         }
 
-        if (!window.confirm(`Are you sure you want to mark ${settlements.length} orders as paid? This will credit the amounts to the restaurant and reset the pending amount to zero.`)) {
+        if (!window.confirm(`Are you sure you want to mark ${pendingSettlements.length} orders as paid? This will credit the amounts to the restaurant and reset the pending amount to zero.`)) {
             return
         }
 
         try {
             setIsProcessing(true)
-            const settlementIds = settlements.map(s => s._id)
+            // Only send IDs of settlements that exist in OrderSettlement collection
+            const settlementIds = pendingSettlements.map(s => s._id).filter(Boolean)
             const response = await adminAPI.markSettlementsProcessed(settlementIds)
 
             if (response?.data?.success) {
