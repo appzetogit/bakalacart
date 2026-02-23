@@ -479,11 +479,16 @@ export default function OrderDetailsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
                         {item.quantity || 1} x {item.name}
-                        {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
-                          <span className="text-xs font-bold ml-2 italic text-[#ff8100]">
-                            ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')})
-                          </span>
-                        )}
+                        {(() => {
+                          const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
+                          const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                          const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                          return displayParts.length > 0 ? (
+                            <span className="text-xs font-bold ml-2 italic text-[#ff8100]">
+                              ({displayParts.join(' ')})
+                            </span>
+                          ) : null
+                        })()}
                       </p>
                       {item.description && (
                         <p className="text-[11px] text-gray-600 mt-1 pl-1 border-l-2 border-gray-200 leading-tight">

@@ -302,7 +302,12 @@ export default function Checkout() {
                         />
                         <div className="flex-1">
                           <p className="font-medium text-sm md:text-base dark:text-gray-200">
-                            {item.name} {(item.itemSizeQuantity || item.itemSizeUnit) ? `(${[item.itemSizeQuantity, item.itemSizeUnit].filter(Boolean).join(' ')})` : ''}
+                            {item.name} {(() => {
+                              const sizeUnit = item.itemSizeUnit || item.unit
+                              const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                              const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                              return displayParts.length > 0 ? `(${displayParts.join(' ')})` : ''
+                            })()}
                           </p>
                           <p className="text-xs md:text-sm text-muted-foreground">
                             ₹{(item.price * 83).toFixed(0)} × {item.quantity}

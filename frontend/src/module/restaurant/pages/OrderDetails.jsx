@@ -676,11 +676,16 @@ export default function OrderDetails() {
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-gray-900">
                       {item.quantity} x {item.name}
-                      {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) && (
-                        <span className="text-xs font-bold text-[#ff8100] ml-2 italic">
-                          ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')})
-                        </span>
-                      )}
+                      {(() => {
+                        const sizeUnit = item.itemSizeUnit || item.unit
+                        const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                        const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                        return displayParts.length > 0 ? (
+                          <span className="text-xs font-bold text-[#ff8100] ml-2 italic">
+                            ({displayParts.join(' ')})
+                          </span>
+                        ) : null
+                      })()}
                     </p>
                     {item.description && (
                       <p className="text-[11px] text-gray-600 mt-1 pl-2 border-l-2 border-gray-200 leading-tight">

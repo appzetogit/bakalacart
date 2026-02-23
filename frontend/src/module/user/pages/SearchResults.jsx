@@ -202,7 +202,8 @@ export default function SearchResults() {
               "Flat ₹50 OFF above ₹199",
               "Flat 50% OFF",
               "Flat ₹40 OFF above ₹149",
-              "Flat 200 off above 500" // Added current preferred offer
+              "Flat 200 off above 500",
+              "Flat ₹200 OFF above ₹500"
             ]
             const defaultDeliveryTimes = ["25-30 mins", "20-25 mins", "30-35 mins"]
             const defaultDistances = ["1.2 km", "1 km", "0.8 km"]

@@ -1190,15 +1190,23 @@ export default function MyOrders() {
   }
 
 
-  // Handle order pickup (bill upload requirement removed)
+  // Handle order pickup (Unified step 2)
   const handleOrderPickup = async (order) => {
     const orderId = order.orderId || order._id
-    if (orderId === null || orderId === undefined || orderId === "") {
+    if (!orderId) {
       toast.error('Order ID not found')
       return
     }
 
     try {
+      // Step A: Confirm reached pickup first if not already done
+      if (!isReachedPickup(order)) {
+        console.log('📍 Automatically confirming reached pickup for order:', orderId)
+        await deliveryAPI.confirmReachedPickup(orderId)
+      }
+
+      // Step B: Confirm order ID (Actual Pickup)
+      console.log('📦 Confirming order pickup for order:', orderId)
       const response = await deliveryAPI.confirmOrderId(orderId, order.orderId || orderId, {})
 
       if (response.data?.success) {
@@ -1215,55 +1223,48 @@ export default function MyOrders() {
         toast.error(response.data?.message || 'Failed to confirm order pickup')
       }
     } catch (error) {
-      console.error('Error confirming order pickup:', error)
-      toast.error(error.response?.data?.message || 'Failed to confirm order pickup')
+      console.error('Error in unified order pickup:', error)
+      toast.error(error.response?.data?.message || 'Failed to pick up order')
     }
   }
 
-  // Handle reached drop
+  // Handle reached drop (Internal helper)
   const handleReachedDrop = async (order) => {
     const orderId = order.orderId || order._id
-    if (orderId === null || orderId === undefined || orderId === "") {
-      toast.error('Order ID not found')
-      return
-    }
+    if (!orderId) return false
 
     try {
       const response = await deliveryAPI.confirmReachedDrop(orderId)
-
-      if (response.data?.success) {
-        toast.success('Reached drop confirmed!')
-        // Refresh orders
-        const fetchResponse = await deliveryAPI.getOrders({
-          includeDelivered: false,
-          limit: 100
-        })
-        if (fetchResponse?.data?.success && fetchResponse?.data?.data?.orders) {
-          setOrders(fetchResponse.data.data.orders || [])
-        }
-      } else {
-        toast.error(response.data?.message || 'Failed to confirm reached drop')
-      }
+      return response.data?.success
     } catch (error) {
       console.error('Error confirming reached drop:', error)
-      toast.error(error.response?.data?.message || 'Failed to confirm reached drop')
+      return false
     }
   }
 
-  // Handle order delivered
+  // Handle order delivered (Unified step 3)
   const handleOrderDelivered = async (order) => {
     const orderId = order.orderId || order._id
-    if (orderId === null || orderId === undefined || orderId === "") {
+    if (!orderId) {
       toast.error('Order ID not found')
       return
     }
 
     try {
-      // Instead of completing, we show the rating popup first
+      // Step A: Confirm reached drop first if not already done
+      if (!isReachedDrop(order)) {
+        console.log('📍 Automatically confirming reached drop for order:', orderId)
+        const reached = await handleReachedDrop(order)
+        if (!reached) {
+          console.warn('⚠️ Reached drop confirmation failed, but proceeding to delivery mark...')
+        }
+      }
+
+      // Step B: Show rating popup to finalize delivery
       setSelectedOrderForRating(order)
       setShowRatingPopup(true)
     } catch (error) {
-      console.error('Error opening rating popup:', error)
+      console.error('Error in unified order delivery:', error)
       toast.error('Something went wrong')
     }
   }
@@ -1435,29 +1436,6 @@ export default function MyOrders() {
   // No swipeable action button needed anymore, replaced by ActionButton
 
   // 3. Swipeable Order Pickup Button (Bill upload requirement removed)
-  const OrderPickupButton = ({ order, onPickup }) => {
-    return (
-      <SwipeButton
-        label="Confirm Order Pickup"
-        onComplete={() => onPickup(order)}
-        color="bg-green-600"
-        progressColor="bg-green-500"
-        icon={<Package className="w-5 h-5 text-white" />}
-      />
-    )
-  }
-
-  // 4. Swipeable Reached Drop Button
-  const ReachedDropButton = ({ order, onReachedDrop }) => (
-    <SwipeButton
-      label="Reached Drop"
-      onComplete={() => onReachedDrop(order)}
-      color="bg-green-600"
-      progressColor="bg-green-500"
-      icon={<Navigation className="w-5 h-5 text-white" />}
-    />
-  )
-
   // 5. Swipeable Order Delivered Button
   const OrderDeliveredButton = ({ order, onDelivered }) => {
     const paymentMethod = (order.payment?.method || '').toLowerCase()
@@ -2131,177 +2109,93 @@ export default function MyOrders() {
 
                   {/* Card Footer: Actions */}
                   <div className="px-4 py-3">
-                    {/* Swipeable Action Button - Only for active pending orders */}
+                    {/* Swipeable Action Button - Consolidated into 3 Steps */}
                     {isActive && activeTab === "pending" ? (
-                      // Phase 1: Order not accepted yet - show Accept/Reject button
+                      // Step 1: Accept/Reject
                       !isAcceptedByDeliveryBoy(order) ? (
                         <ActionButton
                           order={order}
                           onAccept={handleAcceptOrder}
                           onReject={handleRejectOrder}
                         />
-                      ) : // Phase 2: Accepted but not reached pickup - show Reached Pickup button
-                        !isReachedPickup(order) && !isCancelled ? (
+                      ) :
+                        // Step 2: Order Pickup (Covers en_route_to_pickup and at_pickup)
+                        !isOrderPickedUp(order) && !isCancelled ? (
                           <div className="flex items-center gap-2">
                             <div className="flex-1">
-                              <ReachedPickupButton
-                                order={order}
-                                onReachedPickup={handleReachedPickup}
+                              <SwipeButton
+                                label="Confirm Order Pickup"
+                                onComplete={() => handleOrderPickup(order)}
+                                color="bg-green-600"
+                                progressColor="bg-green-500"
+                                icon={<Package className="w-5 h-5 text-white" />}
                               />
                             </div>
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation()
-                                // Get user phone number
-                                const userPhone = order?.userId?.phone ||
-                                  order?.userPhone ||
-                                  order?.address?.phone ||
-                                  order?.customerPhone ||
-                                  null
-
-                                // If phone not found, try to fetch order details from backend
-                                if (!userPhone && order.orderId) {
-                                  try {
-                                    const response = await deliveryAPI.getOrderDetails(order.orderId)
-                                    if (response.data?.success && response.data.data?.order) {
-                                      const orderData = response.data.data.order
-                                      const phone = orderData.userId?.phone || orderData.userPhone || null
-                                      if (phone) {
-                                        // Clean the phone number
-                                        let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
-                                        if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                          cleanPhone = `+91${cleanPhone}`
-                                        } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                          cleanPhone = `+${cleanPhone}`
-                                        }
-                                        console.log('📞 Calling customer:', cleanPhone)
-                                        window.location.href = `tel:${cleanPhone}`
-                                        return
-                                      }
-                                    }
-                                  } catch (error) {
-                                    console.error('Error fetching order details for phone:', error)
-                                  }
-                                }
-
+                                const userPhone = order?.userId?.phone || order?.userPhone || order?.address?.phone || null
                                 if (userPhone) {
-                                  // Clean the phone number (remove spaces, dashes, etc. but keep +)
                                   let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
-                                  // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                                  if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                    cleanPhone = `+91${cleanPhone}`
-                                  } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                    cleanPhone = `+${cleanPhone}`
-                                  }
-                                  console.log('📞 Calling customer:', cleanPhone)
+                                  if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) cleanPhone = `+91${cleanPhone}`
                                   window.location.href = `tel:${cleanPhone}`
                                 } else {
                                   toast.error('Customer phone number not available')
                                 }
                               }}
-                              className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100 hover:bg-green-100 transition-colors"
-                              title="Call customer"
+                              className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100 hover:bg-green-100 transition-colors"
                             >
-                              <Phone className="w-6 h-6" />
+                              <Phone className="w-5 h-5" />
                             </button>
                             <button
                               onClick={(e) => handleRestaurantLocationClick(order, e)}
-                              className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100"
+                              className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-600 shadow-sm border border-green-100"
                               title="View restaurant location"
                             >
-                              <MapPin className="w-6 h-6" />
+                              <MapPin className="w-5 h-5" />
                             </button>
                           </div>
-                        ) : // Phase 3: Reached pickup but not picked up - show Order Pickup with bill upload
-                          !isOrderPickedUp(order) && !isCancelled ? (
-                            <OrderPickupButton
-                              order={order}
-                              onPickup={handleOrderPickup}
-                            />
-                          ) : // Phase 4: Picked up but not reached drop - show Reached Drop button
-                            !isReachedDrop(order) && !isCancelled ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1">
-                                  <ReachedDropButton
-                                    order={order}
-                                    onReachedDrop={handleReachedDrop}
-                                  />
-                                </div>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation()
-                                    // Get user phone number
-                                    const userPhone = order?.userId?.phone ||
-                                      order?.userPhone ||
-                                      order?.address?.phone ||
-                                      null
-
-                                    // If phone not found, try to fetch order details from backend
-                                    if (!userPhone && order.orderId) {
-                                      try {
-                                        const response = await deliveryAPI.getOrderDetails(order.orderId)
-                                        if (response.data?.success && response.data.data?.order) {
-                                          const orderData = response.data.data.order
-                                          const phone = orderData.userId?.phone || orderData.userPhone || null
-                                          if (phone) {
-                                            // Clean the phone number
-                                            let cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '')
-                                            if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                              cleanPhone = `+91${cleanPhone}`
-                                            } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                              cleanPhone = `+${cleanPhone}`
-                                            }
-                                            console.log('📞 Calling customer:', cleanPhone)
-                                            window.location.href = `tel:${cleanPhone}`
-                                            return
-                                          }
-                                        }
-                                      } catch (error) {
-                                        console.error('Error fetching order details for phone:', error)
-                                      }
-                                    }
-
-                                    if (userPhone) {
-                                      // Clean the phone number (remove spaces, dashes, etc. but keep +)
-                                      let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
-                                      // Ensure phone number starts with +91 for Indian numbers if it doesn't have country code
-                                      if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) {
-                                        cleanPhone = `+91${cleanPhone}`
-                                      } else if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-                                        cleanPhone = `+${cleanPhone}`
-                                      }
-                                      console.log('📞 Calling customer:', cleanPhone)
-                                      window.location.href = `tel:${cleanPhone}`
-                                    } else {
-                                      toast.error('Customer phone number not available')
-                                    }
-                                  }}
-                                  className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
-                                  title="Call customer"
-                                >
-                                  <Phone className="w-6 h-6" />
-                                </button>
-                                <button
-                                  onClick={(e) => handleCustomerLocationClick(order, e)}
-                                  className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
-                                  title="View customer location on map"
-                                >
-                                  <MapPin className="w-6 h-6" />
-                                </button>
-                              </div>
-                            ) : // Phase 5: Reached drop but not delivered - show Order Delivered
-                              !isOrderDelivered(order) ? (
+                        ) :
+                          // Step 3: Order Delivered (Covers picking up and reached drop)
+                          !isOrderDelivered(order) && !isCancelled ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
                                 <OrderDeliveredButton
                                   order={order}
                                   onDelivered={handleOrderDelivered}
                                 />
-                              ) : // Phase 6: Delivered - show Complete button with earnings
-                                (
-                                  <CompleteButton
-                                    order={order}
-                                    earnings={order.pricing?.deliveryFee || order.estimatedEarnings || 0}
-                                  />
-                                )
+                              </div>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const userPhone = order?.userId?.phone || order?.userPhone || order?.address?.phone || null
+                                  if (userPhone) {
+                                    let cleanPhone = String(userPhone).replace(/[\s\-\(\)]/g, '')
+                                    if (!cleanPhone.startsWith('+') && cleanPhone.length === 10) cleanPhone = `+91${cleanPhone}`
+                                    window.location.href = `tel:${cleanPhone}`
+                                  } else {
+                                    toast.error('Customer phone number not available')
+                                  }
+                                }}
+                                className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                              >
+                                <Phone className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleCustomerLocationClick(order, e)}
+                                className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100 hover:bg-blue-100 transition-colors"
+                                title="View customer location on map"
+                              >
+                                <MapPin className="w-5 h-5" />
+                              </button>
+                            </div>
+                          ) : (
+                            // Final Step: Complete (Already delivered but need to finish)
+                            <CompleteButton
+                              order={order}
+                              earnings={order.pricing?.deliveryFee || order.estimatedEarnings || 0}
+                            />
+                          )
                     ) : paymentFailed ? (
                       <div className="flex items-center gap-2">
                         <div className="bg-red-100 p-1 rounded-full">

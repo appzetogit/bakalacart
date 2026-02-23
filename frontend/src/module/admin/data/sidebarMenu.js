@@ -257,6 +257,7 @@ export const sidebarMenuData = [
         icon: "FileText",
         subItems: [
           { label: "Restaurant Report", path: "/admin/restaurant-report" },
+          { label: "Finance Report", path: "/admin/restaurant-finance-report" },
         ],
       },
       {

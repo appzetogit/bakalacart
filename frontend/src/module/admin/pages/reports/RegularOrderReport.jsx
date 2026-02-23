@@ -48,6 +48,20 @@ export default function RegularOrderReport() {
   })
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [statusCounts, setStatusCounts] = useState({
+    total: 0,
+    Scheduled: 0,
+    Pending: 0,
+    Accepted: 0,
+    Processing: 0,
+    "Food On The Way": 0,
+    Delivered: 0,
+    Canceled: 0,
+    "Payment Failed": 0,
+    Refunded: 0,
+  })
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -118,14 +132,14 @@ export default function RegularOrderReport() {
       try {
         const { fromDate, toDate } = getDateRange()
         const params = {
-          page: 1,
-          limit: 1000, // Reduced from 10000 for better performance
+          page: currentPage,
+          limit: PAGE_SIZE,
           search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           customer: filters.customer !== "All customers" ? filters.customer : undefined,
-          fromDate: fromDate ? fromDate.toISOString().split('T')[0] : undefined,
-          toDate: toDate ? toDate.toISOString().split('T')[0] : undefined,
+          fromDate: fromDate ? fromDate.toISOString() : undefined,
+          toDate: toDate ? toDate.toISOString() : undefined,
         }
 
         const response = await adminAPI.getOrders(params, { timeout: 120000 })
@@ -147,6 +161,15 @@ export default function RegularOrderReport() {
             orderStatus: order.orderStatus,
           }))
           setOrders(transformedOrders)
+
+          if (response.data.data.pagination) {
+            setTotalPages(response.data.data.pagination.totalPages || 1)
+            setTotalRecords(response.data.data.pagination.total || 0)
+          }
+
+          if (response.data.data.statusCounts) {
+            setStatusCounts(response.data.data.statusCounts)
+          }
         } else {
           setError(response.data?.message || "Failed to fetch orders")
           toast.error(response.data?.message || "Failed to fetch orders")
@@ -161,7 +184,7 @@ export default function RegularOrderReport() {
     }
 
     fetchOrders()
-  }, [filters, searchQuery])
+  }, [filters, searchQuery, currentPage])
 
   const filteredOrders = useMemo(() => {
     return orders // Orders are already filtered by backend
@@ -209,37 +232,7 @@ export default function RegularOrderReport() {
 
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.customer !== "All customers" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE))
-
-  const paginatedOrders = useMemo(() => {
-    const safePage = Math.min(currentPage, totalPages)
-    const start = (safePage - 1) * PAGE_SIZE
-    return filteredOrders.slice(start, start + PAGE_SIZE)
-  }, [filteredOrders, currentPage, totalPages])
-
-  const statusCounts = useMemo(
-    () =>
-      filteredOrders.reduce(
-        (acc, order) => {
-          acc.total += 1
-          if (acc[order.orderStatus] != null) acc[order.orderStatus] += 1
-          return acc
-        },
-        {
-          total: 0,
-          Scheduled: 0,
-          Pending: 0,
-          Accepted: 0,
-          Processing: 0,
-          "Food On The Way": 0,
-          Delivered: 0,
-          Canceled: 0,
-          "Payment Failed": 0,
-          Refunded: 0,
-        }
-      ),
-    [filteredOrders]
-  )
+  const paginatedOrders = orders; // Use direct orders state as it's already paginated by backend
 
   const formatAmount = (amount) =>
     `$ ${Number(amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -589,7 +582,7 @@ export default function RegularOrderReport() {
                 {paginatedOrders.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} -{" "}
                 {(currentPage - 1) * PAGE_SIZE + paginatedOrders.length}
               </span>{" "}
-              of <span className="font-semibold text-slate-700">{filteredOrders.length}</span> orders
+              of <span className="font-semibold text-slate-700">{totalRecords}</span> orders
             </p>
 
             <div className="flex items-center gap-1">

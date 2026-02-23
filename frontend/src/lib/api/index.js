@@ -1644,6 +1644,12 @@ export const adminAPI = {
   deleteNotification: (id) => {
     return apiClient.delete(`${API_ENDPOINTS.ADMIN.NOTIFICATION}/${id}`);
   },
+  getRestaurantSettlements: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.ADMIN.SETTLEMENTS_RESTAURANTS, { params });
+  },
+  markSettlementsProcessed: (settlementIds) => {
+    return apiClient.post(API_ENDPOINTS.ADMIN.SETTLEMENTS_MARK_PROCESSED, { settlementIds });
+  },
 };
 
 // Upload / media helper functions

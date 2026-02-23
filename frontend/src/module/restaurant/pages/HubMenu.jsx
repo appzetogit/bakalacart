@@ -1333,11 +1333,16 @@ export default function HubMenu() {
                                 </div>
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="text-sm font-bold text-gray-900">₹{item.price}</p>
-                                  {(item.itemSizeQuantity || item.itemSizeUnit) && (
-                                    <span className="text-xs font-bold text-[#ff8100] bg-orange-50 px-2 py-0.5 rounded">
-                                      {item.itemSizeQuantity} {item.itemSizeUnit}
-                                    </span>
-                                  )}
+                                  {(() => {
+                                    const sizeUnit = item.itemSizeUnit || item.unit
+                                    const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                                    const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                                    return displayParts.length > 0 ? (
+                                      <span className="text-xs font-bold text-[#ff8100] bg-orange-50 px-2 py-0.5 rounded">
+                                        {displayParts.join(' ')}
+                                      </span>
+                                    ) : null
+                                  })()}
                                   {item.servesInfo && (
                                     <span className="text-xs text-gray-500 italic">
                                       ({item.servesInfo})

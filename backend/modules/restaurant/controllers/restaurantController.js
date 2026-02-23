@@ -92,6 +92,86 @@ function getRestaurantZoneId(restaurantLat, restaurantLng, activeZones) {
   return null;
 }
 
+/**
+ * Helper to calculate if a restaurant is currently accepting orders
+ * based on its manual toggle, admin status, and delivery timings.
+ */
+export const calculateAcceptingOrders = (restaurant) => {
+  // Debug log for Sagar Restaurant to see raw DB values
+  if (restaurant.name?.includes("Sagar")) {
+    console.log(`[DEBUG STATUS] ${restaurant.name}: DB_isAcceptingOrders=${restaurant.isAcceptingOrders}, DB_isRestaurantOpen=${restaurant.isRestaurantOpen}`);
+  }
+
+  // 1. Manual Admin Override (Master close)
+  if (restaurant.isRestaurantOpen === false) {
+    if (restaurant.name?.includes("Sagar")) console.log(`[STATUS] ${restaurant.name}: CALC=CLOSED (Admin Master Close)`);
+    return false;
+  }
+
+  // 2. Manual Owner Toggle (Online/Offline)
+  // Check specifically for false - if it's false, the merchant wants to be offline
+  if (restaurant.isAcceptingOrders === false) {
+    if (restaurant.name?.includes("Sagar")) console.log(`[STATUS] ${restaurant.name}: CALC=CLOSED (Owner Toggle Offline)`);
+    return false;
+  }
+
+  // 3. Delivery Timings Check (Automatic)
+  if (!restaurant.deliveryTimings || !restaurant.deliveryTimings.openingTime || !restaurant.deliveryTimings.closingTime) {
+    if (restaurant.name?.includes("Sagar")) console.log(`[STATUS] ${restaurant.name}: CALC=OPEN (No Timings Configured)`);
+    return true; // Default to open if no timings configured
+  }
+
+  try {
+    const now = new Date();
+    // Use India Standard Time (IST) as the primary market is India
+    const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit', weekday: 'short' };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(now);
+
+    let currentHour, currentMinute, currentDay;
+    parts.forEach(p => {
+      if (p.type === 'hour') currentHour = parseInt(p.value);
+      if (p.type === 'minute') currentMinute = parseInt(p.value);
+      if (p.type === 'weekday') currentDay = p.value;
+    });
+
+    // Check if current day is in openDays
+    if (restaurant.openDays && restaurant.openDays.length > 0) {
+      const isDayOpen = restaurant.openDays.some(day =>
+        day.toLowerCase().startsWith(currentDay.toLowerCase())
+      );
+      if (!isDayOpen) {
+        if (restaurant.name?.includes("Sagar")) console.log(`[STATUS] ${restaurant.name}: CALC=CLOSED (Day ${currentDay} is Closed)`);
+        return false;
+      }
+    }
+
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    const [openHour, openMinute] = restaurant.deliveryTimings.openingTime.split(':').map(Number);
+    const [closeHour, closeMinute] = restaurant.deliveryTimings.closingTime.split(':').map(Number);
+
+    const openingTimeInMinutes = openHour * 60 + openMinute;
+    const closingTimeInMinutes = closeHour * 60 + closeMinute;
+
+    let isWithin = false;
+    if (closingTimeInMinutes > openingTimeInMinutes) {
+      // Same day timing (e.g., 09:00 - 22:00)
+      isWithin = currentTimeInMinutes >= openingTimeInMinutes && currentTimeInMinutes <= closingTimeInMinutes;
+    } else {
+      // Next day timing (e.g., 20:00 - 02:00)
+      isWithin = currentTimeInMinutes >= openingTimeInMinutes || currentTimeInMinutes <= closingTimeInMinutes;
+    }
+
+    if (restaurant.name?.includes("Sagar")) {
+      console.log(`[STATUS] ${restaurant.name}: CALC=${isWithin ? 'OPEN' : 'CLOSED'} (Time: ${currentHour}:${currentMinute}, Open: ${restaurant.deliveryTimings.openingTime}, Close: ${restaurant.deliveryTimings.closingTime})`);
+    }
+    return isWithin;
+  } catch (error) {
+    console.error('Error calculating restaurant timing availability:', error);
+    return restaurant.isAcceptingOrders !== false; // Fallback to manual toggle on error
+  }
+};
+
 // Get all restaurants (for user module)
 export const getRestaurants = async (req, res) => {
   try {
@@ -207,13 +287,12 @@ export const getRestaurants = async (req, res) => {
       const hasMenuImages = restaurant.menuImages && Array.isArray(restaurant.menuImages) && restaurant.menuImages.length > 0
 
       // Use coverImages if available, otherwise fallback to menuImages for backward compatibility
-      // This ensures restaurants that uploaded images via OutletInfo (saved as menuImages before) still show images
       const coverImages = hasCoverImages
         ? restaurant.coverImages
         : (hasMenuImages ? restaurant.menuImages : [])
 
-      // Override isAcceptingOrders if admin has manually closed the restaurant
-      const isAcceptingOrders = restaurant.isAcceptingOrders && (restaurant.isRestaurantOpen !== false);
+      // Calculate the final isAcceptingOrders status based on all factors (Toggle, Admin, Timings)
+      const isAcceptingOrders = calculateAcceptingOrders(restaurant);
 
       return {
         ...restaurant,
@@ -310,10 +389,8 @@ export const getRestaurantById = async (req, res) => {
       return errorResponse(res, 404, 'Restaurant not found');
     }
 
-    // Override isAcceptingOrders if admin has manually closed the restaurant
-    if (restaurant.isRestaurantOpen === false) {
-      restaurant.isAcceptingOrders = false;
-    }
+    // Calculate the final isAcceptingOrders status based on all factors (Toggle, Admin, Timings)
+    restaurant.isAcceptingOrders = calculateAcceptingOrders(restaurant);
 
     return successResponse(res, 200, 'Restaurant retrieved successfully', {
       restaurant,
@@ -1029,14 +1106,15 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
       }
     };
 
-    // Get all active restaurants that are currently accepting orders (online)
-    // These are the only ones that should be visible to users
+    // Get all active restaurants
     let restaurants = await Restaurant.find({
       isActive: true,
-      isAcceptingOrders: true
     })
       .select('-owner -createdAt -updatedAt')
       .lean();
+
+    // Filter by final accepting orders status (Toggle + Admin + Timings)
+    restaurants = restaurants.filter(restaurant => calculateAcceptingOrders(restaurant));
 
     // Note: We show all restaurants regardless of zone. Zone-based filtering is removed.
     // Users in any zone will see all restaurants.

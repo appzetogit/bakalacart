@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { FileText, Calendar, Package } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -33,72 +33,32 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
-  const [page, setPage] = useState(1)
   const [processingRefund, setProcessingRefund] = useState(null)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
-  const [activeFiltersCountState, setActiveFiltersCountState] = useState(0)
-
-  // Get management functions but we'll handle orders differently for server-side pagination
-  const ordersManagement = useOrdersManagement(orders, statusKey, config.title)
-
-  const {
-    searchQuery,
-    setSearchQuery,
-    isFilterOpen,
-    setIsFilterOpen,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    isViewOrderOpen,
-    setIsViewOrderOpen,
-    selectedOrder,
-    filters,
-    setFilters,
-    visibleColumns,
-    // We don't use filteredOrders from the hook because we do server-side filtering
-    // and the 'orders' state itself is already the filtered result
-    restaurants,
-    handleApplyFilters,
-    handleResetFilters,
-    handleExport,
-    handleViewOrder,
-    handlePrintOrder,
-    toggleColumn,
-    resetColumns,
-  } = ordersManagement
 
   // Fetch orders from backend API
-  const fetchOrders = async (pageNum = 1) => {
+  const fetchOrders = async () => {
     try {
       setIsLoading(true)
-
       const params = {
-        page: pageNum,
-        limit: 10, // Match OrdersTable itemsPerPage for perfect server-side pagination
+        page: 1,
+        limit: 500, // Reduced from 1000 for better performance
         status: statusKey === "all" ? undefined :
           statusKey === "restaurant-cancelled" ? "cancelled" : statusKey,
-        cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined,
-        search: searchQuery || undefined,
-        paymentStatus: filters.paymentStatus || undefined,
-        restaurant: filters.restaurant || undefined,
-        fromDate: filters.fromDate || undefined,
-        toDate: filters.toDate || undefined,
-        zone: filters.zone || undefined,
-        customer: filters.customer || undefined
+        cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined
       }
 
       const response = await adminAPI.getOrders(params, { timeout: 60000 })
 
       if (response.data?.success && response.data?.data?.orders) {
         const fetchedOrders = response.data.data.orders;
-        const total = response.data.data.pagination?.total || fetchedOrders.length;
-
         setOrders(fetchedOrders)
-        setTotalCount(total)
+        setTotalCount(fetchedOrders.length)
       } else {
         console.error("Failed to fetch orders:", response.data)
+        toast.error("Failed to fetch orders")
         setOrders([])
-        setTotalCount(0)
       }
     } catch (error) {
       console.error("Error fetching orders:", error)
@@ -109,36 +69,9 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
   }
 
-  // Effect to handle status change
   useEffect(() => {
-    setPage(1)
-    fetchOrders(1)
+    fetchOrders()
   }, [statusKey])
-
-  // Effect to handle search and filter changes - debounced
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1)
-      fetchOrders(1)
-    }, 500)
-
-    // Calculate active filters count for UI
-    let count = 0;
-    if (filters.paymentStatus) count++;
-    if (filters.restaurant) count++;
-    if (filters.fromDate) count++;
-    if (filters.toDate) count++;
-    if (filters.zone) count++;
-    if (filters.customer) count++;
-    setActiveFiltersCountState(count);
-
-    return () => clearTimeout(timer)
-  }, [searchQuery, filters])
-
-  // Effect to handle page change
-  useEffect(() => {
-    fetchOrders(page)
-  }, [page])
 
   // Handle mark picked up by admin
   const handleMarkPickedUp = async (order) => {
@@ -156,7 +89,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       const response = await adminAPI.markOrderAsPickedUp(orderIdToUse)
       if (response.data?.success) {
         toast.success(response.data?.message || `Order ${order.orderId} marked as picked up`)
-        fetchOrders(page)
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to update order status")
       }
@@ -182,7 +115,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       const response = await adminAPI.markOrderAsDelivered(orderIdToUse)
       if (response.data?.success) {
         toast.success(response.data?.message || `Order ${order.orderId} marked as delivered`)
-        fetchOrders(page)
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to update order status")
       }
@@ -214,6 +147,9 @@ export default function OrdersPage({ statusKey = "all" }) {
 
   // Process refund with amount
   const processRefund = async (order, refundAmount = null) => {
+    // Try using MongoDB _id first (more reliable for route matching), then fallback to orderId string
+    // Backend accepts either MongoDB ObjectId (24 chars) or orderId string
+    // Using MongoDB _id is more reliable for route matching (no dashes/special chars)
     const orderIdToUse = order.id || order._id || order.orderId
 
     if (!orderIdToUse) {
@@ -222,11 +158,29 @@ export default function OrdersPage({ statusKey = "all" }) {
       return
     }
 
+    console.log('🔍 Order details for refund:', {
+      orderIdString: order.orderId,
+      mongoId: order.id,
+      orderIdToUse,
+      willUse: order.orderId ? 'orderId string' : 'MongoDB _id',
+      refundAmount
+    })
+
     try {
       setProcessingRefund(orderIdToUse)
 
+      console.log('🔍 Processing refund for order:', {
+        orderId: order.orderId,
+        id: order.id,
+        _id: order._id,
+        orderIdToUse,
+        refundAmount,
+        url: `/api/admin/orders/${orderIdToUse}/refund`
+      })
+
       // Include refundAmount in request body if provided (ensure it's a number)
       const requestData = refundAmount !== null ? { refundAmount: parseFloat(refundAmount) } : {}
+      console.log('📤 Request data being sent:', requestData)
       const response = await adminAPI.processRefund(orderIdToUse, requestData)
 
       if (response.data?.success) {
@@ -234,14 +188,68 @@ export default function OrdersPage({ statusKey = "all" }) {
         toast.success(response.data?.message || (isWalletPayment
           ? `Wallet refund of ₹${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}`
           : `Refund initiated successfully for order ${order.orderId}`))
+        // Update the order in the local state immediately to show "Refunded" status
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            (o.id === order.id || o.orderId === order.orderId)
+              ? { ...o, refundStatus: 'processed' } // Wallet refunds are instant, so mark as processed
+              : o
+          )
+        )
         // Refresh the orders list to get updated data
-        fetchOrders(page)
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to process refund")
       }
     } catch (error) {
       console.error("❌ Error processing refund:", error)
-      toast.error(error.response?.data?.message || "Failed to process refund")
+
+      // Log full error details for debugging
+      const errorDetails = {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        fullURL: error.config?.baseURL + error.config?.url,
+        orderId: orderIdToUse,
+        refundAmount: refundAmount,
+        order: {
+          id: order.id,
+          orderId: order.orderId,
+          _id: order._id
+        },
+        stack: error.stack
+      }
+      console.error("❌ Error details:", JSON.stringify(errorDetails, null, 2))
+
+      // Show more specific error message
+      let errorMessage = "Failed to process refund"
+
+      if (error.response) {
+        // Server responded with error
+        if (error.response.status === 404) {
+          errorMessage = `Order not found (ID: ${orderIdToUse}). Please check if the order exists.`
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data?.message || "Invalid request. Please check the refund amount."
+        } else if (error.response.status === 500) {
+          errorMessage = error.response.data?.message || "Server error. Please try again later."
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message
+        } else {
+          errorMessage = `Error ${error.response.status}: ${error.response.statusText || "Unknown error"}`
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = "Network error. Please check your internet connection and try again."
+      } else {
+        // Error in setting up the request
+        errorMessage = error.message || "Failed to process refund"
+      }
+
+      console.error("❌ Final error message:", errorMessage)
+      toast.error(errorMessage)
     } finally {
       setProcessingRefund(null)
       setRefundModalOpen(false)
@@ -276,8 +284,11 @@ export default function OrdersPage({ statusKey = "all" }) {
 
       if (response.data?.success) {
         toast.success(`Order ${order.orderId} deleted successfully`)
-        // Refresh the orders list
-        fetchOrders(page)
+        // Remove order from local state
+        setOrders(prevOrders => prevOrders.filter(o =>
+          o.id !== order.id && o.orderId !== order.orderId && o._id !== order._id
+        ))
+        setTotalCount(prev => prev - 1)
       } else {
         toast.error(response.data?.message || "Failed to delete order")
       }
@@ -308,7 +319,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       if (response.data?.success) {
         toast.success(response.data?.message || `Order ${order.orderId} accepted successfully on behalf of restaurant`)
         // Refresh the orders list
-        fetchOrders(page)
+        fetchOrders()
       } else {
         toast.error(response.data?.message || "Failed to accept order")
       }
@@ -318,15 +329,52 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
   }
 
+  const {
+    searchQuery,
+    setSearchQuery,
+    isFilterOpen,
+    setIsFilterOpen,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    isViewOrderOpen,
+    setIsViewOrderOpen,
+    selectedOrder,
+    filters,
+    setFilters,
+    visibleColumns,
+    filteredOrders,
+    count,
+    activeFiltersCount,
+    restaurants,
+    handleApplyFilters,
+    handleResetFilters,
+    handleExport,
+    handleViewOrder,
+    handlePrintOrder,
+    toggleColumn,
+    resetColumns,
+  } = useOrdersManagement(orders, statusKey, config.title)
+
+  if (isLoading) {
+    return (
+      <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
       <OrdersTopbar
         title={config.title}
-        count={totalCount}
+        count={count}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
-        activeFiltersCount={activeFiltersCountState}
+        activeFiltersCount={activeFiltersCount}
         onExport={handleExport}
         onSettingsClick={() => setIsSettingsOpen(true)}
       />
@@ -360,30 +408,17 @@ export default function OrdersPage({ statusKey = "all" }) {
         onConfirm={handleRefundConfirm}
         isProcessing={processingRefund !== null}
       />
-
-      <div className="flex flex-col gap-4">
-        {isLoading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-20 flex flex-col items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-            <p className="text-gray-600 font-medium">Fetching orders...</p>
-          </div>
-        ) : (
-          <OrdersTable
-            orders={orders}
-            visibleColumns={visibleColumns}
-            onViewOrder={handleViewOrder}
-            onPrintOrder={handlePrintOrder}
-            onRefund={handleRefund}
-            onDeleteOrder={handleDeleteOrder}
-            onAcceptOrder={handleAcceptOrder}
-            onMarkPickedUp={handleMarkPickedUp}
-            onMarkDelivered={handleMarkDelivered}
-            currentPage={page}
-            totalCount={totalCount}
-            onPageChange={setPage}
-          />
-        )}
-      </div>
+      <OrdersTable
+        orders={filteredOrders}
+        visibleColumns={visibleColumns}
+        onViewOrder={handleViewOrder}
+        onPrintOrder={handlePrintOrder}
+        onRefund={handleRefund}
+        onDeleteOrder={handleDeleteOrder}
+        onAcceptOrder={handleAcceptOrder}
+        onMarkPickedUp={handleMarkPickedUp}
+        onMarkDelivered={handleMarkDelivered}
+      />
     </div>
   )
 }

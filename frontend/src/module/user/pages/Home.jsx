@@ -958,13 +958,16 @@ export default function Home() {
       const cacheKey = JSON.stringify(params);
 
       // Check global memory cache first (for fast back navigation)
+      // TEMPORARILY DISABLED FOR DEBUGGING STATUS ISSUES
+      /*
       if (useCache && HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
         console.log('Using cached restaurants data for key:', cacheKey);
         setRestaurantsData(HOME_PAGE_CACHE.restaurants.get(cacheKey));
         setLoadingRestaurants(false);
         // Optional: fetch in background to update
-        // return; 
+        // return;
       }
+      */
 
       // If we have cached data, we can still fetch to update, but don't show loading spinner if we have data
       if (HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
@@ -1228,6 +1231,11 @@ export default function Home() {
           }
         })
 
+        if (transformedRestaurants.some(r => r.name?.includes("Sagar"))) {
+          const sagar = transformedRestaurants.find(r => r.name?.includes("Sagar"));
+          console.log(`[FRONTEND STATUS] ${sagar.name}: isAcceptingOrders=${sagar.isAcceptingOrders}`);
+        }
+
         // Sort restaurants by distance (nearby first) - only if user location is available
         if (userLat && userLng) {
           transformedRestaurants.sort((a, b) => {
@@ -1328,102 +1336,94 @@ export default function Home() {
     console.log('🔄 Recalculated distances for all restaurants based on user location')
   }, [location?.latitude, location?.longitude])
 
-  // Filter restaurants and foods based on active filters
+  // Filter restaurants and foods based on APPLIED filters (set when user clicks "Show results")
   const filteredRestaurants = useMemo(() => {
     // Use only API data - no mock data fallback
     let filtered = restaurantsData.filter(r =>
       r.isActive !== false
     )
 
+    // Use appliedFilters (confirmed by user) not activeFilters (draft in modal)
+    const af = appliedFilters.activeFilters
+    const sb = appliedFilters.sortBy
+    const sc = appliedFilters.selectedCuisine
+
     // Apply filters
-    if (activeFilters.has('price-under-200')) {
+    if (af.has('price-under-200')) {
       filtered = filtered.filter(r => r.priceRange === "$" || r.priceRange === "$$")
     }
-    if (activeFilters.has('price-under-500')) {
+    if (af.has('price-under-500')) {
       filtered = filtered.filter(r => r.priceRange !== "$$$")
     }
-    if (activeFilters.has('delivery-under-30')) {
+    if (af.has('delivery-under-30')) {
       filtered = filtered.filter(r => {
         const timeMatch = r.deliveryTime.match(/(\d+)/)
         return timeMatch && parseInt(timeMatch[1]) <= 30
       })
     }
-    if (activeFilters.has('delivery-under-45')) {
+    if (af.has('delivery-under-45')) {
       filtered = filtered.filter(r => {
         const timeMatch = r.deliveryTime.match(/(\d+)/)
         return timeMatch && parseInt(timeMatch[1]) <= 45
       })
     }
-    if (activeFilters.has('rating-35-plus')) {
+    if (af.has('rating-35-plus')) {
       filtered = filtered.filter(r => r.rating >= 3.5)
     }
-    if (activeFilters.has('rating-4-plus')) {
+    if (af.has('rating-4-plus')) {
       filtered = filtered.filter(r => r.rating >= 4.0)
     }
-    if (activeFilters.has('rating-45-plus')) {
+    if (af.has('rating-45-plus')) {
       filtered = filtered.filter(r => r.rating >= 4.5)
     }
-    if (activeFilters.has('distance-under-1km')) {
+    if (af.has('distance-under-1km')) {
       filtered = filtered.filter(r => {
-        const distMatch = r.distance.match(/(\d+\.?\d*)/)
+        const distMatch = r.distance?.match(/(\d+\.?\d*)/)
         return distMatch && parseFloat(distMatch[1]) <= 1.0
       })
     }
-    if (activeFilters.has('distance-under-2km')) {
+    if (af.has('distance-under-2km')) {
       filtered = filtered.filter(r => {
-        const distMatch = r.distance.match(/(\d+\.?\d*)/)
+        const distMatch = r.distance?.match(/(\d+\.?\d*)/)
         return distMatch && parseFloat(distMatch[1]) <= 2.0
       })
     }
-    if (activeFilters.has('delivery-under-45')) {
-      filtered = filtered.filter(r => {
-        const timeMatch = r.deliveryTime.match(/(\d+)/)
-        return timeMatch && parseInt(timeMatch[1]) <= 45
-      })
-    }
-    if (activeFilters.has('top-rated')) {
+    if (af.has('top-rated')) {
       filtered = filtered.filter(r => r.rating >= 4.5)
     }
-    if (activeFilters.has('trusted')) {
+    if (af.has('trusted')) {
       filtered = filtered.filter(r => r.rating >= 4.0)
     }
-    if (activeFilters.has('has-offers')) {
+    if (af.has('has-offers')) {
       filtered = filtered.filter(r => r.offer && r.offer.length > 0)
     }
-    if (selectedCuisine) {
-      filtered = filtered.filter(r => r.cuisine === selectedCuisine)
+    if (sc) {
+      filtered = filtered.filter(r => r.cuisine === sc)
     }
 
     // Apply sorting
-    if (sortBy === 'price-low') {
+    if (sb === 'price-low') {
       filtered.sort((a, b) => {
         const aPrice = a.priceRange === "$" ? 1 : a.priceRange === "$$" ? 2 : 3
         const bPrice = b.priceRange === "$" ? 1 : b.priceRange === "$$" ? 2 : 3
         return aPrice - bPrice
       })
-    } else if (sortBy === 'price-high') {
+    } else if (sb === 'price-high') {
       filtered.sort((a, b) => {
         const aPrice = a.priceRange === "$" ? 1 : a.priceRange === "$$" ? 2 : 3
         const bPrice = b.priceRange === "$" ? 1 : b.priceRange === "$$" ? 2 : 3
         return bPrice - aPrice
       })
-    } else if (sortBy === 'rating-high') {
+    } else if (sb === 'rating-high') {
       filtered.sort((a, b) => b.rating - a.rating)
-    } else if (sortBy === 'rating-low') {
+    } else if (sb === 'rating-low') {
       filtered.sort((a, b) => a.rating - b.rating)
     } else {
       // Default sorting: Available restaurants first, then by distance (nearby first)
-      // This ensures all restaurants in zone are shown, but nearby ones appear first
       filtered.sort((a, b) => {
-        // Available restaurants first, then unavailable
         const aAvailable = a.isActive && a.isAcceptingOrders
         const bAvailable = b.isActive && b.isAcceptingOrders
-
-        if (aAvailable !== bAvailable) {
-          return aAvailable ? -1 : 1 // Available restaurants come first
-        }
-
-        // If both have same availability, sort by distance
+        if (aAvailable !== bAvailable) return aAvailable ? -1 : 1
         const aDistance = a.distanceInKm !== null && a.distanceInKm !== undefined ? a.distanceInKm : Infinity
         const bDistance = b.distanceInKm !== null && b.distanceInKm !== undefined ? b.distanceInKm : Infinity
         return aDistance - bDistance
@@ -1431,7 +1431,7 @@ export default function Home() {
     }
 
     return filtered
-  }, [restaurantsData, activeFilters, selectedCuisine, sortBy])
+  }, [restaurantsData, appliedFilters])
 
   // Featured foods removed - will be handled by restaurants data from API
   const filteredFeaturedFoods = useMemo(() => {
@@ -2059,10 +2059,23 @@ export default function Home() {
               <Button
                 variant="outline"
                 onClick={() => setIsFilterOpen(true)}
-                className="h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-white"
+                className={`h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all border hover:bg-gray-50 dark:hover:bg-gray-800 ${appliedFilters.activeFilters.size > 0 || appliedFilters.sortBy || appliedFilters.selectedCuisine
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-700 dark:text-green-400'
+                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-white'
+                  }`}
               >
-                <SlidersHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                <div className="relative">
+                  <SlidersHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
+                  {(appliedFilters.activeFilters.size > 0 || appliedFilters.sortBy || appliedFilters.selectedCuisine) && (
+                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </div>
                 <span className="text-xs sm:text-sm font-bold text-black dark:text-white">Filters</span>
+                {(appliedFilters.activeFilters.size > 0 || appliedFilters.sortBy || appliedFilters.selectedCuisine) && (
+                  <span className="text-xs font-bold text-green-600 dark:text-green-400">
+                    ({appliedFilters.activeFilters.size + (appliedFilters.sortBy ? 1 : 0) + (appliedFilters.selectedCuisine ? 1 : 0)})
+                  </span>
+                )}
               </Button>
             </motion.div>
 
@@ -2542,8 +2555,8 @@ export default function Home() {
                                 <span className="font-medium dark:text-gray-300 text-gray-700">{restaurant.distance}</span>
                               </motion.div>
 
-                              {/* Offer Badge - Show if DB has offer OR if it's top 3 (for default offer) */}
-                              {(restaurant.offer || index < 3) && (
+                              {/* Offer Badge - Only show real offers from DB */}
+                              {restaurant.offer && (
                                 <motion.div
                                   className="flex items-center gap-2 text-sm lg:text-base mt-auto"
                                   variants={{
@@ -2554,9 +2567,7 @@ export default function Home() {
                                 >
                                   <BadgePercent className="h-4 w-4 lg:h-5 lg:w-5 text-black" strokeWidth={2} />
                                   <span className="text-gray-700 dark:text-gray-300 font-medium">
-                                    {(index < 3 && !restaurant.offer)
-                                      ? "Flat ₹200 OFF above ₹500"
-                                      : restaurant.offer}
+                                    {restaurant.offer}
                                   </span>
                                 </motion.div>
                               )}
@@ -2647,6 +2658,7 @@ export default function Home() {
                     setActiveFilters(new Set())
                     setSortBy(null)
                     setSelectedCuisine(null)
+                    setAppliedFilters({ activeFilters: new Set(), sortBy: null, selectedCuisine: null })
                   }}
                   className="text-green-600 font-medium text-sm"
                 >

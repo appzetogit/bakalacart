@@ -9,19 +9,29 @@ import mongoose from 'mongoose';
 export const getPendingRestaurantSettlements = async (restaurantId = null, startDate = null, endDate = null) => {
   try {
     const query = {
-      'restaurantEarning.status': 'credited',
-      restaurantSettled: false,
-      settlementStatus: 'completed'
+      'restaurantEarning.status': { $ne: 'cancelled' },
+      restaurantSettled: false
     };
 
-    if (restaurantId) {
+    if (restaurantId && mongoose.Types.ObjectId.isValid(restaurantId)) {
+      query.restaurantId = new mongoose.Types.ObjectId(restaurantId);
+    } else if (restaurantId) {
       query.restaurantId = restaurantId;
     }
 
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      // If endDate is just a date string, set it to end of day
+      if (end.getHours() === 0 && end.getMinutes() === 0) {
+        end.setHours(23, 59, 59, 999);
+      }
+
       query.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
@@ -188,12 +198,22 @@ export const markSettlementsAsProcessed = async (settlementIds, actorType, actor
     });
 
     for (const settlement of settlements) {
-      if (settlement.restaurantEarning.status === 'credited' && !settlement.restaurantSettled) {
-        settlement.restaurantSettled = true;
-      }
-      if (settlement.deliveryPartnerEarning.status === 'credited' && !settlement.deliveryPartnerSettled) {
+      settlement.restaurantSettled = true;
+      settlement.restaurantEarning.status = 'settled';
+
+      if (settlement.deliveryPartnerId) {
         settlement.deliveryPartnerSettled = true;
+        settlement.deliveryPartnerEarning.status = 'settled';
       }
+
+      settlement.settlementStatus = 'completed';
+
+      // Update metadata with payout info
+      settlement.metadata = settlement.metadata || new Map();
+      settlement.metadata.set('payoutProcessedBy', actorId);
+      settlement.metadata.set('payoutProcessedAt', new Date());
+      settlement.metadata.set('payoutActorType', actorType);
+
       await settlement.save();
     }
 

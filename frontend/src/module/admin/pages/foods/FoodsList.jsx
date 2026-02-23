@@ -578,11 +578,16 @@ export default function FoodsList() {
                           <span className="text-sm font-bold text-slate-900">{food.name}</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] text-slate-400 font-medium">{food.restaurantName}</span>
-                            {(food.itemSizeQuantity || food.itemSizeUnit) && (
-                              <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded">
-                                {food.itemSizeQuantity} {food.itemSizeUnit}
-                              </span>
-                            )}
+                            {(() => {
+                              const sizeUnit = food.itemSizeUnit || food.unit
+                              const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                              const displayParts = [food.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                              return displayParts.length > 0 ? (
+                                <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded">
+                                  {displayParts.join(' ')}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -687,7 +692,12 @@ export default function FoodsList() {
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Portion / Unit</p>
                   <p className="text-sm font-semibold text-slate-800">
-                    {selectedFood.itemSizeQuantity ? `${selectedFood.itemSizeQuantity} ${selectedFood.itemSizeUnit || ''}` : 'N/A'}
+                    {(() => {
+                      const sizeUnit = selectedFood.itemSizeUnit || selectedFood.unit || selectedFood.itemSize
+                      const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                      const displayParts = [selectedFood.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                      return displayParts.length > 0 ? displayParts.join(' ') : 'N/A'
+                    })()}
                   </p>
                 </div>
                 <div className="space-y-1">

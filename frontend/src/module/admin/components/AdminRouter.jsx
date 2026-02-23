@@ -78,6 +78,7 @@ import DisbursementReportDeliverymen from "../pages/reports/DisbursementReportDe
 import RegularOrderReport from "../pages/reports/RegularOrderReport";
 import CampaignOrderReport from "../pages/reports/CampaignOrderReport";
 import RestaurantReport from "../pages/reports/RestaurantReport";
+import RestaurantFinanceReport from "../pages/reports/RestaurantFinanceReport";
 import FeedbackExperienceReport from "../pages/reports/FeedbackExperienceReport";
 import TaxReport from "../pages/reports/TaxReport";
 import RestaurantVATReport from "../pages/reports/RestaurantVATReport";
@@ -257,6 +258,7 @@ export default function AdminRouter() {
         <Route path="order-report/campaign" element={<CampaignOrderReport />} />
         {/* Restaurant Report */}
         <Route path="restaurant-report" element={<RestaurantReport />} />
+        <Route path="restaurant-finance-report" element={<RestaurantFinanceReport />} />
         {/* Customer Report */}
         <Route path="customer-report/feedback-experience" element={<FeedbackExperienceReport />} />
         <Route path="tax-report" element={<TaxReport />} />

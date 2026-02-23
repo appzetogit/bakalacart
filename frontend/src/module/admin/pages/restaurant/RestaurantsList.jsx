@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus, Edit } from "lucide-react"
+import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus, Edit, Tag } from "lucide-react"
 import { adminAPI, restaurantAPI } from "../../../../lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -43,7 +43,8 @@ export default function RestaurantsList() {
     ownerPhone: "",
     ownerEmail: "",
     openingTime: "",
-    closingTime: ""
+    closingTime: "",
+    offer: ""
   })
   const [savingEdit, setSavingEdit] = useState(false)
 
@@ -577,7 +578,8 @@ export default function RestaurantsList() {
       ownerPhone: data.ownerPhone || data.phone || "",
       ownerEmail: data.ownerEmail || data.email || "",
       openingTime: data.deliveryTimings?.openingTime || data.onboarding?.step2?.deliveryTimings?.openingTime || "09:00",
-      closingTime: data.deliveryTimings?.closingTime || data.onboarding?.step2?.deliveryTimings?.closingTime || "22:00"
+      closingTime: data.deliveryTimings?.closingTime || data.onboarding?.step2?.deliveryTimings?.closingTime || "22:00",
+      offer: data.offer || data.onboarding?.step4?.offer || ""
     })
   }
 
@@ -2230,6 +2232,22 @@ export default function RestaurantsList() {
                   type="time"
                   value={editingData.closingTime || ''}
                   onChange={(e) => setEditingData({ ...editingData, closingTime: e.target.value })}
+                  disabled={savingEdit}
+                  className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Special Offer */}
+              <div className="space-y-2.5 md:col-span-2">
+                <Label htmlFor="edit-offer" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-slate-500" />
+                  Special Offer / Promotion
+                </Label>
+                <Input
+                  id="edit-offer"
+                  placeholder="e.g., Flat ₹100 OFF above ₹499"
+                  value={editingData.offer}
+                  onChange={(e) => setEditingData({ ...editingData, offer: e.target.value })}
                   disabled={savingEdit}
                   className="w-full h-11 border-slate-300 focus:border-amber-500 focus:ring-amber-500 rounded-lg text-sm transition-all shadow-sm"
                 />

@@ -251,11 +251,16 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
                         </span>
                         <p className="text-sm font-medium text-slate-900">
                           {item.name || "Unknown Item"}
-                          {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
-                            <span className="text-xs font-bold text-[#ff8100] ml-2">
-                              ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')})
-                            </span>
-                          )}
+                          {(() => {
+                            const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
+                            const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                            const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                            return displayParts.length > 0 ? (
+                              <span className="text-xs font-bold text-[#ff8100] ml-2">
+                                ({displayParts.join(' ')})
+                              </span>
+                            ) : null
+                          })()}
                         </p>
                         {item.isVeg !== undefined && (
                           <span className={`text-xs px-1.5 py-0.5 rounded ${item.isVeg ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>

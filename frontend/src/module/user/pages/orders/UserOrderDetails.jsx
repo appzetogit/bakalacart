@@ -338,12 +338,19 @@ export default function UserOrderDetails() {
       yPos += restaurantAddressLines.length * 7 + 5
 
       // Items table
-      const tableData = items.map(item => [
-        `${item.name || 'Item'}${item.itemSizeQuantity || item.itemSizeUnit ? ` (${item.itemSizeQuantity} ${item.itemSizeUnit})` : ''}`,
-        String(item.quantity || item.qty || 1),
-        `Rs. ${Number(item.price || 0).toFixed(2)}`,
-        `Rs. ${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`
-      ])
+      const tableData = items.map(item => {
+        const sizeUnit = item.itemSizeUnit || item.unit
+        const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+        const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+        const itemDisplayText = displayParts.length > 0 ? ` (${displayParts.join(' ')})` : ''
+
+        return [
+          `${item.name || 'Item'}${itemDisplayText}`,
+          String(item.quantity || item.qty || 1),
+          `Rs. ${Number(item.price || 0).toFixed(2)}`,
+          `Rs. ${Number((item.price || 0) * (item.quantity || item.qty || 1)).toFixed(2)}`
+        ]
+      })
 
       autoTable(doc, {
         startY: yPos,
@@ -493,11 +500,16 @@ export default function UserOrderDetails() {
                 <span className="text-sm text-gray-700 font-medium">
                   {item.quantity || item.qty || 1} x {item.name}
                   {/* Item Size/Unit - Show if available */}
-                  {(item.itemSizeQuantity || item.itemSizeUnit || item.unit || item.itemSize) && (
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
-                      {[item.itemSizeQuantity, item.itemSizeUnit || item.unit || item.itemSize].filter(Boolean).join(' ')}
-                    </p>
-                  )}
+                  {(() => {
+                    const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
+                    const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                    const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                    return displayParts.length > 0 ? (
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
+                        {displayParts.join(' ')}
+                      </p>
+                    ) : null
+                  })()}
                   {/* Item Description */}
                   {item.description && (
                     <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>

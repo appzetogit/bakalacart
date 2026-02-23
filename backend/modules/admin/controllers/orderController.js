@@ -101,153 +101,180 @@ export const getOrders = asyncHandler(async (req, res) => {
       }
     }
 
-    // Restaurant filter
+    // 1. Data pre-fetching for filters (parallelize lookups)
+    const lookupPromises = [];
+
+    // Restaurant lookup
+    let restaurantIdFilter = null;
     if (restaurant && restaurant !== 'All restaurants') {
-      // Try to find restaurant by name or ID
-      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
-      const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
-      }).select('_id restaurantId').lean();
-
-      if (restaurantDoc) {
-        query.restaurantId = restaurantDoc._id?.toString() || restaurantDoc.restaurantId;
-      }
+      lookupPromises.push((async () => {
+        try {
+          const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+          const doc = await Restaurant.findOne({
+            $or: [
+              { name: { $regex: restaurant, $options: 'i' } },
+              { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
+              { restaurantId: restaurant }
+            ]
+          }).select('_id restaurantId').lean();
+          if (doc) restaurantIdFilter = doc._id?.toString() || doc.restaurantId;
+        } catch (e) { console.error('Restaurant lookup error:', e); }
+      })());
     }
 
-    // Zone filter
+    // Zone lookup
+    let zoneIdFilter = null;
     if (zone && zone !== 'All Zones') {
-      // Find zone by name
-      const Zone = (await import('../models/Zone.js')).default;
-      const zoneDoc = await Zone.findOne({
-        name: { $regex: zone, $options: 'i' }
-      }).select('_id name').lean();
-
-      if (zoneDoc) {
-        query['assignmentInfo.zoneId'] = zoneDoc._id;
-      } else {
-        // If zone is selected but not found, force empty results
-        query['assignmentInfo.zoneId'] = new mongoose.Types.ObjectId();
-      }
+      lookupPromises.push((async () => {
+        try {
+          const Zone = (await import('../models/Zone.js')).default;
+          const doc = await Zone.findOne({
+            name: { $regex: zone, $options: 'i' }
+          }).select('_id name').lean();
+          if (doc) zoneIdFilter = doc._id;
+        } catch (e) { console.error('Zone lookup error:', e); }
+      })());
     }
 
-    // Customer filter
+    // Customer lookup
+    let customerUserIdFilter = null;
     if (customer && customer !== 'All customers') {
-      const User = (await import('../../auth/models/User.js')).default;
-      const userDoc = await User.findOne({
-        name: { $regex: customer, $options: 'i' }
-      }).select('_id').lean();
-
-      if (userDoc) {
-        query.userId = userDoc._id;
-      }
+      lookupPromises.push((async () => {
+        try {
+          const User = (await import('../../auth/models/User.js')).default;
+          const doc = await User.findOne({
+            name: { $regex: customer, $options: 'i' }
+          }).select('_id').lean();
+          if (doc) customerUserIdFilter = doc._id;
+        } catch (e) { console.error('Customer lookup error:', e); }
+      })());
     }
 
-    // Search filter (orderId, customer name, customer phone)
+    // Search lookups
+    let searchUserIds = [];
     if (search) {
-      const searchOrConditions = [
-        { orderId: { $regex: search, $options: 'i' } }
-      ];
+      lookupPromises.push((async () => {
+        try {
+          const User = (await import('../../auth/models/User.js')).default;
+          const cleanSearch = search.replace(/\D/g, '');
+          const searchQueries = [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } }
+          ];
+          if (cleanSearch) {
+            searchQueries.push({ phone: { $regex: cleanSearch, $options: 'i' } });
+          }
+          if (mongoose.Types.ObjectId.isValid(search)) {
+            searchQueries.push({ _id: search });
+          }
+          const users = await User.find({ $or: searchQueries }).select('_id').lean();
+          searchUserIds = users.map(u => u._id);
+        } catch (e) { console.error('Search lookup error:', e); }
+      })());
+    }
 
-      // If search looks like a phone number, search in customer data
-      const phoneRegex = /[\d\s\+\-()]+/;
-      if (phoneRegex.test(search)) {
-        const User = (await import('../../auth/models/User.js')).default;
-        const cleanSearch = search.replace(/\D/g, '');
-        const userSearchQuery = { phone: { $regex: cleanSearch, $options: 'i' } };
-        if (mongoose.Types.ObjectId.isValid(search)) {
-          userSearchQuery._id = search;
-        }
-        const users = await User.find(userSearchQuery).select('_id').lean();
-        const userIds = users.map(u => u._id);
-        if (userIds.length > 0) {
-          searchOrConditions.push({ userId: { $in: userIds } });
-        }
+    await Promise.all(lookupPromises);
+
+    // 2. Build the main query
+    if (restaurantIdFilter) query.restaurantId = restaurantIdFilter;
+    if (zoneIdFilter) {
+      query['assignmentInfo.zoneId'] = zoneIdFilter;
+    } else if (zone && zone !== 'All Zones') {
+      // If zone was specified but not found, force empty results
+      query['assignmentInfo.zoneId'] = new mongoose.Types.ObjectId();
+    }
+    if (customerUserIdFilter) query.userId = customerUserIdFilter;
+
+    if (search) {
+      const searchOrConditions = [{ orderId: { $regex: search, $options: 'i' } }];
+      if (searchUserIds.length > 0) {
+        searchOrConditions.push({ userId: { $in: searchUserIds } });
       }
 
-      // Also search by customer name
-      const User = (await import('../../auth/models/User.js')).default;
-      const usersByName = await User.find({
-        name: { $regex: search, $options: 'i' }
-      }).select('_id').lean();
-      const userIdsByName = usersByName.map(u => u._id);
-      if (userIdsByName.length > 0) {
-        searchOrConditions.push({ userId: { $in: userIdsByName } });
-      }
-
-      // Ensure searchOrConditions is not empty before applying
       if (searchOrConditions.length > 0) {
         if (query.$or) {
-          // If we already have a status-based $or (e.g., for restaurant-cancelled), 
-          // we MUST combine them using $and to avoid overwriting or incorrect logic
           const existingOr = query.$or;
           delete query.$or;
-          query.$and = [
-            { $or: existingOr },
-            { $or: searchOrConditions }
-          ];
+          query.$and = [{ $or: existingOr }, { $or: searchOrConditions }];
         } else {
           query.$or = searchOrConditions;
         }
       }
     }
 
-    // Calculate pagination
+    // 3. Parallel execution for main results and stats
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
 
-    // Fetch total count first
-    const total = await Order.countDocuments(query);
+    console.log('📊 Parallelizing count, find, and status stats...');
+    const [total, orders, rawStatusCounts] = await Promise.all([
+      Order.countDocuments(query),
+      Order.find(query)
+        .populate('userId', 'name email phone')
+        .populate('restaurantId', 'name slug')
+        .populate('deliveryPartnerId', 'name phone')
+        .sort({ createdAt: -1 })
+        .limit(limitNum)
+        .skip(skip)
+        .lean(),
+      Order.aggregate([
+        { $match: query },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ])
+    ]);
 
-    // Fetch orders with population
-    const orders = await Order.find(query)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .populate('deliveryPartnerId', 'name phone')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    // Map status counts to friendly names
+    const statusCounts = {
+      total: total,
+      Scheduled: 0,
+      Pending: 0,
+      Accepted: 0,
+      Processing: 0,
+      "Food On The Way": 0,
+      Delivered: 0,
+      Canceled: 0,
+      "Payment Failed": 0,
+      Refunded: 0
+    };
 
-    // Batch fetch settlements and payments (more efficient than individual queries)
+    rawStatusCounts.forEach(item => {
+      const status = item._id;
+      const count = item.count;
+
+      if (status === 'scheduled') statusCounts.Scheduled += count;
+      else if (status === 'pending') statusCounts.Pending += count;
+      else if (status === 'confirmed') statusCounts.Accepted += count;
+      else if (status === 'preparing') statusCounts.Processing += count;
+      else if (status === 'out_for_delivery') statusCounts["Food On The Way"] += count;
+      else if (status === 'delivered') statusCounts.Delivered += count;
+      else if (status === 'cancelled') statusCounts.Canceled += count;
+    });
+
+    // 4. Batch fetch auxiliary data (same as before but cleaner)
     let settlementMap = new Map();
     let refundStatusMap = new Map();
     let paymentMap = new Map();
-    try {
-      const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
-      const Payment = (await import('../../payment/models/Payment.js')).default;
-      const orderIds = orders.map(o => o._id);
 
-      const [settlements, payments] = await Promise.all([
-        OrderSettlement.find({ orderId: { $in: orderIds } })
-          .select('orderId userPayment.platformFee cancellationDetails.refundStatus')
-          .lean(),
-        Payment.find({ orderId: { $in: orderIds } })
-          .select('orderId status')
-          .lean()
-      ]);
+    if (orders.length > 0) {
+      try {
+        const OrderSettlement = (await import('../../order/models/OrderSettlement.js')).default;
+        const Payment = (await import('../../payment/models/Payment.js')).default;
+        const orderIds = orders.map(o => o._id);
 
-      // Create maps for quick lookup
-      settlements.forEach(s => {
-        if (s.orderId) {
-          if (s.userPayment?.platformFee !== undefined) {
-            settlementMap.set(s.orderId.toString(), s.userPayment.platformFee);
+        const [settlements, payments] = await Promise.all([
+          OrderSettlement.find({ orderId: { $in: orderIds } }).select('orderId userPayment.platformFee cancellationDetails.refundStatus').lean(),
+          Payment.find({ orderId: { $in: orderIds } }).select('orderId status').lean()
+        ]);
+
+        settlements.forEach(s => {
+          if (s.orderId) {
+            const oid = s.orderId.toString();
+            if (s.userPayment?.platformFee !== undefined) settlementMap.set(oid, s.userPayment.platformFee);
+            if (s.cancellationDetails?.refundStatus) refundStatusMap.set(oid, s.cancellationDetails.refundStatus);
           }
-          if (s.cancellationDetails?.refundStatus) {
-            refundStatusMap.set(s.orderId.toString(), s.cancellationDetails.refundStatus);
-          }
-        }
-      });
-
-      payments.forEach(p => {
-        if (p.orderId) {
-          paymentMap.set(p.orderId.toString(), p.status);
-        }
-      });
-    } catch (err) {
-      console.warn('Could not batch fetch settlements/payments:', err.message);
+        });
+        payments.forEach(p => { if (p.orderId) paymentMap.set(p.orderId.toString(), p.status); });
+      } catch (err) { console.warn('Auxiliary fetch error:', err.message); }
     }
 
     // Transform orders to match frontend format
@@ -435,6 +462,7 @@ export const getOrders = asyncHandler(async (req, res) => {
 
     return successResponse(res, 200, 'Orders retrieved successfully', {
       orders: transformedOrders,
+      statusCounts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -981,55 +1009,102 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       }
     }
 
-    // Restaurant filter
+    // 1. Data pre-fetching for filters (parallelize lookups)
+    const lookupPromises = [];
+
+    // Restaurant lookup
+    let restaurantIdFilter = null;
     if (restaurant && restaurant !== 'All restaurants') {
-      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
-      const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
-      }).select('_id restaurantId').lean();
-
-      if (restaurantDoc) {
-        query.restaurantId = restaurantDoc._id?.toString() || restaurantDoc.restaurantId;
-      }
+      lookupPromises.push((async () => {
+        try {
+          const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+          const doc = await Restaurant.findOne({
+            $or: [
+              { name: { $regex: restaurant, $options: 'i' } },
+              { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
+              { restaurantId: restaurant }
+            ]
+          }).select('_id restaurantId').lean();
+          if (doc) restaurantIdFilter = doc._id?.toString() || doc.restaurantId;
+        } catch (e) { console.error('Restaurant lookup error:', e); }
+      })());
     }
 
-    // Zone filter
+    // Zone lookup
+    let zoneIdFilter = null;
     if (zone && zone !== 'All Zones') {
-      const Zone = (await import('../models/Zone.js')).default;
-      const zoneDoc = await Zone.findOne({
-        name: { $regex: zone, $options: 'i' }
-      }).select('_id name').lean();
-
-      if (zoneDoc) {
-        query['assignmentInfo.zoneId'] = zoneDoc._id?.toString();
-      }
+      lookupPromises.push((async () => {
+        try {
+          const Zone = (await import('../models/Zone.js')).default;
+          const doc = await Zone.findOne({
+            name: { $regex: zone, $options: 'i' }
+          }).select('_id name').lean();
+          if (doc) zoneIdFilter = doc._id?.toString();
+        } catch (e) { console.error('Zone lookup error:', e); }
+      })());
     }
 
-    // Search filter (orderId)
-    if (search) {
-      query.orderId = { $regex: search, $options: 'i' };
-    }
+    await Promise.all(lookupPromises);
 
-    // Calculate pagination
+    // 2. Build the main query
+    if (restaurantIdFilter) query.restaurantId = restaurantIdFilter;
+    if (zoneIdFilter) query['assignmentInfo.zoneId'] = zoneIdFilter;
+    if (search) query.orderId = { $regex: search, $options: 'i' };
+
+    // 3. Parallel execution for results, count, and summary aggregation
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
 
-    // Fetch orders with population
-    const orders = await Order.find(query)
-      .populate('userId', 'name email phone')
-      .populate('restaurantId', 'name slug')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    console.log('📊 Transaction Report: Parallelizing find, count, and aggregation...');
+    const [orders, total, aggregateResult] = await Promise.all([
+      Order.find(query)
+        .populate('userId', 'name email phone')
+        .populate('restaurantId', 'name slug')
+        .sort({ createdAt: -1 })
+        .limit(limitNum)
+        .skip(skip)
+        .lean(),
+      Order.countDocuments(query),
+      Order.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalCompleted: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ["$status", "delivered"] }, { $eq: ["$payment.status", "completed"] }] },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0
+                ]
+              }
+            },
+            totalRefunded: {
+              $sum: {
+                $cond: [
+                  { $or: [{ $eq: ["$payment.status", "refunded"] }, { $eq: ["$status", "cancelled"] }] },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0
+                ]
+              }
+            },
+            estimatedDeliveryEarnings: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "delivered"] },
+                  { $multiply: [{ $ifNull: ["$pricing.deliveryFee", 0] }, 0.8] },
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
+    ]);
 
-    // Get total count
-    const total = await Order.countDocuments(query);
+    const summaryStats = aggregateResult[0] || { totalCompleted: 0, totalRefunded: 0, estimatedDeliveryEarnings: 0 };
 
-    // Calculate summary statistics
+    // Get admin earning from AdminCommission
     const AdminCommission = (await import('../models/AdminCommission.js')).default;
 
     // Build date query for summary stats
@@ -1050,90 +1125,24 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
 
     // Build restaurant filter for summary
     let summaryRestaurantQuery = {};
-    if (restaurant && restaurant !== 'All restaurants') {
-      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
-      const restaurantDoc = await Restaurant.findOne({
-        $or: [
-          { name: { $regex: restaurant, $options: 'i' } },
-          { _id: mongoose.Types.ObjectId.isValid(restaurant) ? restaurant : null },
-          { restaurantId: restaurant }
-        ]
-      }).select('_id restaurantId').lean();
-
-      if (restaurantDoc) {
-        summaryRestaurantQuery.restaurantId = restaurantDoc._id || restaurantDoc.restaurantId;
-      }
+    if (restaurantIdFilter) { // Use the pre-fetched filter
+      summaryRestaurantQuery.restaurantId = restaurantIdFilter;
     }
 
-    // Get all orders for summary calculation (without pagination)
-    const summaryQuery = { ...query };
-    const allOrdersForSummary = await Order.find(summaryQuery)
-      .populate('userId', 'name')
-      .populate('restaurantId', 'name')
-      .lean();
-
-    // Batch fetch payment statuses for summary accuracy
-    let summaryPaymentMap = new Map();
-    try {
-      const Payment = (await import('../../payment/models/Payment.js')).default;
-      const orderIds = allOrdersForSummary.map(o => o._id);
-      const payments = await Payment.find({ orderId: { $in: orderIds } })
-        .select('orderId status')
-        .lean();
-
-      payments.forEach(p => {
-        if (p.orderId) {
-          summaryPaymentMap.set(p.orderId.toString(), p.status);
-        }
-      });
-    } catch (err) {
-      console.warn('Could not batch fetch payments for summary:', err.message);
-    }
-
-    // Calculate completed transactions (delivered orders)
-    const completedOrders = allOrdersForSummary.filter(order => {
-      const dbPaymentStatus = order.payment?.status;
-      const paymentRecordStatus = summaryPaymentMap.get(order._id.toString());
-      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
-      return order.status === 'delivered' && effectivePaymentStatus === 'completed';
-    });
-
-    const completedTransaction = completedOrders.reduce((sum, order) =>
-      sum + (order.pricing?.total || 0), 0
-    );
-
-    // Calculate refunded transactions
-    const refundedOrders = allOrdersForSummary.filter(order => {
-      const dbPaymentStatus = order.payment?.status;
-      const paymentRecordStatus = summaryPaymentMap.get(order._id.toString());
-      const effectivePaymentStatus = paymentRecordStatus || dbPaymentStatus;
-      return effectivePaymentStatus === 'refunded' || order.status === 'cancelled';
-    });
-    const refundedTransaction = refundedOrders.reduce((sum, order) =>
-      sum + (order.pricing?.total || 0), 0
-    );
-
-    // Get admin earning from AdminCommission
     const adminCommissionQuery = {
       status: 'completed',
-      ...summaryDateQuery,
-      ...summaryRestaurantQuery
+      ...summaryDateQuery
     };
+
+    // Add restaurant filter to admin commission query if relevant
+    if (summaryRestaurantQuery.restaurantId) {
+      adminCommissionQuery.restaurantId = summaryRestaurantQuery.restaurantId;
+    }
+
     const adminCommissions = await AdminCommission.find(adminCommissionQuery).lean();
     const adminEarning = adminCommissions.reduce((sum, comm) => sum + (comm.commissionAmount || 0), 0);
-
-    // Calculate restaurant earning (order total - admin commission - delivery commission)
-    // For simplicity, we'll use restaurantEarning from AdminCommission if available
     const restaurantEarning = adminCommissions.reduce((sum, comm) => sum + (comm.restaurantEarning || 0), 0);
-
-    // Calculate deliveryman earning (from delivery commissions)
-    // This would need to be calculated from delivery wallet transactions or order assignment info
-    // For now, we'll estimate based on delivery fee or use a placeholder
-    const deliverymanEarning = completedOrders.reduce((sum, order) => {
-      // Delivery commission is typically calculated from distance
-      // For now, we'll use a simple estimate or fetch from delivery wallet
-      return sum + (order.pricing?.deliveryFee || 0) * 0.8; // Estimate 80% of delivery fee goes to deliveryman
-    }, 0);
+    const deliverymanEarning = summaryStats.estimatedDeliveryEarnings;
 
     // Transform orders to match frontend format
     const transformedTransactions = orders.map((order, index) => {
@@ -1179,8 +1188,8 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
 
     return successResponse(res, 200, 'Transaction report retrieved successfully', {
       summary: {
-        completedTransaction,
-        refundedTransaction,
+        completedTransaction: summaryStats.totalCompleted,
+        refundedTransaction: summaryStats.totalRefunded,
         adminEarning,
         restaurantEarning,
         deliverymanEarning
@@ -1271,13 +1280,6 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       ];
     }
 
-    // Get all restaurants matching the query
-    const restaurants = await Restaurant.find(restaurantQuery)
-      .select('_id restaurantId name profileImage rating totalRatings isActive')
-      .lean();
-
-    console.log(`📊 Found ${restaurants.length} restaurants`);
-
     // Date range filter for orders
     let dateQuery = {};
     if (time && time !== 'All Time') {
@@ -1309,115 +1311,149 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       }
     }
 
-    // Process each restaurant
-    const restaurantReports = await Promise.all(
-      restaurants.map(async (restaurant) => {
-        const restaurantId = restaurant._id?.toString();
-        const restaurantIdField = restaurant.restaurantId;
+    // Extract page and limit for pagination
+    const { page = 1, limit = 25 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
-        // Build order query for this restaurant
-        const orderQuery = {
+    // 1. Fetch paginated restaurants first
+    const [totalRestaurants, restaurants] = await Promise.all([
+      Restaurant.countDocuments(restaurantQuery),
+      Restaurant.find(restaurantQuery)
+        .select('_id restaurantId name profileImage rating totalRatings isActive')
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean()
+    ]);
+
+    console.log(`📊 Found ${totalRestaurants} restaurants in total, showing ${restaurants.length} on page ${pageNum}`);
+
+    // Bulk fetch statistics to avoid N+1 query issue
+    const restaurantIds = restaurants.map(r => r._id?.toString());
+    const restaurantIdFields = restaurants.map(r => r.restaurantId).filter(Boolean);
+    const allRestaurantIdsForOrders = [...new Set([...restaurantIds, ...restaurantIdFields])];
+
+    console.log(`📊 Fetching bulk statistics for ${restaurants.length} restaurants on current page...`);
+
+    // Define commissionDateQuery for AdminCommission aggregation
+    const commissionDateQuery = dateQuery.createdAt ? { orderDate: dateQuery.createdAt } : {};
+
+    // 1. Order Stats Aggregation (Filtered by restaurants on this page)
+    const orderStats = await Order.aggregate([
+      {
+        $match: {
           ...dateQuery,
-          $or: [
-            { restaurantId: restaurantId },
-            { restaurantId: restaurantIdField }
-          ]
-        };
+          restaurantId: { $in: allRestaurantIdsForOrders }
+        }
+      },
+      {
+        $group: {
+          _id: "$restaurantId",
+          totalOrders: { $sum: 1 },
+          totalAmount: { $sum: { $ifNull: ["$pricing.total", 0] } },
+          totalDiscount: { $sum: { $ifNull: ["$pricing.discount", 0] } },
+          totalTax: { $sum: { $ifNull: ["$pricing.tax", 0] } },
+          items: { $push: "$items" }
+        }
+      }
+    ]);
 
-        // Get orders for this restaurant
-        const orders = await Order.find(orderQuery).lean();
+    // 2. Commission Stats Aggregation (Filtered by restaurants on this page)
+    // AdminCommission was already imported at the top, no need to re-import here.
+    const commissionStats = await AdminCommission.aggregate([
+      {
+        $match: {
+          ...commissionDateQuery,
+          restaurantId: { $in: allRestaurantIdsForOrders },
+          status: { $in: ['completed', 'settled'] } // Consider both completed and settled for commission
+        }
+      },
+      {
+        $group: {
+          _id: "$restaurantId",
+          totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+          netEarnings: { $sum: { $ifNull: ["$restaurantEarning", 0] } }
+        }
+      }
+    ]);
 
-        // Calculate statistics
-        const totalOrder = orders.length;
+    // 3. User Experience/Rating Aggregation (Filtered by restaurants on this page)
+    // FeedbackExperience was already imported at the top, no need to re-import here.
+    const ratingStats = await FeedbackExperience.aggregate([
+      {
+        $match: {
+          restaurantId: { $in: allRestaurantIdsForOrders },
+          rating: { $exists: true, $ne: null, $gt: 0 }
+        }
+      },
+      {
+        $group: {
+          _id: "$restaurantId",
+          averageRating: { $avg: "$rating" },
+          totalRatings: { $sum: 1 }
+        }
+      }
+    ]);
 
-        // Total order amount
-        const totalOrderAmount = orders.reduce((sum, order) =>
-          sum + (order.pricing?.total || 0), 0
-        );
-
-        // Total discount given
-        const totalDiscountGiven = orders.reduce((sum, order) =>
-          sum + (order.pricing?.discount || 0), 0
-        );
-
-        // Total VAT/TAX
-        const totalVATTAX = orders.reduce((sum, order) =>
-          sum + (order.pricing?.tax || 0), 0
-        );
-
-        // Get unique food items (count distinct itemIds from all orders)
-        const uniqueItemIds = new Set();
-        orders.forEach(order => {
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach(item => {
-              if (item.itemId) {
-                uniqueItemIds.add(item.itemId);
-              }
-            });
+    // Create maps for quick lookup
+    const orderStatsMap = new Map();
+    orderStats.forEach(stat => {
+      // Calculate unique food items
+      const uniqueItems = new Set();
+      if (Array.isArray(stat.items)) {
+        stat.items.forEach(orderItems => {
+          if (Array.isArray(orderItems)) {
+            orderItems.forEach(item => { if (item.itemId) uniqueItems.add(item.itemId.toString()); });
           }
         });
-        const totalFood = uniqueItemIds.size;
+      }
+      stat.totalFood = uniqueItems.size;
+      orderStatsMap.set(stat._id.toString(), stat);
+    });
 
-        // Get admin commission for this restaurant
-        const restaurantObjectId = restaurant._id instanceof mongoose.Types.ObjectId
-          ? restaurant._id
-          : new mongoose.Types.ObjectId(restaurant._id);
+    const commissionMap = new Map();
+    commissionStats.forEach(stat => commissionMap.set(stat._id.toString(), stat));
 
-        const commissionQuery = {
-          restaurantId: restaurantObjectId,
-          status: 'completed'
-        };
+    const ratingMap = new Map();
+    ratingStats.forEach(stat => ratingMap.set(stat._id.toString(), stat));
 
-        if (dateQuery.createdAt) {
-          commissionQuery.orderDate = dateQuery.createdAt;
-        }
+    // Combine data
+    const restaurantReports = restaurants.map((restaurant, index) => {
+      const rId = restaurant._id.toString();
+      const rIdField = restaurant.restaurantId;
 
-        const commissions = await AdminCommission.find(commissionQuery).lean();
-        const totalAdminCommission = commissions.reduce((sum, comm) =>
-          sum + (comm.commissionAmount || 0), 0
-        );
+      const oStats = orderStatsMap.get(rId) || orderStatsMap.get(rIdField) || {
+        totalOrders: 0, totalAmount: 0, totalDiscount: 0, totalTax: 0, totalFood: 0
+      };
+      const cStats = commissionMap.get(rId) || commissionMap.get(rIdField) || { totalCommission: 0, netEarnings: 0 };
+      const rStats = ratingMap.get(rId) || ratingMap.get(rIdField) || { averageRating: restaurant.rating || 0, totalRatings: restaurant.totalRatings || 0 };
 
-        // Get ratings from FeedbackExperience
-        const ratingStats = await FeedbackExperience.aggregate([
-          {
-            $match: {
-              restaurantId: restaurantObjectId,
-              rating: { $exists: true, $ne: null, $gt: 0 }
-            }
-          },
-          {
-            $group: {
-              _id: null,
-              averageRating: { $avg: '$rating' },
-              totalRatings: { $sum: 1 }
-            }
-          }
-        ]);
+      const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-        const averageRatings = ratingStats[0]?.averageRating || restaurant.rating || 0;
-        const reviews = ratingStats[0]?.totalRatings || restaurant.totalRatings || 0;
-
-        // Format currency values
-        const formatCurrency = (amount) => {
-          return `₹${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        };
-
-        return {
-          sl: 0, // Will be set in frontend
-          id: restaurantId,
-          restaurantName: restaurant.name,
-          icon: restaurant.profileImage?.url || restaurant.profileImage || null,
-          totalFood,
-          totalOrder,
-          totalOrderAmount: formatCurrency(totalOrderAmount),
-          totalDiscountGiven: formatCurrency(totalDiscountGiven),
-          totalAdminCommission: formatCurrency(totalAdminCommission),
-          totalVATTAX: formatCurrency(totalVATTAX),
-          averageRatings: parseFloat(averageRatings.toFixed(1)),
-          reviews
-        };
-      })
-    );
+      return {
+        sl: skip + index + 1,
+        id: rId,
+        restaurantName: restaurant.name,
+        restaurantId: restaurant.restaurantId,
+        icon: restaurant.profileImage?.url || restaurant.profileImage || null,
+        totalFood: oStats.totalFood,
+        totalOrder: oStats.totalOrders,
+        totalOrderAmount: formatCurrency(oStats.totalAmount),
+        rawOrderAmount: oStats.totalAmount,
+        totalDiscountGiven: formatCurrency(oStats.totalDiscount),
+        rawDiscountGiven: oStats.totalDiscount,
+        totalAdminCommission: formatCurrency(cStats.totalCommission),
+        rawAdminCommission: cStats.totalCommission,
+        totalVATTAX: formatCurrency(oStats.totalTax),
+        rawVATTAX: oStats.totalTax,
+        netEarnings: formatCurrency(cStats.netEarnings),
+        rawNetEarnings: cStats.netEarnings,
+        averageRatings: parseFloat((rStats.averageRating || 0).toFixed(1)),
+        totalRatings: rStats.totalRatings || 0
+      };
+    });
 
     // Filter by type (Commission/Subscription) if needed
     let filteredReports = restaurantReports;
@@ -1427,22 +1463,22 @@ export const getRestaurantReport = asyncHandler(async (req, res) => {
       // You can add subscription filtering logic here if needed
     }
 
-    // Sort by restaurant name
-    filteredReports.sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
+    // Sort by restaurant name (already sorted by query, but re-sort if filteredReports changes)
+    // filteredReports.sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
 
-    // Add serial numbers
-    filteredReports = filteredReports.map((report, index) => ({
-      ...report,
-      sl: index + 1
-    }));
+    // Add serial numbers (already done in map)
+    // filteredReports = filteredReports.map((report, index) => ({
+    //   ...report,
+    //   sl: index + 1
+    // }));
 
     return successResponse(res, 200, 'Restaurant report retrieved successfully', {
       restaurants: filteredReports,
       pagination: {
-        page: 1,
-        limit: 1000,
-        total: filteredReports.length,
-        pages: 1
+        page: pageNum,
+        limit: limitNum,
+        total: totalRestaurants,
+        totalPages: Math.ceil(totalRestaurants / limitNum)
       }
     });
   } catch (error) {
@@ -2093,8 +2129,8 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
       const isDeliveryBoyAccepted = deliveryStateStatus === 'accepted';
       const isDeliveryBoyPending = order.deliveryPartnerId && deliveryStateStatus === 'pending';
 
-      // If delivery boy hasn't accepted and it's been assigned, allow reassignment
-      const canReassign = isDeliveryBoyPending;
+      // Admin can always reassign if a partner is already assigned
+      const canReassign = !!order.deliveryPartnerId;
 
       // Get restaurant zone and location info
       const restaurantZoneName = order.assignmentInfo?.zoneName || null;
@@ -2184,13 +2220,12 @@ export const assignOrderToDeliveryBoy = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'Order not found');
     }
 
-    // Check if order already has delivery partner
-    // Allow reassignment if delivery boy hasn't accepted (status is still 'pending')
-    const deliveryStateStatus = order.deliveryState?.status || 'pending';
-    const canReassign = order.deliveryPartnerId && deliveryStateStatus === 'pending';
+    // Allow reassignment if a delivery partner is already assigned
+    const canReassign = !!order.deliveryPartnerId;
 
     if (order.deliveryPartnerId && !canReassign) {
-      return errorResponse(res, 400, 'Order already has a delivery partner assigned and accepted. Cannot reassign.');
+      // This block will practically never be hit now, but kept for logic safety
+      return errorResponse(res, 400, 'Order already has a delivery partner assigned. Cannot reassign.');
     }
 
     // If reassigning, clear the old assignment and denied list first

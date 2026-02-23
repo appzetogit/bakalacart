@@ -10,6 +10,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import { uploadToCloudinary } from '../../../shared/utils/cloudinaryService.js';
 import { cloudinary } from '../../../config/cloudinary.js';
 import mongoose from 'mongoose';
+import { calculateAcceptingOrders } from '../../restaurant/controllers/restaurantController.js';
 
 /**
  * Get all active hero banners (public endpoint)
@@ -17,21 +18,24 @@ import mongoose from 'mongoose';
 export const getHeroBanners = async (req, res) => {
   try {
     const banners = await HeroBanner.find({ isActive: true })
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage isRestaurantOpen isAcceptingOrders deliveryTimings openDays')
       .sort({ order: 1, createdAt: -1 })
       .select('imageUrl order linkedRestaurants')
       .lean();
 
     console.log(`[getHeroBanners] Found ${banners.length} active banners`);
-    
+
     const formattedBanners = banners.map(b => ({
       imageUrl: b.imageUrl,
-      linkedRestaurants: b.linkedRestaurants || []
+      linkedRestaurants: (b.linkedRestaurants || []).map(r => ({
+        ...r,
+        isAcceptingOrders: calculateAcceptingOrders(r)
+      }))
     }));
 
-    console.log('[getHeroBanners] Formatted banners:', formattedBanners.map(b => ({ 
-      imageUrl: b.imageUrl?.substring(0, 50) + '...', 
-      linkedRestaurantsCount: b.linkedRestaurants?.length || 0 
+    console.log('[getHeroBanners] Formatted banners:', formattedBanners.map(b => ({
+      imageUrl: b.imageUrl?.substring(0, 50) + '...',
+      linkedRestaurantsCount: b.linkedRestaurants?.length || 0
     })));
 
     return successResponse(res, 200, 'Hero banners retrieved successfully', {
@@ -49,7 +53,7 @@ export const getHeroBanners = async (req, res) => {
 export const getAllHeroBanners = async (req, res) => {
   try {
     const banners = await HeroBanner.find()
-      .populate('linkedRestaurants', 'name slug restaurantId profileImage')
+      .populate('linkedRestaurants', 'name slug restaurantId profileImage isRestaurantOpen isAcceptingOrders deliveryTimings openDays')
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
@@ -1009,16 +1013,23 @@ export const getAllTop10Restaurants = async (req, res) => {
 export const getTop10Restaurants = async (req, res) => {
   try {
     const restaurants = await Top10Restaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice isRestaurantOpen isAcceptingOrders deliveryTimings openDays')
       .sort({ rank: 1, order: 1 })
       .lean();
 
     return successResponse(res, 200, 'Top 10 restaurants retrieved successfully', {
-      restaurants: restaurants.map(r => ({
-        ...r.restaurant,
-        rank: r.rank,
-        _id: r._id
-      }))
+      restaurants: restaurants.map(r => {
+        const restaurantData = r.restaurant || {};
+        // Calculate dynamic status
+        const isAcceptingOrders = calculateAcceptingOrders(restaurantData);
+
+        return {
+          ...restaurantData,
+          isAcceptingOrders, // Override with dynamic status
+          rank: r.rank,
+          _id: r._id
+        };
+      })
     });
   } catch (error) {
     console.error('Error fetching Top 10 restaurants:', error);
@@ -1244,15 +1255,22 @@ export const getAllGourmetRestaurants = async (req, res) => {
 export const getGourmetRestaurants = async (req, res) => {
   try {
     const restaurants = await GourmetRestaurant.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice')
+      .populate('restaurant', 'name restaurantId slug profileImage coverImages menuImages rating estimatedDeliveryTime distance offer featuredDish featuredPrice isRestaurantOpen isAcceptingOrders deliveryTimings openDays')
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
     return successResponse(res, 200, 'Gourmet restaurants retrieved successfully', {
-      restaurants: restaurants.map(r => ({
-        ...r.restaurant,
-        _id: r._id
-      }))
+      restaurants: restaurants.map(r => {
+        const restaurantData = r.restaurant || {};
+        // Calculate dynamic status
+        const isAcceptingOrders = calculateAcceptingOrders(restaurantData);
+
+        return {
+          ...restaurantData,
+          isAcceptingOrders, // Override with dynamic status
+          _id: r._id
+        };
+      })
     });
   } catch (error) {
     console.error('Error fetching Gourmet restaurants:', error);

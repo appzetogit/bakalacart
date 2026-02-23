@@ -167,6 +167,7 @@ export default function RestaurantDetails() {
   const [loadingRestaurant, setLoadingRestaurant] = useState(true)
   const [restaurantError, setRestaurantError] = useState(null)
   const fetchedRestaurantRef = useRef(false) // Track if restaurant has been fetched for current slug
+  const [menuFetched, setMenuFetched] = useState(false) // Track if menu fetch is complete (to prevent premature empty state)
 
   // Fetch restaurant data from API
   useEffect(() => {
@@ -187,19 +188,14 @@ export default function RestaurantDetails() {
         setRestaurant(cachedRestaurant);
         setLoadingRestaurant(false);
         fetchedRestaurantRef.current = true;
-        console.log('🚀 Loaded restaurant from memory cache:', slug);
-
-        // Even if we have cached basic data, check if we need to fetch menu/inventory
-        if (cachedRestaurant.menuSections && cachedRestaurant.menuSections.length > 0) {
-          return; // Skip full fetch if we have everything
-        }
+        setMenuFetched(true); // Cache already has menu data
+        return;
       }
 
       try {
         setLoadingRestaurant(true)
         setRestaurantError(null)
 
-        console.log('Fetching restaurant with slug:', slug)
         let response = null
         let apiRestaurant = null
 
@@ -209,23 +205,16 @@ export default function RestaurantDetails() {
           response = await restaurantAPI.getRestaurantById(slug)
           if (response.data && response.data.success && response.data.data) {
             apiRestaurant = response.data.data
-            console.log('✅ Found restaurant in restaurant API by slug/ID:', apiRestaurant)
           }
         } catch (directLookupError) {
           // If direct lookup fails, try searching by name (requires zoneId)
-          console.log('⚠️ Direct lookup failed, trying search by name...')
-
-          // Only search if zoneId is available (zoneId is required by backend for search)
           if (!zoneId) {
-            console.warn('⚠️ User zone not available, cannot search restaurants. Restaurant may not be found.')
-            // Don't throw error - let it fall through to show "Restaurant not found" message
+            console.warn('User zone not available, cannot search restaurants.')
           } else {
-            // Include zoneId for zone-based filtering
             const searchParams = { limit: 100, zoneId: zoneId }
             const searchResponse = await restaurantAPI.getRestaurants(searchParams)
             const restaurants = searchResponse?.data?.data?.restaurants || searchResponse?.data?.data || []
 
-            // Try to find by slug match or name match
             const restaurantName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
             const matchingRestaurant = restaurants.find(r =>
               r.slug === slug ||
@@ -234,23 +223,15 @@ export default function RestaurantDetails() {
             )
 
             if (matchingRestaurant) {
-              // Get full restaurant details by ID
               const fullResponse = await restaurantAPI.getRestaurantById(matchingRestaurant._id || matchingRestaurant.restaurantId)
               if (fullResponse.data && fullResponse.data.success && fullResponse.data.data) {
                 apiRestaurant = fullResponse.data.data
-                console.log('✅ Found restaurant in restaurant API by name search:', apiRestaurant)
               }
             }
           }
         }
 
         if (apiRestaurant) {
-          console.log('✅ Fetched restaurant from API:', apiRestaurant)
-          console.log('📋 Restaurant data keys:', Object.keys(apiRestaurant))
-          console.log('📋 Restaurant name field:', apiRestaurant?.name)
-          console.log('📋 Restaurant restaurantId:', apiRestaurant?.restaurantId)
-          console.log('📋 Restaurant _id:', apiRestaurant?._id)
-          console.log('📋 Restaurant.restaurant:', apiRestaurant?.restaurant)
 
           // Get restaurant data (handle nested structure if present)
           const actualRestaurant = apiRestaurant?.restaurant || apiRestaurant
@@ -351,14 +332,11 @@ export default function RestaurantDetails() {
 
           // Get location object for address formatting
           const locationObj = actualRestaurant?.location || apiRestaurant?.location
-          console.log('📍 Location Object for formatting:', locationObj)
-          console.log('📍 formattedAddress field:', locationObj?.formattedAddress)
           const formattedAddress = formatRestaurantAddress(locationObj)
-          console.log('📍 Final Formatted Address:', formattedAddress)
 
           // Calculate distance from user to restaurant
           const calculateDistance = (lat1, lng1, lat2, lng2) => {
-            const R = 6371 // Earth's radius in kilometers
+            const R = 6371
             const dLat = (lat2 - lat1) * Math.PI / 180
             const dLng = (lng2 - lng1) * Math.PI / 180
             const a =
@@ -366,44 +344,27 @@ export default function RestaurantDetails() {
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
               Math.sin(dLng / 2) * Math.sin(dLng / 2)
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            return R * c // Distance in kilometers
+            return R * c
           }
 
-          // Get restaurant coordinates
-          // Priority: latitude/longitude fields > coordinates array (GeoJSON format: [lng, lat])
+          // Get restaurant coordinates (GeoJSON format: [lng, lat])
           const restaurantLat = locationObj?.latitude || (locationObj?.coordinates && Array.isArray(locationObj.coordinates) ? locationObj.coordinates[1] : null)
           const restaurantLng = locationObj?.longitude || (locationObj?.coordinates && Array.isArray(locationObj.coordinates) ? locationObj.coordinates[0] : null)
 
-          console.log('📍 Restaurant coordinates:', { restaurantLat, restaurantLng, locationObj })
-
-          // Get user coordinates
           const userLat = userLocation?.latitude
           const userLng = userLocation?.longitude
-
-          console.log('📍 User location:', { userLat, userLng, userLocation })
 
           // Calculate distance if both coordinates are available
           let calculatedDistance = null
           if (userLat && userLng && restaurantLat && restaurantLng &&
             !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
             const distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
-            // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
             if (distanceInKm >= 1) {
               calculatedDistance = `${distanceInKm.toFixed(1)} km`
             } else {
               const distanceInMeters = Math.round(distanceInKm * 1000)
               calculatedDistance = `${distanceInMeters} m`
             }
-            console.log('✅ Calculated distance from user to restaurant:', calculatedDistance, 'km:', distanceInKm)
-          } else {
-            console.warn('⚠️ Cannot calculate distance - missing coordinates:', {
-              hasUserLocation: !!(userLat && userLng),
-              hasRestaurantLocation: !!(restaurantLat && restaurantLng),
-              userLat,
-              userLng,
-              restaurantLat,
-              restaurantLng
-            })
           }
 
           // Transform API data to match expected format with comprehensive fallbacks
@@ -438,7 +399,7 @@ export default function RestaurantDetails() {
             offers: Array.isArray(apiRestaurant?.offers) ? apiRestaurant.offers : [], // Will be populated from menu/offers API later
             offerText: (apiRestaurant?.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(apiRestaurant.offer.trim()))
               ? apiRestaurant.offer
-              : "Flat ₹200 OFF above ₹500",
+              : "", // Show empty if no offer in DB
             offerCount: apiRestaurant?.offerCount ?? 0,
             restaurantOffers: {
               goldOffer: {
@@ -475,11 +436,8 @@ export default function RestaurantDetails() {
             isAcceptingOrders: actualRestaurant?.isAcceptingOrders !== false, // Default to true if not specified
           }
 
-          console.log('✅ Transformed restaurant:', transformedRestaurant)
-          console.log('✅ Restaurant ID for menu fetch:', transformedRestaurant.id)
-
           if (!transformedRestaurant.id) {
-            console.error('❌ No restaurant ID found! Cannot fetch menu.')
+            console.error('No restaurant ID found! Cannot fetch menu.')
           }
 
           setRestaurant(transformedRestaurant)
@@ -530,33 +488,32 @@ export default function RestaurantDetails() {
           }
 
           if (restaurantIdForMenu) {
-            try {
-              console.log('📋 Fetching menu for restaurant ID:', restaurantIdForMenu)
-              const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantIdForMenu)
+            // Fetch menu and inventory IN PARALLEL for instant display
+            const [menuResult, inventoryResult] = await Promise.allSettled([
+              restaurantAPI.getMenuByRestaurantId(restaurantIdForMenu),
+              restaurantAPI.getInventoryByRestaurantId(restaurantIdForMenu)
+            ])
+
+            // Process menu result
+            if (menuResult.status === 'fulfilled') {
+              const menuResponse = menuResult.value
               if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
                 const menuSections = menuResponse.data.data.menu.sections || []
 
-                // Collect all recommended items from all sections
-                // Only include items that are both recommended (isRecommended === true) AND available (isAvailable !== false)
+                // Collect recommended items (isRecommended strictly true AND available)
                 const recommendedItems = []
                 menuSections.forEach(section => {
-                  // Check direct items - only include if isRecommended is explicitly true (strict check) AND item is available
                   if (section.items && Array.isArray(section.items)) {
                     section.items.forEach(item => {
-                      // Strict check: isRecommended must be exactly boolean true
-                      // This will exclude: false, undefined, null, 0, "", and any other falsy values
                       if (item.isRecommended === true && typeof item.isRecommended === 'boolean' && item.isAvailable !== false) {
                         recommendedItems.push(item)
                       }
                     })
                   }
-                  // Check subsection items - only include if isRecommended is explicitly true (strict check) AND item is available
                   if (section.subsections && Array.isArray(section.subsections)) {
                     section.subsections.forEach(subsection => {
                       if (subsection.items && Array.isArray(subsection.items)) {
                         subsection.items.forEach(item => {
-                          // Strict check: isRecommended must be exactly boolean true
-                          // This will exclude: false, undefined, null, 0, "", and any other falsy values
                           if (item.isRecommended === true && typeof item.isRecommended === 'boolean' && item.isAvailable !== false) {
                             recommendedItems.push(item)
                           }
@@ -566,57 +523,33 @@ export default function RestaurantDetails() {
                   }
                 })
 
-                // Debug log to verify recommended items and their isRecommended values
-                console.log('Recommended items collected:', recommendedItems.map(item => ({
-                  name: item.name,
-                  isRecommended: item.isRecommended,
-                  isRecommendedType: typeof item.isRecommended,
-                  preparationTime: item.preparationTime
-                })))
-
-                // Debug log to check preparationTime in menu sections
-                console.log('Menu sections with preparationTime:', menuSections.map(section => ({
-                  sectionName: section.name,
-                  items: section.items?.map(item => ({
-                    name: item.name,
-                    preparationTime: item.preparationTime
-                  })) || []
-                })))
-
-                // Always create recommended section (even if empty) - will show "No dish Yet" if empty
                 const finalMenuSections = [{ name: "Recommended for you", items: recommendedItems, subsections: [] }, ...menuSections]
 
                 setRestaurant(prev => {
-                  const updated = {
-                    ...prev,
-                    menuSections: finalMenuSections,
-                  };
-                  // Update cache
+                  const updated = { ...prev, menuSections: finalMenuSections };
                   if (slug) RESTAURANT_DATA_CACHE.set(slug, updated);
                   return updated;
                 })
 
-                // Set first 3 sections (Recommended, Starters, Main Course) as expanded by default
-                const defaultExpandedSections = new Set([0, 1, 2]) // Index 0, 1, 2
-                setExpandedSections(defaultExpandedSections)
-
-                console.log('Fetched menu sections with recommended items:', finalMenuSections)
+                // Set first 3 sections as expanded by default
+                setExpandedSections(new Set([0, 1, 2]))
               }
-            } catch (menuError) {
-              if (menuError.response && menuError.response.status === 404) {
-                console.log('⚠️ Menu not found for this restaurant.')
-              } else {
-                console.error('❌ Error fetching menu:', menuError)
+            } else {
+              const menuError = menuResult.reason
+              if (!menuError?.response || menuError.response.status !== 404) {
+                console.error('Error fetching menu:', menuError)
               }
             }
 
-            try {
-              console.log('📋 Fetching inventory for restaurant ID:', restaurantIdForMenu)
-              const inventoryResponse = await restaurantAPI.getInventoryByRestaurantId(restaurantIdForMenu)
+            // Mark menu as fetched (so empty state can now render if truly empty)
+            setMenuFetched(true)
+
+            // Process inventory result
+            if (inventoryResult.status === 'fulfilled') {
+              const inventoryResponse = inventoryResult.value
               if (inventoryResponse.data && inventoryResponse.data.success && inventoryResponse.data.data && inventoryResponse.data.data.inventory) {
                 const inventoryCategories = inventoryResponse.data.data.inventory.categories || []
 
-                // Normalize inventory categories to ensure proper structure
                 const normalizedInventory = inventoryCategories.map((category, index) => ({
                   id: category.id || `category-${index}`,
                   name: category.name || "Unnamed Category",
@@ -636,19 +569,12 @@ export default function RestaurantDetails() {
                   order: category.order !== undefined ? category.order : index,
                 }))
 
-                setRestaurant(prev => ({
-                  ...prev,
-                  inventory: normalizedInventory,
-                }))
-                console.log('✅ Fetched and normalized inventory categories:', normalizedInventory)
-              }
-            } catch (inventoryError) {
-              if (inventoryError.response && inventoryError.response.status === 404) {
-                console.log('⚠️ Inventory not found for this restaurant.')
-              } else {
-                console.error('❌ Error fetching inventory:', inventoryError)
+                setRestaurant(prev => ({ ...prev, inventory: normalizedInventory }))
               }
             }
+          } else {
+            // No restaurant ID — mark menu as fetched so empty state can show
+            setMenuFetched(true)
           }
         } else {
           console.error('❌ No restaurant data found in API response')
@@ -687,9 +613,10 @@ export default function RestaurantDetails() {
       }
     }
 
-    // Reset fetched flag when slug changes
+    // Reset fetched flags when slug changes (navigating to a different restaurant)
     if (fetchedRestaurantRef.current && restaurant?.slug !== slug) {
       fetchedRestaurantRef.current = false
+      setMenuFetched(false) // Reset so "No items found" doesn't flash for new restaurant
     }
 
     // Wait for zone to load before fetching (if zone-based search might be needed)
@@ -1313,10 +1240,9 @@ export default function RestaurantDetails() {
 
   // Highlight offers/texts for the blue offer line
   const highlightOffers = [
-    "Upto 50% OFF",
     restaurant?.offerText || "",
     ...(Array.isArray(restaurant?.offers) ? restaurant.offers.map((offer) => offer?.title || "") : []),
-  ]
+  ].filter(Boolean) // Only include non-empty offers
 
   // Auto-rotate images every 3 seconds
   useEffect(() => {
@@ -1515,25 +1441,27 @@ export default function RestaurantDetails() {
           </div>
 
           {/* Offers */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm overflow-hidden">
-              <Tag className="h-4 w-4 text-blue-600" />
-              <div className="relative h-5 overflow-hidden">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={highlightIndex}
-                    initial={{ y: 16, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -16, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="text-blue-600 font-medium inline-block"
-                  >
-                    {highlightOffers[highlightIndex]}
-                  </motion.span>
-                </AnimatePresence>
+          {highlightOffers.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm overflow-hidden">
+                <Tag className="h-4 w-4 text-blue-600" />
+                <div className="relative h-5 overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={highlightIndex}
+                      initial={{ y: 16, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -16, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-blue-600 font-medium inline-block"
+                    >
+                      {highlightOffers[highlightIndex]}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Filter/Category Buttons */}
           <div className="border-y border-gray-200 py-3 -mx-4 px-4 overflow-x-auto scrollbar-hide">
@@ -1746,12 +1674,17 @@ export default function RestaurantDetails() {
                                 )}
                               </div>
 
-                              {/* Item Size/Unit - Show if available */}
-                              {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) && (
-                                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
-                                  {[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')}
-                                </p>
-                              )}
+                              {/* Item Size/Unit - Show if available (hide "piece") */}
+                              {(() => {
+                                const sizeUnit = item.itemSizeUnit || item.unit
+                                const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                                const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                                return displayParts.length > 0 ? (
+                                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
+                                    {displayParts.join(' ')}
+                                  </p>
+                                ) : null
+                              })()}
 
                               {/* Description - Show if available */}
                               {item.description && (
@@ -1968,6 +1901,17 @@ export default function RestaurantDetails() {
                                               <span>{String(item.preparationTime).trim()}</span>
                                             </div>
                                           )}
+                                          {/* Item Size/Unit - Show if available (hide "piece") */}
+                                          {(() => {
+                                            const sizeUnit = item.itemSizeUnit || item.unit
+                                            const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                                            const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                                            return displayParts.length > 0 ? (
+                                              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
+                                                {displayParts.join(' ')}
+                                              </p>
+                                            ) : null
+                                          })()}
                                         </div>
 
                                         {/* Description - Show if available */}
@@ -2087,7 +2031,8 @@ export default function RestaurantDetails() {
                 </div>
               )
             })
-          ) : (
+          ) : (restaurant?.menuSections && restaurant.menuSections.length > 0) ? (
+            // menuSections has data but current search/filter returned 0 results
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Search className="h-12 w-12 text-gray-300 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No items found</h3>
@@ -2112,6 +2057,9 @@ export default function RestaurantDetails() {
                 Clear all filters
               </Button>
             </div>
+          ) : (
+            // menuSections is empty — menu still loading, show nothing
+            <div className="min-h-[200px]" />
           )}
         </div>
       </div>

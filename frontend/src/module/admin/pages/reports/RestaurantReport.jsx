@@ -18,6 +18,10 @@ export default function RestaurantReport() {
   })
   const [zones, setZones] = useState([])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const PAGE_SIZE = 25
 
   // Fetch zones for filter dropdown
   useEffect(() => {
@@ -39,19 +43,25 @@ export default function RestaurantReport() {
     const fetchRestaurantReport = async () => {
       try {
         setLoading(true)
-        
+
         const params = {
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           all: filters.all !== "All" ? filters.all : undefined,
           type: filters.type !== "All types" ? filters.type : undefined,
           time: filters.time !== "All Time" ? filters.time : undefined,
-          search: searchQuery || undefined
+          search: searchQuery || undefined,
+          page: currentPage,
+          limit: PAGE_SIZE
         }
 
         const response = await adminAPI.getRestaurantReport(params)
 
         if (response?.data?.success && response.data.data) {
           setRestaurants(response.data.data.restaurants || [])
+          if (response.data.data.pagination) {
+            setTotalPages(response.data.data.pagination.totalPages || 1)
+            setTotalRecords(response.data.data.pagination.total || 0)
+          }
         } else {
           setRestaurants([])
           if (response?.data?.message) {
@@ -68,7 +78,7 @@ export default function RestaurantReport() {
     }
 
     fetchRestaurantReport()
-  }, [filters, searchQuery])
+  }, [filters, searchQuery, currentPage])
 
   const filteredRestaurants = useMemo(() => {
     return restaurants // Backend already filters, so just return restaurants
@@ -84,6 +94,7 @@ export default function RestaurantReport() {
       time: "All Time",
     })
     setSearchQuery("")
+    setCurrentPage(1)
   }
 
   const handleExport = (format) => {
@@ -230,11 +241,10 @@ export default function RestaurantReport() {
                 <RefreshCw className="w-4 h-4" />
                 Reset
               </button>
-              <button 
+              <button
                 onClick={handleFilterApply}
-                className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                  activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                }`}
+                className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                  }`}
               >
                 <Filter className="w-4 h-4" />
                 Filter
@@ -294,7 +304,7 @@ export default function RestaurantReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >
@@ -414,11 +424,10 @@ export default function RestaurantReport() {
                         <span className="text-sm text-slate-700">{restaurant.totalDiscountGiven}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm font-medium ${
-                          restaurant.totalAdminCommission.startsWith('₹-') || restaurant.totalAdminCommission.startsWith('-₹')
-                            ? 'text-red-600'
-                            : 'text-slate-900'
-                        }`}>
+                        <span className={`text-sm font-medium ${restaurant.totalAdminCommission.startsWith('₹-') || restaurant.totalAdminCommission.startsWith('-₹')
+                          ? 'text-red-600'
+                          : 'text-slate-900'
+                          }`}>
                           {restaurant.totalAdminCommission}
                         </span>
                       </td>
@@ -433,6 +442,57 @@ export default function RestaurantReport() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-6">
+            <p className="text-sm text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-700">
+                {restaurants.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {(currentPage - 1) * PAGE_SIZE + restaurants.length}
+              </span>{" "}
+              of <span className="font-semibold text-slate-700">{totalRecords}</span> restaurants
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1 px-2">
+                {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) pageNum = i + 1;
+                  else if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
+                        ? "bg-slate-700 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>

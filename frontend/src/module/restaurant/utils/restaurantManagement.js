@@ -19,6 +19,7 @@ const EMPTY_RESTAURANT_DATA = {
   metaTitle: "",
   metaDescription: "",
   metaImage: null,
+  offer: "",
   rating: 0,
   totalRatings: 0
 }
@@ -70,7 +71,7 @@ export const updateRestaurantData = (updates) => {
     ...currentData,
     ...updates,
     // Merge restaurantName object if it exists
-    restaurantName: updates.restaurantName 
+    restaurantName: updates.restaurantName
       ? { ...currentData.restaurantName, ...updates.restaurantName }
       : currentData.restaurantName
   }

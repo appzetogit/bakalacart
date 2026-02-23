@@ -64,6 +64,7 @@ import Privacy from "../pages/profile/Privacy"
 import Refund from "../pages/profile/Refund"
 import Shipping from "../pages/profile/Shipping"
 import Cancellation from "../pages/profile/Cancellation"
+import ContactUs from "../pages/profile/ContactUs"
 import SendFeedback from "../pages/profile/SendFeedback"
 import ReportSafetyEmergency from "../pages/profile/ReportSafetyEmergency"
 import Accessibility from "../pages/profile/Accessibility"
@@ -296,6 +297,10 @@ export default function UserRouter() {
           <Route
             path="/profile/cancellation"
             element={<Cancellation />}
+          />
+          <Route
+            path="/profile/contact-us"
+            element={<ContactUs />}
           />
           <Route
             path="/profile/send-feedback"

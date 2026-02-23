@@ -1469,11 +1469,9 @@ export default function Cart() {
       <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
         <div className="bg-white dark:bg-[#1a1a1a] border-b dark:border-gray-800 sticky top-0 z-10">
           <div className="flex items-center gap-3 px-4 py-3">
-            <Link onClick={() => navigate(-1)}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+            <button onClick={() => navigate(-1)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+              <ArrowLeft className="h-5 w-5 text-gray-800 dark:text-white" />
+            </button>
             <span className="font-semibold text-gray-800 dark:text-white">Cart</span>
           </div>
         </div>
@@ -1483,9 +1481,12 @@ export default function Cart() {
           </div>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
-          <Link>
-            <Button className="bg-primary-orange hover:opacity-90 text-white">Browse Restaurants</Button>
-          </Link>
+          <Button
+            onClick={() => navigate('/user')}
+            className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 h-12 font-semibold shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
+          >
+            Browse Restaurants
+          </Button>
         </div>
       </AnimatedPage>
     )
@@ -1547,6 +1548,23 @@ export default function Cart() {
             <div className="lg:col-span-2 space-y-2 md:space-y-4">
               {/* Cart Items */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
+                <div className="flex items-center justify-between mb-3 md:mb-4 border-b border-gray-100 dark:border-gray-800 pb-2 md:pb-3">
+                  <h3 className="text-sm md:text-base font-bold text-gray-800 dark:text-gray-200">
+                    Cart Items ({getCartCount()})
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to clear your cart?")) {
+                        clearCart();
+                        toast.info("Cart has been cleared");
+                      }
+                    }}
+                    className="flex items-center gap-1 text-xs md:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 px-2 py-1 rounded-md transition-colors"
+                  >
+                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                    Clear Cart
+                  </button>
+                </div>
                 <div className="space-y-3 md:space-y-4">
                   {cart.map((item) => (
                     <div key={item.id} className="flex items-start gap-3 md:gap-4">
@@ -1557,11 +1575,16 @@ export default function Cart() {
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-200 leading-tight">
-                          {item.name} {(item.itemSizeQuantity || item.itemSizeUnit || item.unit) ? (
-                            <span className="text-gray-500 dark:text-gray-400 font-bold ml-1">
-                              ({[item.itemSizeQuantity, item.itemSizeUnit || item.unit].filter(Boolean).join(' ')})
-                            </span>
-                          ) : ''}
+                          {item.name} {(() => {
+                            const sizeUnit = item.itemSizeUnit || item.unit
+                            const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                            const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                            return displayParts.length > 0 ? (
+                              <span className="text-gray-500 dark:text-gray-400 font-bold ml-1">
+                                ({displayParts.join(' ')})
+                              </span>
+                            ) : ''
+                          })()}
                         </p>
                         <button
                           onClick={() => {

@@ -1155,7 +1155,6 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
 });
 
 
-
 /**
  * Save FCM Token
  * POST /api/restaurant/auth/fcm-token

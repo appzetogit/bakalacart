@@ -378,6 +378,8 @@ export const API_ENDPOINTS = {
     NOTIFICATION: '/notification',
     NOTIFICATION_SEND: '/notification/send',
     NOTIFICATION_STATUS: '/notification/:id/status',
+    SETTLEMENTS_RESTAURANTS: '/admin/settlements/restaurants',
+    SETTLEMENTS_MARK_PROCESSED: '/admin/settlements/mark-processed',
   },
   // Order endpoints
   ORDER: {

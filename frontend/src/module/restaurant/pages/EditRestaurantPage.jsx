@@ -56,9 +56,9 @@ export default function EditRestaurantPage() {
       address: savedData.address || "House: 00, Road: 00, Test City",
       logo: savedData.logo || null,
       cover: savedData.cover || null,
-      metaTitle: savedData.metaTitle || "Hungry Puppets Restaurant: Where Fla",
       metaDescription: savedData.metaDescription || "Satisfy your cravings and indulge in a culinary adventure at Hungry Puppets Restaurant. Our menu is a symphony of taste, offering a delightful fusion of flavors that excite both palate and",
-      metaImage: savedData.metaImage || null
+      metaImage: savedData.metaImage || null,
+      offer: savedData.offer || ""
     }
   })
 
@@ -79,7 +79,8 @@ export default function EditRestaurantPage() {
         cover: savedData.cover || null,
         metaTitle: savedData.metaTitle || "Hungry Puppets Restaurant: Where Fla",
         metaDescription: savedData.metaDescription || "Satisfy your cravings and indulge in a culinary adventure at Hungry Puppets Restaurant. Our menu is a symphony of taste, offering a delightful fusion of flavors that excite both palate and",
-        metaImage: savedData.metaImage || null
+        metaImage: savedData.metaImage || null,
+        offer: savedData.offer || ""
       })
     }
 
@@ -182,8 +183,8 @@ export default function EditRestaurantPage() {
                     type="button"
                     onClick={() => setActiveLanguage(lang.id)}
                     className={`flex-shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 ${activeLanguage === lang.id
-                        ? "text-[#ff8100] border-[#ff8100]"
-                        : "text-gray-600 border-transparent hover:text-gray-900"
+                      ? "text-[#ff8100] border-[#ff8100]"
+                      : "text-gray-600 border-transparent hover:text-gray-900"
                       }`}
                   >
                     {lang.label}
@@ -242,7 +243,20 @@ export default function EditRestaurantPage() {
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
-                  placeholder="Enter address"
+                />
+              </div>
+
+              {/* Special Offer */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Special Offer / Promotion
+                </label>
+                <input
+                  type="text"
+                  value={formData.offer}
+                  onChange={(e) => handleInputChange("offer", e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
+                  placeholder="e.g., Flat ₹100 OFF above ₹499"
                 />
               </div>
             </CardContent>

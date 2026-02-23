@@ -33,6 +33,10 @@ export default function TransactionReport() {
     restaurant: "All restaurants",
     time: "All Time",
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const PAGE_SIZE = 25
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [zones, setZones] = useState([])
   const [restaurants, setRestaurants] = useState([])
@@ -64,12 +68,12 @@ export default function TransactionReport() {
     const fetchTransactionReport = async () => {
       try {
         setLoading(true)
-        
+
         // Build date range based on time filter
         let fromDate = null
         let toDate = null
         const now = new Date()
-        
+
         if (filters.time === "Today") {
           fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
           toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
@@ -89,7 +93,8 @@ export default function TransactionReport() {
           restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           fromDate: fromDate ? fromDate.toISOString() : undefined,
           toDate: toDate ? toDate.toISOString() : undefined,
-          limit: 1000
+          page: currentPage,
+          limit: PAGE_SIZE
         }
 
         const response = await adminAPI.getTransactionReport(params)
@@ -103,6 +108,10 @@ export default function TransactionReport() {
             restaurantEarning: 0,
             deliverymanEarning: 0
           })
+          if (response.data.data.pagination) {
+            setTotalPages(response.data.data.pagination.totalPages || 1)
+            setTotalRecords(response.data.data.pagination.total || 0)
+          }
         } else {
           setTransactions([])
           if (response?.data?.message) {
@@ -119,7 +128,7 @@ export default function TransactionReport() {
     }
 
     fetchTransactionReport()
-  }, [searchQuery, filters])
+  }, [searchQuery, filters, currentPage])
 
   const filteredTransactions = useMemo(() => {
     return transactions // Backend already filters, so just return transactions
@@ -148,6 +157,7 @@ export default function TransactionReport() {
       restaurant: "All restaurants",
       time: "All Time",
     })
+    setCurrentPage(1)
   }
 
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
@@ -232,11 +242,10 @@ export default function TransactionReport() {
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
             </div>
 
-            <button 
+            <button
               onClick={handleFilterApply}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all whitespace-nowrap relative ${
-                activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all whitespace-nowrap relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                }`}
             >
               Filter
               {activeFiltersCount > 0 && (
@@ -245,7 +254,7 @@ export default function TransactionReport() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={handleResetFilters}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap"
             >
@@ -395,7 +404,7 @@ export default function TransactionReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >
@@ -449,11 +458,10 @@ export default function TransactionReport() {
                         <span className="text-[10px] text-slate-700 truncate block">{transaction.restaurant}</span>
                       </td>
                       <td className="px-1.5 py-1">
-                        <span className={`text-[10px] truncate block ${
-                          transaction.customerName === "Invalid Customer Data" 
-                            ? "text-red-600 font-semibold" 
+                        <span className={`text-[10px] truncate block ${transaction.customerName === "Invalid Customer Data"
+                            ? "text-red-600 font-semibold"
                             : "text-slate-700"
-                        }`}>
+                          }`}>
                           {transaction.customerName}
                         </span>
                       </td>
@@ -471,7 +479,7 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">
-                          {transaction.discountedAmount >= 1000 
+                          {transaction.discountedAmount >= 1000
                             ? formatCurrency(transaction.discountedAmount)
                             : formatFullCurrency(transaction.discountedAmount)
                           }
@@ -491,6 +499,57 @@ export default function TransactionReport() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-4">
+            <p className="text-[10px] text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-700">
+                {transactions.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {(currentPage - 1) * PAGE_SIZE + transactions.length}
+              </span>{" "}
+              of <span className="font-semibold text-slate-700">{totalRecords}</span> transactions
+            </p>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-[10px] font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1 px-2">
+                {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) pageNum = i + 1;
+                  else if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-medium transition-all ${currentPage === pageNum
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-[10px] font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
