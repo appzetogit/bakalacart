@@ -37,15 +37,17 @@ export const getOrderSettlementDetails = asyncHandler(async (req, res) => {
  */
 export const getRestaurantSettlements = asyncHandler(async (req, res) => {
   try {
-    const { restaurantId, startDate, endDate } = req.query;
-    
-    const settlements = await getPendingRestaurantSettlements(
+    const { restaurantId, startDate, endDate, page = 1, limit = 50 } = req.query;
+
+    const { settlements, totalCount, hasMore } = await getPendingRestaurantSettlements(
       restaurantId || null,
       startDate || null,
-      endDate || null
+      endDate || null,
+      parseInt(page),
+      parseInt(limit)
     );
 
-    // Calculate totals
+    // Calculate totals from the current page settlements
     const totals = settlements.reduce((acc, s) => {
       acc.totalOrders += 1;
       acc.totalEarnings += s.restaurantEarning.netEarning;
@@ -59,7 +61,13 @@ export const getRestaurantSettlements = asyncHandler(async (req, res) => {
 
     return successResponse(res, 200, 'Restaurant settlements retrieved', {
       settlements,
-      totals
+      totals,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalCount,
+        hasMore
+      }
     });
   } catch (error) {
     console.error('Error getting restaurant settlements:', error);
@@ -75,7 +83,7 @@ export const getRestaurantSettlements = asyncHandler(async (req, res) => {
 export const getDeliverySettlements = asyncHandler(async (req, res) => {
   try {
     const { deliveryId, startDate, endDate } = req.query;
-    
+
     const settlements = await getPendingDeliverySettlements(
       deliveryId || null,
       startDate || null,
@@ -257,7 +265,7 @@ export const getAdminWalletSummary = asyncHandler(async (req, res) => {
 export const getSettlementStatistics = asyncHandler(async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const query = {
       settlementStatus: 'completed'
     };

@@ -15,17 +15,24 @@ import { Badge } from "@/components/ui/badge"
 
 export default function RestaurantFinanceReport() {
     const [selectedRestaurant, setSelectedRestaurant] = useState("all")
-    const [startDate, setStartDate] = useState(format(new Date(new Date().setDate(new Date().getDate() - 30)), 'yyyy-MM-dd'))
+    const [startDate, setStartDate] = useState(format(new Date(new Date().setDate(new Date().getDate() - 7)), 'yyyy-MM-dd'))
     const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
     const [loading, setLoading] = useState(false)
+    const [loadingMore, setLoadingMore] = useState(false)
     const [settlements, setSettlements] = useState([])
-    const [totals, setTotals] = useState({
-        totalOrders: 0,
-        totalEarnings: 0,
-        totalCommission: 0
-    })
+    const [hasMore, setHasMore] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalCount, setTotalCount] = useState(0)
     const [allRestaurants, setAllRestaurants] = useState([])
     const [isProcessing, setIsProcessing] = useState(false)
+
+    // Totals calculated client-side from all loaded settlements
+    const totals = settlements.reduce((acc, s) => {
+        acc.totalOrders += 1
+        acc.totalEarnings += (s.restaurantEarning?.netEarning || 0)
+        acc.totalCommission += (s.restaurantEarning?.commission || 0)
+        return acc
+    }, { totalOrders: 0, totalEarnings: 0, totalCommission: 0 })
 
     // Fetch all restaurants for dropdown dynamically
     useEffect(() => {
@@ -35,7 +42,6 @@ export default function RestaurantFinanceReport() {
                 if (response?.data?.success && response.data.data?.restaurants) {
                     setAllRestaurants(response.data.data.restaurants)
                 } else if (response?.data?.success && Array.isArray(response.data.data)) {
-                    // Fallback if structure is different
                     setAllRestaurants(response.data.data)
                 }
             } catch (error) {
@@ -45,30 +51,31 @@ export default function RestaurantFinanceReport() {
         fetchAllRestaurants()
     }, [])
 
+    // Fetch page 1 (reset settlements)
     const fetchFinanceReport = async () => {
         try {
             setLoading(true)
+            setSettlements([])
+            setCurrentPage(1)
+            setHasMore(false)
             const params = {
                 restaurantId: selectedRestaurant !== "all" ? selectedRestaurant : undefined,
                 startDate: startDate || undefined,
-                endDate: endDate || undefined
+                endDate: endDate || undefined,
+                page: 1,
+                limit: 50
             }
 
             const response = await adminAPI.getRestaurantSettlements(params)
 
             if (response?.data?.success) {
-                setSettlements(response.data.data.settlements || [])
-                setTotals(response.data.data.totals || {
-                    totalOrders: 0,
-                    totalEarnings: 0,
-                    totalCommission: 0
-                })
+                const data = response.data.data
+                setSettlements(data.settlements || [])
+                setHasMore(data.pagination?.hasMore || false)
+                setTotalCount(data.pagination?.totalCount || 0)
             } else {
                 setSettlements([])
-                setTotals({ totalOrders: 0, totalEarnings: 0, totalCommission: 0 })
-                if (response?.data?.message) {
-                    toast.error(response.data.message)
-                }
+                if (response?.data?.message) toast.error(response.data.message)
             }
         } catch (error) {
             console.error("Error fetching finance report:", error)
@@ -76,6 +83,36 @@ export default function RestaurantFinanceReport() {
             setSettlements([])
         } finally {
             setLoading(false)
+        }
+    }
+
+    // Load next page and append to existing settlements
+    const loadMore = async () => {
+        if (loadingMore || !hasMore) return
+        try {
+            setLoadingMore(true)
+            const nextPage = currentPage + 1
+            const params = {
+                restaurantId: selectedRestaurant !== "all" ? selectedRestaurant : undefined,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                page: nextPage,
+                limit: 50
+            }
+
+            const response = await adminAPI.getRestaurantSettlements(params)
+
+            if (response?.data?.success) {
+                const data = response.data.data
+                setSettlements(prev => [...prev, ...(data.settlements || [])])
+                setHasMore(data.pagination?.hasMore || false)
+                setCurrentPage(nextPage)
+            }
+        } catch (error) {
+            console.error("Error loading more settlements:", error)
+            toast.error("Failed to load more records")
+        } finally {
+            setLoadingMore(false)
         }
     }
 
@@ -304,7 +341,7 @@ export default function RestaurantFinanceReport() {
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-bold text-slate-900">Settlement Details</h3>
                         <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none font-medium">
-                            {settlements.length} reports
+                            {settlements.length}{totalCount > 0 && totalCount > settlements.length ? ` / ${totalCount}` : ''} records
                         </Badge>
                     </div>
 
@@ -314,51 +351,63 @@ export default function RestaurantFinanceReport() {
                             <p className="text-slate-500 font-medium">Loading records...</p>
                         </div>
                     ) : settlements.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader className="bg-slate-50/50">
-                                    <TableRow className="border-slate-100">
-                                        <TableHead className="w-16 font-semibold text-slate-700">SL</TableHead>
-                                        <TableHead className="font-semibold text-slate-700">Order #</TableHead>
-                                        <TableHead className="font-semibold text-slate-700">Date</TableHead>
-                                        <TableHead className="font-semibold text-slate-700">Restaurant</TableHead>
-                                        <TableHead className="text-right font-semibold text-slate-700">Food Price</TableHead>
-                                        <TableHead className="text-right font-semibold text-slate-700">Commission</TableHead>
-                                        <TableHead className="text-right font-semibold text-slate-700 text-blue-600">Original Price</TableHead>
-                                        <TableHead className="text-center font-semibold text-slate-700">Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {settlements.map((s, index) => (
-                                        <TableRow key={s._id} className="border-slate-50 hover:bg-slate-50/50">
-                                            <TableCell className="font-medium text-slate-400">{index + 1}</TableCell>
-                                            <TableCell className="font-bold text-slate-900">#{s.orderNumber}</TableCell>
-                                            <TableCell className="text-slate-600">
-                                                <div className="text-sm">
-                                                    <div>{format(new Date(s.createdAt), 'dd MMM yyyy')}</div>
-                                                    <div className="text-[10px] text-slate-400">{format(new Date(s.createdAt), 'HH:mm')}</div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="font-medium text-slate-700">{s.restaurantName}</TableCell>
-                                            <TableCell className="text-right text-slate-600">₹{s.restaurantEarning.foodPrice.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right text-red-500/80">₹{s.restaurantEarning.commission.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right font-bold text-blue-600">₹{s.restaurantEarning.netEarning.toLocaleString()}</TableCell>
-                                            <TableCell className="text-center">
-                                                {(() => {
-                                                    const status = s.orderId?.status || 'delivered';
-                                                    const isDelivered = status === 'delivered';
-                                                    return (
-                                                        <Badge className={isDelivered ? "bg-green-50 text-green-600 border-none font-semibold" : "bg-orange-50 text-orange-600 border-none font-semibold"}>
-                                                            {isDelivered ? 'Delivered' : status.charAt(0).toUpperCase() + status.slice(1)}
-                                                        </Badge>
-                                                    );
-                                                })()}
-                                            </TableCell>
+                        <>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader className="bg-slate-50/50">
+                                        <TableRow className="border-slate-100">
+                                            <TableHead className="w-16 font-semibold text-slate-700">SL</TableHead>
+                                            <TableHead className="font-semibold text-slate-700">Order #</TableHead>
+                                            <TableHead className="font-semibold text-slate-700">Date</TableHead>
+                                            <TableHead className="font-semibold text-slate-700">Restaurant</TableHead>
+                                            <TableHead className="text-right font-semibold text-slate-700">Food Price</TableHead>
+                                            <TableHead className="text-right font-semibold text-slate-700">Commission</TableHead>
+                                            <TableHead className="text-right font-semibold text-slate-700 text-blue-600">Original Price</TableHead>
+                                            <TableHead className="text-center font-semibold text-slate-700">Status</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {settlements.map((s, index) => (
+                                            <TableRow key={`${s._id}-${index}`} className="border-slate-50 hover:bg-slate-50/50">
+                                                <TableCell className="font-medium text-slate-400">{index + 1}</TableCell>
+                                                <TableCell className="font-bold text-slate-900">#{s.orderNumber}</TableCell>
+                                                <TableCell className="text-slate-600">
+                                                    <div className="text-sm">
+                                                        <div>{format(new Date(s.createdAt), 'dd MMM yyyy')}</div>
+                                                        <div className="text-[10px] text-slate-400">{format(new Date(s.createdAt), 'HH:mm')}</div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-medium text-slate-700">{s.restaurantName}</TableCell>
+                                                <TableCell className="text-right text-slate-600">₹{(s.restaurantEarning?.foodPrice || 0).toLocaleString()}</TableCell>
+                                                <TableCell className="text-right text-red-500/80">₹{(s.restaurantEarning?.commission || 0).toLocaleString()}</TableCell>
+                                                <TableCell className="text-right font-bold text-blue-600">₹{(s.restaurantEarning?.netEarning || 0).toLocaleString()}</TableCell>
+                                                <TableCell className="text-center">
+                                                    <Badge className="bg-green-50 text-green-600 border-none font-semibold">Delivered</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Load More Button */}
+                            {hasMore && (
+                                <div className="flex justify-center py-4 border-t border-slate-100">
+                                    <Button
+                                        variant="outline"
+                                        onClick={loadMore}
+                                        disabled={loadingMore}
+                                        className="border-slate-200 text-slate-700 hover:bg-slate-50 gap-2"
+                                    >
+                                        {loadingMore ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+                                        ) : (
+                                            <>Load More ({totalCount - settlements.length} remaining)</>
+                                        )}
+                                    </Button>
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <div className="py-24 text-center">
                             <div className="inline-flex p-4 rounded-full bg-slate-50 mb-4">

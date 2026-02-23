@@ -7,7 +7,7 @@ import mongoose from 'mongoose';
 /**
  * Get pending settlements for restaurants
  */
-export const getPendingRestaurantSettlements = async (restaurantId = null, startDate = null, endDate = null) => {
+export const getPendingRestaurantSettlements = async (restaurantId = null, startDate = null, endDate = null, page = 1, limit = 50) => {
   try {
     // Build date range
     let start = null;
@@ -19,8 +19,7 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
       end.setHours(23, 59, 59, 999);
     }
 
-    // Step 1: Query Order model directly for all delivered orders in the date range
-    // Use createdAt on Order (order placement date) to match what user selects in UI
+    // Build query for delivered orders
     const orderQuery = { status: 'delivered' };
 
     if (restaurantId && mongoose.Types.ObjectId.isValid(restaurantId)) {
@@ -30,23 +29,32 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
     }
 
     if (start && end) {
-      // Filter by order createdAt date range (when order was placed)
       orderQuery.createdAt = { $gte: start, $lte: end };
     }
 
-    const deliveredOrders = await Order.find(orderQuery)
-      .populate('restaurantId', 'name restaurantId')
-      .sort({ createdAt: -1 })
-      .lean();
+    // Run count and fetch IN PARALLEL for max speed
+    const [totalCount, deliveredOrders] = await Promise.all([
+      Order.countDocuments(orderQuery),
+      Order.find(orderQuery)
+        .select('orderId restaurantId restaurantName pricing status createdAt deliveredAt')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+    ]);
 
-    if (deliveredOrders.length === 0) return [];
+    const hasMore = page * limit < totalCount;
 
-    // Step 2: Find matching OrderSettlement records for these orders
+    if (deliveredOrders.length === 0) return { settlements: [], totalCount, hasMore: false };
+
+    // Find matching OrderSettlement records for these orders (no populate, just lean)
     const orderObjectIds = deliveredOrders.map(o => o._id);
     const settlements = await OrderSettlement.find({
       orderId: { $in: orderObjectIds },
       'restaurantEarning.status': { $ne: 'cancelled' }
-    }).lean();
+    })
+      .select('orderId orderNumber restaurantId restaurantName restaurantSettled restaurantEarning createdAt')
+      .lean();
 
     // Map settlements by orderId for quick lookup
     const settlementMap = {};
@@ -54,14 +62,13 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
       settlementMap[s.orderId.toString()] = s;
     });
 
-    // Step 3: Build response - use settlement data when available, fallback for orders without settlements
+    // Build response
     const result = deliveredOrders.map(order => {
       const settlement = settlementMap[order._id.toString()];
-      const restaurantName = order.restaurantName || order.restaurantId?.name || 'N/A';
+      const restaurantName = order.restaurantName || 'N/A';
       const foodPrice = (order.pricing?.subtotal || 0) - (order.pricing?.discount || 0);
 
       if (settlement) {
-        // Return existing settlement data enriched with order status
         return {
           ...settlement,
           orderId: {
@@ -83,27 +90,17 @@ export const getPendingRestaurantSettlements = async (restaurantId = null, start
 
       return {
         _id: order._id,
-        orderId: {
-          _id: order._id,
-          orderId: order.orderId,
-          status: order.status,
-          deliveredAt: order.deliveredAt
-        },
+        orderId: { _id: order._id, orderId: order.orderId, status: order.status, deliveredAt: order.deliveredAt },
         orderNumber: order.orderId,
         restaurantId: order.restaurantId,
         restaurantName,
         restaurantSettled: false,
-        restaurantEarning: {
-          foodPrice,
-          commission,
-          netEarning,
-          status: 'pending'
-        },
+        restaurantEarning: { foodPrice, commission, netEarning, status: 'pending' },
         createdAt: order.createdAt
       };
     });
 
-    return result;
+    return { settlements: result, totalCount, hasMore };
   } catch (error) {
     console.error('Error getting pending restaurant settlements:', error);
     throw error;
