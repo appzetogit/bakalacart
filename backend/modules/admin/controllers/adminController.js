@@ -213,7 +213,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
             as: 'rider'
           }
         },
-        { $unwind: { path: '$rider', preserveNullAndEmpty: false } },
+        { $unwind: { path: '$rider', preserveNullAndEmptyArrays: false } },
         { $project: { name: '$rider.name', phone: '$rider.phone', count: 1 } }
       ])
     ]);
