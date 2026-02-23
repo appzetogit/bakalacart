@@ -15,6 +15,7 @@ import { initializeCloudinary } from '../../../config/cloudinary.js';
 import emailService from '../../auth/services/emailService.js';
 import User from '../../auth/models/User.js';
 import Menu from '../../restaurant/models/Menu.js';
+import Delivery from '../../delivery/models/Delivery.js';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -91,7 +92,10 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       totalCustomers,
       recentOrders,
       recentRestaurants,
-      menuStats
+      menuStats,
+      todayOrderCount,
+      totalAllOrderCount,
+      topRiders
     ] = await Promise.all([
       // 1. Revenue Stats
       Order.aggregate([
@@ -133,9 +137,9 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           }
         ]
       }),
-      // 5. Delivery Boy Stats
-      User.countDocuments({ role: 'delivery' }),
-      User.countDocuments({ role: 'delivery', isActive: false }),
+      // 5. Delivery Boy Stats — use Delivery model (not User)
+      Delivery.countDocuments({ status: { $in: ['approved', 'active'] } }),
+      Delivery.countDocuments({ status: 'pending' }),
       // 6. Total Customers
       User.countDocuments({ role: 'user' }),
       // 7. Recent Activity (last 24h)
@@ -179,6 +183,38 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
             totalAddons: { $sum: '$addonCount' }
           }
         }
+      ]),
+      // 9. Today's order count
+      Order.countDocuments({
+        createdAt: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999))
+        }
+      }),
+      // 10. Total ALL-status order count
+      Order.countDocuments({}),
+      // 11. Top riders by delivered orders this month
+      Order.aggregate([
+        {
+          $match: {
+            status: 'delivered',
+            deliveryPartnerId: { $exists: true, $ne: null },
+            deliveredAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) }
+          }
+        },
+        { $group: { _id: '$deliveryPartnerId', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: 'deliveries',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'rider'
+          }
+        },
+        { $unwind: { path: '$rider', preserveNullAndEmpty: false } },
+        { $project: { name: '$rider.name', phone: '$rider.phone', count: 1 } }
       ])
     ]);
 
@@ -326,7 +362,23 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       foods: { total: counts.totalFoods },
       addons: { total: counts.totalAddons },
       customers: { total: totalCustomers },
-      orderStats: { pending: orderStatusMap.pending || 0, completed: orderStatusMap.delivered || 0 }
+      // Enhanced order analytics
+      todayOrders: todayOrderCount,
+      totalAllOrders: totalAllOrderCount,
+      orderStats: {
+        pending: orderStatusMap.pending || 0,
+        confirmed: orderStatusMap.confirmed || 0,
+        preparing: orderStatusMap.preparing || 0,
+        ready: orderStatusMap.ready || 0,
+        out_for_delivery: orderStatusMap.out_for_delivery || 0,
+        delivered: orderStatusMap.delivered || 0,
+        cancelled: orderStatusMap.cancelled || 0,
+        completed: orderStatusMap.delivered || 0,
+        // Active = confirmed + preparing + ready + out_for_delivery
+        active: (orderStatusMap.confirmed || 0) + (orderStatusMap.preparing || 0) + (orderStatusMap.ready || 0) + (orderStatusMap.out_for_delivery || 0),
+        total: totalAllOrderCount
+      },
+      topRiders: topRiders || []
     });
   } catch (error) {
     logger.error(`Error fetching dashboard stats: ${error.message}`);

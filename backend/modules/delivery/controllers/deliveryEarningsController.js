@@ -34,7 +34,7 @@ export const getEarnings = asyncHandler(async (req, res) => {
 
     // If date is provided, use it as base date for period calculation
     const baseDate = date ? new Date(date) : new Date();
-    
+
     switch (period) {
       case 'today':
         startDate = new Date(baseDate);
@@ -72,25 +72,25 @@ export const getEarnings = asyncHandler(async (req, res) => {
 
     // Filter transactions based on period and type
     let transactions = wallet.transactions || [];
-    
-    // Filter by transaction type (only 'payment' type for earnings)
-    transactions = transactions.filter(t => 
-      t.type === 'payment' && 
+
+    // Filter by transaction type (all earning types)
+    transactions = transactions.filter(t =>
+      ['payment', 'earning_addon', 'bonus'].includes(t.type) &&
       t.status === 'Completed'
     );
 
     // Filter by date range if period is specified
     if (startDate) {
       transactions = transactions.filter(t => {
-        const transactionDate = t.createdAt || t.processedAt || new Date();
+        const transactionDate = t.processedAt || t.createdAt || new Date();
         return transactionDate >= startDate && transactionDate <= endDate;
       });
     }
 
     // Sort by date (newest first)
     transactions.sort((a, b) => {
-      const dateA = a.createdAt || a.processedAt || new Date(0);
-      const dateB = b.createdAt || b.processedAt || new Date(0);
+      const dateA = a.processedAt || a.createdAt || new Date(0);
+      const dateB = b.processedAt || b.createdAt || new Date(0);
       return dateB - dateA;
     });
 
@@ -117,43 +117,62 @@ export const getEarnings = asyncHandler(async (req, res) => {
       const order = transaction.orderId ? orderMap[transaction.orderId.toString()] : null;
       return {
         transactionId: transaction._id?.toString(),
-        orderId: order?.orderId || transaction.orderId?.toString() || 'Unknown',
-        restaurantName: order?.restaurantName || 'Unknown Restaurant',
+        orderId: order?.orderId || transaction.orderId?.toString() || 'Incentive',
+        restaurantName: order?.restaurantName || (transaction.type === 'payment' ? 'Unknown Restaurant' : 'System Incentive'),
         amount: transaction.amount || 0,
+        type: transaction.type,
         description: transaction.description || '',
-        deliveredAt: order?.deliveredAt || transaction.createdAt || transaction.processedAt,
+        deliveredAt: order?.deliveredAt || transaction.processedAt || transaction.createdAt,
         createdAt: transaction.createdAt || transaction.processedAt,
         paymentCollected: transaction.paymentCollected || false
       };
     });
 
     // Calculate pagination
-    const totalEarnings = earnings.length;
+    const totalEarningsCount = earnings.length;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const paginatedEarnings = earnings.slice(skip, skip + parseInt(limit));
 
     // Calculate summary statistics
     const totalAmount = earnings.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const totalOrders = earnings.length;
-    
+
+    // Only count unique orders from 'payment' type transactions
+    const uniqueOrders = new Set(
+      earnings
+        .filter(e => e.type === 'payment' && e.orderId && e.orderId !== 'Incentive')
+        .map(e => e.orderId)
+    );
+    const totalOrders = uniqueOrders.size;
+
     // Calculate time on orders (difference between order creation and delivery)
     let totalTimeMinutes = 0;
+    const processedOrdersForTime = new Set();
     earnings.forEach(e => {
-      // Find order by orderId string (e.orderId is string like "ORD-123-456")
-      const order = orders.find(o => o.orderId === e.orderId);
-      if (order && order.createdAt && order.deliveredAt) {
-        const timeDiff = new Date(order.deliveredAt) - new Date(order.createdAt);
-        totalTimeMinutes += Math.floor(timeDiff / (1000 * 60));
+      if (e.type === 'payment' && e.orderId && e.orderId !== 'Incentive' && !processedOrdersForTime.has(e.orderId)) {
+        processedOrdersForTime.add(e.orderId);
+        const order = orders.find(o => o.orderId === e.orderId);
+        if (order && order.createdAt && order.deliveredAt) {
+          const timeDiff = new Date(order.deliveredAt) - new Date(order.createdAt);
+          totalTimeMinutes += Math.floor(timeDiff / (1000 * 60));
+        }
       }
     });
 
     const totalHours = Math.floor(totalTimeMinutes / 60);
     const totalMinutesRemainder = totalTimeMinutes % 60;
 
-    // Calculate breakdown
-    const orderEarning = totalAmount; // All payments are order earnings
-    const incentive = 0; // Can be added from bonus transactions separately if needed
-    const otherEarnings = 0; // Can include tips, bonuses, etc.
+    // Calculate breakdown correctly
+    const orderEarning = earnings
+      .filter(e => e.type === 'payment')
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    const incentive = earnings
+      .filter(e => e.type === 'earning_addon')
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    const otherEarnings = earnings
+      .filter(e => e.type === 'bonus')
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     return successResponse(res, 200, 'Earnings retrieved successfully', {
       earnings: paginatedEarnings,
@@ -172,8 +191,8 @@ export const getEarnings = asyncHandler(async (req, res) => {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: totalEarnings,
-        pages: Math.ceil(totalEarnings / parseInt(limit))
+        total: totalEarningsCount,
+        pages: Math.ceil(totalEarningsCount / parseInt(limit))
       }
     });
   } catch (error) {
@@ -217,7 +236,7 @@ export const getActiveEarningAddons = asyncHandler(async (req, res) => {
           // Count orders from when offer was created (or start date, whichever is later)
           const countFromDate = offerCreatedAt > offerStartDate ? offerCreatedAt : offerStartDate;
           const endDate = new Date(addon.endDate);
-          
+
           // Calculate delivery partner's order count AFTER offer creation
           // Count orders from offer creation/start date to now (or end date if offer hasn't started)
           const countStartDate = now > countFromDate ? countFromDate : now;

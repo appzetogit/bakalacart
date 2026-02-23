@@ -386,23 +386,24 @@ export const useRestaurantNotifications = () => {
   const playNotificationSound = () => {
     try {
       if (audioRef.current) {
-        // Only play if user has interacted with the page (browser autoplay policy)
-        if (!userInteractedRef.current) {
-          console.log('🔇 Audio playback skipped - user has not interacted with page yet');
-          return;
-        }
-
         audioRef.current.currentTime = 0;
+        // Always attempt play. If browser blocks it (NotAllowedError),
+        // we silently ignore — user hasn't interacted yet.
         audioRef.current.play().catch(error => {
-          // Don't log autoplay policy errors as they're expected
-          if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
+          const isAutoplayBlocked =
+            error.name === 'NotAllowedError' ||
+            error.message?.includes('user didn\'t interact') ||
+            error.message?.includes('play() failed');
+          if (!isAutoplayBlocked) {
             console.warn('Error playing notification sound:', error);
           }
         });
       }
     } catch (error) {
-      // Don't log autoplay policy errors
-      if (!error.message?.includes('user didn\'t interact') && !error.name?.includes('NotAllowedError')) {
+      const isAutoplayBlocked =
+        error.name === 'NotAllowedError' ||
+        error.message?.includes('user didn\'t interact');
+      if (!isAutoplayBlocked) {
         console.warn('Error playing sound:', error);
       }
     }

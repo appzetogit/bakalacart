@@ -18,12 +18,14 @@ export default function Earnings() {
   const getWeekRange = (date) => {
     const startOfWeek = new Date(date)
     const day = startOfWeek.getDay()
-    const diff = startOfWeek.getDate() - day
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
     startOfWeek.setDate(diff)
-    
+    startOfWeek.setHours(0, 0, 0, 0)
+
     const endOfWeek = new Date(startOfWeek)
     endOfWeek.setDate(startOfWeek.getDate() + 6)
-    
+    endOfWeek.setHours(23, 59, 59, 999)
+
     return { start: startOfWeek, end: endOfWeek }
   }
 
@@ -68,7 +70,7 @@ export default function Earnings() {
     const fetchEarnings = async () => {
       try {
         setIsLoading(true)
-        
+
         // Map activeTab to backend period format
         const periodMap = {
           'day': 'today',
@@ -77,25 +79,25 @@ export default function Earnings() {
           'all': 'all'
         }
         const period = periodMap[activeTab] || 'all'
-        
+
         // If date is specified, pass it to backend
         const params = {
           period,
           page: 1,
           limit: 1000
         }
-        
+
         // For week/month, pass the selected date
         if (activeTab === 'week' || activeTab === 'month' || activeTab === 'day') {
           params.date = selectedDate.toISOString()
         }
-        
+
         const response = await deliveryAPI.getEarnings(params)
-        
+
         if (response.data?.success && response.data?.data) {
           const data = response.data.data
           const summary = data.summary || {}
-          
+
           // Set earnings data
           setEarningsData({
             totalEarnings: summary.totalEarnings || 0,
@@ -106,33 +108,35 @@ export default function Earnings() {
             incentive: summary.incentive || 0,
             otherEarnings: summary.otherEarnings || 0
           })
-          
+
           // For week view, calculate daily breakdown
           if (activeTab === 'week' && data.earnings) {
             const weekRange = getWeekRange(selectedDate)
             const dailyBreakdown = []
-            
+
             for (let i = 0; i < 7; i++) {
               const date = new Date(weekRange.start)
               date.setDate(weekRange.start.getDate() + i)
-              
+
               // Find earnings for this date
               const dayEarnings = data.earnings.filter(e => {
                 const eDate = new Date(e.deliveredAt || e.createdAt)
                 return eDate.toDateString() === date.toDateString()
               })
-              
+
               const dayTotal = dayEarnings.reduce((sum, e) => sum + (e.amount || 0), 0)
-              const dayOrders = dayEarnings.length
-              
+
+              // Calculate unique orders for this day (only count payment type)
+              const uniqueOrdersDay = new Set(
+                dayEarnings
+                  .filter(e => e.type === 'payment' && e.orderId && e.orderId !== 'Incentive')
+                  .map(e => e.orderId)
+              )
+              const dayOrders = uniqueOrdersDay.size
+
               // Calculate time for this day
-              let dayMinutes = 0
-              dayEarnings.forEach(e => {
-                // Try to get order time if available in description
-                // Otherwise estimate based on order count
-                dayMinutes += 30 // Average 30 minutes per order
-              })
-              
+              let dayMinutes = dayOrders * 30 // Average 30 minutes per unique order
+
               dailyBreakdown.push({
                 date,
                 day: date.getDate(),
@@ -143,42 +147,49 @@ export default function Earnings() {
                 isFuture: date > new Date()
               })
             }
-            
+
             setDailyEarningsData(dailyBreakdown)
           }
-          
+
           // For month view, calculate weekly breakdown
           if (activeTab === 'month' && data.earnings) {
             const year = selectedDate.getFullYear()
             const month = selectedDate.getMonth()
             const firstDay = new Date(year, month, 1)
             const lastDay = new Date(year, month + 1, 0)
-            
+
             // Calculate weeks
             const weeklyBreakdown = []
             let currentWeekStart = new Date(firstDay)
             const firstDayOfWeek = firstDay.getDay()
             const daysToMonday = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
             currentWeekStart.setDate(firstDay.getDate() - daysToMonday)
-            
+
             let weekNumber = 1
             while (currentWeekStart <= lastDay) {
               const weekEnd = new Date(currentWeekStart)
               weekEnd.setDate(currentWeekStart.getDate() + 6)
-              
+
               if (weekEnd >= firstDay && currentWeekStart <= lastDay) {
                 // Find earnings for this week
                 const weekEarnings = data.earnings.filter(e => {
                   const eDate = new Date(e.deliveredAt || e.createdAt)
                   return eDate >= currentWeekStart && eDate <= weekEnd
                 })
-                
+
                 const weekTotal = weekEarnings.reduce((sum, e) => sum + (e.amount || 0), 0)
-                const weekOrders = weekEarnings.length
-                
+
+                // Calculate unique orders for this week (only count payment type)
+                const uniqueOrdersWeek = new Set(
+                  weekEarnings
+                    .filter(e => e.type === 'payment' && e.orderId && e.orderId !== 'Incentive')
+                    .map(e => e.orderId)
+                )
+                const weekOrders = uniqueOrdersWeek.size
+
                 // Calculate time for this week
                 let weekMinutes = weekOrders * 30 // Average 30 minutes per order
-                
+
                 weeklyBreakdown.push({
                   weekStart: new Date(currentWeekStart),
                   weekEnd: new Date(weekEnd),
@@ -190,19 +201,19 @@ export default function Earnings() {
                   isFuture: weekEnd > new Date()
                 })
               }
-              
+
               currentWeekStart.setDate(currentWeekStart.getDate() + 7)
             }
-            
+
             setWeeklyEarningsData(weeklyBreakdown)
           }
-          
+
           // Update store if viewing today's data
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           const selectedDateNormalized = new Date(selectedDate)
           selectedDateNormalized.setHours(0, 0, 0, 0)
-          
+
           if (activeTab === "day" && selectedDateNormalized.getTime() === today.getTime()) {
             updateTodayEarnings(summary.totalEarnings || 0)
           }
@@ -259,7 +270,7 @@ export default function Earnings() {
     const today = new Date()
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
-    
+
     if (date.toDateString() === today.toDateString()) {
       return "Today"
     } else if (date.toDateString() === yesterday.toDateString()) {
@@ -288,9 +299,13 @@ export default function Earnings() {
     const today = new Date()
     for (let i = 0; i < 12; i++) {
       const weekStart = new Date(today)
-      weekStart.setDate(today.getDate() - (today.getDay() + i * 7))
+      const day = weekStart.getDay()
+      const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1) - (i * 7)
+      weekStart.setDate(diff)
+      weekStart.setHours(0, 0, 0, 0)
       const weekEnd = new Date(weekStart)
       weekEnd.setDate(weekStart.getDate() + 6)
+      weekEnd.setHours(23, 59, 59, 999)
       weeks.push({ start: weekStart, end: weekEnd })
     }
     return weeks
@@ -335,31 +350,31 @@ export default function Earnings() {
     const dailyData = []
     const today = new Date()
     today.setHours(23, 59, 59, 999) // End of today
-    
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart)
       date.setDate(weekStart.getDate() + i)
-      
+
       // Check if date is in the future
       const isFuture = date > today
-      
+
       // Generate random but consistent data based on date (only for past/present dates)
       let earnings = 0
       let orders = 0
       let hours = 0
       let minutes = 0
-      
+
       if (!isFuture) {
         const dateStr = date.toISOString().split('T')[0]
         const seed = dateStr.split('-').join('')
         const seedNum = parseInt(seed) % 10000
-        
+
         earnings = (seedNum % 200) // Random earnings up to ₹200
         orders = earnings > 0 ? (seedNum % 5) + 1 : 0
         hours = earnings > 0 ? Math.floor((seedNum % 2)) : 0
         minutes = earnings > 0 ? (seedNum % 60) : 0
       }
-      
+
       dailyData.push({
         date,
         day: date.getDate(),
@@ -380,45 +395,45 @@ export default function Earnings() {
     const month = monthDate.getMonth()
     const today = new Date()
     today.setHours(23, 59, 59, 999) // End of today
-    
+
     // Get first day of month
     const firstDay = new Date(year, month, 1)
     // Get last day of month
     const lastDay = new Date(year, month + 1, 0)
-    
+
     // Find the first Monday of the month (or start from first day if it's a Monday)
     let currentWeekStart = new Date(firstDay)
     const firstDayOfWeek = firstDay.getDay()
     const daysToMonday = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
     currentWeekStart.setDate(firstDay.getDate() - daysToMonday)
-    
+
     // Generate data for each week that overlaps with the month
     while (currentWeekStart <= lastDay) {
       const weekEnd = new Date(currentWeekStart)
       weekEnd.setDate(currentWeekStart.getDate() + 6)
-      
+
       // Only include weeks that have at least one day in the selected month
       if (weekEnd >= firstDay && currentWeekStart <= lastDay) {
         // Check if week is in the future
         const isFuture = weekEnd > today
-        
+
         // Generate random but consistent data based on week start date (only for past/present weeks)
         let earnings = 0
         let orders = 0
         let hours = 0
         let minutes = 0
-        
+
         if (!isFuture) {
           const dateStr = currentWeekStart.toISOString().split('T')[0]
           const seed = dateStr.split('-').join('')
           const seedNum = parseInt(seed) % 10000
-          
+
           earnings = (seedNum % 1500) + 100 // Random earnings up to ₹1600
           orders = earnings > 0 ? (seedNum % 20) + 1 : 0
           hours = earnings > 0 ? Math.floor((seedNum % 10)) : 0
           minutes = earnings > 0 ? (seedNum % 60) : 0
         }
-        
+
         weeks.push({
           weekStart: new Date(currentWeekStart),
           weekEnd: new Date(weekEnd),
@@ -430,40 +445,40 @@ export default function Earnings() {
           isFuture
         })
       }
-      
+
       // Move to next week
       currentWeekStart.setDate(currentWeekStart.getDate() + 7)
     }
-    
+
     return weeks
   }
 
   // Get daily earnings for current week (only show when week tab is active)
   const weekRange = getWeekRange(selectedDate)
-  const dailyEarnings = activeTab === "week" ? (dailyEarningsData.length > 0 ? dailyEarningsData : generateDailyEarnings(weekRange.start)) : []
-  
+  const dailyEarnings = activeTab === "week" ? dailyEarningsData : []
+
   // Get weekly earnings for current month (only show when month tab is active)
-  const weeklyEarnings = activeTab === "month" ? (weeklyEarningsData.length > 0 ? weeklyEarningsData : generateWeeklyEarnings(selectedDate)) : []
-  
+  const weeklyEarnings = activeTab === "month" ? weeklyEarningsData : []
+
   // Calculate total orders and time for the week
   const weekTotalOrders = dailyEarnings.reduce((sum, day) => sum + day.orders, 0)
   const weekTotalMinutes = dailyEarnings.reduce((sum, day) => sum + (day.hours * 60) + day.minutes, 0)
   const weekTotalHours = Math.floor(weekTotalMinutes / 60)
   const weekTotalMinutesRemainder = weekTotalMinutes % 60
-  
+
   // Calculate total orders and time for the month
   const monthTotalOrders = weeklyEarnings.reduce((sum, week) => sum + week.orders, 0)
   const monthTotalMinutes = weeklyEarnings.reduce((sum, week) => sum + (week.hours * 60) + week.minutes, 0)
   const monthTotalHours = Math.floor(monthTotalMinutes / 60)
   const monthTotalMinutesRemainder = monthTotalMinutes % 60
-  
+
   // Find max earnings for bar chart scaling
-  const maxDailyEarnings = dailyEarnings.length > 0 
-    ? Math.max(...dailyEarnings.map(d => d.earnings), 1) 
+  const maxDailyEarnings = dailyEarnings.length > 0
+    ? Math.max(...dailyEarnings.map(d => d.earnings), 1)
     : 1
-    
-  const maxWeeklyEarnings = weeklyEarnings.length > 0 
-    ? Math.max(...weeklyEarnings.map(w => w.earnings), 1) 
+
+  const maxWeeklyEarnings = weeklyEarnings.length > 0
+    ? Math.max(...weeklyEarnings.map(w => w.earnings), 1)
     : 1
 
   // Handle share
@@ -512,54 +527,51 @@ export default function Earnings() {
 
       {/* Tabs */}
       <div className="bg-black px-4 flex flex-col gap-2 border-b rounded-b-xl border-white">
-      <div className="px-4 py-3 flex gap-2">
-        <button
-          onClick={() => {
-            setActiveTab("day")
-            setShowDatePicker(false)
-            setShowWeekPicker(false)
-            setShowMonthPicker(false)
-          }}
-          className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${
-            activeTab === "day"
+        <div className="px-4 py-3 flex gap-2">
+          <button
+            onClick={() => {
+              setActiveTab("day")
+              setShowDatePicker(false)
+              setShowWeekPicker(false)
+              setShowMonthPicker(false)
+            }}
+            className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${activeTab === "day"
               ? "bg-white text-black"
               : "bg-transparent text-white"
-          }`}
-        >
-          Day
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("week")
-            setShowDatePicker(false)
-            setShowWeekPicker(false)
-            setShowMonthPicker(false)
-          }}
-          className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${
-            activeTab === "week"
+              }`}
+          >
+            Day
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("week")
+              setShowDatePicker(false)
+              setShowWeekPicker(false)
+              setShowMonthPicker(false)
+            }}
+            className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${activeTab === "week"
               ? "bg-white text-black"
               : "bg-transparent text-white"
-          }`}
-        >
-          Week
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("month")
-            setShowDatePicker(false)
-            setShowWeekPicker(false)
-            setShowMonthPicker(false)
-          }}
-          className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${
-            activeTab === "month"
+              }`}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("month")
+              setShowDatePicker(false)
+              setShowWeekPicker(false)
+              setShowMonthPicker(false)
+            }}
+            className={`flex-1 py-2 px-4 rounded-full border border-white font-medium transition-colors ${activeTab === "month"
               ? "bg-white text-black"
               : "bg-transparent text-white"
-          }`}
-        >
-          Month
-        </button>
+              }`}
+          >
+            Month
+          </button>
         </div>
-               {/* Earnings Card */}
+        {/* Earnings Card */}
         <div className="bg-white rounded-lg shadow-sm mb-4">
           {/* Date Selector and Navigation */}
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
@@ -569,7 +581,7 @@ export default function Earnings() {
             >
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
-            
+
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -580,16 +592,16 @@ export default function Earnings() {
               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors"
             >
               <span className="text-sm font-medium text-gray-900">
-                {activeTab === "day" 
+                {activeTab === "day"
                   ? `${formatDateDisplay(selectedDate)}: ${selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long' })}`
                   : activeTab === "week"
-                  ? `${getWeekRange(selectedDate).start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${getWeekRange(selectedDate).end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
-                  : formatMonth(selectedDate)
+                    ? `${getWeekRange(selectedDate).start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${getWeekRange(selectedDate).end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                    : formatMonth(selectedDate)
                 }
               </span>
               <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${(showDatePicker || showWeekPicker || showMonthPicker) ? 'rotate-180' : ''}`} />
             </button>
-            
+
             <button
               onClick={() => navigateDate("next")}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -613,9 +625,8 @@ export default function Earnings() {
                           setSelectedDate(date)
                           setShowDatePicker(false)
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${
-                          date.toDateString() === selectedDate.toDateString() ? 'bg-gray-100 font-medium' : ''
-                        }`}
+                        className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${date.toDateString() === selectedDate.toDateString() ? 'bg-gray-100 font-medium' : ''
+                          }`}
                       >
                         {formatDateWithDay(date)}
                       </button>
@@ -623,7 +634,7 @@ export default function Earnings() {
                   })}
                 </div>
               )}
-              
+
               {showWeekPicker && (
                 <div className="space-y-2">
                   {recentWeeks.map((week, index) => (
@@ -633,16 +644,15 @@ export default function Earnings() {
                         setSelectedDate(week.start)
                         setShowWeekPicker(false)
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${
-                        week.start.toDateString() === getWeekRange(selectedDate).start.toDateString() ? 'bg-gray-100 font-medium' : ''
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${week.start.toDateString() === getWeekRange(selectedDate).start.toDateString() ? 'bg-gray-100 font-medium' : ''
+                        }`}
                     >
                       {week.start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - {week.end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                     </button>
                   ))}
                 </div>
               )}
-              
+
               {showMonthPicker && (
                 <div className="space-y-2">
                   {recentMonths.map((month, index) => (
@@ -652,9 +662,8 @@ export default function Earnings() {
                         setSelectedDate(month)
                         setShowMonthPicker(false)
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${
-                        month.getMonth() === selectedDate.getMonth() && month.getFullYear() === selectedDate.getFullYear() ? 'bg-gray-100 font-medium' : ''
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors ${month.getMonth() === selectedDate.getMonth() && month.getFullYear() === selectedDate.getFullYear() ? 'bg-gray-100 font-medium' : ''
+                        }`}
                     >
                       {formatMonth(month)}
                     </button>
@@ -689,7 +698,7 @@ export default function Earnings() {
 
       {/* Main Content */}
       <div className="px-4 py-6">
- 
+
         {/* Weekly Breakdown Chart (show for week tab) */}
         {activeTab === "week" && (
           <div className="bg-white rounded-lg shadow-sm mb-4">
@@ -714,7 +723,7 @@ export default function Earnings() {
                           ₹{Math.round(day.earnings)}
                         </span>
                       )}
-                      
+
                       {/* Bar Container */}
                       <div className="w-full flex flex-col items-center justify-end relative" style={{ height: '120px' }}>
                         {hasEarnings ? (
@@ -729,7 +738,7 @@ export default function Earnings() {
                           <div className="w-full bg-gray-100 rounded-t" style={{ height: '2px' }} />
                         )}
                       </div>
-                      
+
                       {/* Day Label */}
                       <span className="text-xs text-gray-600 mt-1">
                         {day.day}
@@ -780,7 +789,7 @@ export default function Earnings() {
                           ₹{Math.round(week.earnings)}
                         </span>
                       )}
-                      
+
                       {/* Bar Container */}
                       <div className="w-full flex flex-col items-center justify-end relative" style={{ height: '120px' }}>
                         {hasEarnings ? (
@@ -795,7 +804,7 @@ export default function Earnings() {
                           <div className="w-full bg-gray-100 rounded-t" style={{ height: '2px' }} />
                         )}
                       </div>
-                      
+
                       {/* Week Label */}
                       <span className="text-xs text-gray-600 mt-1">
                         W{week.weekNumber}
@@ -822,7 +831,7 @@ export default function Earnings() {
           </div>
         )}
 
-          {/* Earnings Breakdown */}
+        {/* Earnings Breakdown */}
         <div className="space-y-3">
           <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
             <span className="text-base text-gray-900">Order earning</span>
@@ -830,14 +839,14 @@ export default function Earnings() {
               {earningsData.orderEarning === 0 ? '₹0' : `₹${Math.round(earningsData.orderEarning)}`}
             </span>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
             <span className="text-base text-gray-900">Incentive</span>
             <span className="text-base font-semibold text-gray-900">
               {earningsData.incentive === 0 ? '₹0' : `₹${Math.round(earningsData.incentive)}`}
             </span>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
             <span className="text-base text-gray-900">Other earnings</span>
             <span className="text-base font-semibold text-gray-900">

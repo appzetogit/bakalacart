@@ -118,23 +118,16 @@ export default function AdminHome() {
     fetchDashboardStats()
   }, [selectedPeriod, startDate, endDate])
 
-  // Get order stats from real data
+  // Get order stats from real data — all statuses
   const getOrderStats = () => {
-    if (!dashboardData?.orders?.byStatus) {
-      return [
-        { label: "Delivered", value: 0, color: "#0ea5e9" },
-        { label: "Cancelled", value: 0, color: "#ef4444" },
-        { label: "Refunded", value: 0, color: "#f59e0b" },
-        { label: "Pending", value: 0, color: "#10b981" },
-      ]
-    }
-
-    const byStatus = dashboardData.orders.byStatus
+    const s = dashboardData?.orderStats || {}
     return [
-      { label: "Delivered", value: byStatus.delivered || 0, color: "#0ea5e9" },
-      { label: "Cancelled", value: byStatus.cancelled || 0, color: "#ef4444" },
-      { label: "Refunded", value: 0, color: "#f59e0b" }, // Refunded not tracked separately
-      { label: "Pending", value: byStatus.pending || 0, color: "#10b981" },
+      { label: "Delivered", value: s.delivered || 0, color: "#10b981" },
+      { label: "Cancelled", value: s.cancelled || 0, color: "#ef4444" },
+      { label: "Pending", value: s.pending || 0, color: "#f59e0b" },
+      { label: "Confirmed", value: s.confirmed || 0, color: "#0ea5e9" },
+      { label: "Preparing", value: s.preparing || 0, color: "#a855f7" },
+      { label: "Out for Delivery", value: s.out_for_delivery || 0, color: "#f97316" },
     ]
   }
 
@@ -161,11 +154,9 @@ export default function AdminHome() {
   // Calculate totals from real data
   const revenueTotal = dashboardData?.revenue?.total || 0
   const commissionTotal = dashboardData?.commission?.total || 0
-  const ordersTotal = dashboardData?.orders?.total || 0
   const platformFeeTotal = dashboardData?.platformFee?.total || 0
   const deliveryFeeTotal = dashboardData?.deliveryFee?.total || 0
   const gstTotal = dashboardData?.gst?.total || 0
-  // Total revenue = Commission + Platform Fee + Delivery Fee + GST
   const totalAdminEarnings = commissionTotal + platformFeeTotal + deliveryFeeTotal + gstTotal
 
   // Additional stats
@@ -176,8 +167,18 @@ export default function AdminHome() {
   const totalFoods = dashboardData?.foods?.total || 0
   const totalAddons = dashboardData?.addons?.total || 0
   const totalCustomers = dashboardData?.customers?.total || 0
+
+  // Enhanced order counts from new backend fields
+  const todayOrdersCount = dashboardData?.todayOrders || 0
+  const totalAllOrders = dashboardData?.totalAllOrders || 0
   const pendingOrders = dashboardData?.orderStats?.pending || 0
-  const completedOrders = dashboardData?.orderStats?.completed || 0
+  const activeOrders = dashboardData?.orderStats?.active || 0
+  const completedOrders = dashboardData?.orderStats?.delivered || 0
+  const cancelledOrders = dashboardData?.orderStats?.cancelled || 0
+
+  // Top riders for live signals
+  const topRiders = dashboardData?.topRiders || []
+  const recentOrderActivity = dashboardData?.recentActivity?.orders || 0
 
   const pieData = orderStats.map((item) => ({
     name: item.label,
@@ -185,7 +186,26 @@ export default function AdminHome() {
     fill: item.color,
   }))
 
-  const activityFeed = []
+  const activityFeed = [
+    ...topRiders.map(r => ({
+      title: `🏍️ ${r.name || 'Rider'}`,
+      detail: `${r.count} deliveries this month`,
+      time: 'This month',
+      type: 'rider'
+    })),
+    ...(recentOrderActivity > 0 ? [{
+      title: `📦 ${recentOrderActivity} new orders`,
+      detail: 'Placed in the last 24 hours',
+      time: 'Last 24h',
+      type: 'order'
+    }] : []),
+    ...(todayOrdersCount > 0 ? [{
+      title: `🔥 Today: ${todayOrdersCount} orders`,
+      detail: 'Total orders placed today',
+      time: 'Today',
+      type: 'today'
+    }] : [])
+  ]
 
   return (
     <div className="px-4 pb-10 lg:px-6 pt-4">
@@ -257,6 +277,26 @@ export default function AdminHome() {
         </div>
 
         <div className="space-y-6 px-6 py-6">
+          {/* Today's Quick Stats Bar */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
+            <div className="flex flex-col items-center py-2">
+              <span className="text-2xl font-bold text-blue-700">{todayOrdersCount}</span>
+              <span className="text-xs text-blue-500 font-medium mt-0.5">Today's Orders</span>
+            </div>
+            <div className="flex flex-col items-center py-2 border-l border-blue-200">
+              <span className="text-2xl font-bold text-amber-600">{pendingOrders}</span>
+              <span className="text-xs text-amber-500 font-medium mt-0.5">Pending Now</span>
+            </div>
+            <div className="flex flex-col items-center py-2 border-l border-blue-200">
+              <span className="text-2xl font-bold text-orange-600">{activeOrders}</span>
+              <span className="text-xs text-orange-500 font-medium mt-0.5">Active / In Progress</span>
+            </div>
+            <div className="flex flex-col items-center py-2 border-l border-blue-200">
+              <span className="text-2xl font-bold text-emerald-700">{completedOrders}</span>
+              <span className="text-xs text-emerald-500 font-medium mt-0.5">Delivered (Period)</span>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               title="Gross revenue"
@@ -276,8 +316,8 @@ export default function AdminHome() {
             />
             <MetricCard
               title="Orders processed"
-              value={ordersTotal.toLocaleString("en-IN")}
-              helper="Fulfilled & billed"
+              value={totalAllOrders.toLocaleString("en-IN")}
+              helper="All orders (all statuses)"
               icon={<Activity className="h-5 w-5 text-amber-600" />}
               accent="bg-amber-200/40"
               onClick={() => navigate('/admin/orders/all')}
@@ -309,7 +349,7 @@ export default function AdminHome() {
             <MetricCard
               title="Total revenue"
               value={`₹${totalAdminEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              helper={`Commission ₹${commissionTotal.toFixed(2)} + Platform ₹${platformFeeTotal.toFixed(2)} + Delivery ₹${deliveryFeeTotal.toFixed(2)} + GST ₹${gstTotal.toFixed(2)}`}
+              helper={`Comm ₹${commissionTotal.toFixed(0)} + Plat ₹${platformFeeTotal.toFixed(0)} + Del ₹${deliveryFeeTotal.toFixed(0)} + GST ₹${gstTotal.toFixed(0)}`}
               icon={<DollarSign className="h-5 w-5 text-green-600" />}
               accent="bg-green-200/40"
               onClick={() => navigate('/admin/transaction-report')}
@@ -331,9 +371,9 @@ export default function AdminHome() {
               onClick={() => navigate('/admin/restaurants/joining-request')}
             />
             <MetricCard
-              title="Total delivery boy"
+              title="Total delivery boys"
               value={totalDeliveryBoys.toLocaleString("en-IN")}
-              helper="All delivery partners"
+              helper="Approved delivery partners"
               icon={<Truck className="h-5 w-5 text-indigo-600" />}
               accent="bg-indigo-200/40"
               onClick={() => navigate('/admin/delivery-partners')}
@@ -507,7 +547,9 @@ export default function AdminHome() {
             <Card className="border-neutral-200 bg-white">
               <CardHeader className="flex items-center justify-between border-b border-neutral-200 pb-4">
                 <CardTitle className="text-lg text-neutral-900">Momentum snapshot</CardTitle>
-                <span className="text-xs text-neutral-500">No data available</span>
+                <span className="text-xs text-neutral-500">
+                  {monthlyData.some(d => d.orders > 0) ? `Last ${monthlyData.slice(-6).length} periods` : 'No order data yet'}
+                </span>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-64">
@@ -536,18 +578,25 @@ export default function AdminHome() {
                 <p className="text-sm text-neutral-500">Ops notes and service health</p>
               </CardHeader>
               <CardContent className="space-y-3 pt-4">
-                {activityFeed.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start justify-between rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
-                      <p className="text-xs text-neutral-600">{item.detail}</p>
+                {activityFeed.length > 0 ? (
+                  activityFeed.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start justify-between rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p className="text-xs text-neutral-600">{item.detail}</p>
+                      </div>
+                      <span className="text-xs text-neutral-500 shrink-0 ml-2">{item.time}</span>
                     </div>
-                    <span className="text-xs text-neutral-500">{item.time}</span>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-neutral-400">
+                    <p className="text-sm">No activity data available</p>
+                    <p className="text-xs mt-1">Orders and rider data will appear here</p>
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
 

@@ -15,6 +15,7 @@ export function useOrdersManagement(orders, statusKey, title) {
     fromDate: "",
     toDate: "",
     restaurant: "",
+    deliveryPartner: "",
   })
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
@@ -128,6 +129,7 @@ export function useOrdersManagement(orders, statusKey, title) {
       fromDate: "",
       toDate: "",
       restaurant: "",
+      deliveryPartner: "",
     })
   }
 

@@ -5,7 +5,7 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, onAp
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div 
+      <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -18,7 +18,7 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, onAp
             <X className="w-5 h-5 text-slate-600" />
           </button>
         </div>
-        
+
         <div className="p-6 space-y-6">
           {/* Payment Status Filter */}
           <div>
@@ -30,11 +30,10 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, onAp
                 <button
                   key={status}
                   onClick={() => setFilters(prev => ({ ...prev, paymentStatus: status === "All" ? "" : status }))}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    filters.paymentStatus === status || (status === "All" && !filters.paymentStatus)
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filters.paymentStatus === status || (status === "All" && !filters.paymentStatus)
                       ? "bg-emerald-500 text-white shadow-md"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {status}
                 </button>
@@ -52,11 +51,10 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, onAp
                 <button
                   key={type}
                   onClick={() => setFilters(prev => ({ ...prev, deliveryType: type === "All" ? "" : type }))}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    filters.deliveryType === type || (type === "All" && !filters.deliveryType)
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filters.deliveryType === type || (type === "All" && !filters.deliveryType)
                       ? "bg-emerald-500 text-white shadow-md"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {type}
                 </button>
@@ -136,6 +134,20 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, onAp
               </select>
             </div>
           )}
+
+          {/* Delivery Partner Filter */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Delivery Partner (Name)
+            </label>
+            <input
+              type="text"
+              value={filters.deliveryPartner || ""}
+              onChange={(e) => setFilters(prev => ({ ...prev, deliveryPartner: e.target.value }))}
+              placeholder="e.g. John Doe, or Exact ID"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
         </div>
 
         <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-end gap-3">

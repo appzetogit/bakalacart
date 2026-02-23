@@ -1402,14 +1402,14 @@ export default function Cart() {
 
   const handleGoToOrders = () => {
     setShowOrderSuccess(false)
-    navigate(`/user/orders/${placedOrderId}?confirmed=true`)
+    navigate(`/orders/${placedOrderId}?confirmed=true`)
   }
 
   // Handle share click
   const handleShare = async () => {
     // Determine share URL - prefer restaurant detail page if restaurant data is available
     const shareUrl = restaurantData?.slug
-      ? `${window.location.origin}/user/restaurants/${restaurantData.slug}`
+      ? `${window.location.origin}/restaurants/${restaurantData?.slug || restaurantData?.restaurantId || restaurantId}`
       : window.location.origin
 
     const shareText = restaurantName
@@ -1482,7 +1482,7 @@ export default function Cart() {
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
           <Button
-            onClick={() => navigate('/user')}
+            onClick={() => navigate('/')}
             className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 h-12 font-semibold shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
           >
             Browse Restaurants
@@ -1590,7 +1590,7 @@ export default function Cart() {
                           onClick={() => {
                             if (restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId) {
                               const slug = restaurantData?.slug || restaurantData?.restaurantId || cart[0]?.restaurantId;
-                              navigate(`/user/restaurants/${slug}`);
+                              navigate(`/restaurants/${slug}`);
                             } else {
                               toast.error("Restaurant details not found");
                             }
@@ -1843,33 +1843,26 @@ export default function Cart() {
               {/* Delivery Fleet selection removed as per request - default 'standard' is used in background */}
 
               {/* Delivery Address Section */}
-              <div id="delivery-address-section" className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">Delivery Address</h3>
+              <div id="delivery-address-section" className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center font-bold">
+                      <MapPin className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delivery Address</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowAddressForm(true)}
+                    className="text-sm font-bold text-red-600 dark:text-red-400 hover:opacity-80 transition-opacity bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg"
+                  >
+                    + Add New
+                  </button>
                 </div>
 
-
-
-                {/* Add New Address Button */}
-                <button
-                  onClick={() => setShowAddressForm(true)}
-                  className="w-full flex items-center justify-between p-4 mb-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30 rounded-2xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-full">
-                      <Plus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">+ Add New Address</span>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-emerald-400 dark:text-emerald-600 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                {/* Saved Addresses List */}
-                <div className="space-y-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Saved Addresses</p>
-
+                {/* Address List - Horizontal Scroll for Better Organization */}
+                <div className="mb-6">
                   {addresses && addresses.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1 scrollbar-hide">
                       {addresses.map((address) => {
                         const isSelected = currentLocation?.id === address.id || currentLocation?.addressId === address.id || currentLocation?.id === address._id || currentLocation?.addressId === address._id;
 
@@ -1877,68 +1870,68 @@ export default function Cart() {
                           <div
                             key={address.id || address._id}
                             onClick={() => handleSelectAddress(address)}
-                            className={`flex items-start gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${isSelected
-                              ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-900/10 shadow-sm'
-                              : 'border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            className={`flex-shrink-0 w-[240px] md:w-[280px] p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${isSelected
+                                ? 'border-red-600 bg-red-50/10 dark:bg-red-900/10 shadow-md'
+                                : 'border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 hover:border-gray-200 dark:hover:border-gray-700'
                               }`}
                           >
-                            {/* Selection Radio */}
-                            <div className="flex-shrink-0 mt-1">
-                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected
-                                ? 'border-emerald-500'
-                                : 'border-gray-300 dark:border-gray-600'
-                                }`}>
-                                {isSelected && <div className="w-3 h-3 rounded-full bg-emerald-500" />}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="bg-white dark:bg-[#1a1a1a] p-1.5 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+                                {address.label?.toLowerCase() === 'home' ? <Building2 className="h-4 w-4 text-gray-500" /> : <MapPin className="h-4 w-4 text-gray-500" />}
+                              </div>
+                              <div className="flex gap-1">
+                                <button onClick={(e) => handleEditAddress(e, address)} className="p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-colors"><Edit2 className="h-3.5 w-3.5 text-gray-400" /></button>
+                                <button onClick={(e) => handleDeleteAddress(e, address.id || address._id)} className="p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-colors"><Trash2 className="h-3.5 w-3.5 text-gray-400" /></button>
                               </div>
                             </div>
-
-                            {/* Map Icon */}
-                            <div className="bg-gray-100 dark:bg-gray-800 p-2.5 rounded-xl flex-shrink-0">
-                              <MapPin className={`h-5 w-5 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`} />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-800 dark:text-emerald-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                                  {address.street || address.label}
-                                </p>
+                            <p className={`font-bold text-sm mb-1 truncate ${isSelected ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                              {address.label || address.street}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed h-8">
+                              {[address.street, address.area, address.city].filter(Boolean).join(', ')}
+                            </p>
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center shadow-sm">
+                                <Check className="h-3 w-3 text-white" />
                               </div>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5 leading-relaxed font-medium">
-                                {[address.additionalDetails, address.city, address.zipCode].filter(Boolean).join(', ')}
-                              </p>
-                            </div>
-
-                            {/* Edit/Delete Actions */}
-                            <div className="flex flex-col gap-2">
-                              <button
-                                onClick={(e) => handleEditAddress(e, address)}
-                                className="p-2 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-colors group/edit"
-                              >
-                                <Edit2 className="h-4 w-4 text-gray-400 group-hover/edit:text-emerald-500" />
-                              </button>
-                              <button
-                                onClick={(e) => handleDeleteAddress(e, address.id || address._id)}
-                                className="p-2 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-colors group/trash"
-                              >
-                                <Trash2 className="h-4 w-4 text-gray-400 group-hover/trash:text-red-500" />
-                              </button>
-                            </div>
+                            )}
                           </div>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-6 bg-gray-50/50 dark:bg-gray-900/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-400 font-medium tracking-wide">No saved addresses found.</p>
+                    <div className="text-center py-10 bg-gray-50/50 dark:bg-gray-900/30 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
+                      <MapPin className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No saved addresses found</p>
                     </div>
                   )}
                 </div>
+
+                {/* Specific Address Input - Fixing the "Missing" Input */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-1 px-1">
+                    <Sparkles className="h-4 w-4 text-red-600" />
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Additional Information</span>
+                  </div>
+                  <div className="relative group">
+                    <textarea
+                      value={manualAddressDetails}
+                      onChange={(e) => setManualAddressDetails(e.target.value)}
+                      placeholder="Enter Flat No, Floor, House Name, etc. (Required)"
+                      className="w-full bg-gray-50/30 dark:bg-gray-900/30 border-2 border-gray-100 dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-red-600 dark:focus:border-red-500 transition-all min-h-[90px] resize-none text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
+                    />
+                    <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-400 group-focus-within:text-red-500">
+                      {manualAddressDetails?.length || 0} characters
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 px-1">
+                    * This helps our delivery partners find your location easily
+                  </p>
+                </div>
               </div>
-
-
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link to="/user/profile/edit" className="flex items-center justify-between">
+                <Link to="/profile/edit" className="flex items-center justify-between">
                   <div className="flex items-center gap-3 md:gap-4">
                     <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
                     <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">

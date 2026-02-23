@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react"
-import { FileText, Calendar, Package } from "lucide-react"
+import { FileText, Calendar, Package, CalendarDays, X, Bike } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
 import OrdersTopbar from "../../components/orders/OrdersTopbar"
@@ -38,6 +38,7 @@ export default function OrdersPage({ statusKey = "all" }) {
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
   const [activeFiltersCountState, setActiveFiltersCountState] = useState(0)
+  const [quickDateLabel, setQuickDateLabel] = useState("")
 
   // Get management functions but we'll handle orders differently for server-side pagination
   const ordersManagement = useOrdersManagement(orders, statusKey, config.title)
@@ -84,7 +85,8 @@ export default function OrdersPage({ statusKey = "all" }) {
         fromDate: filters.fromDate || undefined,
         toDate: filters.toDate || undefined,
         zone: filters.zone || undefined,
-        customer: filters.customer || undefined
+        customer: filters.customer || undefined,
+        deliveryPartner: filters.deliveryPartner || undefined
       }
 
       const response = await adminAPI.getOrders(params, { timeout: 60000 })
@@ -130,7 +132,13 @@ export default function OrdersPage({ statusKey = "all" }) {
     if (filters.toDate) count++;
     if (filters.zone) count++;
     if (filters.customer) count++;
+    if (filters.deliveryPartner) count++;
     setActiveFiltersCountState(count);
+
+    // If user manually cleared dates, reset quick date label
+    if (!filters.fromDate && !filters.toDate) {
+      setQuickDateLabel("");
+    }
 
     return () => clearTimeout(timer)
   }, [searchQuery, filters])
@@ -318,6 +326,59 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
   }
 
+  // Quick date helpers — set fromDate+toDate using existing filter state
+  const todayStr = () => {
+    const d = new Date()
+    return d.toISOString().split('T')[0]
+  }
+
+  const applyQuickDate = (label, from, to) => {
+    setQuickDateLabel(label)
+    setFilters(prev => ({ ...prev, fromDate: from, toDate: to }))
+  }
+
+  const clearQuickDate = () => {
+    setQuickDateLabel("")
+    setFilters(prev => ({ ...prev, fromDate: "", toDate: "" }))
+  }
+
+  const quickDateButtons = [
+    {
+      label: "Today",
+      getRange: () => {
+        const t = todayStr()
+        return { from: t, to: t }
+      }
+    },
+    {
+      label: "Yesterday",
+      getRange: () => {
+        const d = new Date()
+        d.setDate(d.getDate() - 1)
+        const s = d.toISOString().split('T')[0]
+        return { from: s, to: s }
+      }
+    },
+    {
+      label: "This Week",
+      getRange: () => {
+        const d = new Date()
+        const day = d.getDay()
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+        const mon = new Date(d.setDate(diff))
+        return { from: mon.toISOString().split('T')[0], to: todayStr() }
+      }
+    },
+    {
+      label: "This Month",
+      getRange: () => {
+        const d = new Date()
+        const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+        return { from, to: todayStr() }
+      }
+    },
+  ]
+
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
       <OrdersTopbar
@@ -360,6 +421,61 @@ export default function OrdersPage({ statusKey = "all" }) {
         onConfirm={handleRefundConfirm}
         isProcessing={processingRefund !== null}
       />
+
+      {/* Quick Date Shortcuts + Active Filter Summary */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+          <CalendarDays className="w-3.5 h-3.5" /> Quick:
+        </span>
+        {quickDateButtons.map(({ label, getRange }) => {
+          const isActive = quickDateLabel === label
+          return (
+            <button
+              key={label}
+              onClick={() => {
+                const { from, to } = getRange()
+                applyQuickDate(label, from, to)
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${isActive
+                ? "bg-blue-600 text-white border-blue-600 shadow"
+                : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600"
+                }`}
+            >
+              {label}
+            </button>
+          )
+        })}
+
+        {/* Active filter pills */}
+        {(quickDateLabel || filters.fromDate || filters.toDate || filters.deliveryPartner) && (
+          <div className="flex flex-wrap items-center gap-2 ml-2">
+            {(quickDateLabel || filters.fromDate) && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+                <Calendar className="w-3 h-3" />
+                {quickDateLabel
+                  ? `${quickDateLabel}: ${totalCount} order${totalCount !== 1 ? 's' : ''}`
+                  : `${filters.fromDate}${filters.toDate && filters.toDate !== filters.fromDate ? ` → ${filters.toDate}` : ''}: ${totalCount} order${totalCount !== 1 ? 's' : ''}`
+                }
+                <button onClick={clearQuickDate} className="ml-1 hover:text-blue-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filters.deliveryPartner && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                <Bike className="w-3 h-3" />
+                Rider: {filters.deliveryPartner} — {totalCount} order{totalCount !== 1 ? 's' : ''}
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, deliveryPartner: '' }))}
+                  className="ml-1 hover:text-emerald-900"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col gap-4">
         {isLoading ? (

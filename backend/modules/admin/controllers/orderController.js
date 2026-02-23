@@ -22,7 +22,8 @@ export const getOrders = asyncHandler(async (req, res) => {
       paymentStatus,
       zone,
       customer,
-      cancelledBy
+      cancelledBy,
+      deliveryPartner
     } = req.query;
 
     // Build query
@@ -150,6 +151,25 @@ export const getOrders = asyncHandler(async (req, res) => {
       })());
     }
 
+    // Delivery Partner lookup
+    let deliveryPartnerIdFilter = null;
+    if (deliveryPartner && deliveryPartner !== 'All delivery partners') {
+      lookupPromises.push((async () => {
+        try {
+          const Delivery = (await import('../../delivery/models/Delivery.js')).default;
+          // Could be name or exact ID
+          if (mongoose.Types.ObjectId.isValid(deliveryPartner)) {
+            deliveryPartnerIdFilter = new mongoose.Types.ObjectId(deliveryPartner);
+          } else {
+            const doc = await Delivery.findOne({
+              name: { $regex: deliveryPartner, $options: 'i' }
+            }).select('_id').lean();
+            if (doc) deliveryPartnerIdFilter = doc._id;
+          }
+        } catch (e) { console.error('Delivery Partner lookup error:', e); }
+      })());
+    }
+
     // Search lookups
     let searchUserIds = [];
     if (search) {
@@ -184,6 +204,7 @@ export const getOrders = asyncHandler(async (req, res) => {
       query['assignmentInfo.zoneId'] = new mongoose.Types.ObjectId();
     }
     if (customerUserIdFilter) query.userId = customerUserIdFilter;
+    if (deliveryPartnerIdFilter) query.deliveryPartnerId = deliveryPartnerIdFilter;
 
     if (search) {
       const searchOrConditions = [{ orderId: { $regex: search, $options: 'i' } }];

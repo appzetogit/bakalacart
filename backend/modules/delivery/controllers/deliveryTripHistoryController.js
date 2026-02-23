@@ -28,31 +28,25 @@ export const getTripHistory = asyncHandler(async (req, res) => {
   try {
     const delivery = req.delivery;
     const deliveryId = delivery._id;
-    const { 
-      period = 'daily', 
-      date, 
+    const {
+      period = 'daily',
+      date,
       status,
-      page = 1, 
-      limit = 50 
+      page = 1,
+      limit = 50
     } = req.query;
 
     // Build date range based on period
     let startDate, endDate;
+    // Normalize date to local midnight
     const selectedDate = date ? new Date(date) : new Date();
-    
-    // Set time to start of day
     selectedDate.setHours(0, 0, 0, 0);
 
     switch (period) {
-      case 'daily':
-        startDate = new Date(selectedDate);
-        endDate = new Date(selectedDate);
-        endDate.setHours(23, 59, 59, 999);
-        break;
       case 'weekly':
         // Get start of week (Monday)
         const dayOfWeek = selectedDate.getDay();
-        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust for Monday start
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
         startDate = new Date(selectedDate);
         startDate.setDate(selectedDate.getDate() + diff);
         startDate.setHours(0, 0, 0, 0);
@@ -66,19 +60,34 @@ export const getTripHistory = asyncHandler(async (req, res) => {
         endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
         break;
+      case 'daily':
       default:
         startDate = new Date(selectedDate);
+        startDate.setHours(0, 0, 0, 0);
         endDate = new Date(selectedDate);
         endDate.setHours(23, 59, 59, 999);
     }
 
-    // Build query
+    // Build query - use deliveredAt for delivered orders, createdAt for others
+    // We want to show trips based on when they were actually completed OR when they were assigned/created
     const query = {
       deliveryPartnerId: delivery._id,
-      createdAt: {
-        $gte: startDate,
-        $lte: endDate
-      }
+      $or: [
+        {
+          status: 'delivered',
+          deliveredAt: {
+            $gte: startDate,
+            $lte: endDate
+          }
+        },
+        {
+          status: { $ne: 'delivered' },
+          createdAt: {
+            $gte: startDate,
+            $lte: endDate
+          }
+        }
+      ]
     };
 
     // Status filter
@@ -109,13 +118,13 @@ export const getTripHistory = asyncHandler(async (req, res) => {
 
     // Get order IDs for Payment collection lookup
     const orderIds = orders.map(o => o._id);
-    
+
     // Fetch payment records for COD fallback check
     const codOrderIds = new Set();
     try {
-      const codPayments = await Payment.find({ 
-        orderId: { $in: orderIds }, 
-        method: 'cash' 
+      const codPayments = await Payment.find({
+        orderId: { $in: orderIds },
+        method: 'cash'
       }).select('orderId').lean();
       codPayments.forEach(p => codOrderIds.add(p.orderId?.toString()));
     } catch (e) {
@@ -127,14 +136,14 @@ export const getTripHistory = asyncHandler(async (req, res) => {
     const settlementMap = new Map();
     const settlementDetailsMap = new Map();
     const orderNumberMap = new Map(); // Map orderNumber to orderId for lookup
-    
+
     // Create orderNumber to orderId mapping
     orders.forEach(order => {
       if (order.orderId) {
         orderNumberMap.set(order.orderId, order._id.toString());
       }
     });
-    
+
     try {
       // Convert orderIds to ObjectIds for proper matching
       const orderObjectIds = orderIds.map(id => {
@@ -154,19 +163,19 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           { orderNumber: { $in: orderNumbers } }
         ]
       }).select('_id orderId orderNumber deliveryPartnerEarning').lean();
-      
+
       logger.info(`Found ${settlements.length} settlements for ${orderIds.length} orders`);
-      
+
       // Recalculate settlements that might have old formula
       for (const settlement of settlements) {
         let orderIdKeys = [];
-        
+
         // Try to match by orderId first
         if (settlement.orderId) {
           const orderIdKey = settlement.orderId.toString ? settlement.orderId.toString() : String(settlement.orderId);
           orderIdKeys.push(orderIdKey);
         }
-        
+
         // Also try to match by orderNumber
         if (settlement.orderNumber && orderNumberMap.has(settlement.orderNumber)) {
           const mappedOrderId = orderNumberMap.get(settlement.orderNumber);
@@ -174,33 +183,33 @@ export const getTripHistory = asyncHandler(async (req, res) => {
             orderIdKeys.push(mappedOrderId);
           }
         }
-        
+
         let totalEarning = settlement.deliveryPartnerEarning?.totalEarning || 0;
         let deliveryPartnerEarning = settlement.deliveryPartnerEarning;
-        
+
         // Check if settlement was calculated with old formula and recalculate if needed
         if (deliveryPartnerEarning && deliveryPartnerEarning.distance > 0 && deliveryPartnerEarning.distanceCommission > 0) {
           const oldDistance = deliveryPartnerEarning.distance;
           const oldDistanceCommission = deliveryPartnerEarning.distanceCommission;
           const oldCommissionPerKm = deliveryPartnerEarning.commissionPerKm || 0;
-          
+
           // Detect old formula: if distanceCommission ≈ distance × commissionPerKm (entire distance charged)
           // New formula: distanceCommission = (distance - minDistance) × commissionPerKm (only extra distance)
           if (oldCommissionPerKm > 0) {
             const expectedOldFormula = oldDistance * oldCommissionPerKm;
             const tolerance = 0.01;
-            
+
             // If it matches old formula (entire distance charged), recalculate with new formula
             if (Math.abs(oldDistanceCommission - expectedOldFormula) < tolerance) {
               try {
                 const commissionResult = await DeliveryBoyCommission.calculateCommission(oldDistance);
                 const newDistanceCommission = commissionResult.breakdown.distanceCommission;
                 const newTotalEarning = commissionResult.commission;
-                
+
                 // Only update if there's a difference (old formula was used)
                 if (Math.abs(oldDistanceCommission - newDistanceCommission) > tolerance) {
                   logger.info(`🔄 Recalculating settlement for order ${settlement.orderNumber || settlement.orderId}: Old: ₹${totalEarning.toFixed(2)}, New: ₹${newTotalEarning.toFixed(2)}`);
-                  
+
                   // Update settlement in database
                   await OrderSettlement.findByIdAndUpdate(settlement._id, {
                     $set: {
@@ -208,7 +217,7 @@ export const getTripHistory = asyncHandler(async (req, res) => {
                       'deliveryPartnerEarning.totalEarning': newTotalEarning
                     }
                   });
-                  
+
                   // Update local values
                   totalEarning = newTotalEarning;
                   deliveryPartnerEarning = {
@@ -223,11 +232,11 @@ export const getTripHistory = asyncHandler(async (req, res) => {
             }
           }
         }
-        
+
         // Set earnings for all matching order IDs
         orderIdKeys.forEach(orderIdKey => {
           logger.info(`Settlement found for order ${orderIdKey} (orderNumber: ${settlement.orderNumber}): earnings = ₹${totalEarning}`);
-          
+
           // Only set if not already set (prefer orderId match over orderNumber match)
           if (!settlementMap.has(orderIdKey)) {
             settlementMap.set(orderIdKey, totalEarning);
@@ -240,14 +249,14 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           }
         });
       }
-      
+
       // Log all order IDs and their earnings for debugging
       if (settlementMap.size > 0) {
         logger.info(`Settlement map entries: ${Array.from(settlementMap.entries()).map(([id, earning]) => `${id}: ₹${earning}`).join(', ')}`);
       } else {
         logger.warn(`⚠️ No settlements found in map! Check if settlements exist for these orders.`);
       }
-      
+
       // Fallback: If settlement doesn't have earnings, try to get from wallet transactions
       const hasZeroEarnings = Array.from(settlementMap.values()).every(e => e === 0);
       if (settlementMap.size === 0 || hasZeroEarnings) {
@@ -266,7 +275,7 @@ export const getTripHistory = asyncHandler(async (req, res) => {
                 }
               }
             });
-            
+
             // Merge wallet earnings into settlement map
             walletEarningsMap.forEach((amount, orderId) => {
               if (!settlementMap.has(orderId) || settlementMap.get(orderId) === 0) {
@@ -356,15 +365,15 @@ export const getTripHistory = asyncHandler(async (req, res) => {
       let restaurantName = order.restaurantName;
       if (!restaurantName || restaurantName === 'Unknown Restaurant' || restaurantName.trim() === '') {
         // Try to get from lookup map
-        restaurantName = restaurantNameMap.get(order.restaurantId) || 
-                        restaurantNameMap.get(order.restaurantId?.toString()) ||
-                        'Unknown Restaurant';
+        restaurantName = restaurantNameMap.get(order.restaurantId) ||
+          restaurantNameMap.get(order.restaurantId?.toString()) ||
+          'Unknown Restaurant';
       }
 
       // Get delivery boy's earning from settlement, fallback to delivery fee
       const orderIdStr = order._id.toString();
       let earning = settlementMap.get(orderIdStr);
-      
+
       // If not found by orderId, try by orderNumber
       if (earning === undefined && order.orderId) {
         const mappedOrderId = orderNumberMap.get(order.orderId);
@@ -372,12 +381,12 @@ export const getTripHistory = asyncHandler(async (req, res) => {
           earning = settlementMap.get(mappedOrderId);
         }
       }
-      
+
       // Final fallback
       if (earning === undefined || earning === null) {
         earning = order.pricing?.deliveryFee || 0;
       }
-      
+
       const amount = earning; // Keep 'amount' field for backward compatibility, but it now represents earning
 
       // Debug logging

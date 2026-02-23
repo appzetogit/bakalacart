@@ -48,10 +48,16 @@ export default function OrderAssign() {
   const [bulkDeliveryBoyId, setBulkDeliveryBoyId] = useState("")
   const [isBulkAssigning, setIsBulkAssigning] = useState(false)
 
+  // Dynamic Dialogs state
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [deliverDialogOpen, setDeliverDialogOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState("Cancelled by Admin")
+  const [actionOrderId, setActionOrderId] = useState(null)
+
   // Fetch orders for assignment
-  const fetchOrders = async () => {
+  const fetchOrders = async (showLoading = true) => {
     try {
-      setIsLoading(true)
+      if (showLoading) setIsLoading(true)
       const params = {
         page,
         limit: 50,
@@ -81,7 +87,7 @@ export default function OrderAssign() {
       toast.error(error.response?.data?.message || "Failed to fetch orders")
       setOrders([])
     } finally {
-      setIsLoading(false)
+      if (showLoading) setIsLoading(false)
     }
   }
 
@@ -346,6 +352,74 @@ export default function OrderAssign() {
       console.error("Error rejecting order:", error)
       toast.error(error.response?.data?.message || "Failed to reject order")
     }
+  }
+
+  // Handle Mark Cancelled
+  const handleMarkCancelled = async () => {
+    if (!actionOrderId) return;
+    const orderId = actionOrderId;
+    const reason = cancelReason || "Cancelled by Admin";
+
+    try {
+      // Optimistic update
+      setOrders(prev => prev.filter(o => (o.id || o._id) !== orderId));
+      setCancelDialogOpen(false);
+
+      // Re-using rejectOrderOnBehalfOfRestaurant since it acts like a direct cancel in most flows 
+      const response = await adminAPI.rejectOrderOnBehalfOfRestaurant(orderId, reason)
+      if (response?.data?.success) {
+        toast.success("Order has been Cancelled")
+        fetchOrders(false) // Refetch silently
+      } else {
+        toast.error(response?.data?.message || "Failed to cancel order")
+        fetchOrders(false) // Revert on fail
+      }
+    } catch (error) {
+      console.error("Error cancelling order:", error)
+      toast.error(error.response?.data?.message || "Failed to cancel order")
+      fetchOrders(false)
+    } finally {
+      setActionOrderId(null);
+      setCancelReason("Cancelled by Admin");
+    }
+  }
+
+  // Handle Mark Delivered
+  const handleMarkDelivered = async () => {
+    if (!actionOrderId) return;
+    const orderId = actionOrderId;
+
+    try {
+      // Optimistic update
+      setOrders(prev => prev.filter(o => (o.id || o._id) !== orderId));
+      setDeliverDialogOpen(false);
+
+      const response = await adminAPI.markOrderAsDelivered(orderId)
+      if (response?.data?.success) {
+        toast.success("Order marked as Delivered successfully")
+        fetchOrders(false) // Refetch silently
+      } else {
+        toast.error(response?.data?.message || "Failed to mark order as delivered")
+        fetchOrders(false) // Revert on fail
+      }
+    } catch (error) {
+      console.error("Error marking order as delivered:", error)
+      toast.error(error.response?.data?.message || "Failed to mark order as delivered")
+      fetchOrders(false)
+    } finally {
+      setActionOrderId(null);
+    }
+  }
+
+  const openCancelDialog = (orderId) => {
+    setActionOrderId(orderId);
+    setCancelReason("Cancelled by Admin");
+    setCancelDialogOpen(true);
+  }
+
+  const openDeliverDialog = (orderId) => {
+    setActionOrderId(orderId);
+    setDeliverDialogOpen(true);
   }
 
   return (
@@ -638,20 +712,42 @@ export default function OrderAssign() {
                           </div>
                         </td>
                         <td className="p-4 align-top text-right">
-                          <Button
-                            onClick={() => handleAssignClick(order)}
-                            disabled={assigningOrderId === orderId}
-                            className={`h-9 px-4 text-sm ${order.isAssigned ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
-                              }`}
-                          >
-                            {assigningOrderId === orderId ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : order.isAssigned ? (
-                              "Reassign"
-                            ) : (
-                              "Assign Now"
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              onClick={() => handleAssignClick(order)}
+                              disabled={assigningOrderId === orderId}
+                              className={`h-9 px-4 text-sm w-full ${order.isAssigned ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300" : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                                }`}
+                            >
+                              {assigningOrderId === orderId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                              ) : order.isAssigned ? (
+                                "Reassign"
+                              ) : (
+                                "Assign Now"
+                              )}
+                            </Button>
+                            {(order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled') && (
+                              <div className="flex gap-2 justify-end w-full mt-2">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => openCancelDialog(order.id || order._id)}
+                                  className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 flex-1"
+                                  title="Cancel Order"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => openDeliverDialog(order.id || order._id)}
+                                  className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 flex-1"
+                                  title="Mark as Delivered"
+                                >
+                                  Mark as Delivered
+                                </Button>
+                              </div>
                             )}
-                          </Button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -692,15 +788,35 @@ export default function OrderAssign() {
                             </div>
                           </div>
                         </div>
-                        <Button
-                          onClick={() => handleAssignClick(order)}
-                          disabled={assigningOrderId === orderId}
-                          size="sm"
-                          variant={order.isAssigned ? "outline" : "default"}
-                          className={`h-9 px-3 text-sm ${!order.isAssigned ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                        >
-                          {order.isAssigned ? "Reassign" : "Assign"}
-                        </Button>
+                        <div className="flex flex-col gap-2 items-end">
+                          <Button
+                            onClick={() => handleAssignClick(order)}
+                            disabled={assigningOrderId === orderId}
+                            size="sm"
+                            variant={order.isAssigned ? "outline" : "default"}
+                            className={`h-9 px-3 text-sm w-full ${!order.isAssigned ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                          >
+                            {order.isAssigned ? "Reassign" : "Assign"}
+                          </Button>
+                          {(order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled') && (
+                            <div className="flex gap-2 w-full mt-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => openCancelDialog(order.id || order._id)}
+                                className="h-7 px-2 text-[10px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 flex-1"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => openDeliverDialog(order.id || order._id)}
+                                className="h-7 px-2 text-[10px] border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 flex-1"
+                              >
+                                Mark as Delivered
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 dark:border-gray-700">
@@ -1247,6 +1363,93 @@ export default function OrderAssign() {
           </div>
         </DialogContent>
       </Dialog >
+      {/* Modern Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 border-none shadow-2xl overflow-hidden rounded-2xl p-0">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-full">
+                <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white">Cancel Order</DialogTitle>
+                <DialogDescription className="text-sm text-gray-500 mt-1">
+                  Are you sure you want to cancel this order?
+                </DialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-4 py-2 mt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Reason for Cancellation
+                </label>
+                <Input
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Enter cancellation reason"
+                  className="font-medium bg-gray-50 dark:bg-gray-800 border-gray-200"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-8">
+              <Button
+                variant="outline"
+                onClick={() => setCancelDialogOpen(false)}
+                className="font-medium min-w-[100px]"
+              >
+                Go Back
+              </Button>
+              <Button
+                onClick={handleMarkCancelled}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium min-w-[100px]"
+              >
+                Confirm Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modern Deliver Dialog */}
+      <Dialog open={deliverDialogOpen} onOpenChange={setDeliverDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 border-none shadow-2xl overflow-hidden rounded-2xl p-0">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-full">
+                <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white">Mark Delivered</DialogTitle>
+                <DialogDescription className="text-sm text-gray-500 mt-1">
+                  Manually complete this order
+                </DialogDescription>
+              </div>
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-300">
+              Are you sure you want to mark this order as <span className="font-bold text-green-600">DELIVERED</span>? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 mt-8">
+              <Button
+                variant="outline"
+                onClick={() => setDeliverDialogOpen(false)}
+                className="font-medium min-w-[100px]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleMarkDelivered}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium min-w-[100px]"
+              >
+                Yes, Delivered
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div >
   )
 }

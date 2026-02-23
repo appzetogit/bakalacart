@@ -663,47 +663,66 @@ export default function OrderDetails() {
         </div>
 
         {/* Item Details Section */}
-        <div>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Item details</h2>
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">Item details</h2>
 
-          {orderData.items.map((item, index) => (
-            <div key={index} className="bg-white rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center mt-0.5">
-                  <span className="text-green-600 text-xs">▲</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {item.quantity} x {item.name}
-                      {(() => {
-                        const sizeUnit = item.itemSizeUnit || item.unit
-                        const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
-                        const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
-                        return displayParts.length > 0 ? (
-                          <span className="text-xs font-bold text-[#ff8100] ml-2 italic">
-                            ({displayParts.join(' ')})
-                          </span>
-                        ) : null
-                      })()}
-                    </p>
-                    {item.description && (
-                      <p className="text-[11px] text-gray-600 mt-1 pl-2 border-l-2 border-gray-200 leading-tight">
-                        {item.description}
-                      </p>
-                    )}
-                    <p className="text-sm font-semibold text-gray-900">₹{item.price}</p>
-                  </div>
-                  {item.type && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>Quantity</span>
-                      <span>{item.type}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[300px]">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="py-3 px-4 text-sm font-bold text-gray-700 w-16">Qty</th>
+                    <th className="py-3 px-4 text-sm font-bold text-gray-700">Item Details</th>
+                    <th className="py-3 px-4 text-sm font-bold text-gray-700 text-right w-24">Price</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {orderData.items.map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50 transition-colors bg-white">
+                      <td className="py-4 px-4 align-top w-16">
+                        <span className="text-base font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded inline-block whitespace-nowrap">{item.quantity} x</span>
+                      </td>
+                      <td className="py-4 px-4 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-start gap-2">
+                            <div className={`w-4 h-4 mt-1 rounded-sm border flex items-center justify-center shrink-0 ${item.type === 'Non-Veg' ? 'border-red-500 bg-red-50' : 'border-green-500 bg-green-50'}`}>
+                              <div className={`w-2 h-2 rounded-full ${item.type === 'Non-Veg' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                            </div>
+                            <span className="text-base font-bold text-gray-900 leading-tight">
+                              {item.name}
+                            </span>
+                          </div>
+
+                          {(() => {
+                            const sizeUnit = item.itemSizeUnit || item.unit
+                            const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                            const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                            return displayParts.length > 0 ? (
+                              <span className="text-sm font-bold text-[#ff8100] ml-6 block mt-0.5">
+                                ({displayParts.join(' ')})
+                              </span>
+                            ) : null
+                          })()}
+
+                          {item.description && (
+                            <div className="ml-6 mt-1.5 p-2.5 bg-blue-50/50 rounded-md border border-blue-100 border-l-2 border-l-blue-400">
+                              <p className="text-sm text-gray-800 font-medium whitespace-pre-wrap">
+                                <span className="font-bold text-gray-900">Note: </span>
+                                {item.description}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 align-top text-right w-24">
+                        <span className="text-base font-bold text-gray-900">₹{item.price}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          </div>
         </div>
 
         {/* Bill Details Section */}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Info, Phone, Upload, X, Loader2 } from "lucide-react";
+import { Phone, Upload, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { adminAPI } from "@/lib/api";
 import { clearCache, updateFavicon, updateTitle } from "@/lib/utils/businessSettings";
@@ -13,7 +13,7 @@ export default function BusinessSetup() {
   const [faviconFile, setFaviconFile] = useState(null);
   const logoInputRef = useRef(null);
   const faviconInputRef = useRef(null);
-  
+
   const [formData, setFormData] = useState({
     companyName: "",
     email: "",
@@ -47,16 +47,16 @@ export default function BusinessSetup() {
       // Add cache-busting timestamp to force fresh data
       const response = await adminAPI.getBusinessSettings();
       const settings = response?.data?.data || response?.data;
-      
+
       console.log('📥 Fetched settings:', JSON.stringify(settings?.maintenanceMode, null, 2));
-      
+
       if (settings) {
         // Use explicit boolean checks instead of || false to preserve actual false values
         const userMaintenanceEnabled = settings.maintenanceMode?.user?.isEnabled === true;
         const restaurantMaintenanceEnabled = settings.maintenanceMode?.restaurantDelivery?.isEnabled === true;
-        
+
         console.log('✅ Parsed maintenanceMode - User:', userMaintenanceEnabled, 'Restaurant:', restaurantMaintenanceEnabled);
-        
+
         setFormData({
           companyName: settings.companyName || "",
           email: settings.email || "",
@@ -78,7 +78,7 @@ export default function BusinessSetup() {
             }
           }
         });
-        
+
         // Set logo and favicon previews if they exist
         if (settings.logo?.url) {
           setLogoPreview(settings.logo.url);
@@ -142,7 +142,7 @@ export default function BusinessSetup() {
           }
         }
       };
-      
+
       console.log('📤 Sending maintenanceMode:', JSON.stringify(dataToSend.maintenanceMode, null, 2));
 
       // Prepare files
@@ -160,15 +160,15 @@ export default function BusinessSetup() {
       if (updatedSettings) {
         // Clear cache to force reload
         clearCache();
-        
+
         // Update form data with saved values including maintenanceMode
         console.log('📥 Received updated settings:', JSON.stringify(updatedSettings?.maintenanceMode, null, 2));
-        
+
         const savedUserMaintenance = updatedSettings.maintenanceMode?.user?.isEnabled === true;
         const savedRestaurantMaintenance = updatedSettings.maintenanceMode?.restaurantDelivery?.isEnabled === true;
-        
+
         console.log('✅ Parsed saved maintenanceMode - User:', savedUserMaintenance, 'Restaurant:', savedRestaurantMaintenance);
-        
+
         setFormData((prev) => ({
           ...prev,
           companyName: updatedSettings.companyName || prev.companyName,
@@ -191,7 +191,7 @@ export default function BusinessSetup() {
             }
           }
         }));
-        
+
         // Update previews with new URLs if files were uploaded
         if (updatedSettings.logo?.url) {
           setLogoPreview(updatedSettings.logo.url);
@@ -210,10 +210,10 @@ export default function BusinessSetup() {
       }
 
       toast.success("Business settings saved successfully");
-      
+
       // Refetch settings to ensure we have the latest data from server
       await fetchBusinessSettings();
-      
+
       // Dispatch event to notify other components (like AdminNavbar)
       window.dispatchEvent(new Event('businessSettingsUpdated'));
     } catch (error) {
@@ -249,24 +249,11 @@ export default function BusinessSetup() {
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       {/* Page header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl lg:text-2xl font-bold text-slate-900">Business setup</h1>
-          <p className="text-xs lg:text-sm text-slate-500 mt-1">
-            Manage your company information, general configuration and business rules.
-          </p>
-        </div>
-
-        {/* Note card (top-right) */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3 max-w-md">
-          <div className="mt-0.5">
-            <Info className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-xs lg:text-sm text-slate-700">
-            <p className="font-semibold text-amber-700 mb-0.5">Note</p>
-            <p>Don&apos;t forget to click the &quot;Save Information&quot; button below to save changes.</p>
-          </div>
-        </div>
+      <div className="flex flex-col gap-1 mb-4">
+        <h1 className="text-xl lg:text-2xl font-bold text-slate-900">Business setup</h1>
+        <p className="text-xs lg:text-sm text-slate-500">
+          Manage your company information, general configuration and business rules.
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -311,7 +298,7 @@ export default function BusinessSetup() {
                 </label>
                 <div className="flex gap-2">
                   <div className="relative w-32">
-                    <select 
+                    <select
                       value={formData.phoneCountryCode}
                       onChange={(e) => handleInputChange("phoneCountryCode", e.target.value)}
                       className="w-full pl-8 pr-6 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
@@ -717,15 +704,15 @@ export default function BusinessSetup() {
             <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <span>Maintenance Mode</span>
             </h3>
-            
+
             <div className="space-y-4">
               {/* User Maintenance Mode */}
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-slate-900 mb-1">User App Maintenance Mode</p>
                   <p className="text-[11px] text-slate-500">
-                    {formData.maintenanceMode.user.isEnabled 
-                      ? "User app is currently in maintenance mode" 
+                    {formData.maintenanceMode.user.isEnabled
+                      ? "User app is currently in maintenance mode"
                       : "User app is operational"}
                   </p>
                 </div>
@@ -751,8 +738,8 @@ export default function BusinessSetup() {
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-slate-900 mb-1">Restaurant Delivery Maintenance Mode</p>
                   <p className="text-[11px] text-slate-500">
-                    {formData.maintenanceMode.restaurantDelivery.isEnabled 
-                      ? "Restaurant delivery is currently in maintenance mode" 
+                    {formData.maintenanceMode.restaurantDelivery.isEnabled
+                      ? "Restaurant delivery is currently in maintenance mode"
                       : "Restaurant delivery is operational"}
                   </p>
                 </div>
@@ -819,9 +806,8 @@ function ToggleSwitch({ enabled = false, onChange }) {
     <button
       type="button"
       onClick={() => onChange && onChange(!enabled)}
-      className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${
-        enabled ? "bg-blue-600 border-blue-600 justify-end" : "bg-slate-200 border-slate-300 justify-start"
-      }`}
+      className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${enabled ? "bg-blue-600 border-blue-600 justify-end" : "bg-slate-200 border-slate-300 justify-start"
+        }`}
     >
       <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
     </button>

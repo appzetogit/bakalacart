@@ -496,6 +496,18 @@ export default function OrdersMain() {
   const [cancelReason, setCancelReason] = useState("")
   const [orderToCancel, setOrderToCancel] = useState(null)
   const audioRef = useRef(null)
+
+  // Initialise audio object once on mount (programmatic, not via JSX ref — more reliable)
+  useEffect(() => {
+    const audio = new Audio(notificationSound)
+    audio.loop = true
+    audio.volume = 0.8
+    audioRef.current = audio
+    return () => {
+      audio.pause()
+      audioRef.current = null
+    }
+  }, [])
   const shownOrdersRef = useRef(new Set()) // Track orders already shown in popup
   const [restaurantStatus, setRestaurantStatus] = useState({
     isActive: null,
@@ -1744,8 +1756,7 @@ export default function OrdersMain() {
         </AnimatePresence>
       </div>
 
-      {/* Audio element */}
-      <audio ref={audioRef} src={notificationSound} />
+      {/* Audio element rendered via programmatic new Audio() above, no JSX element needed */}
 
       {/* New Order Popup */}
       <AnimatePresence>
