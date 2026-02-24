@@ -181,7 +181,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+          maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
         });
 
         return successResponse(res, 200, 'OTP verified. Please complete your profile.', {
@@ -241,7 +241,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
     // Update last login

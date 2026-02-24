@@ -287,7 +287,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
     // Return access token and user info
@@ -451,7 +451,7 @@ export const register = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
   });
 
   logger.info(`New user registered via email: ${user._id}`, { email, userId: user._id, role: userRole });
@@ -548,7 +548,7 @@ export const login = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
   });
 
   logger.info(`User logged in via email: ${user._id}`, { email, userId: user._id });
