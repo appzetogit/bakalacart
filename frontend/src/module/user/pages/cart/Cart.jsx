@@ -2008,44 +2008,41 @@ export default function Cart() {
                 </div>
               </div>
 
-              <Button
-                size="lg"
-                onClick={() => {
-                  if (isPlacingOrder) return
+              {/* Address Selection Check for Button State */}
+              {(() => {
+                const isAddressSelected = !!defaultAddress && (
+                  defaultAddress.id ||
+                  defaultAddress._id ||
+                  (defaultAddress.formattedAddress && defaultAddress.formattedAddress !== "Select location")
+                );
 
-                  // Check if an address is selected (either from saved list or current location)
-                  const isAddressSelected = !!defaultAddress && (defaultAddress.id || defaultAddress._id || (defaultAddress.formattedAddress && defaultAddress.formattedAddress !== "Select location"));
+                const isRestaurantClosed = restaurantData && restaurantData.isAcceptingOrders === false;
 
-                  if (!isAddressSelected) {
-                    toast.error("Please select a delivery address from your saved addresses list");
-                    // Scroll to address section for better UX
-                    const addressSection = document.getElementById('delivery-address-section');
-                    if (addressSection) {
-                      addressSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                    return
-                  }
-
-
-
-                  setShowPaymentSheet(true)
-                }}
-                disabled={isPlacingOrder || (restaurantData && restaurantData.isAcceptingOrders === false)}
-                className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="text-left mr-3 md:mr-4">
-                  <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
-                  <p className="text-xs md:text-sm opacity-75">TOTAL</p>
-                </div>
-                <span className="font-bold text-base md:text-lg">
-                  {isPlacingOrder
-                    ? "Processing..."
-                    : selectedPaymentMethod === "razorpay"
-                      ? "Select Payment"
-                      : "Place Order"}
-                </span>
-                <ChevronRight className="h-5 w-5 md:h-6 md:w-6 ml-2" />
-              </Button>
+                return (
+                  <Button
+                    size="lg"
+                    onClick={() => {
+                      if (isPlacingOrder) return
+                      setShowPaymentSheet(true)
+                    }}
+                    disabled={isPlacingOrder || !isAddressSelected || isRestaurantClosed}
+                    className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="text-left mr-3 md:mr-4">
+                      <p className="text-sm md:text-base opacity-90">₹{total.toFixed(0)}</p>
+                      <p className="text-xs md:text-sm opacity-75">TOTAL</p>
+                    </div>
+                    <span className="font-bold text-base md:text-lg">
+                      {isPlacingOrder
+                        ? "Processing..."
+                        : selectedPaymentMethod === "razorpay"
+                          ? "Select Payment"
+                          : "Place Order"}
+                    </span>
+                    <ChevronRight className="h-5 w-5 md:h-6 md:w-6 ml-2" />
+                  </Button>
+                );
+              })()}
             </div>
           </div>
         </div>
