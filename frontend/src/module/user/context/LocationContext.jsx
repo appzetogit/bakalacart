@@ -54,8 +54,10 @@ export const LocationProvider = ({ children }) => {
             if (locationData.postalCode) locationPayload.postalCode = locationData.postalCode
 
             // Critical: Ensure we have coordinates before calling API
-            if (!locationPayload.latitude || !locationPayload.longitude) {
-                console.warn("⚠️ [LocationContext] Skipping DB update: Missing coordinates")
+            const lat = parseFloat(locationPayload.latitude);
+            const lng = parseFloat(locationPayload.longitude);
+            if (isNaN(lat) || isNaN(lng)) {
+                console.warn("⚠️ [LocationContext] Skipping DB update: Missing or invalid coordinates")
                 return
             }
 

@@ -170,8 +170,8 @@ export const getZonesInRadius = asyncHandler(async (req, res) => {
   try {
     const { latitude, longitude, radius = 70 } = req.query;
 
-    // Validate required parameters
-    if (!latitude || !longitude) {
+    // Validate required parameters - allow 0
+    if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
       return errorResponse(res, 400, 'Latitude and longitude are required');
     }
 

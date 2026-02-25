@@ -199,25 +199,13 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
       streetNumber
     } = req.body;
 
-    // Validate required fields
-    if (!latitude || !longitude) {
-      return errorResponse(res, 400, 'Latitude and longitude are required');
-    }
-
+    // Validate required fields - allow 0 and make optional if address is provided
     const latNum = parseFloat(latitude);
     const lngNum = parseFloat(longitude);
+    const hasValidCoords = !isNaN(latNum) && !isNaN(lngNum);
 
-    // Validate coordinates
-    if (isNaN(latNum) || isNaN(lngNum)) {
-      return errorResponse(res, 400, 'Invalid latitude or longitude');
-    }
-
-    // Validate coordinate ranges
-    if (latNum < -90 || latNum > 90) {
-      return errorResponse(res, 400, 'Latitude must be between -90 and 90');
-    }
-    if (lngNum < -180 || lngNum > 180) {
-      return errorResponse(res, 400, 'Longitude must be between -180 and 180');
+    if (!hasValidCoords && !address && !formattedAddress) {
+      return errorResponse(res, 400, 'Latitude and longitude (or a text address) are required');
     }
 
     const user = await User.findById(req.user._id);
@@ -228,19 +216,28 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
 
     // Build complete location object with all available data
     const locationUpdate = {
-      latitude: latNum,
-      longitude: lngNum,
       address: address || user.currentLocation?.address || '',
       city: city || user.currentLocation?.city || '',
       state: state || user.currentLocation?.state || '',
       area: area || user.currentLocation?.area || '',
       formattedAddress: formattedAddress || user.currentLocation?.formattedAddress || '',
       lastUpdated: new Date(),
-      location: {
+    };
+
+    // Only update coordinates if they are valid
+    if (hasValidCoords) {
+      locationUpdate.latitude = latNum;
+      locationUpdate.longitude = lngNum;
+      locationUpdate.location = {
         type: 'Point',
         coordinates: [lngNum, latNum] // [longitude, latitude] for GeoJSON
-      }
-    };
+      };
+    } else {
+      // Keep existing coordinates if we don't have new valid ones
+      locationUpdate.latitude = user.currentLocation?.latitude;
+      locationUpdate.longitude = user.currentLocation?.longitude;
+      locationUpdate.location = user.currentLocation?.location;
+    }
 
     // Add optional fields if provided
     if (accuracy !== undefined && accuracy !== null) {
@@ -390,16 +387,14 @@ export const addUserAddress = asyncHandler(async (req, res) => {
       isDefault: isDefault === true || (user.addresses || []).length === 0
     };
 
-    // Add location coordinates if provided
-    if (latitude && longitude) {
-      const latNum = parseFloat(latitude);
-      const lngNum = parseFloat(longitude);
-      if (!isNaN(latNum) && !isNaN(lngNum)) {
-        newAddress.location = {
-          type: 'Point',
-          coordinates: [lngNum, latNum] // [longitude, latitude]
-        };
-      }
+    // Add location coordinates if provided - allow 0
+    const latNum = parseFloat(latitude);
+    const lngNum = parseFloat(longitude);
+    if (!isNaN(latNum) && !isNaN(lngNum)) {
+      newAddress.location = {
+        type: 'Point',
+        coordinates: [lngNum, latNum] // [longitude, latitude]
+      };
     }
 
     // If this is set as default, unset other defaults
