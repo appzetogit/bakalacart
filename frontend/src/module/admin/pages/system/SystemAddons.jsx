@@ -6,18 +6,18 @@ import { toast } from "sonner"
 export default function SystemAddons() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
+
   // Form state for all environment variables
   const [envData, setEnvData] = useState({
     // Razorpay
     RAZORPAY_API_KEY: "",
     RAZORPAY_SECRET_KEY: "",
-    
+
     // Cloudinary
     CLOUDINARY_CLOUD_NAME: "",
     CLOUDINARY_API_KEY: "",
     CLOUDINARY_API_SECRET: "",
-    
+
     // Firebase
     FIREBASE_API_KEY: "",
     FIREBASE_AUTH_DOMAIN: "",
@@ -28,22 +28,23 @@ export default function SystemAddons() {
     FIREBASE_PROJECT_ID: "",
     FIREBASE_CLIENT_EMAIL: "",
     FIREBASE_PRIVATE_KEY: "",
-    
+    FIREBASE_DATABASE_URL: "",
+
     // SMTP
     SMTP_HOST: "",
     SMTP_PORT: "",
     SMTP_USER: "",
     SMTP_PASS: "",
-    
+
     // SMS Hub India
     SMSINDIAHUB_API_KEY: "",
     SMSINDIAHUB_SENDER_ID: "",
-    
+
     // MSG91
     MSG91_AUTH_KEY: "",
     MSG91_SENDER_ID: "",
     MSG91_DLT_TE_ID: "",
-    
+
     // Google Maps
     VITE_GOOGLE_MAPS_API_KEY: "",
   })
@@ -87,7 +88,7 @@ export default function SystemAddons() {
       const response = await adminAPI.saveEnvVariables(envData)
       if (response.data.success) {
         toast.success("Environment variables saved successfully")
-        
+
         // Clear Google Maps API key cache after saving
         try {
           const { clearGoogleMapsApiKeyCache } = await import('@/lib/utils/googleMapsApiKey.js');
@@ -223,9 +224,12 @@ export default function SystemAddons() {
               <InputField label="Firebase Project ID" fieldKey="FIREBASE_PROJECT_ID" />
               <InputField label="Firebase Client Email" fieldKey="FIREBASE_CLIENT_EMAIL" type="email" />
               <div className="md:col-span-2">
-                <InputField 
-                  label="Firebase Private Key" 
-                  fieldKey="FIREBASE_PRIVATE_KEY" 
+                <InputField label="Firebase Realtime Database URL" fieldKey="FIREBASE_DATABASE_URL" placeholder="https://your-project-id.firebaseio.com/" />
+              </div>
+              <div className="md:col-span-2">
+                <InputField
+                  label="Firebase Private Key"
+                  fieldKey="FIREBASE_PRIVATE_KEY"
                   type="textarea"
                   placeholder="Enter Firebase Private Key (can be multiline)"
                 />

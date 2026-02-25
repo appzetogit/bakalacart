@@ -22,10 +22,13 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     maintenanceCheck = restaurantMaintenance;
   }
 
-  // Show maintenance screen if maintenance mode is enabled
+  // Maintenance mode is now handled via top banners in layouts/components
+  // instead of blocking the entire application, allowing users to still view the app.
+  /*
   if (maintenanceCheck && !maintenanceCheck.loading && maintenanceCheck.isMaintenanceMode) {
     return <MaintenanceModeScreen />;
   }
+  */
 
   // Check if user is authenticated for the required module using module-specific token
   if (!requiredRole) {
@@ -52,6 +55,15 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
 
     const redirectPath = roleLoginPaths[requiredRole] || '/';
     return <Navigate to={`${redirectPath}?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />;
+  }
+
+  if (maintenanceCheck && !maintenanceCheck.loading && maintenanceCheck.isMaintenanceMode) {
+    return (
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 z-[9998] bg-gray-500/10 backdrop-blur-[1px] cursor-not-allowed" />
+        {children}
+      </div>
+    );
   }
 
   return children;

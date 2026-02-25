@@ -60,6 +60,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
   })
   const [loadingAddress, setLoadingAddress] = useState(false)
   const [mapLoading, setMapLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const mapContainerRef = useRef(null)
   const googleMapRef = useRef(null) // Google Maps instance
   const greenMarkerRef = useRef(null) // Green marker for address selection
@@ -71,6 +72,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
   const locationUpdateTimeoutRef = useRef(null) // Timeout for location updates
   const [currentAddress, setCurrentAddress] = useState("")
   const [GOOGLE_MAPS_API_KEY, setGOOGLE_MAPS_API_KEY] = useState(null)
+  const [predictions, setPredictions] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isGoogleLoaded, setIsGoogleLoaded] = useState(false)
 
   // Load Google Maps API key from backend
   useEffect(() => {
@@ -664,6 +668,189 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [isOpen])
+
+  // Pre-load Google Maps script for search functionality as soon as overlay opens
+  useEffect(() => {
+    if (!isOpen || !GOOGLE_MAPS_API_KEY || isGoogleLoaded || isGoogleLoading) {
+      if (window.google?.maps?.places && !isGoogleLoaded) setIsGoogleLoaded(true)
+      return
+    }
+
+    const loadGoogleScript = async () => {
+      setIsGoogleLoading(true)
+      try {
+        const loader = new Loader({
+          apiKey: GOOGLE_MAPS_API_KEY,
+          version: "weekly",
+          libraries: ["places", "geocoding"]
+        })
+        await loader.load()
+        setIsGoogleLoaded(true)
+        console.log("✅ Google Maps script loaded for search results")
+      } catch (error) {
+        console.error("Error pre-loading Google Maps script:", error)
+      } finally {
+        setIsGoogleLoading(false)
+      }
+    }
+
+    loadGoogleScript()
+  }, [isOpen, GOOGLE_MAPS_API_KEY, isGoogleLoaded, isGoogleLoading])
+
+  // Fetch predictions when search value changes
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      if (!searchValue || searchValue.length < 2 || !GOOGLE_MAPS_API_KEY) {
+        setPredictions([])
+        return
+      }
+
+      // Check if google maps places library is available
+      if (!window.google?.maps?.places) {
+        console.warn("Places library not yet loaded")
+        return
+      }
+
+      setIsSearching(true)
+      try {
+        const autocompleteService = new window.google.maps.places.AutocompleteService()
+        autocompleteService.getPlacePredictions(
+          {
+            input: searchValue,
+            componentRestrictions: { country: "in" },
+            types: ["geocode", "establishment"]
+          },
+          (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              setPredictions(results)
+            } else {
+              setPredictions([])
+            }
+            setIsSearching(false)
+          }
+        )
+      } catch (error) {
+        console.error("Error fetching predictions:", error)
+        setIsSearching(false)
+      }
+    }
+
+    const timer = setTimeout(fetchPredictions, 300)
+    return () => clearTimeout(timer)
+  }, [searchValue, GOOGLE_MAPS_API_KEY, isGoogleLoaded])
+
+  const handlePredictionSelect = async (prediction) => {
+    if (!prediction || !window.google) return
+
+    setSearchValue(prediction.description)
+    setPredictions([])
+    setIsSearching(true)
+
+    try {
+      const placesService = new window.google.maps.places.PlacesService(document.createElement('div'))
+      placesService.getDetails(
+        {
+          placeId: prediction.place_id,
+          fields: ["geometry", "formatted_address", "address_components"]
+        },
+        async (place, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry) {
+            const lat = place.geometry.location.lat()
+            const lng = place.geometry.location.lng()
+
+            setMapPosition([lat, lng])
+            setShowAddressForm(true)
+            setCurrentAddress(place.formatted_address)
+
+            // Extract address components
+            const components = place.address_components || []
+            let city = "", state = "", postalCode = "", area = "", street = ""
+
+            for (const component of components) {
+              const types = component.types || []
+              if (types.includes("locality")) city = component.long_name
+              if (types.includes("administrative_area_level_1")) state = component.long_name
+              if (types.includes("postal_code")) postalCode = component.long_name
+              if (types.includes("sublocality_level_1")) area = component.long_name
+              if (types.includes("route")) street = component.long_name
+            }
+
+            setAddressFormData(prev => ({
+              ...prev,
+              street: street || area || "",
+              city: city || "",
+              state: state || "",
+              zipCode: postalCode || "",
+              additionalDetails: place.formatted_address || "",
+            }))
+
+            // Update map if ready
+            if (googleMapRef.current) {
+              googleMapRef.current.panTo({ lat, lng })
+              googleMapRef.current.setZoom(17)
+              if (greenMarkerRef.current) {
+                greenMarkerRef.current.setPosition({ lat, lng })
+              }
+            }
+          }
+          setIsSearching(false)
+        }
+      )
+    } catch (error) {
+      console.error("Error getting place details:", error)
+      setIsSearching(false)
+    }
+  }
+
+  const handleConfirmLocation = async () => {
+    if (!mapPosition || mapPosition.length !== 2) {
+      toast.error("Please select a valid location on the map")
+      return
+    }
+
+    setLoadingAddress(true)
+    try {
+      const locationData = {
+        city: addressFormData.city,
+        state: addressFormData.state,
+        address: addressFormData.street,
+        area: addressFormData.additionalDetails || "",
+        zipCode: addressFormData.zipCode,
+        latitude: mapPosition[0],
+        longitude: mapPosition[1],
+        formattedAddress: addressFormData.additionalDetails || `${addressFormData.street}, ${addressFormData.city}, ${addressFormData.state}`,
+        isManual: true,
+        timestamp: Date.now()
+      }
+
+      // Update backend
+      await userAPI.updateLocation({
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        address: locationData.address,
+        city: locationData.city,
+        state: locationData.state,
+        area: locationData.area,
+        zipCode: locationData.zipCode,
+        formattedAddress: locationData.formattedAddress
+      })
+
+      localStorage.setItem("userLocation", JSON.stringify(locationData))
+      updateLocation(locationData)
+
+      toast.success("Location updated successfully")
+      onClose()
+      navigate("/")
+
+      // Force refresh for restaurants if needed
+      window.location.reload()
+    } catch (error) {
+      console.error("Error confirming location:", error)
+      toast.error("Failed to update location. Please try again.")
+    } finally {
+      setLoadingAddress(false)
+    }
+  }
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -2505,11 +2692,12 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
         <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] border-t border-gray-200 dark:border-gray-800 px-4 py-4">
           <form onSubmit={handleAddressFormSubmit}>
             <Button
-              type="submit"
-              className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-base font-semibold"
+              type="button"
+              onClick={handleConfirmLocation}
+              className="w-full bg-[#bc005d] hover:bg-[#a0004d] text-white h-12 text-base font-semibold transition-colors shadow-lg"
               disabled={loadingAddress}
             >
-              {loadingAddress ? "Loading..." : "Save address"}
+              {loadingAddress ? "Loading..." : "Confirm location"}
             </Button>
           </form>
         </div>
@@ -2547,9 +2735,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       </div>
 
       {/* Search Bar */}
-      <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full">
+      <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full relative">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-orange z-10" />
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#bc005d] z-10" />
           <Input
             ref={inputRef}
             value={searchValue}
@@ -2558,6 +2746,36 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
             className="pl-12 pr-4 h-12 w-full bg-gray-50 dark:bg-[#2a2a2a] border-gray-200 dark:border-gray-700 focus:border-primary-orange dark:focus:border-primary-orange rounded-xl text-base dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
           />
         </div>
+
+        {/* Search Results Overlay */}
+        {searchValue && predictions.length > 0 && (
+          <div className="absolute left-4 right-4 sm:left-6 sm:right-6 lg:left-8 lg:right-8 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10001] max-h-80 overflow-y-auto">
+            {predictions.map((prediction) => (
+              <button
+                key={prediction.place_id}
+                onClick={() => handlePredictionSelect(prediction)}
+                className="w-full flex items-start gap-4 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-50 dark:border-gray-800 last:border-0"
+              >
+                <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 dark:text-white truncate">
+                    {prediction.structured_formatting?.main_text || prediction.description}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    {prediction.structured_formatting?.secondary_text || ""}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {searchValue && predictions.length === 0 && isSearching && (
+          <div className="absolute left-4 right-4 sm:left-6 sm:right-6 lg:left-8 lg:right-8 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10001] p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#bc005d] mx-auto mb-2"></div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Searching...</p>
+          </div>
+        )}
       </div>
 
       {/* Scrollable Content */}

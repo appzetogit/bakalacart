@@ -15,7 +15,7 @@ dotenv.config({ override: true });
 
 // Manual cleanup for Razorpay keys (in case of quotes in .env)
 // Manual cleanup for Razorpay and Encryption keys (in case of quotes or whitespace in .env)
-['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'ENCRYPTION_KEY'].forEach(key => {
+['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'ENCRYPTION_KEY', 'JWT_SECRET'].forEach(key => {
   if (process.env[key]) {
     // Remove quotes if present
     if (process.env[key].startsWith('"') || process.env[key].startsWith("'")) {
@@ -29,6 +29,8 @@ dotenv.config({ override: true });
 // Import configurations
 import { connectDB } from './config/database.js';
 import { connectRedis } from './config/redis.js';
+import { initializeFirebase } from './shared/services/firebaseAdmin.js';
+import { initializeCloudinary } from './config/cloudinary.js';
 
 // Import middleware
 import { errorHandler } from './shared/middleware/errorHandler.js';
@@ -417,10 +419,10 @@ deliveryNamespace.on('connection', (socket) => {
 app.set('io', io);
 
 // Connect to databases
-import { initializeCloudinary } from './config/cloudinary.js';
+connectDB().then(async () => {
+  // Initialize Firebase Admin (Realtime Database & FCM)
+  await initializeFirebase().catch(err => console.error('❌ Failed to initialize Firebase:', err));
 
-// Connect to databases
-connectDB().then(() => {
   // Initialize Cloudinary after DB connection
   initializeCloudinary().catch(err => console.error('Failed to initialize Cloudinary:', err));
 });
@@ -581,7 +583,7 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Delivery boy sends location update
-  socket.on('update-location', (data) => {
+  socket.on('update-location', async (data) => {
     try {
       // Validate data
       if (!data.orderId || typeof data.lat !== 'number' || typeof data.lng !== 'number') {
@@ -601,6 +603,26 @@ io.on('connection', (socket) => {
 
       // Send to specific order room
       io.to(`order:${data.orderId}`).emit(`location-receive-${data.orderId}`, locationData);
+
+      // --- FIREBASE REAL-TIME SYNC ---
+      const { syncActiveOrderToFirebase, syncDeliveryBoyStatusToFirebase } = await import('./shared/services/firebaseAdmin.js');
+
+      // Update specific order tracking
+      await syncActiveOrderToFirebase(data.orderId, {
+        boy_lat: data.lat,
+        boy_lng: data.lng,
+        boy_id: data.riderId || data.deliveryPartnerId // Use whichever ID is provided
+      });
+
+      // Update global delivery boy status (if riderId is provided)
+      const boyId = data.riderId || data.deliveryPartnerId;
+      if (boyId) {
+        await syncDeliveryBoyStatusToFirebase(boyId, {
+          lat: data.lat,
+          lng: data.lng,
+          status: 'online'
+        });
+      }
 
       console.log(`📍 Location broadcasted to order room ${data.orderId}:`, {
         lat: locationData.lat,

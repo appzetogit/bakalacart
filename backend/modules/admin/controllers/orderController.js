@@ -2294,12 +2294,55 @@ export const assignOrderToDeliveryBoy = asyncHandler(async (req, res) => {
       assignedByAdmin: req.user?._id?.toString() || req.admin?._id?.toString() || null // Store admin ID separately if needed
     };
 
+    // Save order status first
     try {
       await order.save();
       console.log(`✅ Order ${order.orderId} assigned to delivery boy ${deliveryBoyId}`);
     } catch (saveError) {
       console.error('Error saving order:', saveError);
       return errorResponse(res, 500, `Failed to save order: ${saveError.message}`);
+    }
+
+    // --- FIREBASE ASSIGNMENT SYNC ---
+    try {
+      const { generateRoutePolyline } = await import('../../delivery/services/locationProcessingService.js');
+      const { syncActiveOrderToFirebase } = await import('../../../shared/services/firebaseAdmin.js');
+
+      // Get restaurant info
+      const Restaurant = (await import('../../restaurant/models/Restaurant.js')).default;
+      const restaurant = await Restaurant.findById(order.restaurantId).lean();
+
+      const restLat = restaurant?.location?.coordinates?.[1] || restaurant?.location?.latitude;
+      const restLng = restaurant?.location?.coordinates?.[0] || restaurant?.location?.longitude;
+      const custLat = order.address?.lat || order.address?.latitude;
+      const custLng = order.address?.lng || order.address?.longitude;
+
+      if (restLat && restLng && custLat && custLng) {
+        // Generate/Fetch polyline (this will check Firebase cache automatically)
+        const route = await generateRoutePolyline(
+          { lat: restLat, lng: restLng },
+          null,
+          { lat: custLat, lng: custLng }
+        );
+
+        await syncActiveOrderToFirebase(order.orderId, {
+          boy_id: deliveryBoyId.toString(),
+          boy_lat: restLat,
+          boy_lng: restLng,
+          created_at: Date.now(),
+          customer_lat: custLat,
+          customer_lng: custLng,
+          restaurant_lat: restLat,
+          restaurant_lng: restLng,
+          status: 'assigned',
+          polyline: route?.polyline || null,
+          distance: route?.totalDistance || 0,
+          duration: route?.duration ? (route.duration / 60) : 0 // in minutes
+        });
+        console.log(`✅ Order ${order.orderId} tracking initialized in Firebase`);
+      }
+    } catch (fbError) {
+      console.warn('⚠️ Failed to sync assignment to Firebase:', fbError.message);
     }
 
     // Notify delivery boy about the assigned order (non-blocking)

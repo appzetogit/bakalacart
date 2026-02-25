@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getMessaging, getToken, onMessage, deleteToken } from 'firebase/messaging';
+import { getDatabase } from 'firebase/database';
 
 // Firebase configuration - Hardcoded to ensure consistency across all environments
 const firebaseConfig = {
@@ -18,6 +19,7 @@ let app;
 let firebaseAuth;
 let googleProvider;
 let messaging;
+let database;
 
 // Function to ensure Firebase is initialized
 function ensureFirebaseInitialized() {
@@ -66,6 +68,12 @@ function ensureFirebaseInitialized() {
         console.warn('Firebase Messaging could not be initialized (likely not supported in this browser):', messagingError.message);
       }
     }
+
+    // Initialize Realtime Database
+    if (!database) {
+      database = getDatabase(app);
+      console.log('Firebase Realtime Database initialized successfully');
+    }
   } catch (error) {
     console.error('Firebase initialization error:', error);
     console.error('Firebase config used:', firebaseConfig);
@@ -77,6 +85,15 @@ function ensureFirebaseInitialized() {
 ensureFirebaseInitialized();
 
 export const firebaseApp = app;
-export { firebaseAuth, googleProvider, messaging, getToken, onMessage, deleteToken, ensureFirebaseInitialized };
+export {
+  firebaseAuth,
+  googleProvider,
+  messaging,
+  database,
+  getToken,
+  onMessage,
+  deleteToken,
+  ensureFirebaseInitialized
+};
 
 

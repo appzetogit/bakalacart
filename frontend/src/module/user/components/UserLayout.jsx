@@ -12,6 +12,7 @@ import { registerFCMToken } from "@/services/pushNotificationService"
 import { getModuleToken } from "@/lib/utils/auth"
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode"
 import MaintenanceModeScreen from "@/components/MaintenanceModeScreen"
+import MaintenanceBanner from "@/components/MaintenanceBanner"
 
 // Create SearchOverlay context with default value
 const SearchOverlayContext = createContext({
@@ -129,12 +130,14 @@ export default function UserLayout() {
 
     registerToken();
   }, []);
-  
-  // Show maintenance screen if maintenance mode is enabled
-  // This must be AFTER all hooks are called
+
+  // Maintenance mode is now handled via the top banner
+  // to keep the app visible instead of hiding it completely.
+  /*
   if (!loading && isMaintenanceMode) {
     return <MaintenanceModeScreen />
   }
+  */
 
   // Note: Authentication checks and redirects are handled by ProtectedRoute components
   // UserLayout should not interfere with authentication redirects
@@ -149,24 +152,27 @@ export default function UserLayout() {
     location.pathname.startsWith("/user/profile")
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200">
-      <CartProvider>
-        <ProfileProvider>
-          <OrdersProvider>
-            <SearchOverlayProvider>
-              <LocationSelectorProvider>
-                {/* <Navbar /> */}
-                {showBottomNav && <DesktopNavbar />}
-                <LocationPrompt />
-                <main>
-                  <Outlet />
-                </main>
-                {showBottomNav && <BottomNavigation />}
-              </LocationSelectorProvider>
-            </SearchOverlayProvider>
-          </OrdersProvider>
-        </ProfileProvider>
-      </CartProvider>
+    <div className={`min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200 ${isMaintenanceMode ? 'overflow-x-hidden' : ''}`}>
+      <MaintenanceBanner mode="user" />
+      <div className={isMaintenanceMode ? 'grayscale-[0.5] opacity-90 pointer-events-none' : ''}>
+        <CartProvider>
+          <ProfileProvider>
+            <OrdersProvider>
+              <SearchOverlayProvider>
+                <LocationSelectorProvider>
+                  {/* <Navbar /> */}
+                  {showBottomNav && <DesktopNavbar />}
+                  <LocationPrompt />
+                  <main>
+                    <Outlet />
+                  </main>
+                  {showBottomNav && <BottomNavigation />}
+                </LocationSelectorProvider>
+              </SearchOverlayProvider>
+            </OrdersProvider>
+          </ProfileProvider>
+        </CartProvider>
+      </div>
     </div>
   )
 }

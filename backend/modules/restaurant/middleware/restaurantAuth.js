@@ -113,7 +113,7 @@ export const authenticate = async (req, res, next) => {
           isInventoryRoute
         }
       });
-      return errorResponse(res, 401, 'Restaurant account is inactive. Please wait for admin approval.');
+      return errorResponse(res, 403, 'Restaurant account is inactive. Please wait for admin approval.');
     }
 
     // Attach restaurant to request

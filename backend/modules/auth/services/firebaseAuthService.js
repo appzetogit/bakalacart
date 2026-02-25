@@ -75,13 +75,16 @@ class FirebaseAuthService {
 
       try {
         if (!admin.apps.length) {
+          const databaseURL = process.env.FIREBASE_DATABASE_URL || `https://${projectId}-default-rtdb.firebaseio.com/`;
           admin.initializeApp({
             credential: admin.credential.cert({
               projectId,
               clientEmail,
               privateKey
-            })
+            }),
+            databaseURL
           });
+          logger.info(`Firebase Admin initialized with DB: ${databaseURL}`);
         }
 
         this.initialized = true;

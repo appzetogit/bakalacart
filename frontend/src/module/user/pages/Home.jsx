@@ -1287,53 +1287,46 @@ export default function Home() {
   useEffect(() => {
     if (!restaurantsData || restaurantsData.length === 0 || !location?.latitude || !location?.longitude) return
 
-    const calculateDistance = (lat1, lng1, lat2, lng2) => {
-      const R = 6371 // Earth's radius in kilometers
-      const dLat = (lat2 - lat1) * Math.PI / 180
-      const dLng = (lng2 - lng1) * Math.PI / 180
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2)
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      return R * c // Distance in kilometers
-    }
+    // Use a 2-second debounce for distance recalculation to prevent UI lag
+    const timer = setTimeout(() => {
+      const userLat = location.latitude
+      const userLng = location.longitude
 
-    const userLat = location.latitude
-    const userLng = location.longitude
+      // Recalculate distances for all restaurants
+      const updatedRestaurants = restaurantsData.map(restaurant => {
+        if (!restaurant.location) return restaurant
 
-    // Recalculate distances for all restaurants
-    const updatedRestaurants = restaurantsData.map(restaurant => {
-      if (!restaurant.location) return restaurant
+        const restaurantLat = restaurant.location?.latitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[1] : null)
+        const restaurantLng = restaurant.location?.longitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[0] : null)
 
-      const restaurantLat = restaurant.location?.latitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[1] : null)
-      const restaurantLng = restaurant.location?.longitude || (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) ? restaurant.location.coordinates[0] : null)
+        if (!restaurantLat || !restaurantLng ||
+          isNaN(restaurantLat) || isNaN(restaurantLng)) {
+          return restaurant
+        }
 
-      if (!restaurantLat || !restaurantLng ||
-        isNaN(restaurantLat) || isNaN(restaurantLng)) {
-        return restaurant
-      }
+        const distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
+        let calculatedDistance = null
 
-      const distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
-      let calculatedDistance = null
+        // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
+        if (distanceInKm >= 1) {
+          calculatedDistance = `${distanceInKm.toFixed(1)} km`
+        } else {
+          const distanceInMeters = Math.round(distanceInKm * 1000)
+          calculatedDistance = `${distanceInMeters} m`
+        }
 
-      // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
-      if (distanceInKm >= 1) {
-        calculatedDistance = `${distanceInKm.toFixed(1)} km`
-      } else {
-        const distanceInMeters = Math.round(distanceInKm * 1000)
-        calculatedDistance = `${distanceInMeters} m`
-      }
+        return {
+          ...restaurant,
+          distance: calculatedDistance,
+          distanceInKm: distanceInKm // Preserve numeric distance for sorting
+        }
+      })
 
-      return {
-        ...restaurant,
-        distance: calculatedDistance,
-        distanceInKm: distanceInKm // Preserve numeric distance for sorting
-      }
-    })
+      setRestaurantsData(updatedRestaurants)
+      console.log('🔄 Recalculated distances for all restaurants (debounced)')
+    }, 2000)
 
-    setRestaurantsData(updatedRestaurants)
-    console.log('🔄 Recalculated distances for all restaurants based on user location')
+    return () => clearTimeout(timer)
   }, [location?.latitude, location?.longitude])
 
   // Filter restaurants and foods based on APPLIED filters (set when user clicks "Show results")
@@ -2060,8 +2053,8 @@ export default function Home() {
                 variant="outline"
                 onClick={() => setIsFilterOpen(true)}
                 className={`h-7 sm:h-8 px-2 sm:px-3 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all border hover:bg-gray-50 dark:hover:bg-gray-800 ${appliedFilters.activeFilters.size > 0 || appliedFilters.sortBy || appliedFilters.selectedCuisine
-                    ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-700 dark:text-green-400'
-                    : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-white'
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-700 dark:text-green-400'
+                  : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-white'
                   }`}
               >
                 <div className="relative">

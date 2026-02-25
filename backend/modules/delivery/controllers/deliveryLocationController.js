@@ -36,11 +36,11 @@ export const updateLocation = asyncHandler(async (req, res) => {
     const hasLatitude = latitude !== undefined && latitude !== null;
     const hasLongitude = longitude !== undefined && longitude !== null;
     const hasIsOnline = isOnline !== undefined && isOnline !== null;
-    
+
     if (!hasLatitude && !hasLongitude && !hasIsOnline) {
       return errorResponse(res, 400, 'At least one field (latitude, longitude, or isOnline) must be provided');
     }
-    
+
     // If latitude or longitude is provided, both must be provided
     if ((hasLatitude && !hasLongitude) || (!hasLatitude && hasLongitude)) {
       return errorResponse(res, 400, 'Both latitude and longitude must be provided together');
@@ -57,7 +57,7 @@ export const updateLocation = asyncHandler(async (req, res) => {
         return errorResponse(res, 400, locationError.details[0].message);
       }
     }
-    
+
     if (hasIsOnline && typeof isOnline !== 'boolean') {
       return errorResponse(res, 400, 'isOnline must be a boolean');
     }
@@ -91,6 +91,25 @@ export const updateLocation = asyncHandler(async (req, res) => {
 
     if (!updatedDelivery) {
       return errorResponse(res, 404, 'Delivery partner not found');
+    }
+
+    // --- FIREBASE SYNC ---
+    try {
+      const { syncDeliveryBoyStatusToFirebase } = await import('../../../shared/services/firebaseAdmin.js');
+      const fbData = {
+        status: updatedDelivery.availability?.isOnline ? 'online' : 'offline',
+        name: updatedDelivery.name,
+        phone: updatedDelivery.phone
+      };
+
+      if (hasLatitude && hasLongitude) {
+        fbData.lat = latitude;
+        fbData.lng = longitude;
+      }
+
+      await syncDeliveryBoyStatusToFirebase(delivery._id.toString(), fbData);
+    } catch (fbError) {
+      console.warn('⚠️ Firebase delivery_boys status update failed:', fbError.message);
     }
 
     const currentLocation = updatedDelivery.availability?.currentLocation;
@@ -127,7 +146,7 @@ export const getLocation = asyncHandler(async (req, res) => {
     }
 
     const location = deliveryData.availability?.currentLocation;
-    
+
     return successResponse(res, 200, 'Location retrieved successfully', {
       location: location ? {
         latitude: location.coordinates[1],
@@ -180,7 +199,7 @@ export const getZonesInRadius = asyncHandler(async (req, res) => {
       const R = 6371; // Earth's radius in kilometers
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = 
+      const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLng / 2) * Math.sin(dLng / 2);

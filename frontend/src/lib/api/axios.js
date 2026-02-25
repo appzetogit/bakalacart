@@ -253,18 +253,20 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // If response contains new access token, store it for the current module
-    if (response.data?.accessToken) {
+    // Check for access token in standard successResponse (response.data.data.accessToken)
+    // or direct responses (response.data.accessToken)
+    const token = response.data?.data?.accessToken || response.data?.accessToken;
+
+    if (token) {
       const currentPath = window.location.pathname;
       const { tokenKey, expectedRole } = getModuleInfo(currentPath);
 
-      const token = response.data.accessToken;
       const role = getRoleFromToken(token);
 
       // Only store the token if the role matches the current module or is a valid fallback
       if (role && role === expectedRole) {
         localStorage.setItem(tokenKey, token);
-      } else if (role === 'user' && tokenKey === 'accessToken') {
+      } else if (role === 'user' && (tokenKey === 'accessToken' || !tokenKey)) {
         // Handle legacy case
         localStorage.setItem('user_accessToken', token);
       }

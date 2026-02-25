@@ -1,50 +1,195 @@
-
 import admin from 'firebase-admin';
+import { getDatabase } from 'firebase-admin/database';
 import path from 'path';
 import fs from 'fs';
+import { getFirebaseCredentials } from '../utils/envService.js';
 
-// Initialize Firebase Admin
 let isInitialized = false;
+let database = null;
 
-try {
-    const serviceAccountPath = path.resolve(process.cwd(), 'config', 'firebase-service-account.json');
+/**
+ * Initialize Firebase Admin with both Messaging and Realtime Database
+ */
+export const initializeFirebase = async () => {
+    if (isInitialized) return { admin, database };
 
-    if (fs.existsSync(serviceAccountPath)) {
-        const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    try {
+        // 1. Get credentials (prioritizing database/env vars)
+        const credentials = await getFirebaseCredentials();
+        let serviceAccount = null;
+        let databaseURL = process.env.FIREBASE_DATABASE_URL || credentials.databaseURL;
 
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
+        if (credentials.projectId && credentials.clientEmail && credentials.privateKey) {
+            console.log('📦 [Firebase] Using credentials from database/env vars.');
+            serviceAccount = {
+                projectId: credentials.projectId,
+                clientEmail: credentials.clientEmail,
+                privateKey: credentials.privateKey.replace(/\\n/g, '\n')
+            };
+            if (!databaseURL) {
+                databaseURL = `https://${credentials.projectId}-default-rtdb.firebaseio.com/`;
+            }
+        }
+        // 2. Fallback to service account file
+        else {
+            const serviceAccountPath = path.resolve(process.cwd(), 'config', 'firebase-service-account.json');
+            if (fs.existsSync(serviceAccountPath)) {
+                console.log('📦 [Firebase] Falling back to service account file.');
+                serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+                if (!databaseURL) {
+                    databaseURL = `https://${serviceAccount.project_id}-default-rtdb.firebaseio.com/`;
+                }
+            }
+        }
+
+        if (serviceAccount) {
+            if (!admin.apps.length) {
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount),
+                    databaseURL: databaseURL
+                });
+            }
+
+            try {
+                // Use getDatabase() for better ESM/v12 support
+                database = getDatabase();
+                isInitialized = true;
+                console.log('✅ [Firebase] Firebase Admin initialized successfully.');
+                const currentDbUrl = admin.app().options.databaseURL;
+                console.log(`📡 [Firebase] Realtime Database: ${currentDbUrl || databaseURL}`);
+            } catch (dbError) {
+                console.warn('⚠️ [Firebase] Could not initialize Realtime Database:', dbError.message);
+                if (admin.apps.length) isInitialized = true;
+            }
+        } else {
+            console.warn('⚠️ [Firebase] Firebase configuration missing. Realtime features will be disabled.');
+        }
+
+        return { admin, database };
+    } catch (error) {
+        console.error('❌ [Firebase] Error initializing Firebase Admin:', error);
+        return { admin: null, database: null };
+    }
+};
+
+/**
+ * Legacy support for the requested function name
+ */
+export const initializeFirebaseRealtime = initializeFirebase;
+
+/**
+ * Get the Realtime Database instance
+ */
+export const getFirebaseDb = () => {
+    if (!isInitialized || !database) {
+        return null;
+    }
+    return database;
+};
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ */
+export const calculateHaversineDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
+/**
+ * Sync active order status and polyline to Firebase
+ */
+export const syncActiveOrderToFirebase = async (orderId, data) => {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+        await db.ref(`active_orders/${orderId}`).update({
+            ...data,
+            last_updated: Date.now()
         });
-
-        isInitialized = true;
-        console.log('✅ [FCM] Firebase Admin initialized successfully.');
-    } else {
-        console.warn('⚠️ [FCM] Firebase service account file not found.');
+        return true;
+    } catch (error) {
+        console.warn(`⚠️ Firebase Sync Error (active_orders/${orderId}):`, error.message);
+        return false;
     }
-} catch (error) {
-    console.error('❌ [FCM] Error initializing Firebase Admin:', error);
-}
+};
 
-// Function to send notification
+/**
+ * Sync delivery boy online status and location to Firebase
+ */
+export const syncDeliveryBoyStatusToFirebase = async (boyId, data) => {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+        await db.ref(`delivery_boys/${boyId}`).update({
+            ...data,
+            last_updated: Date.now()
+        });
+        return true;
+    } catch (error) {
+        console.warn(`⚠️ Firebase Sync Error (delivery_boys/${boyId}):`, error.message);
+        return false;
+    }
+};
+
+/**
+ * Find nearest online delivery boy using Firebase data
+ */
+export const findNearestBoyFirebase = async (restLat, restLng, maxDist = 50) => {
+    const db = getFirebaseDb();
+    if (!db) return null;
+
+    try {
+        const snapshot = await db.ref('delivery_boys')
+            .orderByChild('status')
+            .equalTo('online')
+            .once('value');
+
+        const boys = snapshot.val();
+        if (!boys) return null;
+
+        let nearestBoyId = null;
+        let minDistance = Infinity;
+
+        for (const boyId in boys) {
+            const boy = boys[boyId];
+            if (!boy.lat || !boy.lng) continue;
+
+            const dist = calculateHaversineDistance(restLat, restLng, boy.lat, boy.lng);
+            if (dist < minDistance && dist <= maxDist) {
+                minDistance = dist;
+                nearestBoyId = boyId;
+            }
+        }
+
+        return nearestBoyId ? { id: nearestBoyId, distance: minDistance, ...boys[nearestBoyId] } : null;
+    } catch (error) {
+        console.error('❌ Error finding nearest boy from Firebase:', error);
+        return null;
+    }
+};
+
+// Function to send notification (kept from original for compatibility)
 export const sendPushNotification = async (tokens, payload) => {
-    if (!isInitialized) return { success: false, error: 'Firebase Admin not initialized' };
-
-    // Ensure tokens are unique and non-empty
-    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
-
-    if (uniqueTokens.length === 0) {
-        console.log('⚠️ [FCM] No tokens to send to.');
-        return { successCount: 0, failureCount: 0, failedTokens: [] };
+    if (!isInitialized) {
+        // Try to initialize if not done yet
+        await initializeFirebase();
+        if (!isInitialized) return { success: false, error: 'Firebase Admin not initialized' };
     }
 
-    // FCM sendEachForMulticast has a limit of 500 tokens per call
+    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
+    if (uniqueTokens.length === 0) return { successCount: 0, failureCount: 0, failedTokens: [] };
+
     const CHUNK_SIZE = 500;
     const chunks = [];
     for (let i = 0; i < uniqueTokens.length; i += CHUNK_SIZE) {
         chunks.push(uniqueTokens.slice(i, i + CHUNK_SIZE));
     }
-
-    console.log(`🚀 [FCM] Preparing to send to ${uniqueTokens.length} tokens in ${chunks.length} batches. Tag: ${payload.data?.tag || 'none'}`);
 
     const results = {
         successCount: 0,
@@ -56,8 +201,6 @@ export const sendPushNotification = async (tokens, payload) => {
 
     const tag = payload.data?.tag || payload.data?.orderId || payload.data?.notificationId || Date.now().toString();
     const iconUrl = payload.data?.icon || 'https://bakalacart.com/bakalalogo.png';
-
-    // Determine if this is a new order notification that needs sound
     const isNewOrder = payload.data?.type === 'new_order' || payload.data?.orderId;
     const baseUrl = process.env.CORS_ORIGIN || 'https://bakalacart.com';
     const soundUrl = isNewOrder ? `${baseUrl}/audio/alert.mp3` : null;
@@ -67,7 +210,7 @@ export const sendPushNotification = async (tokens, payload) => {
             const message = {
                 data: {
                     ...payload.data,
-                    tag: tag,
+                    tag,
                     title: payload.title,
                     body: payload.body,
                     icon: iconUrl,
@@ -75,37 +218,17 @@ export const sendPushNotification = async (tokens, payload) => {
                     sound: soundUrl || ''
                 },
                 tokens: tokenChunk,
-                android: {
-                    collapseKey: tag,
-                    priority: 'high',
-                },
+                android: { collapseKey: tag, priority: 'high' },
                 apns: {
-                    headers: {
-                        'apns-collapse-id': tag,
-                        'apns-priority': '10'
-                    },
-                    payload: {
-                        aps: {
-                            alert: {
-                                title: payload.title,
-                                body: payload.body
-                            },
-                            'thread-id': tag,
-                            badge: 1,
-                            sound: 'default',
-                            'mutable-content': 1
-                        }
-                    }
+                    headers: { 'apns-collapse-id': tag, 'apns-priority': '10' },
+                    payload: { ops: { alert: { title: payload.title, body: payload.body }, 'thread-id': tag, badge: 1, sound: 'default', 'mutable-content': 1 } }
                 },
                 webpush: {
-                    headers: {
-                        Urgency: 'high',
-                        Topic: tag.substring(0, 32)
-                    },
+                    headers: { Urgency: 'high', Topic: tag.substring(0, 32) },
                     notification: {
                         title: payload.title,
                         body: payload.body,
-                        tag: tag,
+                        tag,
                         icon: iconUrl,
                         badge: iconUrl,
                         image: payload.image || undefined,
@@ -121,7 +244,6 @@ export const sendPushNotification = async (tokens, payload) => {
             };
 
             const response = await admin.messaging().sendEachForMulticast(message);
-
             results.successCount += response.successCount;
             results.failureCount += response.failureCount;
             results.responses.push(...response.responses);
@@ -130,22 +252,17 @@ export const sendPushNotification = async (tokens, payload) => {
                 if (!resp.success) {
                     const token = tokenChunk[idx];
                     results.failedTokens.push({ token, error: resp.error?.code });
-
-                    if (['messaging/registration-token-not-registered',
-                        'messaging/invalid-registration-token',
-                        'messaging/invalid-argument',
-                        'messaging/mismatched-credential'].includes(resp.error?.code)) {
+                    if (['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(resp.error?.code)) {
                         results.cleanupTokens.push(token);
                     }
                 }
             });
         } catch (error) {
-            console.error('❌ [FCM] Batch Error:', error);
+            console.error('❌ [Firebase] Notification Batch Error:', error);
             results.failureCount += tokenChunk.length;
         }
     }
 
-    console.log(`✅ [FCM] All batches complete. Success: ${results.successCount}, Failed: ${results.failureCount}`);
     return results;
 };
 

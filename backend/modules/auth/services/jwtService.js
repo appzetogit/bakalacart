@@ -10,10 +10,17 @@ class JWTService {
   constructor() {
     let secret = process.env.JWT_SECRET;
 
+    // Manual cleanup for JWT_SECRET (in case of quotes or whitespace in .env)
+    if (secret) {
+      if (secret.startsWith('"') || secret.startsWith("'")) {
+        secret = secret.replace(/^["'](.*)["']$/, '$1');
+      }
+      secret = secret.trim();
+    }
+
     this.secret = secret;
     this.accessTokenExpiry = process.env.JWT_ACCESS_EXPIRY || '24h';
     this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRY || '7d';
-
   }
 
   /**

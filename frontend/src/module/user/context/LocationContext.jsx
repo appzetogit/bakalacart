@@ -253,11 +253,11 @@ export const LocationProvider = ({ children }) => {
             async (pos) => {
                 const { latitude, longitude, accuracy } = pos.coords
 
-                // Threshold check to avoid excessive updates
+                // Threshold check to avoid excessive updates (roughly 22 meters)
                 const latDiff = Math.abs(latitude - (prevLocationCoordsRef.current.latitude || 0))
                 const lngDiff = Math.abs(longitude - (prevLocationCoordsRef.current.longitude || 0))
 
-                if (latDiff < 0.0001 && lngDiff < 0.0001) return
+                if (latDiff < 0.0002 && lngDiff < 0.0002) return
 
                 prevLocationCoordsRef.current = { latitude, longitude }
 
@@ -269,15 +269,15 @@ export const LocationProvider = ({ children }) => {
                     setLocation(loc)
                     localStorage.setItem("userLocation", JSON.stringify(loc))
 
-                    // Debounced DB update
+                    // Debounced DB update (10 seconds to avoid spamming server)
                     clearTimeout(updateTimerRef.current)
-                    updateTimerRef.current = setTimeout(() => updateLocationInDB(loc), 5000)
+                    updateTimerRef.current = setTimeout(() => updateLocationInDB(loc), 10000)
                 }
             },
             (err) => {
                 if (err.code !== 3) console.warn("⚠️ [LocationContext] Watch error:", err.message)
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
         )
     }, [reverseGeocodeWithGoogleMaps, updateLocationInDB])
 

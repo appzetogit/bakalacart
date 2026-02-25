@@ -78,6 +78,11 @@ const environmentVariableSchema = new mongoose.Schema(
       default: '',
       trim: true
     },
+    FIREBASE_DATABASE_URL: {
+      type: String,
+      default: '',
+      trim: true
+    },
 
     // SMTP
     SMTP_HOST: {
@@ -182,6 +187,7 @@ environmentVariableSchema.methods.toEnvObject = function () {
     'FIREBASE_API_KEY',
     'FIREBASE_CLIENT_EMAIL',
     'FIREBASE_PRIVATE_KEY',
+    'FIREBASE_DATABASE_URL',
     'SMTP_USER',
     'SMTP_PASS',
     'SMSINDIAHUB_API_KEY',

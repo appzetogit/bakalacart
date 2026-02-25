@@ -445,6 +445,18 @@ export const acceptOrder = asyncHandler(async (req, res) => {
         };
         await orderDoc.save();
         console.log(`✅ Order ${order.orderId} assigned to delivery partner ${currentDeliveryId} upon acceptance`);
+
+        // --- FIREBASE SYNC ---
+        try {
+          const { syncActiveOrderToFirebase } = await import('../../../shared/services/firebaseAdmin.js');
+          await syncActiveOrderToFirebase(order.orderId, {
+            status: 'accepted',
+            boy_id: currentDeliveryId
+          });
+        } catch (fbErr) {
+          console.warn('⚠️ Firebase Sync Failed (acceptOrder):', fbErr.message);
+        }
+
       } catch (saveError) {
         console.error(`❌ Error saving order assignment: ${saveError.message}`);
         console.error(`❌ Error stack: ${saveError.stack}`);
@@ -1416,6 +1428,17 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
       .populate('restaurantId', 'name location address')
       .lean();
 
+    // --- FIREBASE SYNC ---
+    try {
+      const { syncActiveOrderToFirebase } = await import('../../../shared/services/firebaseAdmin.js');
+      await syncActiveOrderToFirebase(order.orderId, {
+        status: 'out_for_delivery',
+        boy_id: deliveryId.toString()
+      });
+    } catch (fbErr) {
+      console.warn('⚠️ Firebase Sync Failed (confirmOrderId):', fbErr.message);
+    }
+
     console.log(`✅ Order ID confirmed for order ${order.orderId}`);
     console.log(`📍 Route to delivery calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
 
@@ -1848,6 +1871,31 @@ export const completeDelivery = asyncHandler(async (req, res) => {
 
     if (!updatedOrder) {
       return errorResponse(res, 500, 'Failed to update order status');
+    }
+
+    // --- FIREBASE SYNC ---
+    try {
+      const { syncActiveOrderToFirebase, getFirebaseDb } = await import('../../../shared/services/firebaseAdmin.js');
+      await syncActiveOrderToFirebase(order.orderId || updatedOrder.orderId, {
+        status: 'delivered',
+        delivered_at: Date.now()
+      });
+
+      // Clean up after 1 minute (give UI some time to show "Delivered")
+      setTimeout(async () => {
+        try {
+          const db = getFirebaseDb();
+          if (db) {
+            await db.ref(`active_orders/${order.orderId || updatedOrder.orderId}`).remove();
+            console.log(`🗑️ Removed completed order ${order.orderId || updatedOrder.orderId} from Firebase active_orders`);
+          }
+        } catch (removeErr) {
+          console.warn('⚠️ Failed to remove order from Firebase:', removeErr.message);
+        }
+      }, 60000);
+
+    } catch (fbErr) {
+      console.warn('⚠️ Firebase Sync Failed (completeDelivery):', fbErr.message);
     }
 
     const orderIdForLog = updatedOrder.orderId || order.orderId || orderMongoId?.toString() || orderId;

@@ -262,6 +262,28 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
     // Save to database
     await user.save();
 
+    // --- FIREBASE SYNC ---
+    try {
+      const { getFirebaseDb } = await import('../../../shared/services/firebaseAdmin.js');
+      const db = getFirebaseDb();
+      if (db) {
+        await db.ref(`users/${user._id}`).update({
+          lat: latNum,
+          lng: lngNum,
+          accuracy: locationUpdate.accuracy || 0,
+          address: locationUpdate.address || '',
+          area: locationUpdate.area || '',
+          city: locationUpdate.city || '',
+          state: locationUpdate.state || '',
+          formatted_address: locationUpdate.formattedAddress || '',
+          last_updated: Date.now()
+        });
+        console.log(`✅ User ${user._id} location synced to Firebase`);
+      }
+    } catch (fbError) {
+      console.warn('⚠️ Firebase User Sync failed:', fbError.message);
+    }
+
     logger.info(`User live location updated: ${user._id}`, {
       latitude: latNum,
       longitude: lngNum,

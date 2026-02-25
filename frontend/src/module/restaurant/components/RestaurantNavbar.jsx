@@ -4,6 +4,8 @@ import { Search, Menu, ChevronRight, MapPin, X, Bell } from "lucide-react"
 import { restaurantAPI } from "@/lib/api"
 import { proactiveTokenRefresh } from "@/lib/utils/auth"
 
+import MaintenanceBanner from "@/components/MaintenanceBanner"
+
 export default function RestaurantNavbar({
   restaurantName: propRestaurantName,
   location: propLocation,
@@ -48,7 +50,7 @@ export default function RestaurantNavbar({
   // Format full address from location object - using stored data only, no live fetching
   const formatAddress = (location) => {
     if (!location) return ""
-    
+
     // Priority 1: Use formattedAddress if available (stored address from database)
     if (location.formattedAddress && location.formattedAddress.trim() !== "" && location.formattedAddress !== "Select location") {
       // Check if it's just coordinates (latitude, longitude format)
@@ -57,37 +59,37 @@ export default function RestaurantNavbar({
         return location.formattedAddress.trim()
       }
     }
-    
+
     // Priority 2: Use address field if available
     if (location.address && location.address.trim() !== "") {
       return location.address.trim()
     }
-    
+
     // Priority 3: Build from individual components
     const parts = []
-    
+
     // Add street address (addressLine1 or street)
     if (location.addressLine1) {
       parts.push(location.addressLine1.trim())
     } else if (location.street) {
       parts.push(location.street.trim())
     }
-    
+
     // Add addressLine2 if available
     if (location.addressLine2) {
       parts.push(location.addressLine2.trim())
     }
-    
+
     // Add area if available
     if (location.area) {
       parts.push(location.area.trim())
     }
-    
+
     // Add landmark if available
     if (location.landmark) {
       parts.push(location.landmark.trim())
     }
-    
+
     // Add city if available and not already in area
     if (location.city) {
       const city = location.city.trim()
@@ -97,7 +99,7 @@ export default function RestaurantNavbar({
         parts.push(city)
       }
     }
-    
+
     // Add state if available
     if (location.state) {
       const state = location.state.trim()
@@ -107,13 +109,13 @@ export default function RestaurantNavbar({
         parts.push(state)
       }
     }
-    
+
     // Add zipCode/pincode if available
     if (location.zipCode || location.pincode || location.postalCode) {
       const zip = (location.zipCode || location.pincode || location.postalCode).trim()
       parts.push(zip)
     }
-    
+
     return parts.length > 0 ? parts.join(", ") : ""
   }
 
@@ -125,7 +127,7 @@ export default function RestaurantNavbar({
   // Update location when restaurantData or propLocation changes
   useEffect(() => {
     let newLocation = ""
-    
+
     // Priority 1: Explicit prop takes highest priority
     if (propLocation && propLocation.trim() !== "") {
       newLocation = propLocation.trim()
@@ -140,12 +142,12 @@ export default function RestaurantNavbar({
         directAddress: restaurantData.address,
         fullLocation: restaurantData.location
       })
-      
+
       if (restaurantData.location) {
         // Use stored formattedAddress first (from database)
-        if (restaurantData.location.formattedAddress && 
-            restaurantData.location.formattedAddress.trim() !== "" && 
-            restaurantData.location.formattedAddress !== "Select location") {
+        if (restaurantData.location.formattedAddress &&
+          restaurantData.location.formattedAddress.trim() !== "" &&
+          restaurantData.location.formattedAddress !== "Select location") {
           // Check if it's just coordinates (latitude, longitude format)
           const isCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(restaurantData.location.formattedAddress.trim())
           if (!isCoordinates) {
@@ -153,7 +155,7 @@ export default function RestaurantNavbar({
             console.log('✅ Using formattedAddress:', newLocation)
           }
         }
-        
+
         // If formattedAddress is not available or is coordinates, try formatAddress function
         if (!newLocation) {
           const formatted = formatAddress(restaurantData.location)
@@ -162,23 +164,23 @@ export default function RestaurantNavbar({
             console.log('✅ Using formatAddress result:', newLocation)
           }
         }
-        
+
         // Additional fallback: check if address is directly on location
         if (!newLocation && restaurantData.location.address && restaurantData.location.address.trim() !== "") {
           newLocation = restaurantData.location.address.trim()
           console.log('✅ Using location.address:', newLocation)
         }
       }
-      
+
       // Priority 3: Fallback - check if address is directly on restaurantData (not in location object)
       if (!newLocation && restaurantData.address && restaurantData.address.trim() !== "") {
         newLocation = restaurantData.address.trim()
         console.log('✅ Using restaurantData.address:', newLocation)
       }
     }
-    
+
     setLocation(newLocation)
-    
+
     // Debug log
     if (newLocation) {
       console.log('📍 Restaurant address displayed:', newLocation)
@@ -193,7 +195,7 @@ export default function RestaurantNavbar({
       // Check if user is authenticated
       const isAuthenticated = localStorage.getItem("restaurant_authenticated") === "true"
       if (!isAuthenticated) return
-      
+
       // Try to refresh token if needed
       try {
         await proactiveTokenRefresh('restaurant')
@@ -202,13 +204,13 @@ export default function RestaurantNavbar({
         // Token will be refreshed on next API call via interceptor
       }
     }
-    
+
     // Refresh immediately on mount
     refreshTokenPeriodically()
-    
+
     // Then refresh every 4 minutes (before 5 minute threshold)
     const refreshInterval = setInterval(refreshTokenPeriodically, 4 * 60 * 1000)
-    
+
     return () => clearInterval(refreshInterval)
   }, [])
 
@@ -240,10 +242,10 @@ export default function RestaurantNavbar({
     }
 
     window.addEventListener('restaurantStatusChanged', handleStatusChange)
-    
+
     // Also check localStorage periodically to catch direct changes
     const interval = setInterval(updateStatus, 1000)
-    
+
     return () => {
       window.removeEventListener('restaurantStatusChanged', handleStatusChange)
       clearInterval(interval)
@@ -304,82 +306,81 @@ export default function RestaurantNavbar({
   }
 
   return (
-    <div className="w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-      {/* Left Side - Restaurant Info */}
-      <div className="flex-1 min-w-0 pr-4">
-        {/* Restaurant Name */}
-        <h1 className="text-base font-bold text-gray-900 truncate">
-          {loading ? "Loading..." : restaurantName}
-        </h1>
-        
-        {/* Location */}
-        {!loading && location && location.trim() !== "" && (
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <MapPin className="w-3 h-3 text-gray-500 shrink-0" />
-            <p className="text-xs text-gray-600 truncate" title={location}>
-              {location}
-            </p>
-          </div>
-        )}
-      </div>
+    <>
+      <MaintenanceBanner mode="restaurantDelivery" />
+      <div className="w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        {/* Left Side - Restaurant Info */}
+        <div className="flex-1 min-w-0 pr-4">
+          {/* Restaurant Name */}
+          <h1 className="text-base font-bold text-gray-900 truncate">
+            {loading ? "Loading..." : restaurantName}
+          </h1>
 
-      {/* Right Side - Interactive Elements */}
-      <div className="flex items-center">
-        {/* Offline/Online Status Tag */}
-        {showOfflineOnlineTag && (
-          <button
-            onClick={handleStatusClick}
-            className={`flex items-center gap-1.5 px-2 py-1 border rounded-full hover:opacity-80 transition-all ${
-              status === "Online" 
-                ? "bg-green-50 border-green-300" 
+          {/* Location */}
+          {!loading && location && location.trim() !== "" && (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <MapPin className="w-3 h-3 text-gray-500 shrink-0" />
+              <p className="text-xs text-gray-600 truncate" title={location}>
+                {location}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side - Interactive Elements */}
+        <div className="flex items-center">
+          {/* Offline/Online Status Tag */}
+          {showOfflineOnlineTag && (
+            <button
+              onClick={handleStatusClick}
+              className={`flex items-center gap-1.5 px-2 py-1 border rounded-full hover:opacity-80 transition-all ${status === "Online"
+                ? "bg-green-50 border-green-300"
                 : "bg-gray-100 border-gray-300"
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${
-              status === "Online" ? "bg-green-500" : "bg-gray-500"
-            }`}></span>
-            <span className={`text-sm font-medium ${
-              status === "Online" ? "text-green-700" : "text-gray-700"
-            }`}>
-              {status}
-            </span>
-            <ChevronRight className={`w-4 h-4 ${
-              status === "Online" ? "text-green-700" : "text-gray-700"
-            }`} />
-          </button>
-        )}
+                }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${status === "Online" ? "bg-green-500" : "bg-gray-500"
+                }`}></span>
+              <span className={`text-sm font-medium ${status === "Online" ? "text-green-700" : "text-gray-700"
+                }`}>
+                {status}
+              </span>
+              <ChevronRight className={`w-4 h-4 ${status === "Online" ? "text-green-700" : "text-gray-700"
+                }`} />
+            </button>
+          )}
 
-        {/* Search Icon */}
-        {showSearch && (
+          {/* Search Icon */}
+          {showSearch && (
+            <button
+              onClick={handleSearchClick}
+              className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5 text-gray-700" />
+            </button>
+          )}
+
+          {/* Notifications Icon */}
+          {showNotifications && (
+            <button
+              onClick={handleNotificationsClick}
+              className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5 text-gray-700" />
+            </button>
+          )}
+
+          {/* Hamburger Menu Icon */}
           <button
-            onClick={handleSearchClick}
-            className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label="Search"
+            onClick={handleMenuClick}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Menu"
           >
-            <Search className="w-5 h-5 text-gray-700" />
+            <Menu className="w-5 h-5 text-gray-700" />
           </button>
-        )}
-
-        {/* Notifications Icon */}
-        {showNotifications && (
-          <button
-            onClick={handleNotificationsClick}
-            className="p-2 ml-1 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="w-5 h-5 text-gray-700" />
-          </button>
-        )}
-
-        {/* Hamburger Menu Icon */}
-        <button
-          onClick={handleMenuClick}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          aria-label="Menu"
-        >
-          <Menu className="w-5 h-5 text-gray-700" />
-        </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

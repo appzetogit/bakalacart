@@ -35,8 +35,23 @@ export default function SearchResults() {
   const [activeFilters, setActiveFilters] = useState(new Set())
   const [favorites, setFavorites] = useState(new Set())
   const categoryScrollRef = useRef(null)
-  const [restaurantsData, setRestaurantsData] = useState([])
-  const [loadingRestaurants, setLoadingRestaurants] = useState(true)
+
+  // Load cached restaurants from sessionStorage instantly (no loading spinner)
+  const getCachedRestaurants = () => {
+    try {
+      const cached = sessionStorage.getItem('search_restaurants_cache')
+      if (!cached) return null
+      const { data, timestamp } = JSON.parse(cached)
+      // Use cache if fresher than 5 minutes
+      if (Date.now() - timestamp < 5 * 60 * 1000) return data
+    } catch { }
+    return null
+  }
+
+  const cachedData = getCachedRestaurants()
+  const [restaurantsData, setRestaurantsData] = useState(cachedData || [])
+  const [loadingRestaurants, setLoadingRestaurants] = useState(!cachedData)
+  const [menusLoading, setMenusLoading] = useState(true) // tracks background menu fetching; always true until menus load
   const [categories, setCategories] = useState([
     { id: 'all', name: "All", image: offerImage }
   ])
@@ -126,6 +141,24 @@ export default function SearchResults() {
           }
         }
       }
+
+      // Check subsections
+      if (section.subsections && Array.isArray(section.subsections)) {
+        for (const subsection of section.subsections) {
+          if (subsection.items && Array.isArray(subsection.items)) {
+            for (const item of subsection.items) {
+              const itemNameLower = (item.name || '').toLowerCase()
+              if (keywords.some(keyword => itemNameLower.includes(keyword))) {
+                return true
+              }
+              const itemCategoryLower = (item.category || '').toLowerCase()
+              if (keywords.some(keyword => itemCategoryLower.includes(keyword))) {
+                return true
+              }
+            }
+          }
+        }
+      }
     }
 
     return false
@@ -156,6 +189,24 @@ export default function SearchResults() {
           }
         }
       }
+
+      // Check subsections
+      if (section.subsections && Array.isArray(section.subsections)) {
+        for (const subsection of section.subsections) {
+          if (subsection.items && Array.isArray(subsection.items)) {
+            for (const item of subsection.items) {
+              const itemNameLower = (item.name || '').toLowerCase()
+              const itemCategoryLower = (item.category || '').toLowerCase()
+
+              if (keywords.some(keyword =>
+                itemNameLower.includes(keyword) || itemCategoryLower.includes(keyword)
+              )) {
+                return item.name
+              }
+            }
+          }
+        }
+      }
     }
 
     return null
@@ -165,266 +216,199 @@ export default function SearchResults() {
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        setLoadingRestaurants(true)
-        console.log('🔄 Fetching restaurants from API...')
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
-        const params = {}
-        if (zoneId) {
-          params.zoneId = zoneId
+        // PERMANENT FIX: Start hydration for cached data IMMEDIATELY
+        if (cachedData && cachedData.length > 0) {
+          hydrateMenus(cachedData)
         }
-        const response = await restaurantAPI.getRestaurants(params)
 
-        console.log('📦 Full API Response:', response)
-        console.log('📦 Response Data:', response?.data)
+        // Only show loading spinner if no data at all
+        if (restaurantsData.length === 0) setLoadingRestaurants(true)
+
+        const params = {}
+        if (zoneId) params.zoneId = zoneId
+
+        const response = await restaurantAPI.getRestaurants(params)
 
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
-          console.log(`✅ Got ${restaurantsArray.length} restaurants from API`)
-
-          // Check if we have actual data or just defaults
-          if (restaurantsArray.length > 0) {
-            console.log('📋 First restaurant sample:', {
-              id: restaurantsArray[0]._id || restaurantsArray[0].restaurantId,
-              name: restaurantsArray[0].name,
-              rating: restaurantsArray[0].rating,
-              offer: restaurantsArray[0].offer,
-              featuredDish: restaurantsArray[0].featuredDish,
-              featuredPrice: restaurantsArray[0].featuredPrice,
-            })
-          }
 
           // Helper function to check if value is a default/mock value
           const isDefaultValue = (value, fieldName) => {
             if (!value) return false
-
-            // Common default values from backend model
             const defaultOffers = [
-              "Flat ₹50 OFF above ₹199",
-              "Flat 50% OFF",
-              "Flat ₹40 OFF above ₹149",
-              "Flat 200 off above 500",
-              "Flat ₹200 OFF above ₹500"
+              "Flat ₹50 OFF above ₹199", "Flat 50% OFF", "Flat ₹40 OFF above ₹149",
+              "Flat 200 off above 500", "Flat ₹200 OFF above ₹500"
             ]
             const defaultDeliveryTimes = ["25-30 mins", "20-25 mins", "30-35 mins"]
             const defaultDistances = ["1.2 km", "1 km", "0.8 km"]
             const defaultFeaturedPrice = 249
-
-            if (fieldName === 'offer' && defaultOffers.includes(value)) {
-              return true
-            }
-            if (fieldName === 'deliveryTime' && defaultDeliveryTimes.includes(value)) {
-              return true
-            }
-            if (fieldName === 'distance' && defaultDistances.includes(value)) {
-              return true
-            }
-            if (fieldName === 'featuredPrice' && value === defaultFeaturedPrice) {
-              return true
-            }
-
+            if (fieldName === 'offer' && defaultOffers.includes(value)) return true
+            if (fieldName === 'deliveryTime' && defaultDeliveryTimes.includes(value)) return true
+            if (fieldName === 'distance' && defaultDistances.includes(value)) return true
+            if (fieldName === 'featuredPrice' && value === defaultFeaturedPrice) return true
             return false
           }
 
-          // First transform restaurants without menu data - USE ONLY BACKEND DATA
-          // IMPORTANT: Filter out offline restaurants (isAcceptingOrders: false) first
-          // Then filter out restaurants with only default/mock data
           const restaurantsWithIds = restaurantsArray
             .filter((restaurant) => {
-              // First check: Only show active restaurants
-              if (restaurant.isActive === false) {
-                return false
-              }
-
-              // Second check: Only include restaurants with real data (not just defaults)
-              // At minimum, restaurant should have a name and either images or menu
+              if (restaurant.isActive === false) return false
               const hasName = restaurant.name && restaurant.name.trim().length > 0
               const hasRealImage = restaurant.profileImage?.url ||
                 (restaurant.coverImages && restaurant.coverImages.length > 0) ||
                 (restaurant.menuImages && restaurant.menuImages.length > 0)
-
               return hasName && hasRealImage
             })
             .map((restaurant) => {
-              // Use backend data directly - filter out default values
               let deliveryTime = restaurant.estimatedDeliveryTime || null
               let distance = restaurant.distance || null
               let offer = (restaurant.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(restaurant.offer.trim()))
-                ? restaurant.offer
-                : ""
+                ? restaurant.offer : ""
 
-              // No longer nulling out offers, but only showing what's in DB (after cleanup)
-              if (isDefaultValue(distance, 'distance')) {
-                distance = null
-              }
-              if (isDefaultValue(deliveryTime, 'deliveryTime')) {
-                deliveryTime = null
-              }
+              if (isDefaultValue(distance, 'distance')) distance = null
+              if (isDefaultValue(deliveryTime, 'deliveryTime')) deliveryTime = null
 
               const cuisine = restaurant.cuisines && restaurant.cuisines.length > 0
-                ? restaurant.cuisines.join(", ")
-                : null
+                ? restaurant.cuisines.join(", ") : null
 
-              // Get images from backend only
               const coverImages = restaurant.coverImages && restaurant.coverImages.length > 0
-                ? restaurant.coverImages.map(img => img.url || img).filter(Boolean)
-                : []
-
+                ? restaurant.coverImages.map(img => img.url || img).filter(Boolean) : []
               const fallbackImages = restaurant.menuImages && restaurant.menuImages.length > 0
-                ? restaurant.menuImages.map(img => img.url || img).filter(Boolean)
-                : []
-
-              // Use backend images only - no fallback placeholder
-              const allImages = coverImages.length > 0
-                ? coverImages
-                : (fallbackImages.length > 0
-                  ? fallbackImages
+                ? restaurant.menuImages.map(img => img.url || img).filter(Boolean) : []
+              const allImages = coverImages.length > 0 ? coverImages
+                : (fallbackImages.length > 0 ? fallbackImages
                   : (restaurant.profileImage?.url ? [restaurant.profileImage.url] : []))
 
-              const image = allImages[0] || null // Will be handled in UI
+              const image = allImages[0] || null
               const restaurantId = restaurant.restaurantId || restaurant._id
-
               let featuredDish = restaurant.featuredDish || null
               let featuredPrice = restaurant.featuredPrice || null
-
-              // Filter out default featured price
-              if (featuredPrice && isDefaultValue(featuredPrice, 'featuredPrice')) {
-                featuredPrice = null
-              }
+              if (featuredPrice && isDefaultValue(featuredPrice, 'featuredPrice')) featuredPrice = null
 
               return {
-                id: restaurantId,
-                name: restaurant.name,
-                cuisine: cuisine,
-                rating: restaurant.rating || null, // Use backend rating or null
-                deliveryTime: deliveryTime,
-                distance: distance,
-                image: image,
-                images: allImages,
-                priceRange: restaurant.priceRange || null,
-                featuredDish: featuredDish, // Will be set from menu if available
-                featuredPrice: featuredPrice, // Will be set from menu if available
-                offer: offer, // Use backend offer or null (defaults filtered out)
+                id: restaurantId, name: restaurant.name, cuisine: cuisine,
+                rating: restaurant.rating || null, deliveryTime: deliveryTime,
+                distance: distance, image: image, images: allImages,
+                priceRange: restaurant.priceRange || null, featuredDish: featuredDish,
+                featuredPrice: featuredPrice, offer: offer,
                 slug: restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, '-'),
-                restaurantId: restaurantId,
-                hasPaneer: false, // Will be updated after menu fetch
-                category: 'all',
+                restaurantId: restaurantId, hasPaneer: false, category: 'all',
                 isAcceptingOrders: restaurant.isAcceptingOrders !== false,
               }
             })
 
-          // Show restaurants immediately without waiting for menus
-          // Initialize restaurants with default values
-          const initialRestaurants = restaurantsWithIds.map(restaurant => ({
-            ...restaurant,
-            menu: null,
-            hasPaneer: false,
-            categoryMatches: {},
-          }))
-
-          console.log(`✅ Showing ${initialRestaurants.length} restaurants immediately`)
-          setRestaurantsData(initialRestaurants)
-
-          // Fetch menus in the background and update restaurants progressively
-          // This allows users to see results instantly while menu data loads
-          restaurantsWithIds.forEach(async (restaurant, index) => {
-            try {
-              const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId)
-              if (menuResponse.data && menuResponse.data.success && menuResponse.data.data && menuResponse.data.data.menu) {
-                const menu = menuResponse.data.data.menu
-
-                // Store menu data for dynamic filtering
-                const hasPaneer = checkCategoryInMenu(menu, 'paneer-tikka')
-
-                // Get featured dish and price from menu if not set in restaurant
-                let featuredDish = restaurant.featuredDish
-                let featuredPrice = restaurant.featuredPrice
-
-                // If featured dish/price not set, get from first available menu item
-                if (!featuredDish || !featuredPrice) {
-                  for (const section of (menu.sections || [])) {
-                    if (section.items && section.items.length > 0) {
-                      const firstItem = section.items[0]
-                      if (!featuredDish) featuredDish = firstItem.name
-                      if (!featuredPrice) {
-                        // Calculate final price considering discounts
-                        const originalPrice = firstItem.originalPrice || firstItem.price || 0
-                        const discountPercent = firstItem.discountPercent || 0
-                        featuredPrice = discountPercent > 0
-                          ? Math.round(originalPrice * (1 - discountPercent / 100))
-                          : originalPrice
-                      }
-                      break
-                    }
-                  }
-                }
-
-                // Update the specific restaurant in the state
-                setRestaurantsData(prev => {
-                  const updated = [...prev]
-                  const restaurantIndex = updated.findIndex(r => r.id === restaurant.id)
-                  if (restaurantIndex !== -1) {
-                    updated[restaurantIndex] = {
-                      ...updated[restaurantIndex],
-                      menu: menu,
-                      hasPaneer: hasPaneer,
-                      featuredDish: featuredDish || updated[restaurantIndex].featuredDish,
-                      featuredPrice: featuredPrice || updated[restaurantIndex].featuredPrice,
-                      categoryMatches: {},
-                    }
-                  }
-                  return updated
-                })
-              }
-            } catch (error) {
-              // If menu fetch fails, keep restaurant without menu data (already set)
-              console.warn(`Failed to fetch menu for restaurant ${restaurant.restaurantId}:`, error)
-            }
+          setRestaurantsData(prev => {
+            const menuMap = new Map(prev.filter(r => r.menu).map(r => [r.id, r.menu]))
+            return restaurantsWithIds.map(fresh => ({
+              ...fresh,
+              menu: menuMap.get(fresh.id) || null,
+              categoryMatches: {},
+            }))
           })
+
+          setLoadingRestaurants(false)
+
+          // Hydrate menus for the list
+          hydrateMenus(restaurantsWithIds)
+
+          // Save to sessionStorage for instant load next time
+          try {
+            sessionStorage.setItem('search_restaurants_cache', JSON.stringify({
+              data: restaurantsWithIds,
+              timestamp: Date.now()
+            }))
+          } catch { }
+
         } else {
-          console.warn('⚠️ No restaurants in API response. Response structure:', {
-            hasData: !!response.data,
-            hasSuccess: response.data?.success,
-            hasDataField: !!response.data?.data,
-            hasRestaurants: !!response.data?.data?.restaurants,
-            fullResponse: response.data
-          })
-          setRestaurantsData([])
+          if (restaurantsData.length === 0) setRestaurantsData([])
         }
       } catch (error) {
         console.error('❌ Error fetching restaurants:', error)
-        console.error('❌ Error response:', error.response?.data)
-        setRestaurantsData([])
+        if (restaurantsData.length === 0) setRestaurantsData([])
       } finally {
-        setLoadingRestaurants(false)
+        setLoadingRestaurants(false) // fallback in case of early error
       }
+
     }
 
     fetchRestaurants()
   }, [zoneId, isOutOfService])
 
+  const hydrateMenus = (restaurants) => {
+    if (!restaurants || restaurants.length === 0) {
+      setMenusLoading(false)
+      return
+    }
+
+    setMenusLoading(true)
+    let completed = 0
+
+    restaurants.forEach((restaurant) => {
+      // Check if we already have this menu in state to avoid redundant calls
+      // Use a fast check against the latest ref or state if possible, but for simplicity:
+      restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId)
+        .then(menuResponse => {
+          if (menuResponse.data?.success && menuResponse.data?.data?.menu) {
+            const menu = menuResponse.data.data.menu
+
+            setRestaurantsData(prev => prev.map(r => {
+              if (r.id !== restaurant.id || r.menu) return r
+
+              // Find featured info if missing
+              let fDish = r.featuredDish
+              let fPrice = r.featuredPrice
+              if (!fDish || !fPrice) {
+                const sections = menu.sections || []
+                for (const s of sections) {
+                  const items = [...(s.items || []), ...(s.subsections?.flatMap(ss => ss.items || []) || [])]
+                  if (items.length > 0) {
+                    fDish = fDish || items[0].name
+                    if (!fPrice) {
+                      const p = items[0].originalPrice || items[0].price || 0
+                      const d = items[0].discountPercent || 0
+                      fPrice = d > 0 ? Math.round(p * (1 - d / 100)) : p
+                    }
+                    break
+                  }
+                }
+              }
+
+              return {
+                ...r,
+                menu,
+                featuredDish: fDish || r.featuredDish,
+                featuredPrice: fPrice || r.featuredPrice,
+              }
+            }))
+          }
+        })
+        .catch(() => { })
+        .finally(() => {
+          completed++
+          if (completed >= restaurants.length) {
+            setMenusLoading(false)
+          }
+        })
+    })
+  }
+
   // Update search query when URL changes
   useEffect(() => {
     if (query) {
       setSearchQuery(query)
-      // Try to match query to a category
       const matchedCategory = categories.find(cat =>
-        cat.name.toLowerCase() === query.toLowerCase() ||
-        cat.id === query.toLowerCase().replace(/\s+/g, '-')
+        cat.slug === query.toLowerCase() ||
+        cat.id === query.toLowerCase() ||
+        cat.name.toLowerCase() === query.toLowerCase()
       )
-      if (matchedCategory) {
-        setSelectedCategory(matchedCategory.id)
-      }
+      if (matchedCategory) setSelectedCategory(matchedCategory.id)
     }
-  }, [query])
+  }, [query, categories])
 
   const toggleFilter = (filterId) => {
     setActiveFilters(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(filterId)) {
-        newSet.delete(filterId)
-      } else {
-        newSet.add(filterId)
-      }
+      if (newSet.has(filterId)) newSet.delete(filterId)
+      else newSet.add(filterId)
       return newSet
     })
   }
@@ -432,11 +416,8 @@ export default function SearchResults() {
   const toggleFavorite = (id) => {
     setFavorites(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
-      } else {
-        newSet.add(id)
-      }
+      if (newSet.has(id)) newSet.delete(id)
+      else newSet.add(id)
       return newSet
     })
   }
@@ -462,6 +443,52 @@ export default function SearchResults() {
   }
 
   // Filter restaurants based on search query, selected category, and filters
+  // Smart Search logic: checks if query match exactly or if ALL words match somewhere
+  // Smart Search logic: checks if ALL query words are found in the union of (Restaurant Info + Menu Item)
+  // Smart Match: Matches across Restaurant Info and Menu Items
+  const isMatch = (restaurant, lowerQuery, queryWords) => {
+    if (!lowerQuery) return true;
+
+    // Restaurant Context
+    const rInfo = `${restaurant.name || ""} ${restaurant.cuisine || ""} ${restaurant.featuredDish || ""} ${restaurant.offer || ""} ${restaurant.description || ""}`.toLowerCase();
+
+    // 1. Direct Restaurant Match
+    if (queryWords.every(word => rInfo.includes(word))) return true;
+
+    // 2. Menu Item Match (Cumulative)
+    if (restaurant.menu?.sections) {
+      for (const section of restaurant.menu.sections) {
+        const sInfo = `${rInfo} ${section.name || ""}`.toLowerCase();
+
+        // Check if (Resto + Section) has all words
+        if (queryWords.every(word => sInfo.includes(word))) return true;
+
+        if (section.items) {
+          for (const item of section.items) {
+            const iInfo = `${sInfo} ${item.name || ""} ${item.category || ""} ${item.description || ""}`.toLowerCase();
+            if (queryWords.every(word => iInfo.includes(word))) return true;
+          }
+        }
+
+        if (section.subsections) {
+          for (const subs of section.subsections) {
+            const ssInfo = `${sInfo} ${subs.name || ""}`.toLowerCase();
+            if (queryWords.every(word => ssInfo.includes(word))) return true;
+
+            if (subs.items) {
+              for (const item of subs.items) {
+                const siInfo = `${ssInfo} ${item.name || ""} ${item.category || ""} ${item.description || ""}`.toLowerCase();
+                if (queryWords.every(word => siInfo.includes(word))) return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  // Filter restaurants based on search query, selected category, and filters
   const filteredRecommended = useMemo(() => {
     // Use ONLY backend data - no hardcoded fallback
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
@@ -470,13 +497,8 @@ export default function SearchResults() {
     // Filter by search query
     if (query.trim()) {
       const lowerQuery = query.toLowerCase()
-      filtered = filtered.filter(r =>
-        (r.name || "").toLowerCase().includes(lowerQuery) ||
-        (r.cuisine || "").toLowerCase().includes(lowerQuery) ||
-        (r.featuredDish || "").toLowerCase().includes(lowerQuery) ||
-        (r.description || "").toLowerCase().includes(lowerQuery) ||
-        r.category === selectedCategory
-      )
+      const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 0)
+      filtered = filtered.filter(r => isMatch(r, lowerQuery, queryWords))
     }
 
     // Filter by category - Dynamic filtering based on menu items
@@ -555,35 +577,11 @@ export default function SearchResults() {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
 
-    // Filter by search query - Search in name, cuisine, featured dish
+    // Filter by search query - Smart Multi-word Match
     if (query.trim()) {
       const lowerQuery = query.toLowerCase()
-      filtered = filtered.filter(r => {
-        const nameMatch = (r.name || "").toLowerCase().includes(lowerQuery)
-        const cuisineMatch = (r.cuisine || "").toLowerCase().includes(lowerQuery)
-        const dishMatch = (r.featuredDish || "").toLowerCase().includes(lowerQuery)
-        const descriptionMatch = (r.description || "").toLowerCase().includes(lowerQuery)
-
-        // Also search in menu items if menu is available
-        let menuMatch = false
-        if (r.menu && r.menu.sections) {
-          for (const section of r.menu.sections) {
-            if (section.items) {
-              for (const item of section.items) {
-                if ((item.name || "").toLowerCase().includes(lowerQuery) ||
-                  (item.category || "").toLowerCase().includes(lowerQuery) ||
-                  (item.description || "").toLowerCase().includes(lowerQuery)) {
-                  menuMatch = true
-                  break
-                }
-              }
-            }
-            if (menuMatch) break
-          }
-        }
-
-        return nameMatch || cuisineMatch || dishMatch || descriptionMatch || menuMatch || r.category === selectedCategory
-      })
+      const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 0)
+      filtered = filtered.filter(r => isMatch(r, lowerQuery, queryWords))
     }
 
     // Filter by category - Dynamic filtering based on menu items
@@ -1004,23 +1002,38 @@ export default function SearchResults() {
             {/* Empty State */}
             {filteredAllRestaurants.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">
-                  {query
-                    ? `No restaurants found for "${query}"`
-                    : "No restaurants found with selected filters"}
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-4 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                  onClick={() => {
-                    setActiveFilters(new Set())
-                    setSearchQuery("")
-                    setSelectedCategory('all')
-                    setSearchParams({})
-                  }}
-                >
-                  Clear all filters
-                </Button>
+                {/* If menus are still loading AND there's a search query → show loading */}
+                {menusLoading && query ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">
+                      Searching menu items for &ldquo;{query}&rdquo;...
+                    </p>
+                    <p className="text-gray-400 dark:text-gray-500 text-sm">
+                      Loading menus from all restaurants, please wait
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      {query
+                        ? `No restaurants found for "${query}"`
+                        : "No restaurants found with selected filters"}
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setActiveFilters(new Set())
+                        setSearchQuery("")
+                        setSelectedCategory('all')
+                        setSearchParams({})
+                      }}
+                    >
+                      Clear all filters
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </div>
