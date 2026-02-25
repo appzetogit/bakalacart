@@ -26,9 +26,6 @@ export const initializeFirebase = async () => {
                 clientEmail: credentials.clientEmail,
                 privateKey: credentials.privateKey.replace(/\\n/g, '\n')
             };
-            if (!databaseURL) {
-                databaseURL = `https://${credentials.projectId}-default-rtdb.firebaseio.com/`;
-            }
         }
         // 2. Fallback to service account file
         else {
@@ -36,13 +33,21 @@ export const initializeFirebase = async () => {
             if (fs.existsSync(serviceAccountPath)) {
                 console.log('📦 [Firebase] Falling back to service account file.');
                 serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-                if (!databaseURL) {
-                    databaseURL = `https://${serviceAccount.project_id}-default-rtdb.firebaseio.com/`;
-                }
             }
         }
 
         if (serviceAccount) {
+            // Use the suggested URL from the warning if we know the project
+            if (!databaseURL) {
+                const projectId = serviceAccount.projectId || serviceAccount.project_id;
+                // Specifically handle the asia-southeast1 region mismatch for this project
+                if (projectId === 'bakalaa-8f5c2') {
+                    databaseURL = `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+                } else {
+                    databaseURL = `https://${projectId}-default-rtdb.firebaseio.com/`;
+                }
+            }
+
             if (!admin.apps.length) {
                 admin.initializeApp({
                     credential: admin.credential.cert(serviceAccount),
