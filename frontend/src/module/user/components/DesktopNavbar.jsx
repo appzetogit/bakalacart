@@ -109,13 +109,13 @@ export default function DesktopNavbar() {
                         fill="black"
                         strokeWidth={2}
                       />
-                      <span className="text-sm lg:text-base font-bold text-black truncate max-w-[200px] lg:max-w-[300px]">
+                      <span className="text-sm lg:text-base font-bold text-black truncate max-w-[120px] lg:max-w-[200px] block">
                         {mainLocationName}
                       </span>
                       <ChevronDown className="h-4 w-4 lg:h-5 lg:w-5 text-black flex-shrink-0" strokeWidth={2.5} />
                     </div>
                     {secondaryLocation && (
-                      <span className="text-xs lg:text-sm font-bold text-black mt-0.5 truncate max-w-[150px] lg:max-w-[250px]">
+                      <span className="text-xs lg:text-sm font-bold text-black mt-0.5 truncate max-w-[100px] lg:max-w-[150px] block">
                         {secondaryLocation}
                       </span>
                     )}

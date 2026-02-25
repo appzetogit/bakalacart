@@ -942,14 +942,14 @@ export default function PageNavbar({
                     fill={iconFill}
                     strokeWidth={2}
                   />
-                  <span className={`text-md sm:text-lg font-bold ${textColorClass} truncate max-w-[180px] sm:max-w-[300px] ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
+                  <span className={`text-md sm:text-lg font-bold ${textColorClass} truncate max-w-[120px] xs:max-w-[150px] sm:max-w-[280px] block ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
                     {mainLocationName}
                   </span>
                   <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`} strokeWidth={2.5} />
                 </div>
                 {/* Show sub location (city, state) in second line */}
                 {subLocationName && (
-                  <span className={`text-xs font-bold ${textColorClass}${textColor === "white" ? "/90" : ""} truncate max-w-[150px] sm:max-w-[250px] mt-0.5 ${textColor === "white" ? "drop-shadow-md" : ""}`}>
+                  <span className={`text-xs font-bold ${textColorClass}${textColor === "white" ? "/90" : ""} truncate max-w-[110px] xs:max-w-[140px] sm:max-w-[240px] mt-0.5 block ${textColor === "white" ? "drop-shadow-md" : ""}`}>
                     {subLocationName}
                   </span>
                 )}

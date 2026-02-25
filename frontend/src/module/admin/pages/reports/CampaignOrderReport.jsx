@@ -95,6 +95,7 @@ export default function CampaignOrderReport() {
 
   const handleFilterApply = () => {
     // Filters are already applied via useMemo
+    toast.success("Filters applied")
   }
 
   const handleResetFilters = () => {
@@ -201,22 +202,21 @@ export default function CampaignOrderReport() {
             </div>
 
             <div className="flex items-end gap-2 pt-1">
-              <button 
+              <button
                 onClick={handleResetFilters}
                 className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
               >
                 Reset
               </button>
-              <button 
+              <button
                 onClick={handleFilterApply}
-                className={`px-4 py-2 text-xs font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                  activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                }`}
+                className={`px-4 py-2 text-xs font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                  }`}
               >
                 <Filter className="w-3.5 h-3.5" />
                 Filter
                 {activeFiltersCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
                     {activeFiltersCount}
                   </span>
                 )}
@@ -353,7 +353,7 @@ export default function CampaignOrderReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >

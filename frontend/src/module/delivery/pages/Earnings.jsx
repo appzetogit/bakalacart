@@ -73,7 +73,7 @@ export default function Earnings() {
 
         // Map activeTab to backend period format
         const periodMap = {
-          'day': 'today',
+          'day': 'daily',
           'week': 'week',
           'month': 'month',
           'all': 'all'
@@ -87,9 +87,12 @@ export default function Earnings() {
           limit: 1000
         }
 
-        // For week/month, pass the selected date
+        // For week/month, pass the selected date in YYYY-MM-DD format using LOCAL time
         if (activeTab === 'week' || activeTab === 'month' || activeTab === 'day') {
-          params.date = selectedDate.toISOString()
+          const year = selectedDate.getFullYear()
+          const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+          const day = String(selectedDate.getDate()).padStart(2, '0')
+          params.date = `${year}-${month}-${day}`
         }
 
         const response = await deliveryAPI.getEarnings(params)

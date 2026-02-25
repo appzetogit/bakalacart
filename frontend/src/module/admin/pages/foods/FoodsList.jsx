@@ -29,53 +29,73 @@ export default function FoodsList() {
 
   // Filter states
   const [selectedRestaurant, setSelectedRestaurant] = useState("all")
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedFoodType, setSelectedFoodType] = useState("all")
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState("all")
   const [selectedAvailability, setSelectedAvailability] = useState("all")
 
-  // Fetch all foods from all restaurants
+  // State for categories
+  const [categories, setCategories] = useState([])
+
+  // Fetch categories for filtering
   useEffect(() => {
-    const fetchAllFoods = async () => {
+    const fetchCategories = async () => {
       try {
-        setLoading(true)
+        const response = await adminAPI.getCategories({ limit: 1000 })
+        const cats = response?.data?.data?.categories || response?.data?.categories || []
+        setCategories(cats)
+      } catch (error) {
+        console.error("Error fetching categories:", error)
+      }
+    }
+    fetchCategories()
+  }, [])
 
-        // First, fetch all restaurants
-        const restaurantsResponse = await adminAPI.getRestaurants({ limit: 1000 })
-        const restaurants = restaurantsResponse?.data?.data?.restaurants ||
-          restaurantsResponse?.data?.restaurants ||
-          []
+  // Fetch all foods from all restaurants
+  const fetchAllFoods = async () => {
+    try {
+      setLoading(true)
 
-        if (restaurants.length === 0) {
-          setFoods([])
-          setLoading(false)
-          return
-        }
+      // First, fetch all restaurants
+      const restaurantsResponse = await adminAPI.getRestaurants({ limit: 1000 })
+      const restaurants = restaurantsResponse?.data?.data?.restaurants ||
+        restaurantsResponse?.data?.restaurants ||
+        []
 
-        // Fetch menu for each restaurant and extract all food items
-        const allFoods = []
+      if (restaurants.length === 0) {
+        setFoods([])
+        setLoading(false)
+        return
+      }
 
-        for (const restaurant of restaurants) {
+      // Fetch menu for each restaurant in parallel with batching
+      const batchSize = 10
+      const allFoods = []
+
+      for (let i = 0; i < restaurants.length; i += batchSize) {
+        const batch = restaurants.slice(i, i + batchSize)
+        const batchPromises = batch.map(async (restaurant) => {
           try {
             const restaurantId = restaurant._id || restaurant.id
             const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
             const menu = menuResponse?.data?.data?.menu || menuResponse?.data?.menu
 
+            const restaurantFoods = []
             if (menu && menu.sections) {
-              // Extract items from sections and subsections
               menu.sections.forEach((section) => {
-                // Items directly in section
                 if (section.items && Array.isArray(section.items)) {
                   section.items.forEach((item) => {
-                    allFoods.push({
+                    restaurantFoods.push({
                       id: item.id || `${restaurantId}-${section.id}-${item.name}`,
                       _id: item._id,
                       name: item.name || "Unnamed Item",
                       image: item.image || item.images?.[0] || "https://via.placeholder.com/40",
-                      priority: "Normal", // Default priority
+                      priority: "Normal",
                       status: item.isAvailable !== false && item.approvalStatus !== 'rejected',
                       restaurantId: restaurantId,
                       restaurantName: restaurant.name || "Unknown Restaurant",
                       sectionName: section.name || "Unknown Section",
+                      categoryId: section.id,
                       price: item.price || 0,
                       foodType: item.foodType || "Non-Veg",
                       approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
@@ -84,27 +104,27 @@ export default function FoodsList() {
                       itemSizeUnit: item.itemSizeUnit,
                       servesInfo: item.servesInfo,
                       description: item.description,
-                      originalItem: item // Keep original item data
+                      originalItem: item
                     })
                   })
                 }
 
-                // Items in subsections
                 if (section.subsections && Array.isArray(section.subsections)) {
                   section.subsections.forEach((subsection) => {
                     if (subsection.items && Array.isArray(subsection.items)) {
                       subsection.items.forEach((item) => {
-                        allFoods.push({
+                        restaurantFoods.push({
                           id: item.id || `${restaurantId}-${section.id}-${subsection.id}-${item.name}`,
                           _id: item._id,
                           name: item.name || "Unnamed Item",
                           image: item.image || item.images?.[0] || "https://via.placeholder.com/40",
-                          priority: "Normal", // Default priority
+                          priority: "Normal",
                           status: item.isAvailable !== false && item.approvalStatus !== 'rejected',
                           restaurantId: restaurantId,
                           restaurantName: restaurant.name || "Unknown Restaurant",
                           sectionName: section.name || "Unknown Section",
                           subsectionName: subsection.name || "Unknown Subsection",
+                          categoryId: section.id,
                           price: item.price || 0,
                           foodType: item.foodType || "Non-Veg",
                           approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
@@ -113,7 +133,7 @@ export default function FoodsList() {
                           itemSizeUnit: item.itemSizeUnit,
                           servesInfo: item.servesInfo,
                           description: item.description,
-                          originalItem: item // Keep original item data
+                          originalItem: item
                         })
                       })
                     }
@@ -121,21 +141,28 @@ export default function FoodsList() {
                 }
               })
             }
+            return restaurantFoods
           } catch (err) {
             console.error(`Error fetching menu for restaurant ${restaurant.name}:`, err)
+            return []
           }
-        }
+        })
 
-        setFoods(allFoods)
-      } catch (error) {
-        console.error("Error fetching foods:", error)
-        toast.error("Failed to load foods from restaurants")
-        setFoods([])
-      } finally {
-        setLoading(false)
+        const batchResults = await Promise.all(batchPromises)
+        allFoods.push(...batchResults.flat())
       }
-    }
 
+      setFoods(allFoods)
+    } catch (error) {
+      console.error("Error fetching foods:", error)
+      toast.error("Failed to load foods from restaurants")
+      setFoods([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchAllFoods()
   }, [])
 
@@ -196,6 +223,11 @@ export default function FoodsList() {
       result = result.filter(food => food.restaurantName === selectedRestaurant)
     }
 
+    // Category filter
+    if (selectedCategory !== "all") {
+      result = result.filter(food => food.sectionName === selectedCategory || food.categoryId === selectedCategory)
+    }
+
     // Food Type filter
     if (selectedFoodType !== "all") {
       result = result.filter(food => {
@@ -238,6 +270,7 @@ export default function FoodsList() {
   // Reset all filters
   const resetFilters = () => {
     setSelectedRestaurant("all")
+    setSelectedCategory("all")
     setSelectedFoodType("all")
     setSelectedApprovalStatus("all")
     setSelectedAvailability("all")
@@ -246,6 +279,7 @@ export default function FoodsList() {
 
   // Check if any filter is active
   const hasActiveFilters = selectedRestaurant !== "all" ||
+    selectedCategory !== "all" ||
     selectedFoodType !== "all" ||
     selectedApprovalStatus !== "all" ||
     selectedAvailability !== "all" ||
@@ -431,20 +465,20 @@ export default function FoodsList() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Restaurant Filter */}
+            {/* Category Filter */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Restaurant
+                Category
               </label>
-              <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full h-9 text-sm bg-white">
-                  <SelectValue placeholder="All Restaurants" />
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Restaurants</SelectItem>
-                  {uniqueRestaurants.map((restaurant) => (
-                    <SelectItem key={restaurant} value={restaurant}>
-                      {restaurant}
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category._id || category.id} value={category.name}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

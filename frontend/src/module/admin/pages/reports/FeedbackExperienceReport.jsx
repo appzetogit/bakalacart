@@ -56,7 +56,7 @@ export default function FeedbackExperienceReport() {
 
   const filteredFeedback = useMemo(() => {
     let result = [...feedbackExperiences]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(feedback =>
@@ -154,7 +154,7 @@ export default function FeedbackExperienceReport() {
     return labels[experience] || experience
   }
 
-  const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) + 
+  const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) +
     (filters.rating ? 1 : 0) + (filters.experience ? 1 : 0) + (filters.module ? 1 : 0)
 
   return (
@@ -181,7 +181,7 @@ export default function FeedbackExperienceReport() {
               className={`w-5 h-5 text-slate-600 transition-transform ${isFilterOpen ? "rotate-180" : ""}`}
             />
           </button>
-          
+
           {isFilterOpen && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -281,16 +281,15 @@ export default function FeedbackExperienceReport() {
                   <RefreshCw className="w-4 h-4" />
                   Reset
                 </button>
-                <button 
+                <button
                   onClick={fetchFeedbackExperiences}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                    activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                  }`}
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   Filter
                   {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                       {activeFiltersCount}
                     </span>
                   )}

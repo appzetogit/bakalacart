@@ -64,7 +64,7 @@ export default function Navbar() {
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    
+
     return () => {
       window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
     }
@@ -95,18 +95,18 @@ export default function Navbar() {
               onClick={handleLocationClick}
               disabled={loading}
             >
-              {loading ? ( 
+              {loading ? (
                 <span className="text-xs sm:text-sm font-semibold text-left text-black">
                   Loading...
                 </span>
               ) : (
                 <div className="flex flex-col items-start w-full min-w-0">
-                  <span className="text-xs sm:text-sm flex flex-row items-center gap-1 font-semibold text-left text-foreground truncate w-full">
+                  <div className="text-xs sm:text-sm flex flex-row items-center gap-1 font-semibold text-left text-foreground w-full min-w-0">
                     <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-black flex-shrink-0" />
-                    {cityName}
-                  </span>
+                    <span className="truncate">{cityName}</span>
+                  </div>
                   {location?.state && (
-                    <span className="text-[10px] sm:text-xs text-black pt-1 text-left truncate w-full">
+                    <span className="text-[10px] sm:text-xs text-black pt-1 text-left truncate w-full block">
                       {stateName}
                     </span>
                   )}
@@ -140,7 +140,7 @@ export default function Navbar() {
             <Button
               variant="ghost"
 
-              
+
               size="icon"
               className="relative h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 hover:bg-gray-100"
               title={`${userPoints} Points`}

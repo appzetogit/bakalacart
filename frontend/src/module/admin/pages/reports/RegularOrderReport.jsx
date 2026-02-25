@@ -125,64 +125,64 @@ export default function RegularOrderReport() {
   }
 
   // Fetch orders from backend
-  useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const { fromDate, toDate } = getDateRange()
-        const params = {
-          page: currentPage,
-          limit: PAGE_SIZE,
-          search: searchQuery || undefined,
-          zone: filters.zone !== "All Zones" ? filters.zone : undefined,
-          restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
-          customer: filters.customer !== "All customers" ? filters.customer : undefined,
-          fromDate: fromDate ? fromDate.toISOString() : undefined,
-          toDate: toDate ? toDate.toISOString() : undefined,
-        }
-
-        const response = await adminAPI.getOrders(params, { timeout: 120000 })
-
-        if (response.data?.success) {
-          // Transform backend orders to match frontend format
-          const transformedOrders = (response.data.data.orders || []).map(order => ({
-            orderId: order.orderId,
-            restaurant: order.restaurant,
-            customerName: order.customerName,
-            totalItemAmount: order.totalItemAmount || 0,
-            itemDiscount: order.itemDiscount || 0,
-            discountedAmount: order.discountedAmount || 0,
-            couponDiscount: order.couponDiscount || 0,
-            referralDiscount: order.referralDiscount || 0,
-            vatTax: order.vatTax || 0,
-            deliveryCharge: order.deliveryCharge || 0,
-            totalAmount: order.totalAmount || 0,
-            orderStatus: order.orderStatus,
-          }))
-          setOrders(transformedOrders)
-
-          if (response.data.data.pagination) {
-            setTotalPages(response.data.data.pagination.totalPages || 1)
-            setTotalRecords(response.data.data.pagination.total || 0)
-          }
-
-          if (response.data.data.statusCounts) {
-            setStatusCounts(response.data.data.statusCounts)
-          }
-        } else {
-          setError(response.data?.message || "Failed to fetch orders")
-          toast.error(response.data?.message || "Failed to fetch orders")
-        }
-      } catch (err) {
-        console.error("Error fetching orders:", err)
-        setError(err.response?.data?.message || "Failed to fetch orders")
-        toast.error(err.response?.data?.message || "Failed to fetch orders")
-      } finally {
-        setLoading(false)
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    setError(null)
+    try {
+      const { fromDate, toDate } = getDateRange()
+      const params = {
+        page: currentPage,
+        limit: PAGE_SIZE,
+        search: searchQuery || undefined,
+        zone: filters.zone !== "All Zones" ? filters.zone : undefined,
+        restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
+        customer: filters.customer !== "All customers" ? filters.customer : undefined,
+        fromDate: fromDate ? fromDate.toISOString() : undefined,
+        toDate: toDate ? toDate.toISOString() : undefined,
       }
-    }
 
+      const response = await adminAPI.getOrders(params, { timeout: 120000 })
+
+      if (response.data?.success) {
+        // Transform backend orders to match frontend format
+        const transformedOrders = (response.data.data.orders || []).map(order => ({
+          orderId: order.orderId,
+          restaurant: order.restaurant,
+          customerName: order.customerName,
+          totalItemAmount: order.totalItemAmount || 0,
+          itemDiscount: order.itemDiscount || 0,
+          discountedAmount: order.discountedAmount || 0,
+          couponDiscount: order.couponDiscount || 0,
+          referralDiscount: order.referralDiscount || 0,
+          vatTax: order.vatTax || 0,
+          deliveryCharge: order.deliveryCharge || 0,
+          totalAmount: order.totalAmount || 0,
+          orderStatus: order.orderStatus,
+        }))
+        setOrders(transformedOrders)
+
+        if (response.data.data.pagination) {
+          setTotalPages(response.data.data.pagination.totalPages || 1)
+          setTotalRecords(response.data.data.pagination.total || 0)
+        }
+
+        if (response.data.data.statusCounts) {
+          setStatusCounts(response.data.data.statusCounts)
+        }
+      } else {
+        setError(response.data?.message || "Failed to fetch orders")
+        toast.error(response.data?.message || "Failed to fetch orders")
+      }
+    } catch (err) {
+      console.error("Error fetching orders:", err)
+      setError(err.response?.data?.message || "Failed to fetch orders")
+      toast.error(err.response?.data?.message || "Failed to fetch orders")
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchOrders()
   }, [filters, searchQuery, currentPage])
 
@@ -218,7 +218,8 @@ export default function RegularOrderReport() {
   }
 
   const handleFilterApply = () => {
-    // Filters are already applied via useMemo
+    fetchOrders()
+    toast.success("Filters applied")
   }
 
   const handleResetFilters = () => {
@@ -384,7 +385,7 @@ export default function RegularOrderReport() {
             >
               Filter
               {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
                   {activeFiltersCount}
                 </span>
               )}

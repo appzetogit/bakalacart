@@ -31,44 +31,44 @@ export default function CustomerWalletReport() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // Fetch customer wallet report data
-  useEffect(() => {
-    const fetchCustomerWalletReport = async () => {
-      try {
-        setLoading(true)
-        
-        const params = {
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          all: filters.all !== "All" ? filters.all : undefined,
-          customer: filters.customer !== "Select Customer" ? filters.customer : undefined,
-          search: searchQuery || undefined
-        }
+  const fetchCustomerWalletReport = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true)
 
-        const response = await adminAPI.getCustomerWalletReport(params)
-
-        if (response?.data?.success && response.data.data) {
-          setTransactions(response.data.data.transactions || [])
-          setWalletStats(response.data.data.stats || {
-            debit: "₹ 0.00",
-            credit: "₹ 0.00",
-            balance: "₹ 0.00"
-          })
-          setCustomers(response.data.data.customers || [])
-        } else {
-          setTransactions([])
-          if (response?.data?.message) {
-            toast.error(response.data.message)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching customer wallet report:", error)
-        toast.error("Failed to fetch customer wallet report")
-        setTransactions([])
-      } finally {
-        setLoading(false)
+      const params = {
+        fromDate: filters.fromDate || undefined,
+        toDate: filters.toDate || undefined,
+        all: filters.all !== "All" ? filters.all : undefined,
+        customer: filters.customer !== "Select Customer" ? filters.customer : undefined,
+        search: searchQuery || undefined
       }
-    }
 
+      const response = await adminAPI.getCustomerWalletReport(params)
+
+      if (response?.data?.success && response.data.data) {
+        setTransactions(response.data.data.transactions || [])
+        setWalletStats(response.data.data.stats || {
+          debit: "₹ 0.00",
+          credit: "₹ 0.00",
+          balance: "₹ 0.00"
+        })
+        setCustomers(response.data.data.customers || [])
+      } else {
+        setTransactions([])
+        if (response?.data?.message) {
+          toast.error(response.data.message)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching customer wallet report:", error)
+      toast.error("Failed to fetch customer wallet report")
+      setTransactions([])
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchCustomerWalletReport()
   }, [filters, searchQuery])
 
@@ -113,7 +113,8 @@ export default function CustomerWalletReport() {
   }
 
   const handleFilterApply = () => {
-    // Filters are already applied via useMemo
+    fetchCustomerWalletReport()
+    toast.success("Filters applied")
   }
 
   const activeFiltersCount = (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.customer !== "Select Customer" ? 1 : 0)
@@ -153,7 +154,7 @@ export default function CustomerWalletReport() {
               className={`w-5 h-5 text-slate-600 transition-transform ${isFilterOpen ? "rotate-180" : ""}`}
             />
           </button>
-          
+
           {isFilterOpen && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -233,16 +234,15 @@ export default function CustomerWalletReport() {
                   <RefreshCw className="w-4 h-4" />
                   Reset
                 </button>
-                <button 
+                <button
                   onClick={handleFilterApply}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                    activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                  }`}
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   Filter
                   {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                       {activeFiltersCount}
                     </span>
                   )}

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
+import {
   X,
   ShoppingBag,
   Users,
@@ -14,10 +14,12 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Trash2, ArrowLeft, Utensils } from "lucide-react"
+import { toast } from "sonner"
 
 export default function CartPage() {
   const navigate = useNavigate()
-  
+
   // Mock cart items - in real app, this would come from cart context/state
   const [cartItems, setCartItems] = useState([
     {
@@ -82,6 +84,31 @@ export default function CartPage() {
 
   const total = calculateTotal()
 
+  const handleClearCart = () => {
+    if (window.confirm("Are you sure you want to clear your cart?")) {
+      setCartItems([])
+      toast.info("Cart has been cleared")
+    }
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#f6e9dc] flex flex-col items-center justify-center p-4">
+        <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+          <Utensils className="h-10 w-10 text-gray-400" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">Your cart is empty</h2>
+        <p className="text-sm text-gray-600 mb-6 text-center">Add items to start a new order</p>
+        <Button
+          onClick={() => navigate('/usermain')}
+          className="bg-[#ff8100] hover:bg-[#e67300] text-white rounded-xl px-8 h-12 font-bold transition-all active:scale-95"
+        >
+          Browse Restaurants
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f6e9dc] pb-24">
       {/* Header */}
@@ -93,7 +120,14 @@ export default function CartPage() {
           >
             <X className="w-5 h-5 text-gray-800" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Cart</h1>
+          <h1 className="text-lg font-bold text-gray-900 flex-1">Cart</h1>
+          <button
+            onClick={handleClearCart}
+            className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear
+          </button>
         </div>
       </div>
 
@@ -107,8 +141,8 @@ export default function CartPage() {
             <div className="flex gap-3 p-3">
               {/* Food Image */}
               <div className="flex-shrink-0">
-                <img 
-                  src={item.image} 
+                <img
+                  src={item.image}
                   alt={item.name}
                   className="w-20 h-20 rounded-lg object-cover"
                 />
@@ -117,7 +151,7 @@ export default function CartPage() {
               {/* Food Details */}
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-bold text-gray-900 mb-2">{item.name}</h3>
-                
+
                 {/* Availability Indicators */}
                 <div className="flex items-center gap-3 mb-2">
                   <div className="flex items-center gap-1">
@@ -133,7 +167,7 @@ export default function CartPage() {
                 {/* Price and Quantity */}
                 <div className="flex items-center justify-between">
                   <span className="text-base font-bold text-gray-900">${item.price.toFixed(2)}</span>
-                  
+
                   {/* Quantity Selector */}
                   <div className="flex items-center gap-2">
                     <button
@@ -205,14 +239,14 @@ export default function CartPage() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate('/usermain')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
             <Home className="w-6 h-6" />
             <span className="text-xs text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
@@ -224,7 +258,7 @@ export default function CartPage() {
               <ChefHat className="w-6 h-6 text-gray-600" />
             </div>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/cart')}
             className="flex flex-col items-center gap-1 p-2 text-[#ff8100]"
           >

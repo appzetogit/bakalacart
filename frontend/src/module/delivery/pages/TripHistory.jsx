@@ -33,9 +33,15 @@ export default function TripHistory() {
       setError("")
 
       try {
+        // Use local date string YYYY-MM-DD instead of UTC to avoid being a day off in some timezones
+        const year = selectedDate.getFullYear()
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+        const day = String(selectedDate.getDate()).padStart(2, '0')
+        const localDateStr = `${year}-${month}-${day}`
+
         const params = {
           period: activeTab,
-          date: selectedDate.toISOString().split('T')[0],
+          date: localDateStr,
           status: selectedTripType !== "ALL TRIPS" ? selectedTripType : undefined,
           limit: 1000
         }
@@ -47,13 +53,16 @@ export default function TripHistory() {
           setTrips(tripsData)
 
           // Update store if viewing today's data and showing all trips
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          const selectedDateNormalized = new Date(selectedDate)
-          selectedDateNormalized.setHours(0, 0, 0, 0)
+          const now = new Date()
+          const todayLocalStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-          if (activeTab === "daily" && selectedDateNormalized.getTime() === today.getTime() && selectedTripType === "ALL TRIPS") {
-            updateTodayTrips(tripsData.length)
+          if (activeTab === "daily" && localDateStr === todayLocalStr && selectedTripType === "ALL TRIPS") {
+            // Update both trips and earnings in the store for the home dashboard
+            const todayEarnings = tripsData.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
+            useProgressStore.getState().updateTodayProgress({
+              trips: tripsData.length,
+              earnings: todayEarnings
+            })
           }
         } else {
           setTrips([])
@@ -253,34 +262,50 @@ export default function TripHistory() {
       </div>
 
       {/* Sticky Filter Controls */}
-      <div className="bg-white px-4 py-4 border-b border-gray-200 flex gap-3 flex-shrink-0 sticky top-[129px] z-30">
-        {/* Date/Period Selector */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowDatePicker(!showDatePicker)
-            setShowTripTypePicker(false)
-          }}
-          className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <span className="text-sm font-medium text-black">
-            {formatDateDisplay(selectedDate)}: {selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-          </span>
-          <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
-        </button>
+      <div className="bg-white px-4 py-4 border-b border-gray-200 flex flex-col gap-3 flex-shrink-0 sticky top-[129px] z-30">
+        <div className="flex gap-3">
+          {/* Date/Period Selector */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowDatePicker(!showDatePicker)
+              setShowTripTypePicker(false)
+            }}
+            className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <span className="text-sm font-medium text-black">
+              {formatDateDisplay(selectedDate)}: {selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
+          </button>
 
-        {/* Trip Type Selector */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowTripTypePicker(!showTripTypePicker)
-            setShowDatePicker(false)
-          }}
-          className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <span className="text-sm font-medium text-black">{selectedTripType}</span>
-          <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showTripTypePicker ? 'rotate-180' : ''}`} />
-        </button>
+          {/* Trip Type Selector */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowTripTypePicker(!showTripTypePicker)
+              setShowDatePicker(false)
+            }}
+            className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <span className="text-sm font-medium text-black">{selectedTripType}</span>
+            <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showTripTypePicker ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {/* Summary Stats */}
+        {!loading && !error && trips.length > 0 && (
+          <div className="flex gap-4 pt-4 border-t border-gray-100">
+            <div className="flex-1 bg-green-50 rounded-xl p-3 border border-green-100">
+              <p className="text-xs text-green-600 font-bold uppercase tracking-wider mb-1">Orders</p>
+              <p className="text-xl font-black text-gray-900">{trips.length}</p>
+            </div>
+            <div className="flex-1 bg-blue-50 rounded-xl p-3 border border-blue-100">
+              <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Earnings</p>
+              <p className="text-xl font-black text-gray-900">₹{Math.round(trips.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0))}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Date Picker Dropdown */}
@@ -368,8 +393,8 @@ export default function TripHistory() {
                     })()}
                   </div>
                   <span className={`text-sm font-medium ${trip.status === 'Completed' ? 'text-green-600' :
-                      trip.status === 'Cancelled' ? 'text-red-600' :
-                        'text-yellow-600'
+                    trip.status === 'Cancelled' ? 'text-red-600' :
+                      'text-yellow-600'
                     }`}>
                     {trip.status}
                   </span>
@@ -466,10 +491,10 @@ export default function TripHistory() {
                             )}
                           </div>
                           <span className={`text-xs font-medium px-3 py-1 rounded-full ${transaction.status === 'Completed'
-                              ? 'bg-green-100 text-green-700'
-                              : transaction.status === 'Pending'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
+                            ? 'bg-green-100 text-green-700'
+                            : transaction.status === 'Pending'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
                             }`}>
                             {transaction.status || 'Pending'}
                           </span>

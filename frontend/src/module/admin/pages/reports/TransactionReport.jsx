@@ -64,69 +64,69 @@ export default function TransactionReport() {
   }, [])
 
   // Fetch transaction report data
-  useEffect(() => {
-    const fetchTransactionReport = async () => {
-      try {
-        setLoading(true)
+  const fetchTransactionReport = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true)
 
-        // Build date range based on time filter
-        let fromDate = null
-        let toDate = null
-        const now = new Date()
+      // Build date range based on time filter
+      let fromDate = null
+      let toDate = null
+      const now = new Date()
 
-        if (filters.time === "Today") {
-          fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-        } else if (filters.time === "This Week") {
-          const dayOfWeek = now.getDay()
-          const diff = now.getDate() - dayOfWeek
-          fromDate = new Date(now.getFullYear(), now.getMonth(), diff)
-          toDate = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59)
-        } else if (filters.time === "This Month") {
-          fromDate = new Date(now.getFullYear(), now.getMonth(), 1)
-          toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-        }
-
-        const params = {
-          search: searchQuery || undefined,
-          zone: filters.zone !== "All Zones" ? filters.zone : undefined,
-          restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
-          fromDate: fromDate ? fromDate.toISOString() : undefined,
-          toDate: toDate ? toDate.toISOString() : undefined,
-          page: currentPage,
-          limit: PAGE_SIZE
-        }
-
-        const response = await adminAPI.getTransactionReport(params)
-
-        if (response?.data?.success && response.data.data) {
-          setTransactions(response.data.data.transactions || [])
-          setSummary(response.data.data.summary || {
-            completedTransaction: 0,
-            refundedTransaction: 0,
-            adminEarning: 0,
-            restaurantEarning: 0,
-            deliverymanEarning: 0
-          })
-          if (response.data.data.pagination) {
-            setTotalPages(response.data.data.pagination.totalPages || 1)
-            setTotalRecords(response.data.data.pagination.total || 0)
-          }
-        } else {
-          setTransactions([])
-          if (response?.data?.message) {
-            toast.error(response.data.message)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching transaction report:", error)
-        toast.error("Failed to fetch transaction report")
-        setTransactions([])
-      } finally {
-        setLoading(false)
+      if (filters.time === "Today") {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+      } else if (filters.time === "This Week") {
+        const dayOfWeek = now.getDay()
+        const diff = now.getDate() - dayOfWeek
+        fromDate = new Date(now.getFullYear(), now.getMonth(), diff)
+        toDate = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59)
+      } else if (filters.time === "This Month") {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
       }
-    }
 
+      const params = {
+        search: searchQuery || undefined,
+        zone: filters.zone !== "All Zones" ? filters.zone : undefined,
+        restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
+        fromDate: fromDate ? fromDate.toISOString() : undefined,
+        toDate: toDate ? toDate.toISOString() : undefined,
+        page: currentPage,
+        limit: PAGE_SIZE
+      }
+
+      const response = await adminAPI.getTransactionReport(params)
+
+      if (response?.data?.success && response.data.data) {
+        setTransactions(response.data.data.transactions || [])
+        setSummary(response.data.data.summary || {
+          completedTransaction: 0,
+          refundedTransaction: 0,
+          adminEarning: 0,
+          restaurantEarning: 0,
+          deliverymanEarning: 0
+        })
+        if (response.data.data.pagination) {
+          setTotalPages(response.data.data.pagination.totalPages || 1)
+          setTotalRecords(response.data.data.pagination.total || 0)
+        }
+      } else {
+        setTransactions([])
+        if (response?.data?.message) {
+          toast.error(response.data.message)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching transaction report:", error)
+      toast.error("Failed to fetch transaction report")
+      setTransactions([])
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchTransactionReport()
   }, [searchQuery, filters, currentPage])
 
@@ -148,7 +148,8 @@ export default function TransactionReport() {
   }
 
   const handleFilterApply = () => {
-    // Filters are already applied via useMemo
+    fetchTransactionReport()
+    toast.success("Filters applied")
   }
 
   const handleResetFilters = () => {
@@ -249,7 +250,7 @@ export default function TransactionReport() {
             >
               Filter
               {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
                   {activeFiltersCount}
                 </span>
               )}
@@ -459,8 +460,8 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className={`text-[10px] truncate block ${transaction.customerName === "Invalid Customer Data"
-                            ? "text-red-600 font-semibold"
-                            : "text-slate-700"
+                          ? "text-red-600 font-semibold"
+                          : "text-slate-700"
                           }`}>
                           {transaction.customerName}
                         </span>
@@ -533,8 +534,8 @@ export default function TransactionReport() {
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
                       className={`w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-medium transition-all ${currentPage === pageNum
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-slate-50 border border-slate-200"
                         }`}
                     >
                       {pageNum}

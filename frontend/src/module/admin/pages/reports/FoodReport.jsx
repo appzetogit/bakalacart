@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react"
-import { Search, Download, ChevronDown, Filter, UtensilsCrossed, Settings, ArrowUpDown, Star, BarChart3, FileText, FileSpreadsheet, Code } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { Search, Download, ChevronDown, Filter, UtensilsCrossed, Settings, ArrowUpDown, Star, BarChart3, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
+import { adminAPI, restaurantAPI } from "@/lib/api"
+import { toast } from "sonner"
 // Dummy data removed - using empty arrays and default data
 const yearlySalesData = {
   averageYearlySales: 0,
@@ -20,11 +22,105 @@ export default function FoodReport() {
     time: "All Time",
   })
 
+  const [loading, setLoading] = useState(true)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [restaurants, setRestaurants] = useState([])
+  const [categories, setCategories] = useState([])
+  const [zones, setZones] = useState([])
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [zonesRes, restaurantsRes, categoriesRes] = await Promise.all([
+          adminAPI.getZones({ limit: 100 }),
+          adminAPI.getRestaurants({ limit: 1000 }),
+          adminAPI.getCategories({ limit: 1000 })
+        ])
+
+        setZones(zonesRes?.data?.data?.zones || [])
+        setRestaurants(restaurantsRes?.data?.data?.restaurants || [])
+        setCategories(categoriesRes?.data?.data?.categories || [])
+      } catch (error) {
+        console.error("Error fetching initial data:", error)
+      }
+    }
+    fetchInitialData()
+  }, [])
+
+  const fetchFoods = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true)
+
+      const resList = restaurants.length > 0 ? restaurants : (await adminAPI.getRestaurants({ limit: 1000 }))?.data?.data?.restaurants || []
+
+      const batchSize = 15
+      const allFoods = []
+
+      for (let i = 0; i < resList.length; i += batchSize) {
+        const batch = resList.slice(i, i + batchSize)
+        const batchPromises = batch.map(async (restaurant) => {
+          try {
+            const restaurantId = restaurant._id || restaurant.id
+            const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
+            const menu = menuResponse?.data?.data?.menu || menuResponse?.data?.menu
+
+            const restaurantFoods = []
+            if (menu && menu.sections) {
+              menu.sections.forEach((section, sIdx) => {
+                if (section.items) {
+                  section.items.forEach((item, iIdx) => {
+                    restaurantFoods.push({
+                      sl: allFoods.length + restaurantFoods.length + 1,
+                      name: item.name,
+                      image: item.image || item.images?.[0] || "https://via.placeholder.com/40",
+                      restaurant: restaurant.name,
+                      restaurantId: restaurantId,
+                      zone: restaurant.zone?.name || "Unknown",
+                      category: section.name,
+                      type: item.foodType || "Non-Veg",
+                      orderCount: item.orderCount || 0,
+                      price: `₹${item.price || 0}`,
+                      priceNum: item.price || 0,
+                      totalAmountSold: `₹${(item.price || 0) * (item.orderCount || 0)}`,
+                      totalDiscountGiven: "₹0",
+                      averageSaleValue: `₹${item.price || 0}`,
+                      averageRatings: item.rating || 0,
+                      reviews: item.reviewsCount || 0
+                    })
+                  })
+                }
+              })
+            }
+            return restaurantFoods
+          } catch (err) {
+            return []
+          }
+        })
+        const results = await Promise.all(batchPromises)
+        allFoods.push(...results.flat())
+      }
+
+      // Update SL numbers
+      const finalFoods = allFoods.map((f, idx) => ({ ...f, sl: idx + 1 }))
+      setFoods(finalFoods)
+    } catch (error) {
+      console.error("Error fetching foods:", error)
+      toast.error("Failed to load food report data")
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (restaurants.length > 0) {
+      fetchFoods(true)
+    }
+  }, [restaurants])
 
   const filteredFoods = useMemo(() => {
     let result = [...foods]
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(food =>
@@ -34,7 +130,7 @@ export default function FoodReport() {
     }
 
     if (filters.zone !== "All Zones") {
-      // Filter by zone if needed
+      result = result.filter(f => f.zone === filters.zone)
     }
 
     if (filters.restaurant !== "All restaurants") {
@@ -42,11 +138,11 @@ export default function FoodReport() {
     }
 
     if (filters.category !== "All Categories") {
-      // Filter by category if needed
+      result = result.filter(f => f.category === filters.category)
     }
 
     if (filters.type !== "All types") {
-      // Filter by type if needed
+      result = result.filter(f => f.type.toLowerCase() === filters.type.toLowerCase())
     }
 
     return result
@@ -79,7 +175,8 @@ export default function FoodReport() {
   }
 
   const handleFilterApply = () => {
-    // Filters are already applied via useMemo
+    toast.success("Filters applied")
+    fetchFoods(false) // Refresh data
   }
 
   const handleResetFilters = () => {
@@ -129,9 +226,9 @@ export default function FoodReport() {
                   className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="All Zones">All Zones</option>
-                  <option value="Zone 1">Zone 1</option>
-                  <option value="Zone 2">Zone 2</option>
-                  <option value="Zone 3">Zone 3</option>
+                  {zones.map(z => (
+                    <option key={z._id} value={z.name}>{z.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
@@ -146,9 +243,9 @@ export default function FoodReport() {
                   className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="All restaurants">All restaurants</option>
-                  <option value="Hungry Puppets">Hungry Puppets</option>
-                  <option value="Café Monarch">Café Monarch</option>
-                  <option value="Redcliff Cafe">Redcliff Cafe</option>
+                  {restaurants.map(r => (
+                    <option key={r._id} value={r.name}>{r.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
@@ -163,9 +260,9 @@ export default function FoodReport() {
                   className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="All Categories">All Categories</option>
-                  <option value="Pizza">Pizza</option>
-                  <option value="Burger">Burger</option>
-                  <option value="Dessert">Dessert</option>
+                  {categories.map(c => (
+                    <option key={c._id} value={c.name}>{c.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
@@ -207,22 +304,21 @@ export default function FoodReport() {
               </div>
 
               <div className="flex items-end gap-2">
-                <button 
+                <button
                   onClick={handleResetFilters}
                   className="px-6 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
                 >
                   Reset
                 </button>
-                <button 
+                <button
                   onClick={handleFilterApply}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                    activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
-                  }`}
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   Filter
                   {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                       {activeFiltersCount}
                     </span>
                   )}
@@ -248,7 +344,7 @@ export default function FoodReport() {
               </button>
             </div>
           </div>
-          
+
           {/* Bar Chart */}
           <div className="relative pl-12 pb-8">
             {/* Y-axis labels */}
@@ -259,12 +355,12 @@ export default function FoodReport() {
               <span>16000</span>
               <span>0</span>
             </div>
-            
+
             {/* Y-axis label */}
             <div className="absolute -left-10 top-1/2 -translate-y-1/2 -rotate-90 text-xs text-slate-600 whitespace-nowrap">
               $(Currency)
             </div>
-            
+
             {/* Chart Area */}
             <div className="relative">
               {/* Grid lines */}
@@ -273,7 +369,7 @@ export default function FoodReport() {
                   <div key={i} className="border-t border-slate-200"></div>
                 ))}
               </div>
-              
+
               {/* Bars */}
               <div className="flex items-end justify-between gap-4 h-64 relative z-10">
                 {yearlySalesData.chartData.map((data) => {
@@ -283,8 +379,8 @@ export default function FoodReport() {
                       <div className="w-full flex items-end justify-center h-full">
                         <div
                           className="w-5 bg-blue-400 rounded-t transition-all hover:bg-blue-500"
-                          style={{ 
-                            height: `${height}px`, 
+                          style={{
+                            height: `${height}px`,
                             minHeight: height > 0 ? '4px' : '0'
                           }}
                           title={`${data.year}: $${data.amount.toLocaleString()}`}
@@ -294,7 +390,7 @@ export default function FoodReport() {
                   )
                 })}
               </div>
-              
+
               {/* X-axis labels */}
               <div className="flex justify-between gap-4 mt-2">
                 {yearlySalesData.chartData.map((data) => (
@@ -305,7 +401,7 @@ export default function FoodReport() {
               </div>
             </div>
           </div>
-          
+
           {/* Legend */}
           <div className="flex items-center gap-2 mt-6">
             <div className="w-4 h-4 bg-blue-400 rounded"></div>
@@ -359,7 +455,7 @@ export default function FoodReport() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button 
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-all"
               >

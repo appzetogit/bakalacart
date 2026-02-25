@@ -39,44 +39,44 @@ export default function RestaurantReport() {
   }, [])
 
   // Fetch restaurant report data
-  useEffect(() => {
-    const fetchRestaurantReport = async () => {
-      try {
-        setLoading(true)
+  const fetchRestaurantReport = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true)
 
-        const params = {
-          zone: filters.zone !== "All Zones" ? filters.zone : undefined,
-          all: filters.all !== "All" ? filters.all : undefined,
-          type: filters.type !== "All types" ? filters.type : undefined,
-          time: filters.time !== "All Time" ? filters.time : undefined,
-          search: searchQuery || undefined,
-          page: currentPage,
-          limit: PAGE_SIZE
-        }
-
-        const response = await adminAPI.getRestaurantReport(params)
-
-        if (response?.data?.success && response.data.data) {
-          setRestaurants(response.data.data.restaurants || [])
-          if (response.data.data.pagination) {
-            setTotalPages(response.data.data.pagination.totalPages || 1)
-            setTotalRecords(response.data.data.pagination.total || 0)
-          }
-        } else {
-          setRestaurants([])
-          if (response?.data?.message) {
-            toast.error(response.data.message)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching restaurant report:", error)
-        toast.error("Failed to fetch restaurant report")
-        setRestaurants([])
-      } finally {
-        setLoading(false)
+      const params = {
+        zone: filters.zone !== "All Zones" ? filters.zone : undefined,
+        all: filters.all !== "All" ? filters.all : undefined,
+        type: filters.type !== "All types" ? filters.type : undefined,
+        time: filters.time !== "All Time" ? filters.time : undefined,
+        search: searchQuery || undefined,
+        page: currentPage,
+        limit: PAGE_SIZE
       }
-    }
 
+      const response = await adminAPI.getRestaurantReport(params)
+
+      if (response?.data?.success && response.data.data) {
+        setRestaurants(response.data.data.restaurants || [])
+        if (response.data.data.pagination) {
+          setTotalPages(response.data.data.pagination.totalPages || 1)
+          setTotalRecords(response.data.data.pagination.total || 0)
+        }
+      } else {
+        setRestaurants([])
+        if (response?.data?.message) {
+          toast.error(response.data.message)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching restaurant report:", error)
+      toast.error("Failed to fetch restaurant report")
+      setRestaurants([])
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchRestaurantReport()
   }, [filters, searchQuery, currentPage])
 
@@ -122,7 +122,8 @@ export default function RestaurantReport() {
   }
 
   const handleFilterApply = () => {
-    // Filters are already applied via useMemo
+    fetchRestaurantReport()
+    toast.success("Filters applied")
   }
 
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.type !== "All types" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
@@ -249,7 +250,7 @@ export default function RestaurantReport() {
                 <Filter className="w-4 h-4" />
                 Filter
                 {activeFiltersCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                     {activeFiltersCount}
                   </span>
                 )}

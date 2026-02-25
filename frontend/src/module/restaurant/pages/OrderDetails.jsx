@@ -69,7 +69,8 @@ export default function OrderDetails() {
               itemSizeQuantity: item.itemSizeQuantity,
               itemSizeUnit: item.itemSizeUnit,
               unit: item.unit,
-              description: item.description
+              description: item.description,
+              variation: item.variation
             })) || [],
             billing: {
               itemSubtotal: order.pricing?.subtotal || 0,
@@ -640,8 +641,8 @@ export default function OrderDetails() {
                   <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-blue-800 font-bold uppercase tracking-wider mb-1">IMPORTANT: Customer Instructions</p>
-                  <p className="text-sm text-gray-900 font-medium italic leading-relaxed bg-white/50 p-2 rounded border border-blue-100">
+                  <p className="text-sm text-blue-800 font-bold uppercase tracking-wider mb-1">IMPORTANT: Customer Instructions</p>
+                  <p className="text-base text-gray-900 font-semibold italic leading-relaxed bg-white/50 p-3 rounded-lg border border-blue-100">
                     "{orderData.customer.note}"
                   </p>
                 </div>
@@ -671,16 +672,16 @@ export default function OrderDetails() {
               <table className="w-full text-left border-collapse min-w-[300px]">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="py-3 px-4 text-sm font-bold text-gray-700 w-16">Qty</th>
-                    <th className="py-3 px-4 text-sm font-bold text-gray-700">Item Details</th>
-                    <th className="py-3 px-4 text-sm font-bold text-gray-700 text-right w-24">Price</th>
+                    <th className="py-4 px-4 text-base font-black text-gray-800 w-20">Qty</th>
+                    <th className="py-4 px-4 text-base font-black text-gray-800">Item Details</th>
+                    <th className="py-4 px-4 text-base font-black text-gray-800 text-right w-28">Price</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {orderData.items.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50 transition-colors bg-white">
-                      <td className="py-4 px-4 align-top w-16">
-                        <span className="text-base font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded inline-block whitespace-nowrap">{item.quantity} x</span>
+                      <td className="py-4 px-4 align-top w-20">
+                        <span className="text-lg font-bold text-gray-900 bg-gray-100 px-3 py-1.5 rounded inline-block whitespace-nowrap">{item.quantity} x</span>
                       </td>
                       <td className="py-4 px-4 align-top">
                         <div className="flex flex-col gap-1.5">
@@ -688,7 +689,7 @@ export default function OrderDetails() {
                             <div className={`w-4 h-4 mt-1 rounded-sm border flex items-center justify-center shrink-0 ${item.type === 'Non-Veg' ? 'border-red-500 bg-red-50' : 'border-green-500 bg-green-50'}`}>
                               <div className={`w-2 h-2 rounded-full ${item.type === 'Non-Veg' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                             </div>
-                            <span className="text-base font-bold text-gray-900 leading-tight">
+                            <span className="text-lg font-bold text-gray-900 leading-tight">
                               {item.name}
                             </span>
                           </div>
@@ -698,15 +699,21 @@ export default function OrderDetails() {
                             const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
                             const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
                             return displayParts.length > 0 ? (
-                              <span className="text-sm font-bold text-[#ff8100] ml-6 block mt-0.5">
+                              <span className="text-base font-bold text-[#ff8100] ml-6 block mt-0.5">
                                 ({displayParts.join(' ')})
                               </span>
                             ) : null
                           })()}
 
+                          {item.variation && (
+                            <span className="text-sm font-semibold text-gray-600 ml-6 block mt-0.5">
+                              {item.variation}
+                            </span>
+                          )}
+
                           {item.description && (
-                            <div className="ml-6 mt-1.5 p-2.5 bg-blue-50/50 rounded-md border border-blue-100 border-l-2 border-l-blue-400">
-                              <p className="text-sm text-gray-800 font-medium whitespace-pre-wrap">
+                            <div className="ml-6 mt-1.5 p-3 bg-blue-50/50 rounded-lg border border-blue-100 border-l-4 border-l-blue-500">
+                              <p className="text-base text-gray-800 font-semibold whitespace-pre-wrap">
                                 <span className="font-bold text-gray-900">Note: </span>
                                 {item.description}
                               </p>
@@ -714,8 +721,8 @@ export default function OrderDetails() {
                           )}
                         </div>
                       </td>
-                      <td className="py-4 px-4 align-top text-right w-24">
-                        <span className="text-base font-bold text-gray-900">₹{item.price}</span>
+                      <td className="py-4 px-4 align-top text-right w-28">
+                        <span className="text-lg font-bold text-gray-900">₹{item.price}</span>
                       </td>
                     </tr>
                   ))}
@@ -731,17 +738,17 @@ export default function OrderDetails() {
 
           <div className="bg-white  rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-600">Item subtotal</span>
-              <span className="text-sm text-gray-900">₹{orderData.billing.itemSubtotal}</span>
+              <span className="text-base text-gray-600">Item subtotal</span>
+              <span className="text-base font-medium text-gray-900">₹{orderData.billing.itemSubtotal}</span>
             </div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-600">Taxes</span>
-              <span className="text-sm text-gray-900">₹{orderData.billing.taxes}</span>
+              <span className="text-base text-gray-600">Taxes</span>
+              <span className="text-base font-medium text-gray-900">₹{orderData.billing.taxes}</span>
             </div>
-            <div className="my-3"></div>
+            <div className="my-3 border-t border-dashed border-gray-200"></div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">Total bill</span>
-              <span className="text-sm font-semibold text-gray-900">₹{orderData.billing.total}</span>
+              <span className="text-xl font-bold text-gray-900">Total bill</span>
+              <span className="text-2xl font-black text-[#ff8100]">₹{orderData.billing.total}</span>
             </div>
           </div>
         </div>

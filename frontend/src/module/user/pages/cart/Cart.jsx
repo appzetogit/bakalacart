@@ -1482,7 +1482,7 @@ export default function Cart() {
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">Your cart is empty</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Add items from a restaurant to start a new order</p>
           <Button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/restaurants')}
             className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 h-12 font-semibold shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
           >
             Browse Restaurants
@@ -1871,8 +1871,8 @@ export default function Cart() {
                             key={address.id || address._id}
                             onClick={() => handleSelectAddress(address)}
                             className={`flex-shrink-0 w-[240px] md:w-[280px] p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${isSelected
-                                ? 'border-red-600 bg-red-50/10 dark:bg-red-900/10 shadow-md'
-                                : 'border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 hover:border-gray-200 dark:hover:border-gray-700'
+                              ? 'border-red-600 bg-red-50/10 dark:bg-red-900/10 shadow-md'
+                              : 'border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 hover:border-gray-200 dark:hover:border-gray-700'
                               }`}
                           >
                             <div className="flex items-start justify-between mb-2">
