@@ -778,10 +778,6 @@ export default function Cart() {
       const longitude = coordinates[0]
       const latitude = coordinates[1]
 
-      if (!latitude || !longitude) {
-        console.warn(`Selected address is missing coordinates, attempting to use address string only`);
-      }
-
       // Format location data
       const street = address.street || ""
       const city = address.city || ""
@@ -793,19 +789,7 @@ export default function Cart() {
         ? `${area}, ${street}, ${city}, ${state}, ${zipCode}`
         : `${street}, ${city}, ${state}, ${zipCode}`
 
-      // Update location in backend
-      await userAPI.updateLocation({
-        latitude,
-        longitude,
-        address: `${street}, ${city}`,
-        city,
-        state,
-        area,
-        zipCode,
-        formattedAddress: formattedAddr
-      })
-
-      // Update the location in localStorage
+      // Create local location data object
       const locationData = {
         city,
         state,
@@ -820,10 +804,30 @@ export default function Cart() {
         isManual: true,
         timestamp: Date.now()
       }
-      localStorage.setItem("userLocation", JSON.stringify(locationData))
 
-      toast.success(`Address selected!`)
+      // --- OPTIMISTIC UI: Update local state INSTANTLY ---
+      // This removes the "Lag" or "Loading" feeling
+      localStorage.setItem("userLocation", JSON.stringify(locationData))
       updateLocation(locationData)
+      toast.success(`Address selected!`)
+
+      // --- BACKGROUND SYNC: Update backend without blocking UI ---
+      // We don't await this to keep the UI snappy
+      userAPI.updateLocation({
+        latitude,
+        longitude,
+        address: `${street}, ${city}`,
+        city,
+        state,
+        area,
+        zipCode,
+        formattedAddress: formattedAddr
+      }).catch(err => {
+        console.warn("⚠️ Background location update failed:", err.message)
+        // We don't show an error toast here to avoid confusing the user
+        // since the local state is already set and consistent.
+      });
+
     } catch (error) {
       console.error(`Error selecting address:`, error)
       toast.error(`Failed to select address. Please try again.`)
@@ -1146,7 +1150,7 @@ export default function Cart() {
         deliveryFleet: deliveryFleet || 'standard',
         note: note || "",
         sendCutlery: sendCutlery !== false,
-        deliveryAddressDetails: manualAddressDetails.trim(),
+        deliveryAddressDetails: (defaultAddress?.additionalDetails || defaultAddress?.address || "").trim(),
         paymentMethod: finalPaymentMethod,
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
