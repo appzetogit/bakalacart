@@ -37,15 +37,17 @@ export const initializeFirebase = async () => {
         }
 
         if (serviceAccount) {
-            // Use the suggested URL from the warning if we know the project
-            if (!databaseURL) {
-                const projectId = serviceAccount.projectId || serviceAccount.project_id;
-                // Specifically handle the asia-southeast1 region mismatch for this project
-                if (projectId === 'bakalaa-8f5c2') {
+            const projectId = serviceAccount.projectId || serviceAccount.project_id;
+
+            // Specifically handle the asia-southeast1 region mismatch for this project
+            // Force override if it's the wrong URL or if no URL is provided
+            if (projectId === 'bakalaa-8f5c2') {
+                if (!databaseURL || databaseURL.includes('firebaseio.com')) {
+                    console.log('🔧 [Firebase] Correcting Database URL to asia-southeast1 region');
                     databaseURL = `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
-                } else {
-                    databaseURL = `https://${projectId}-default-rtdb.firebaseio.com/`;
                 }
+            } else if (!databaseURL) {
+                databaseURL = `https://${projectId}-default-rtdb.firebaseio.com/`;
             }
 
             if (!admin.apps.length) {
