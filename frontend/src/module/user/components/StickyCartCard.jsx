@@ -41,7 +41,7 @@ export default function StickyCartCard() {
   // Get restaurant info from first cart item or use default
   const restaurantName = cart[0]?.restaurant || "Restaurant"
   const restaurantImage = cart[0]?.image || "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=200&h=200&fit=crop"
-  
+
   // Create restaurant slug from restaurant name
   const restaurantSlug = restaurantName.toLowerCase().replace(/\s+/g, "-")
 
@@ -98,8 +98,8 @@ export default function StickyCartCard() {
               <div className="flex items-center gap-3 p-3 md:p-4">
                 {/* Restaurant Image */}
                 <div className="flex-shrink-0">
-                  <img 
-                    src={restaurantImage} 
+                  <img
+                    src={restaurantImage}
                     alt={restaurantName}
                     className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover"
                     style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
@@ -107,7 +107,7 @@ export default function StickyCartCard() {
                 </div>
 
                 {/* Restaurant Info */}
-                <Link to={`/user/restaurants/${restaurantSlug}`} className="flex-1 min-w-0">
+                <Link to={`/restaurants/${restaurantSlug}`} className="flex-1 min-w-0">
                   <h3 className="font-bold text-gray-900 dark:text-gray-200 text-base md:text-lg mb-0.5 line-clamp-1">
                     {restaurantName}
                   </h3>
@@ -118,8 +118,8 @@ export default function StickyCartCard() {
                 </Link>
 
                 {/* View Cart Button */}
-                <Link 
-                  to="/user/cart"
+                <Link
+                  to="/cart"
                   className="flex-shrink-0 bg-green-600 dark:bg-green-700 hover:bg-green-700 text-white px-4 py-2.5 md:px-5 md:py-3 rounded-lg font-semibold transition-colors"
                 >
                   <div className="text-center">

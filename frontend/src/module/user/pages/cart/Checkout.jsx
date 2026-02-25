@@ -165,7 +165,7 @@ export default function Checkout() {
       <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
         <ScrollReveal>
           <div className="flex items-center gap-4 mb-6 md:mb-8">
-            <Link to="/user/cart">
+            <Link to="/cart">
               <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 md:h-10 md:w-10">
                 <ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
               </Button>

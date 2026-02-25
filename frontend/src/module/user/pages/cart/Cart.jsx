@@ -57,40 +57,7 @@ const formatFullAddress = (address) => {
   return ""
 }
 
-/**
- * Derive delivery address details string that backend expects (non-empty),
- * based on the selected/default address object.
- * This keeps deliveryAddressDetails fully dynamic & in sync with DB addresses.
- */
-const deriveDeliveryAddressDetails = (address) => {
-  if (!address) return ""
 
-  // Priority 1: If we have explicit additionalDetails/area + street, prefer that combo
-  const detail = address.additionalDetails || address.area
-  const street = address.street || address.address
-
-  if (detail && street && street !== detail && !street.includes(detail) && !detail.includes(street)) {
-    return `${detail}, ${street}`
-  }
-
-  // Priority 2: Use formattedAddress if available and meaningful
-  if (address.formattedAddress && address.formattedAddress !== "Select location") {
-    return address.formattedAddress
-  }
-
-  // Fallback: build from parts
-  const parts = []
-  if (address.street) parts.push(address.street)
-  if (address.city) parts.push(address.city)
-  if (address.state) parts.push(address.state)
-  if (address.zipCode) parts.push(address.zipCode)
-
-  if (parts.length > 0) {
-    return parts.join(", ")
-  }
-
-  return address.address || address.formattedAddress || ""
-}
 
 export default function Cart() {
   const navigate = useNavigate()
@@ -136,7 +103,6 @@ export default function Cart() {
   const [note, setNote] = useState("")
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [sendCutlery, setSendCutlery] = useState(true)
-  const [manualAddressDetails, setManualAddressDetails] = useState("")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [showBillDetails, setShowBillDetails] = useState(false)
   const [showPlacingOrder, setShowPlacingOrder] = useState(false)
@@ -220,14 +186,7 @@ export default function Cart() {
     return defaultAddress.label || null;
   }, [defaultAddress]);
 
-  // Keep delivery address details in sync with the active/default address.
-  useEffect(() => {
-    if (!defaultAddress) return
 
-    // Sync manualAddressDetails with the derived address string whenever defaultAddress changes
-    const autoDetails = deriveDeliveryAddressDetails(defaultAddress)
-    setManualAddressDetails(autoDetails || "")
-  }, [defaultAddress])
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
@@ -820,8 +779,7 @@ export default function Cart() {
       const latitude = coordinates[1]
 
       if (!latitude || !longitude) {
-        toast.error(`Invalid coordinates for the selected address`)
-        return
+        console.warn(`Selected address is missing coordinates, attempting to use address string only`);
       }
 
       // Format location data
@@ -863,12 +821,6 @@ export default function Cart() {
         timestamp: Date.now()
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
-
-      // Sync details
-      const derivedDetails = deriveDeliveryAddressDetails(address)
-      if (derivedDetails) {
-        setManualAddressDetails(derivedDetails)
-      }
 
       toast.success(`Address selected!`)
       updateLocation(locationData)
@@ -962,10 +914,7 @@ export default function Cart() {
       return
     }
 
-    if (!manualAddressDetails.trim()) {
-      alert("Please enter additional address details")
-      return
-    }
+
 
     if (cart.length === 0) {
       alert("Your cart is empty")
@@ -1499,11 +1448,14 @@ export default function Cart() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between px-3 md:px-6 py-2 md:py-3">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Link onClick={() => navigate(-1)}>
-                <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0">
-                  <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 md:h-8 md:w-8 flex-shrink-0"
+                onClick={() => navigate(-1)}
+              >
+                <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+              </Button>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">{restaurantName}</p>
@@ -1631,7 +1583,13 @@ export default function Cart() {
 
                 {/* Add more items */}
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => {
+                    if (restaurantData?.slug) {
+                      navigate(`/restaurants/${restaurantData.slug}`);
+                    } else {
+                      navigate(-1);
+                    }
+                  }}
                   className="flex items-center gap-2 mt-4 md:mt-6 text-red-600 dark:text-red-400"
                 >
                   <Plus className="h-4 w-4 md:h-5 md:w-5" />
@@ -1907,27 +1865,7 @@ export default function Cart() {
                   )}
                 </div>
 
-                {/* Specific Address Input - Fixing the "Missing" Input */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-1 px-1">
-                    <Sparkles className="h-4 w-4 text-red-600" />
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Additional Information</span>
-                  </div>
-                  <div className="relative group">
-                    <textarea
-                      value={manualAddressDetails}
-                      onChange={(e) => setManualAddressDetails(e.target.value)}
-                      placeholder="Enter Flat No, Floor, House Name, etc. (Required)"
-                      className="w-full bg-gray-50/30 dark:bg-gray-900/30 border-2 border-gray-100 dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-red-600 dark:focus:border-red-500 transition-all min-h-[90px] resize-none text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
-                    />
-                    <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-400 group-focus-within:text-red-500">
-                      {manualAddressDetails?.length || 0} characters
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-gray-400 px-1">
-                    * This helps our delivery partners find your location easily
-                  </p>
-                </div>
+
               </div>
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
@@ -2071,11 +2009,8 @@ export default function Cart() {
                 onClick={() => {
                   if (isPlacingOrder) return
 
-                  // Check if an address is selected from the saved addresses list
-                  const isAddressSelected = addresses?.some(addr =>
-                    (currentLocation?.id && (addr._id === currentLocation.id || addr.id === currentLocation.id)) ||
-                    (currentLocation?.addressId && (addr._id === currentLocation.addressId || addr.id === currentLocation.addressId))
-                  );
+                  // Check if an address is selected (either from saved list or current location)
+                  const isAddressSelected = !!defaultAddress && (defaultAddress.id || defaultAddress._id || (defaultAddress.formattedAddress && defaultAddress.formattedAddress !== "Select location"));
 
                   if (!isAddressSelected) {
                     toast.error("Please select a delivery address from your saved addresses list");
@@ -2087,10 +2022,7 @@ export default function Cart() {
                     return
                   }
 
-                  if (!manualAddressDetails.trim()) {
-                    toast.error("Please enter additional address details (Flat, Floor, etc.)")
-                    return
-                  }
+
 
                   setShowPaymentSheet(true)
                 }}

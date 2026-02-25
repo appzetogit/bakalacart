@@ -115,6 +115,7 @@ export default function UserRouter() {
           <Route path="/category/:category" element={<CategoryPage />} />
           <Route path="/restaurants" element={<Restaurants />} />
           <Route path="/restaurants/:slug" element={<RestaurantDetails />} />
+          <Route path="/user/restaurants/:slug" element={<RestaurantDetails />} />
           <Route path="/search" element={<SearchResults />} />
           <Route path="/product/:id" element={<ProductDetail />} />
 
@@ -128,7 +129,23 @@ export default function UserRouter() {
             }
           />
           <Route
+            path="/user/cart"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
+                <Cart />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/cart/checkout"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user/cart/checkout"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
                 <Checkout />
