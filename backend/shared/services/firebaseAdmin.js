@@ -228,7 +228,7 @@ export const sendPushNotification = async (tokens, payload) => {
                 android: { collapseKey: tag, priority: 'high' },
                 apns: {
                     headers: { 'apns-collapse-id': tag, 'apns-priority': '10' },
-                    payload: { ops: { alert: { title: payload.title, body: payload.body }, 'thread-id': tag, badge: 1, sound: 'default', 'mutable-content': 1 } }
+                    payload: { aps: { alert: { title: payload.title, body: payload.body }, 'thread-id': tag, badge: 1, sound: 'default', 'mutable-content': 1 } }
                 },
                 webpush: {
                     headers: { Urgency: 'high', Topic: tag.substring(0, 32) },

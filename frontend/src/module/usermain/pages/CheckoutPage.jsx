@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   MapPin,
   CreditCard,
@@ -68,7 +68,7 @@ export default function CheckoutPage() {
         console.error('Error parsing cart data:', error)
       }
     }
-    
+
     // Default fallback data
     return {
       items: [
@@ -167,24 +167,29 @@ export default function CheckoutPage() {
     fetchAddresses()
   }, [])
 
+  const [validationError, setValidationError] = useState(false)
+
   // Save order data to localStorage before navigating to payment
   const handleProceedToPayment = () => {
-    if (!selectedAddress) {
-      alert("Please choose a delivery address")
+    // Validation: Check if a saved address is selected
+    if (!selectedAddressId) {
+      setValidationError(true)
+      alert("Please select a saved address to proceed to payment.")
       return
     }
 
+    setValidationError(false)
     const deliveryAddressText = formatAddress(selectedAddress)
 
     const orderDataWithDetails = {
       ...orderSummary,
       deliveryAddress: deliveryAddressText,
-      additionalAddressDetails: selectedAddress.additionalDetails || "",
-      addressLabel: selectedAddress.label || addressLabel,
+      additionalAddressDetails: selectedAddress?.additionalDetails || "",
+      addressLabel: selectedAddress?.label || addressLabel,
       customerName: userData?.name || "Guest",
       customerPhone: userData?.phone || ""
     }
-    
+
     localStorage.setItem('usermain_current_order', JSON.stringify(orderDataWithDetails))
     if (paymentMethod === "cash") {
       navigate(`/usermain/payment?method=cash`)
@@ -268,7 +273,7 @@ export default function CheckoutPage() {
 
       {/* Delivery Address - tap to choose */}
       <div className="px-4 py-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <div className={`bg-white rounded-xl p-4 shadow-sm transition-all ${validationError ? "ring-2 ring-red-500" : ""}`}>
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Delivery Address</h3>
@@ -279,8 +284,12 @@ export default function CheckoutPage() {
           </div>
           <button
             type="button"
-            onClick={() => setIsAddressSelectorOpen(true)}
-            className="w-full flex items-start gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 hover:border-[#ff8100] hover:bg-[#fff7ed] transition-colors"
+            onClick={() => {
+              setIsAddressSelectorOpen(true)
+              setValidationError(false)
+            }}
+            className={`w-full flex items-start gap-2 rounded-xl border border-dashed px-3 py-3 transition-colors ${validationError ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-[#ff8100] hover:bg-[#fff7ed]"
+              }`}
           >
             <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1 text-left">
@@ -399,11 +408,10 @@ export default function CheckoutPage() {
           <div className="space-y-2">
             <button
               onClick={() => setPaymentMethod("card")}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
-                paymentMethod === "card"
-                  ? "border-[#ff8100] bg-[#ff8100]/10"
-                  : "border-gray-200 bg-white"
-              }`}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${paymentMethod === "card"
+                ? "border-[#ff8100] bg-[#ff8100]/10"
+                : "border-gray-200 bg-white"
+                }`}
             >
               <CreditCard className={`w-5 h-5 ${paymentMethod === "card" ? "text-[#ff8100]" : "text-gray-400"}`} />
               <span className={`text-sm font-medium ${paymentMethod === "card" ? "text-[#ff8100]" : "text-gray-700"}`}>
@@ -412,11 +420,10 @@ export default function CheckoutPage() {
             </button>
             <button
               onClick={() => setPaymentMethod("cash")}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
-                paymentMethod === "cash"
-                  ? "border-[#ff8100] bg-[#ff8100]/10"
-                  : "border-gray-200 bg-white"
-              }`}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${paymentMethod === "cash"
+                ? "border-[#ff8100] bg-[#ff8100]/10"
+                : "border-gray-200 bg-white"
+                }`}
             >
               <ShoppingBag className={`w-5 h-5 ${paymentMethod === "cash" ? "text-[#ff8100]" : "text-gray-400"}`} />
               <span className={`text-sm font-medium ${paymentMethod === "cash" ? "text-[#ff8100]" : "text-gray-700"}`}>
@@ -494,9 +501,8 @@ export default function CheckoutPage() {
                             setAddressLabel(address.label || "Other")
                             setIsAddressSelectorOpen(false)
                           }}
-                          className={`w-full flex items-center justify-between rounded-xl border px-3 py-3 text-left ${
-                            isSelected ? "border-[#ff8100] bg-[#fff3e6]" : "border-gray-200"
-                          }`}
+                          className={`w-full flex items-center justify-between rounded-xl border px-3 py-3 text-left ${isSelected ? "border-[#ff8100] bg-[#fff3e6]" : "border-gray-200"
+                            }`}
                         >
                           <div className="flex items-start gap-2">
                             <MapPin className="w-4 h-4 mt-0.5 text-[#ff8100]" />
@@ -512,11 +518,10 @@ export default function CheckoutPage() {
                             </div>
                           </div>
                           <span
-                            className={`w-4 h-4 rounded-full border ${
-                              isSelected
-                                ? "border-[#ff8100] bg-[#ff8100]"
-                                : "border-gray-300"
-                            }`}
+                            className={`w-4 h-4 rounded-full border ${isSelected
+                              ? "border-[#ff8100] bg-[#ff8100]"
+                              : "border-gray-300"
+                              }`}
                           />
                         </button>
                       )
@@ -596,14 +601,14 @@ export default function CheckoutPage() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate('/usermain')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
             <Home className="w-6 h-6" />
             <span className="text-xs text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
