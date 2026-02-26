@@ -36,7 +36,7 @@ export default function TransactionReport() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
-  const PAGE_SIZE = 25
+  const PAGE_SIZE = 50
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [zones, setZones] = useState([])
   const [restaurants, setRestaurants] = useState([])
@@ -362,7 +362,7 @@ export default function TransactionReport() {
         {/* Order Transactions Section */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-            <h2 className="text-base font-bold text-slate-900">Order Transactions {filteredTransactions.length}</h2>
+            <h2 className="text-base font-bold text-slate-900">Order Transactions {totalRecords}</h2>
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1 sm:flex-initial min-w-[180px]">

@@ -30,7 +30,7 @@ const statusMeta = {
   Refunded: { label: "Refunded", color: "text-teal-600", bg: "bg-teal-50", icon: refundedIcon },
 }
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 50
 
 export default function RegularOrderReport() {
   const [orders, setOrders] = useState([])

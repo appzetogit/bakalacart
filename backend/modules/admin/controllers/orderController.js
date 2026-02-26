@@ -749,7 +749,7 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
@@ -982,7 +982,7 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
@@ -1220,7 +1220,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
