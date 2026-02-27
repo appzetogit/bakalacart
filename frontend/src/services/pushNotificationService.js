@@ -239,18 +239,29 @@ function setupForegroundNotificationHandler(handler) {
 
         // Show notification manually in foreground if needed
         if ('Notification' in window && Notification.permission === 'granted') {
-            const { title, body } = payload.notification || {};
-            // Use the provided icon or default
+            const title = payload.notification?.title || payload.data?.title || 'Bakala Update';
+            const body = payload.notification?.body || payload.data?.body || '';
             const icon = payload.data?.icon || '/bakalalogo.png';
 
-            console.log(`🔔 [FCM Service] Displaying real-time notification: ${title}`);
+            // Unique tag for cross-tab deduplication
+            const tag = payload.data?.tag || payload.data?.orderId || title;
+            const debounceKey = `fcm_notif_shown_${tag}`;
+            const lastShown = localStorage.getItem(debounceKey);
 
-            new Notification(title, {
-                body: body,
-                icon: icon,
-                data: payload.data,
-                tag: payload.data?.tag || payload.data?.orderId // Prevent multiple notifications for same order/message
-            });
+            // Prevent multiple tabs from showing the exact same notification within 5 seconds
+            if (lastShown && (Date.now() - parseInt(lastShown, 10)) < 5000) {
+                console.log('🚫 [FCM Service] Skipping duplicate OS notification (already shown by another tab).');
+            } else {
+                console.log(`🔔 [FCM Service] Displaying real-time notification: ${title}`);
+                localStorage.setItem(debounceKey, Date.now().toString());
+
+                new Notification(title, {
+                    body: body,
+                    icon: icon,
+                    data: payload.data,
+                    tag: tag
+                });
+            }
         }
 
         // Call custom handler
