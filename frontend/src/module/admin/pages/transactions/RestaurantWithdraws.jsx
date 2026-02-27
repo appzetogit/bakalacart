@@ -52,14 +52,11 @@ export default function RestaurantWithdraws() {
     }
   }
 
-  // Refetch when search changes (with debounce)
+  // Refetch when search changes (no debounce for instant loading)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery !== undefined) {
-        fetchWithdrawals()
-      }
-    }, 500)
-    return () => clearTimeout(timer)
+    if (searchQuery !== undefined) {
+      fetchWithdrawals()
+    }
   }, [searchQuery])
 
   const filteredWithdraws = useMemo(() => {
@@ -241,8 +238,8 @@ export default function RestaurantWithdraws() {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-600 hover:text-slate-900"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-slate-600 hover:text-slate-900"
                   }`}
               >
                 {tab}
