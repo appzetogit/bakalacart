@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react"
-import { 
-  Utensils, 
-  Search, 
-  CheckCircle2, 
-  XCircle, 
-  Loader2, 
-  User, 
-  Phone, 
-  MapPin, 
+import {
+  Utensils,
+  Search,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  User,
+  Phone,
+  MapPin,
   IndianRupee,
   Clock,
   Package,
@@ -79,17 +79,13 @@ export default function RestaurantOrders() {
     fetchOrders()
   }, [page, restaurantAcceptedFilter])
 
-  // Debounced search
+  // Instant search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (page === 1) {
-        fetchOrders()
-      } else {
-        setPage(1)
-      }
-    }, 500)
-
-    return () => clearTimeout(timer)
+    if (page === 1) {
+      fetchOrders()
+    } else {
+      setPage(1)
+    }
   }, [searchQuery])
 
   // Handle accept order on behalf of restaurant
@@ -99,7 +95,7 @@ export default function RestaurantOrders() {
     try {
       setIsProcessing(true)
       const orderId = selectedOrder.id || selectedOrder.orderId
-      
+
       // Call admin API to accept order on behalf of restaurant
       const response = await adminAPI.acceptOrderOnBehalfOfRestaurant(orderId)
 
@@ -114,9 +110,9 @@ export default function RestaurantOrders() {
       }
     } catch (error) {
       console.error("Error accepting order:", error)
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          "Failed to accept order. Please try again."
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        "Failed to accept order. Please try again."
       toast.error(errorMessage)
     } finally {
       setIsProcessing(false)
@@ -130,7 +126,7 @@ export default function RestaurantOrders() {
     try {
       setIsProcessing(true)
       const orderId = selectedOrder.id || selectedOrder.orderId
-      
+
       // Call admin API to reassign order to same restaurant
       const response = await adminAPI.reassignOrderToRestaurant(orderId)
 
@@ -145,9 +141,9 @@ export default function RestaurantOrders() {
       }
     } catch (error) {
       console.error("Error reassigning order:", error)
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          "Failed to reassign order. Please try again."
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        "Failed to reassign order. Please try again."
       toast.error(errorMessage)
     } finally {
       setIsProcessing(false)
@@ -282,10 +278,10 @@ export default function RestaurantOrders() {
                             <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" />
                               <span className="truncate max-w-[200px]">
-                                {order.address.formattedAddress || 
-                                 order.address.street || 
-                                 `${order.address.city || ''}${order.address.state ? ', ' + order.address.state : ''}`.trim() || 
-                                 'Address not available'}
+                                {order.address.formattedAddress ||
+                                  order.address.street ||
+                                  `${order.address.city || ''}${order.address.state ? ', ' + order.address.state : ''}`.trim() ||
+                                  'Address not available'}
                               </span>
                             </div>
                           )}
@@ -417,12 +413,12 @@ export default function RestaurantOrders() {
               {actionType === 'accept' ? 'Accept Order' : 'Reassign Order'}
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1.5 leading-relaxed">
-              {actionType === 'accept' 
+              {actionType === 'accept'
                 ? 'Accept this order on behalf of the restaurant. This will mark the order as accepted and move it to preparing status.'
                 : 'Reassign this order to the same restaurant. This will resend the order notification to the restaurant.'}
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Order Details Card */}
           {selectedOrder && (
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -509,11 +505,10 @@ export default function RestaurantOrders() {
             <Button
               onClick={actionType === 'accept' ? handleAcceptOrder : handleReassignOrder}
               disabled={isProcessing}
-              className={`min-w-[140px] h-10 disabled:opacity-50 disabled:cursor-not-allowed ${
-                actionType === 'accept' 
-                  ? 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-sm' 
+              className={`min-w-[140px] h-10 disabled:opacity-50 disabled:cursor-not-allowed ${actionType === 'accept'
+                  ? 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-sm'
                   : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-sm'
-              }`}
+                }`}
             >
               {isProcessing ? (
                 <>

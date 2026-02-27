@@ -49,11 +49,8 @@ export default function DeliveryBoyWallet() {
   }, [page])
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setPage(1)
-      fetchWallets({ page: 1 })
-    }, 500)
-    return () => clearTimeout(t)
+    setPage(1)
+    fetchWallets({ page: 1 })
   }, [searchQuery])
 
   return (

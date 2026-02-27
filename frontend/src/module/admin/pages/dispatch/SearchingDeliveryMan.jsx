@@ -25,13 +25,9 @@ export default function SearchingDeliveryMan() {
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
 
-  // Debounce search query
+  // Sync search query instantly
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery)
-    }, 500) // 500ms delay
-
-    return () => clearTimeout(timer)
+    setDebouncedSearchQuery(searchQuery)
   }, [searchQuery])
 
   // Fetch orders from API
@@ -68,11 +64,11 @@ export default function SearchingDeliveryMan() {
             baseURL: error.config?.baseURL
           } : null
         })
-        
+
         if (error.response) {
           const status = error.response.status
           const errorData = error.response.data
-          
+
           if (status === 401) {
             toast.error('Authentication required. Please login again.')
           } else if (status === 403) {
@@ -164,9 +160,9 @@ export default function SearchingDeliveryMan() {
           </span>
         </div>
       </div>
-      <OrdersTopbar 
-        title="Searching For Deliverymen Orders" 
-        count={count} 
+      <OrdersTopbar
+        title="Searching For Deliverymen Orders"
+        count={count}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
@@ -204,8 +200,8 @@ export default function SearchingDeliveryMan() {
         onOpenChange={setIsViewOrderOpen}
         order={selectedOrder}
       />
-      <DispatchOrdersTable 
-        orders={filteredData} 
+      <DispatchOrdersTable
+        orders={filteredData}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}

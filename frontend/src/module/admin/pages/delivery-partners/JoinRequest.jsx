@@ -88,13 +88,9 @@ export default function JoinRequest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
-  // Debounced search effect
+  // Search effect without debounce
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchJoinRequests()
-    }, 500) // Wait 500ms after user stops typing
-
-    return () => clearTimeout(timer)
+    fetchJoinRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery])
 
@@ -248,8 +244,8 @@ export default function JoinRequest() {
             <button
               onClick={() => handleTabChange("pending")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "pending"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-600 hover:text-slate-900"
                 }`}
             >
               Pending Delivery Man
@@ -257,8 +253,8 @@ export default function JoinRequest() {
             <button
               onClick={() => handleTabChange("denied")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "denied"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-600 hover:text-slate-900"
                 }`}
             >
               Denied Deliveryman
@@ -422,10 +418,10 @@ export default function JoinRequest() {
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium inline-block w-fit ${request.status === "Pending" || request.status === "pending"
-                                ? "bg-blue-100 text-blue-700"
-                                : request.status === "Denied" || request.status === "denied" || request.status === "blocked"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-700"
+                              ? "bg-blue-100 text-blue-700"
+                              : request.status === "Denied" || request.status === "denied" || request.status === "blocked"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-green-100 text-green-700"
                               }`}>
                               {request.status === "blocked" || request.status === "Blocked" || request.status === "Denied" || request.status === "denied" ? "Rejected" : request.status}
                             </span>
@@ -608,9 +604,9 @@ export default function JoinRequest() {
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
                       <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${viewDetails.status === 'pending' ? 'bg-blue-100 text-blue-700' :
-                          viewDetails.status === 'approved' || viewDetails.status === 'active' ? 'bg-green-100 text-green-700' :
-                            viewDetails.status === 'blocked' ? 'bg-red-100 text-red-700' :
-                              'bg-slate-100 text-slate-700'
+                        viewDetails.status === 'approved' || viewDetails.status === 'active' ? 'bg-green-100 text-green-700' :
+                          viewDetails.status === 'blocked' ? 'bg-red-100 text-red-700' :
+                            'bg-slate-100 text-slate-700'
                         }`}>
                         {viewDetails.status === 'blocked' ? 'Rejected' : (viewDetails.status?.charAt(0).toUpperCase() + viewDetails.status?.slice(1) || "N/A")}
                       </span>

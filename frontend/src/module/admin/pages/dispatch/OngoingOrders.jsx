@@ -25,13 +25,9 @@ export default function OngoingOrders() {
     actions: true,
   })
 
-  // Debounce search query
+  // Sync search query instantly
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery)
-    }, 500) // 500ms delay
-
-    return () => clearTimeout(timer)
+    setDebouncedSearchQuery(searchQuery)
   }, [searchQuery])
 
   // Fetch orders from API
@@ -68,11 +64,11 @@ export default function OngoingOrders() {
             baseURL: error.config?.baseURL
           } : null
         })
-        
+
         if (error.response) {
           const status = error.response.status
           const errorData = error.response.data
-          
+
           if (status === 401) {
             toast.error('Authentication required. Please login again.')
           } else if (status === 403) {
@@ -149,9 +145,9 @@ export default function OngoingOrders() {
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
-      <OrdersTopbar 
-        title="On Going Orders" 
-        count={count} 
+      <OrdersTopbar
+        title="On Going Orders"
+        count={count}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
@@ -189,8 +185,8 @@ export default function OngoingOrders() {
         onOpenChange={setIsViewOrderOpen}
         order={selectedOrder}
       />
-      <DispatchOrdersTable 
-        orders={filteredData} 
+      <DispatchOrdersTable
+        orders={filteredData}
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}

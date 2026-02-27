@@ -65,12 +65,9 @@ export default function Category() {
     fetchCategories()
   }, [])
 
-  // Debounced search
+  // Search without debounce for instant results
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchCategories()
-    }, 500)
-    return () => clearTimeout(timeoutId)
+    fetchCategories()
   }, [searchQuery])
 
   // Scroll tracking effect for filter modal

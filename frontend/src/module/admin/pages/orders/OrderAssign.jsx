@@ -149,11 +149,9 @@ export default function OrderAssign() {
     prevFilterRef.current = restaurantAcceptedFilter;
 
     if (isSearchUpdate) {
-      // Debounce search typing
-      fetchTimeoutRef.current = setTimeout(() => {
-        if (page !== 1) setPage(1);
-        else fetchOrders();
-      }, 500);
+      // Instant search typing
+      if (page !== 1) setPage(1);
+      else fetchOrders();
     } else if (isFilterUpdate && page !== 1) {
       // Filter changed while not on page 1: Reset page (this triggers effect again instantly)
       setPage(1);

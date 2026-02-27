@@ -148,11 +148,9 @@ export default function OrdersPage({ statusKey = "all" }) {
     prevStatusRef.current = statusKey;
 
     if (isSearchUpdate) {
-      // Debounce typing in search
-      fetchTimeoutRef.current = setTimeout(() => {
-        if (page !== 1) setPage(1);
-        else fetchOrders(1);
-      }, 500);
+      // Fetch instantly on search update
+      if (page !== 1) setPage(1);
+      else fetchOrders(1);
     } else if ((isFiltersUpdate || isStatusUpdate) && page !== 1) {
       // Filter or status changed while not on page 1: reset to page 1
       setPage(1);

@@ -32,13 +32,9 @@ export default function JoiningRequest() {
     fetchRequests()
   }, [activeTab])
 
-  // Debounced search effect
+  // Instant search effect
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRequests()
-    }, 500) // Wait 500ms after user stops typing
-
-    return () => clearTimeout(timer)
+    fetchRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery])
 

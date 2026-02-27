@@ -56,10 +56,7 @@ export default function DeliveryWithdrawal() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery !== undefined) fetchRequests()
-    }, 500)
-    return () => clearTimeout(timer)
+    if (searchQuery !== undefined) fetchRequests()
   }, [searchQuery])
 
   const filteredRequests = useMemo(() => {
@@ -168,8 +165,8 @@ export default function DeliveryWithdrawal() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.key
-                    ? "border-emerald-600 text-emerald-600"
-                    : "border-transparent text-slate-600 hover:text-slate-900"
+                  ? "border-emerald-600 text-emerald-600"
+                  : "border-transparent text-slate-600 hover:text-slate-900"
                   }`}
               >
                 {tab.label}

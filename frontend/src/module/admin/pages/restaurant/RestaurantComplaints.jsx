@@ -64,12 +64,9 @@ export default function RestaurantComplaints() {
   })
   const [updating, setUpdating] = useState(false)
 
-  // Debounce search
+  // Instant search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setFilters(prev => ({ ...prev, search: searchTerm, page: 1 }))
-    }, 500)
-    return () => clearTimeout(timer)
+    setFilters(prev => ({ ...prev, search: searchTerm, page: 1 }))
   }, [searchTerm])
 
   useEffect(() => {
