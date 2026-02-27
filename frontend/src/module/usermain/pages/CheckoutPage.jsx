@@ -30,8 +30,8 @@ export default function CheckoutPage() {
   const [isAddressFormOpen, setIsAddressFormOpen] = useState(false)
   const [savingAddress, setSavingAddress] = useState(false)
   const [defaultCityState, setDefaultCityState] = useState({
-    city: "Indore",
-    state: "Madhya Pradesh"
+    city: "",
+    state: ""
   })
   const [addressFormData, setAddressFormData] = useState({
     flatRoom: "",
