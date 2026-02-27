@@ -225,8 +225,15 @@ async function registerFCMToken(authType = 'user', authToken = null) {
     }
 }
 
+let isForegroundHandlerSetup = false;
+
 // Setup foreground notification handler
 function setupForegroundNotificationHandler(handler) {
+    if (isForegroundHandlerSetup) {
+        console.warn('ℹ️ [FCM Service] Foreground notification handler already setup. Skipping to prevent duplicate notifications.');
+        return;
+    }
+
     onMessage(messaging, (payload) => {
         console.log('📬 [FCM Service] Foreground message received:', payload);
 
@@ -251,6 +258,8 @@ function setupForegroundNotificationHandler(handler) {
             handler(payload);
         }
     });
+
+    isForegroundHandlerSetup = true;
 }
 
 // Initialize push notifications
