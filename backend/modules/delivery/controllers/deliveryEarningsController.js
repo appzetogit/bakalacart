@@ -37,6 +37,7 @@ export const getEarnings = asyncHandler(async (req, res) => {
 
     switch (period) {
       case 'today':
+      case 'daily':
         startDate = new Date(baseDate);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(baseDate);

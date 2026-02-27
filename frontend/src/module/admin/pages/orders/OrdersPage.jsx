@@ -111,20 +111,9 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
   }
 
-  // Effect to handle status change
-  useEffect(() => {
-    setPage(1)
-    fetchOrders(1)
-  }, [statusKey])
 
-  // Effect to handle search and filter changes - debounced
+  // Recalculate filter count UI
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1)
-      fetchOrders(1)
-    }, 500)
-
-    // Calculate active filters count for UI
     let count = 0;
     if (filters.paymentStatus) count++;
     if (filters.restaurant) count++;
@@ -135,18 +124,47 @@ export default function OrdersPage({ statusKey = "all" }) {
     if (filters.deliveryPartner) count++;
     setActiveFiltersCountState(count);
 
-    // If user manually cleared dates, reset quick date label
     if (!filters.fromDate && !filters.toDate) {
       setQuickDateLabel("");
     }
+  }, [filters]);
 
-    return () => clearTimeout(timer)
-  }, [searchQuery, filters])
+  const fetchTimeoutRef = useRef(null);
+  const prevSearchRef = useRef(searchQuery);
+  const prevFiltersRef = useRef(JSON.stringify(filters));
+  const prevStatusRef = useRef(statusKey);
 
-  // Effect to handle page change
+  // Single unified fetch effect to completely eliminate duplicate API calls
   useEffect(() => {
-    fetchOrders(page)
-  }, [page])
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+
+    const isSearchUpdate = prevSearchRef.current !== searchQuery;
+    const currentFiltersStr = JSON.stringify(filters);
+    const isFiltersUpdate = prevFiltersRef.current !== currentFiltersStr;
+    const isStatusUpdate = prevStatusRef.current !== statusKey;
+
+    prevSearchRef.current = searchQuery;
+    prevFiltersRef.current = currentFiltersStr;
+    prevStatusRef.current = statusKey;
+
+    if (isSearchUpdate) {
+      // Debounce typing in search
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (page !== 1) setPage(1);
+        else fetchOrders(1);
+      }, 500);
+    } else if ((isFiltersUpdate || isStatusUpdate) && page !== 1) {
+      // Filter or status changed while not on page 1: reset to page 1
+      setPage(1);
+    } else {
+      // Mount, simple page change, or filter change on page 1: instant fetch
+      fetchOrders(page);
+    }
+
+    return () => {
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    };
+  }, [page, statusKey, searchQuery, filters]);
 
   // Handle mark picked up by admin
   const handleMarkPickedUp = async (order) => {

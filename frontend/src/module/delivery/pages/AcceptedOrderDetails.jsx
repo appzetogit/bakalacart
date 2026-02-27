@@ -82,18 +82,36 @@ export default function AcceptedOrderDetails() {
 
           // Get customer address
           const getCustomerAddress = () => {
-            if (order.address?.formattedAddress) {
-              return order.address.formattedAddress
+            let a = order.address || {};
+            let addr = a.formattedAddress || a.address || "";
+
+            if (!addr || /^-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g.test(addr.trim())) {
+              const parts = [
+                a.street,
+                a.additionalDetails,
+                a.city,
+                a.state,
+                a.zipCode || a.pincode
+              ].filter(Boolean);
+              if (parts.length > 0) {
+                addr = parts.join(', ');
+              }
             }
-            const parts = []
-            if (order.address?.street) parts.push(order.address.street)
-            if (order.address?.area) parts.push(order.address.area)
-            if (order.address?.city) parts.push(order.address.city)
-            if (order.address?.state) parts.push(order.address.state)
-            if (order.address?.pincode || order.address?.zipCode) {
-              parts.push(order.address.pincode || order.address.zipCode)
+
+            if (order.customerName) {
+              addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
+            } else if (order.userId?.name) {
+              addr = addr.replace(new RegExp(order.userId.name, 'gi'), '');
             }
-            return parts.length > 0 ? parts.join(', ') : 'Address not available'
+
+            addr = addr.replace(/(?:\+?\d{10,15})/g, '');
+            addr = addr.replace(/Flat\s*,?/gi, '');
+            addr = addr.replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
+            addr = addr.replace(/,\s*,/g, ',');
+            addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
+            addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
+
+            return addr || 'Address not available'
           }
 
           // Transform API order to component format

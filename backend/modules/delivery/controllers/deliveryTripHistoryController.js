@@ -92,13 +92,15 @@ export const getTripHistory = asyncHandler(async (req, res) => {
 
     // Status filter
     if (status && status !== 'ALL TRIPS') {
-      // Map frontend status to backend status
-      const statusMap = {
-        'Completed': 'delivered',
-        'Cancelled': 'cancelled',
-        'Pending': 'pending'
-      };
-      query.status = statusMap[status] || status.toLowerCase();
+      if (status === 'Pending') {
+        query.status = { $in: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'] };
+      } else if (status === 'Completed') {
+        query.status = 'delivered';
+      } else if (status === 'Cancelled') {
+        query.status = 'cancelled';
+      } else {
+        query.status = status.toLowerCase();
+      }
     }
 
     // Calculate pagination

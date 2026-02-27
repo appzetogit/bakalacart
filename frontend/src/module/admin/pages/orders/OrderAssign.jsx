@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Package, Search, CheckCircle2, XCircle, Loader2, User, Phone, IndianRupee, CheckSquare, Square, MapPin, Navigation, Clock, Copy } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -130,26 +130,42 @@ export default function OrderAssign() {
     }
   }
 
-  useEffect(() => {
-    fetchOrders()
-  }, [page, restaurantAcceptedFilter])
+  const fetchTimeoutRef = useRef(null);
+  const prevSearchRef = useRef(searchQuery);
+  const prevFilterRef = useRef(restaurantAcceptedFilter);
 
   useEffect(() => {
     fetchDeliveryBoys()
   }, [])
 
-  // Debounced search
+  // Single robust observer for fetches that completely blocks double API calls
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (page === 1) {
-        fetchOrders()
-      } else {
-        setPage(1)
-      }
-    }, 500)
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
 
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+    const isSearchUpdate = prevSearchRef.current !== searchQuery;
+    const isFilterUpdate = prevFilterRef.current !== restaurantAcceptedFilter;
+
+    prevSearchRef.current = searchQuery;
+    prevFilterRef.current = restaurantAcceptedFilter;
+
+    if (isSearchUpdate) {
+      // Debounce search typing
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (page !== 1) setPage(1);
+        else fetchOrders();
+      }, 500);
+    } else if (isFilterUpdate && page !== 1) {
+      // Filter changed while not on page 1: Reset page (this triggers effect again instantly)
+      setPage(1);
+    } else {
+      // Mount, page change, or filter change on page 1: Fetch instantly
+      fetchOrders();
+    }
+
+    return () => {
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    };
+  }, [page, restaurantAcceptedFilter, searchQuery]);
 
   // Handle assign button click
   const handleAssignClick = (order) => {
@@ -598,13 +614,31 @@ export default function OrderAssign() {
                                   className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-normal"
                                 >
                                   {(() => {
-                                    let addr = order.address?.formattedAddress || order.address?.address || "No customer address";
+                                    let a = order.address || {};
+                                    let addr = a.formattedAddress || a.address || "";
+
+                                    // If address looks like just lat/long coordinates or is missing, try to build it from parts
+                                    if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.trim())) {
+                                      const parts = [
+                                        a.street,
+                                        a.additionalDetails,
+                                        a.city,
+                                        a.state,
+                                        a.zipCode
+                                      ].filter(Boolean);
+                                      if (parts.length > 0) {
+                                        addr = parts.join(', ');
+                                      }
+                                    }
+
                                     if (order.customerName) {
                                       addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
                                     }
                                     // Remove phone numbers and optional trailing punctuation
                                     addr = addr.replace(/(?:\+?\d{10,15})/g, '');
                                     addr = addr.replace(/Flat\s*,?/gi, '');
+                                    // Remove lat/long coordinates that might be embedded (very aggressive matching)
+                                    addr = addr.replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
                                     addr = addr.replace(/,\s*,/g, ',');
                                     addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
                                     addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
@@ -932,12 +966,28 @@ export default function OrderAssign() {
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
                             <p className="text-sm text-gray-700 dark:text-gray-300 leading-normal">
                               {(() => {
-                                let addr = order.address?.formattedAddress || order.address?.address || "No address provided";
+                                let a = order.address || {};
+                                let addr = a.formattedAddress || a.address || "";
+
+                                if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.trim())) {
+                                  const parts = [
+                                    a.street,
+                                    a.additionalDetails,
+                                    a.city,
+                                    a.state,
+                                    a.zipCode
+                                  ].filter(Boolean);
+                                  if (parts.length > 0) {
+                                    addr = parts.join(', ');
+                                  }
+                                }
+
                                 if (order.customerName) {
                                   addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
                                 }
                                 addr = addr.replace(/(?:\+?\d{10,15})/g, '');
                                 addr = addr.replace(/Flat\s*,?/gi, '');
+                                addr = addr.replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
                                 addr = addr.replace(/,\s*,/g, ',');
                                 addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
                                 addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
