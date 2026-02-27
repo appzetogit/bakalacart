@@ -27,6 +27,9 @@ export default function FoodsList() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
 
+  // Selected food for detail dialog
+  const [selectedFood, setSelectedFood] = useState(null)
+
   // Filter states
   const [selectedRestaurant, setSelectedRestaurant] = useState("all")
   const [selectedCategory, setSelectedCategory] = useState("all")

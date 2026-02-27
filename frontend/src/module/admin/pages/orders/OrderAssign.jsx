@@ -596,9 +596,20 @@ export default function OrderAssign() {
                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
                                 <span
                                   className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-normal"
-                                  title={order.address?.formattedAddress}
                                 >
-                                  {order.address?.formattedAddress?.replace(/, Madhya Pradesh/g, "")?.replace(/Madhya Pradesh/g, "") || "No customer address"}
+                                  {(() => {
+                                    let addr = order.address?.formattedAddress || order.address?.address || "No customer address";
+                                    if (order.customerName) {
+                                      addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
+                                    }
+                                    // Remove phone numbers and optional trailing punctuation
+                                    addr = addr.replace(/(?:\+?\d{10,15})/g, '');
+                                    addr = addr.replace(/Flat\s*,?/gi, '');
+                                    addr = addr.replace(/,\s*,/g, ',');
+                                    addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
+                                    addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
+                                    return addr || "No customer address";
+                                  })()}
                                 </span>
                                 {order.note && order.note.trim() && (
                                   <div className="mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
@@ -920,7 +931,18 @@ export default function OrderAssign() {
                           <div className="flex flex-col">
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Delivery Address</span>
                             <p className="text-sm text-gray-700 dark:text-gray-300 leading-normal">
-                              {order.address?.formattedAddress?.replace(/, Madhya Pradesh/g, "")?.replace(/Madhya Pradesh/g, "") || "No address provided"}
+                              {(() => {
+                                let addr = order.address?.formattedAddress || order.address?.address || "No address provided";
+                                if (order.customerName) {
+                                  addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
+                                }
+                                addr = addr.replace(/(?:\+?\d{10,15})/g, '');
+                                addr = addr.replace(/Flat\s*,?/gi, '');
+                                addr = addr.replace(/,\s*,/g, ',');
+                                addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
+                                addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
+                                return addr || "No address provided";
+                              })()}
                             </p>
                             {order.note && order.note.trim() && (
                               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
