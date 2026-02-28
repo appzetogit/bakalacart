@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   CreditCard,
   Lock,
@@ -18,7 +18,7 @@ export default function PaymentPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const paymentMethod = searchParams.get("method") || "card"
-  
+
   const [cardNumber, setCardNumber] = useState("")
   const [cardName, setCardName] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
@@ -129,19 +129,19 @@ export default function PaymentPage() {
     if (paymentMethod === "cash") {
       return // Already handled by useEffect
     }
-    
+
     if (!cardNumber || !cardName || !expiryDate || !cvv) {
       return
     }
-    
+
     setIsProcessing(true)
-    
+
     // Simulate payment processing
     setTimeout(() => {
       saveOrder()
       setIsProcessing(false)
       setIsSuccess(true)
-      
+
       // Navigate to success page after 2 seconds
       setTimeout(() => {
         navigate('/usermain/orders')
@@ -160,8 +160,8 @@ export default function PaymentPage() {
             {paymentMethod === "cash" ? "Order Placed!" : "Payment Successful!"}
           </h2>
           <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
-            {paymentMethod === "cash" 
-              ? "Your order has been placed. Pay cash on delivery." 
+            {paymentMethod === "cash"
+              ? "Your order has been placed. Pay cash on delivery."
               : "Your order has been placed successfully."}
           </p>
           <Button
@@ -182,7 +182,11 @@ export default function PaymentPage() {
         <div className="bg-white rounded-2xl p-6 text-center max-w-md w-full shadow-lg">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ff8100] border-t-transparent mx-auto mb-4"></div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Placing Order...</h2>
-          <p className="text-sm text-gray-600">Please wait</p>
+          <div className="bg-gray-50 p-3 rounded-lg mb-4 text-left">
+            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Confirming Address</p>
+            <p className="text-xs text-gray-700 line-clamp-2">{orderData.deliveryAddress}</p>
+          </div>
+          <p className="text-sm text-gray-600">Please wait while we confirm your order</p>
         </div>
       </div>
     )
@@ -203,12 +207,22 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      {/* Payment Amount */}
-      <div className="px-4 py-3 md:py-4">
-        <div className="bg-white rounded-xl p-3 md:p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs md:text-sm font-medium text-gray-600">Total Amount</span>
-            <span className="text-xl md:text-2xl font-bold text-[#ff8100]">${totalAmount.toFixed(2)}</span>
+      {/* Delivery Address Verification */}
+      <div className="px-4 mb-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-[#ff8100]">
+          <div className="flex items-start gap-3">
+            <MapPin className="w-5 h-5 text-[#ff8100] mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Delivering to</p>
+              <p className="text-sm font-bold text-gray-900 leading-snug">
+                {orderData.deliveryAddress}
+              </p>
+              {orderData.additionalAddressDetails && (
+                <p className="text-xs text-gray-500 mt-1 italic">
+                  Note: {orderData.additionalAddressDetails}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -298,14 +312,14 @@ export default function PaymentPage() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate('/usermain')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
             <Home className="w-6 h-6" />
             <span className="text-xs text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >

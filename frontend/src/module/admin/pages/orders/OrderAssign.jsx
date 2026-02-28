@@ -613,15 +613,14 @@ export default function OrderAssign() {
                                 >
                                   {(() => {
                                     let a = order.address || {};
-                                    let addr = a.formattedAddress || a.address || "";
+                                    // Prefer the direct field from DB as requested
+                                    let addr = order.deliveryAddressDetails || a.formattedAddress || a.address || "";
 
-                                    // If address looks like just lat/long coordinates or is missing, try to build it from parts
-                                    if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.trim())) {
+                                    // Fallback if empty or just lat/long coordinates (legacy/emergency check)
+                                    if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(String(addr).trim())) {
                                       const parts = [
                                         a.street,
                                         a.additionalDetails,
-                                        a.city,
-                                        a.state,
                                         a.zipCode
                                       ].filter(Boolean);
                                       if (parts.length > 0) {
@@ -629,18 +628,29 @@ export default function OrderAssign() {
                                       }
                                     }
 
+                                    // Clean the address as requested (no name, no phone, no lat/long, no state, no district)
                                     if (order.customerName) {
-                                      addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
+                                      addr = String(addr).replace(new RegExp(order.customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
                                     }
-                                    // Remove phone numbers and optional trailing punctuation
-                                    addr = addr.replace(/(?:\+?\d{10,15})/g, '');
-                                    addr = addr.replace(/Flat\s*,?/gi, '');
-                                    // Remove lat/long coordinates that might be embedded (very aggressive matching)
-                                    addr = addr.replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
-                                    addr = addr.replace(/,\s*,/g, ',');
-                                    addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
+                                    // Remove phone numbers
+                                    addr = String(addr).replace(/(?:\+?\d{10,15})/g, '');
+                                    // Remove lat/long coordinates
+                                    addr = String(addr).replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
+
+                                    // Remove known state and city if they specifically appear (as requested: "state aur distruct bhi nhi")
+                                    if (a.state) {
+                                      addr = String(addr).replace(new RegExp(`,\\s*${a.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(a.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+                                    }
+                                    if (a.city) {
+                                      addr = String(addr).replace(new RegExp(`,\\s*${a.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(a.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+                                    }
+
+                                    // Remove common state names if they are hardcoded but not in address object
                                     addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
-                                    return addr || "No customer address";
+                                    addr = addr.replace(/,\s*Maharashtra/gi, '').replace(/Maharashtra/gi, '');
+
+                                    // Final clean up of commas and spaces
+                                    return String(addr).replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '') || "No customer address";
                                   })()}
                                 </span>
                                 {order.note && order.note.trim() && (
@@ -965,14 +975,14 @@ export default function OrderAssign() {
                             <p className="text-sm text-gray-700 dark:text-gray-300 leading-normal">
                               {(() => {
                                 let a = order.address || {};
-                                let addr = a.formattedAddress || a.address || "";
+                                // Use the direct field from DB as requested
+                                let addr = order.deliveryAddressDetails || a.formattedAddress || a.address || "";
 
-                                if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.trim())) {
+                                // Fallback if empty or just lat/long coordinates
+                                if (!addr || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(String(addr).trim())) {
                                   const parts = [
                                     a.street,
                                     a.additionalDetails,
-                                    a.city,
-                                    a.state,
                                     a.zipCode
                                   ].filter(Boolean);
                                   if (parts.length > 0) {
@@ -980,16 +990,26 @@ export default function OrderAssign() {
                                   }
                                 }
 
+                                // Clean the address as requested (no name, no phone, no lat/long, no state, no district)
                                 if (order.customerName) {
-                                  addr = addr.replace(new RegExp(order.customerName, 'gi'), '');
+                                  addr = String(addr).replace(new RegExp(order.customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
                                 }
-                                addr = addr.replace(/(?:\+?\d{10,15})/g, '');
-                                addr = addr.replace(/Flat\s*,?/gi, '');
-                                addr = addr.replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
-                                addr = addr.replace(/,\s*,/g, ',');
-                                addr = addr.replace(/^[\s,]+|[\s,]+$/g, '');
+                                addr = String(addr).replace(/(?:\+?\d{10,15})/g, '');
+                                addr = String(addr).replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
+
+                                // Remove known state and city if they specifically appear
+                                if (a.state) {
+                                  addr = String(addr).replace(new RegExp(`,\\s*${a.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(a.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+                                }
+                                if (a.city) {
+                                  addr = String(addr).replace(new RegExp(`,\\s*${a.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(a.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+                                }
+
+                                // Remove hardcoded common state names
                                 addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
-                                return addr || "No address provided";
+                                addr = addr.replace(/,\s*Maharashtra/gi, '').replace(/Maharashtra/gi, '');
+
+                                return String(addr).replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '') || "No address provided";
                               })()}
                             </p>
                             {order.note && order.note.trim() && (

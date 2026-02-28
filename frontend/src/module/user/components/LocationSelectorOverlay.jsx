@@ -1673,6 +1673,8 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
     console.log("✅ watchPosition started, ID:", watchPositionIdRef.current)
   }
 
+  const isUserEditedRef = useRef(false)
+
   const handleMapMoveEnd = async (lat, lng) => {
     // Round coordinates to 6 decimal places (about 10cm precision) to avoid duplicate calls
     const roundedLat = parseFloat(lat.toFixed(6))
@@ -1942,7 +1944,10 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
             city: city || prev.city,
             state: state || prev.state,
             zipCode: postalCode || prev.zipCode,
-            additionalDetails: fullAddressForField || prev.additionalDetails, // Store FULL address in Address details field
+            // Only update additionalDetails if it hasn't been edited by user OR if it's currently empty
+            additionalDetails: (document.activeElement?.id === "additionalDetails" || isUserEditedRef.current === true)
+              ? prev.additionalDetails
+              : (fullAddressForField || prev.additionalDetails),
           }))
 
           // Cache the geocoding result in global cache (shared across all components)
@@ -2113,7 +2118,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
           // Wait for map to finish moving, then fetch address (reduced delay for faster response)
           setTimeout(async () => {
             await handleMapMoveEnd(lat, lng)
-            toast.success("Location updated!", { id: "current-location" })
+            toast.success("Location updated!", { id: "address-selection" })
           }, 200)
 
         } catch (mapError) {
@@ -2124,7 +2129,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
         // Map not initialized yet, just update position and fetch address (reduced delay)
         setTimeout(async () => {
           await handleMapMoveEnd(lat, lng)
-          toast.success("Location updated!", { id: "current-location" })
+          toast.success("Location updated!", { id: "address-selection" })
         }, 200)
       }
     } catch (error) {
@@ -2253,6 +2258,9 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
       // Update active location to the newly saved/updated address
       const locationData = {
+        addressId: addressToSave.id || addressToSave._id,
+        id: addressToSave.id || addressToSave._id,
+        _id: addressToSave._id || addressToSave.id,
         city: addressToSave.city,
         state: addressToSave.state,
         address: addressToSave.street,
@@ -2415,12 +2423,12 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
         googleMapRef.current.setZoom(17)
       }
 
-      toast.success(`Selected address: ${address.label}`)
+      toast.success(`Selected address: ${address.label}`, { id: "address-selection" })
 
       // Close overlay after a small delay
       setTimeout(() => {
         onClose()
-      }, 600)
+      }, 300)
     } catch (error) {
       console.error("Error selecting saved address:", error)
       toast.error("Failed to update location. Please try again.")
@@ -2584,14 +2592,21 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
         </div>
 
         {/* Form Section - Scrollable */}
-        <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0a] min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="px-4 py-4 space-y-4 pb-32">
+        <div
+          className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0a] min-h-0 overscroll-contain pb-80"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          <div className="px-4 py-4 space-y-4">
             {/* Delivery Details */}
-            <div>
+            <div onClick={() => {
+              // Focus the map or scroll to top to see location better
+              const mapSection = document.querySelector('[style*="height: 40vh"]');
+              if (mapSection) mapSection.scrollIntoView({ behavior: 'smooth' });
+            }}>
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
                 Delivery details
               </Label>
-              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-3">
+              <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-3 active:scale-95 transition-transform cursor-pointer">
                 <MapPin className="h-5 w-5 text-green-600 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -2615,7 +2630,30 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                 placeholder="E.g. Floor, House no."
                 value={addressFormData.additionalDetails}
                 onChange={handleAddressFormChange}
-                className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700"
+                onFocus={(e) => {
+                  // Ensure input scrolls into view on mobile when keyboard opens
+                  // Use a slightly larger delay for better reliability on all devices
+                  setTimeout(() => {
+                    const el = e.target;
+                    const offset = 100; // Extra padding to ensure it's well above keyboard
+                    const bodyRect = document.body.getBoundingClientRect().top;
+                    const elementRect = el.getBoundingClientRect().top;
+                    const elementPosition = elementRect - bodyRect;
+                    const offsetPosition = elementPosition - offset;
+
+                    window.scrollTo({
+                      top: offsetPosition,
+                      behavior: 'smooth'
+                    });
+
+                    // Also scroll the parent container if it's overflow-y-auto
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 500);
+                }}
+                onInput={() => {
+                  isUserEditedRef.current = true;
+                }}
+                className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700 h-12 text-base focus:ring-2 focus:ring-green-500/20"
               />
             </div>
 
@@ -2647,11 +2685,13 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                     type="button"
                     onClick={() => setAddressFormData(prev => ({ ...prev, label }))}
                     variant={addressFormData.label === label ? "default" : "outline"}
-                    className={`flex-1 ${addressFormData.label === label
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : "bg-white dark:bg-[#1a1a1a]"
+                    className={`flex-1 h-11 rounded-xl ${addressFormData.label === label
+                      ? "bg-green-600 hover:bg-green-700 text-white border-transparent"
+                      : "bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                   >
+                    {label === "Home" && <Home className="w-4 h-4 mr-2" />}
+                    {label === "Office" && <Building2 className="w-4 h-4 mr-2" />}
                     {label}
                   </Button>
                 ))}
@@ -2678,7 +2718,6 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                 onChange={handleAddressFormChange}
                 required
               />
-              {/* zipCode is optional, not required */}
               <Input
                 name="zipCode"
                 value={addressFormData.zipCode || ""}

@@ -71,6 +71,9 @@ const Terms = lazy(() => import("@/module/user/pages/profile/Terms"))
 const Privacy = lazy(() => import("@/module/user/pages/profile/Privacy"))
 const ContentPolicy = lazy(() => import("@/module/user/pages/profile/ContentPolicy"))
 
+// Context for location
+import { LocationProvider } from "@/module/user/context/LocationContext"
+
 const RestaurantOrdersPage = lazy(() => import("@/module/restaurant/pages/OrdersPage"))
 const AllOrdersPage = lazy(() => import("@/module/restaurant/pages/AllOrdersPage"))
 const RestaurantDetailsPage = lazy(() => import("@/module/restaurant/pages/RestaurantDetailsPage"))
@@ -232,16 +235,25 @@ export default function App() {
         />
 
 
-        <Route path="/usermain" element={<HomePage />} />
-        <Route path="/usermain/categories" element={<CategoriesPage />} />
-        <Route path="/usermain/category/:categoryName" element={<CategoryFoodsPage />} />
-        <Route path="/usermain/food/:id" element={<FoodDetailPage />} />
-        <Route path="/usermain/cart" element={<CartPage />} />
-        <Route path="/usermain/checkout" element={<CheckoutPage />} />
-        <Route path="/usermain/payment" element={<PaymentPage />} />
-        <Route path="/usermain/orders" element={<OrdersPage />} />
-        <Route path="/usermain/orders/:orderId" element={<OrderDetailsPage />} />
-        <Route path="/usermain/wishlist" element={<WishlistPage />} />
+        <Route
+          path="/usermain/*"
+          element={
+            <LocationProvider>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/category/:categoryName" element={<CategoryFoodsPage />} />
+                <Route path="/food/:id" element={<FoodDetailPage />} />
+                <Route path="/cart" element={<CartPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/payment" element={<PaymentPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
+                <Route path="/wishlist" element={<WishlistPage />} />
+              </Routes>
+            </LocationProvider>
+          }
+        />
 
         {/* Restaurant Protected Routes - Old Routes */}
         <Route

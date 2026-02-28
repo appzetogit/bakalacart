@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { 
+import {
   ArrowLeft,
   Clock,
   MapPin,
@@ -81,23 +81,22 @@ export default function OrderDetailsPage() {
               <h3 className="text-sm md:text-base font-bold text-gray-900 mb-1">Order #{order.id}</h3>
               <p className="text-xs md:text-sm text-gray-600">{order.restaurant}</p>
             </div>
-            <div className={`px-2 md:px-3 py-1 md:py-1.5 rounded-full text-xs font-semibold ${
-              order.status === "Delivered" 
-                ? "bg-green-100 text-green-700"
-                : order.status === "Preparing"
+            <div className={`px-2 md:px-3 py-1 md:py-1.5 rounded-full text-xs font-semibold ${order.status === "Delivered"
+              ? "bg-green-100 text-green-700"
+              : order.status === "Preparing"
                 ? "bg-orange-100 text-orange-700"
                 : "bg-blue-100 text-blue-700"
-            }`}>
+              }`}>
               {order.status}
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
             <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>{new Date(order.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
+            <span>{new Date(order.date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
             })} at {order.time}</span>
           </div>
         </div>
@@ -132,20 +131,14 @@ export default function OrderDetailsPage() {
                 <div className="text-center">
                   <MapPin className="w-12 h-12 md:w-16 md:h-16 text-[#ff8100] mx-auto mb-2" />
                   <p className="text-sm md:text-base font-semibold text-gray-700">Live Tracking</p>
-                  <p className="text-xs md:text-sm text-gray-600 mt-1">Order is on the way</p>
+                  <p className="text-xs md:text-sm text-gray-600 mt-1">Order #{order.id} is on the way</p>
                 </div>
               </div>
-              {/* You can integrate Google Maps here */}
-              {/* <iframe
-                src="https://www.google.com/maps/embed?pb=..."
-                className="w-full h-full"
-                allowFullScreen
-              /> */}
             </div>
-            <div className="p-3 md:p-4">
-              <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
-                <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#ff8100]" />
-                <span>{orderDetails.deliveryAddress || "202, Princess Centre, 2nd Floor, 6/3, 452001, New Delhi"}</span>
+            <div className="p-3 md:p-4 bg-orange-50 border-t border-orange-100">
+              <div className="flex items-start gap-2 text-xs md:text-sm text-gray-900">
+                <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#ff8100] mt-0.5 flex-shrink-0" />
+                <span className="font-medium">{orderDetails.deliveryAddress || "Delivery Address"}</span>
               </div>
             </div>
           </div>
@@ -217,7 +210,7 @@ export default function OrderDetailsPage() {
               <div className="flex-1">
                 <p className="text-xs md:text-sm font-semibold text-gray-900 mb-1">Delivery Address</p>
                 <p className="text-[10px] md:text-xs text-gray-600">
-                  {orderDetails.deliveryAddress || "202, Princess Centre, 2nd Floor, 6/3, 452001, New Delhi"}
+                  {orderDetails.deliveryAddress || "Delivery Address Not Found"}
                 </p>
               </div>
             </div>
@@ -274,14 +267,14 @@ export default function OrderDetailsPage() {
       {/* Bottom Navigation Bar - Mobile Only */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="flex items-center justify-around py-2 px-4">
-          <button 
+          <button
             onClick={() => navigate('/usermain')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
             <Home className="w-6 h-6" />
             <span className="text-xs text-gray-600 font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
@@ -293,7 +286,7 @@ export default function OrderDetailsPage() {
               <ChefHat className="w-6 h-6 text-gray-600" />
             </div>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/orders')}
             className="flex flex-col items-center gap-1 p-2 text-[#ff8100]"
           >

@@ -47,23 +47,47 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
     })
   }
 
-  // Format address for display
-  const formatAddress = (address) => {
+  // Format address for display as per user's strict requirements: 
+  // "exact as it is in DB, no lat/long, no name, no phone, no state/district"
+  const formatAddress = (address, order) => {
     if (!address) return "N/A"
 
-    const parts = []
-    if (address.label) parts.push(address.label)
-    if (address.street) parts.push(address.street)
-    if (address.additionalDetails) parts.push(address.additionalDetails)
-    if (address.formattedAddress) {
-      parts.push(address.formattedAddress)
-    } else {
-      if (address.city) parts.push(address.city)
-      if (address.state) parts.push(address.state)
-      if (address.zipCode) parts.push(address.zipCode)
+    // Use order.deliveryAddressDetails if available as it's the DB address requested by user
+    // Fallback to formattedAddress if needed
+    let addr = order.deliveryAddressDetails || address.formattedAddress || address.address || ""
+
+    // Cleanup: Remove name, phone, lat/long
+    if (order.customerName) {
+      addr = String(addr).replace(new RegExp(order.customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+    }
+    addr = String(addr).replace(/(?:\+?\d{10,15})/g, '');
+    addr = String(addr).replace(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+,?\s*/g, '');
+
+    // Remove state and city/district as requested: "state aur distruct bhi nhi"
+    if (address.state) {
+      addr = String(addr).replace(new RegExp(`,\\s*${address.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(address.state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+    }
+    if (address.city) {
+      addr = String(addr).replace(new RegExp(`,\\s*${address.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '').replace(new RegExp(address.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
     }
 
-    return parts.length > 0 ? parts.join(", ") : "Address not available"
+    // Explicitly remove common state names from images/past turn
+    addr = addr.replace(/,\s*Maharashtra/gi, '').replace(/Maharashtra/gi, '');
+    addr = addr.replace(/,\s*Madhya Pradesh/gi, '').replace(/Madhya Pradesh/gi, '');
+
+    // Final clean up of commas and spaces
+    addr = String(addr).replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '')
+
+    // If after cleaning it's empty, build from basic parts minus city/state
+    if (!addr) {
+      const parts = []
+      if (address.street) parts.push(address.street)
+      if (address.additionalDetails) parts.push(address.additionalDetails)
+      if (address.zipCode) parts.push(address.zipCode)
+      addr = parts.join(", ")
+    }
+
+    return addr || "Address not available"
   }
 
   // Get coordinates if available
@@ -356,23 +380,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
                 Delivery Address
               </h3>
               <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-900">{formatAddress(order.address)}</p>
-                {order.deliveryAddressDetails && (
-                  <div className="mt-3 pt-3 border-t border-slate-200">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Additional Address Details</p>
-                    <p className="text-sm text-slate-900">{order.deliveryAddressDetails}</p>
-                  </div>
-                )}
-                {getCoordinates(order.address) && (
-                  <p className="text-xs text-slate-500 mt-2">
-                    <span className="font-medium">Coordinates:</span> {getCoordinates(order.address)}
-                  </p>
-                )}
-                {order.address.label && (
-                  <p className="text-xs text-slate-500">
-                    <span className="font-medium">Label:</span> {order.address.label}
-                  </p>
-                )}
+                <p className="text-sm text-slate-900">{formatAddress(order.address, order)}</p>
               </div>
             </div>
           )}

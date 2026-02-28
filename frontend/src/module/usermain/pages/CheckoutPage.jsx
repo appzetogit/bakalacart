@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
+import { useLocation } from "@/module/user/hooks/useLocation"
 import {
   ArrowLeft,
   MapPin,
@@ -11,14 +12,27 @@ import {
   Menu,
   ChefHat,
   Phone,
-  User
+  User,
+  Building2,
+  Check,
+  Plus
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { userAPI } from "@/lib/api"
 
+// Get icon based on address type/label
+const getAddressIcon = (address) => {
+  const label = (address.label || address.additionalDetails || "").toLowerCase()
+  if (label.includes("home")) return Home
+  if (label.includes("work") || label.includes("office")) return Building2
+  if (label.includes("building") || label.includes("apt")) return Building2
+  return Home
+}
+
 export default function CheckoutPage() {
   const navigate = useNavigate()
+  const { location: globalLocation } = useLocation()
   const [paymentMethod, setPaymentMethod] = useState("card")
   const [userData, setUserData] = useState(null)
   const [addressLabel, setAddressLabel] = useState("Other")
@@ -89,15 +103,23 @@ export default function CheckoutPage() {
   const orderSummary = getOrderData()
 
   const formatAddress = (address) => {
-    if (!address) return orderSummary.deliveryAddress
-    const parts = [
-      address.street,
-      address.additionalDetails,
-      address.city,
-      address.state,
-      address.zipCode
-    ].filter(Boolean)
-    return parts.join(", ")
+    if (!address) return ""
+
+    // If it's a saved address object from DB
+    if (address.street || address.additionalDetails || address.city) {
+      const parts = [
+        address.street,
+        address.additionalDetails,
+        address.city,
+        address.state,
+        address.zipCode
+      ].filter(part => part && String(part).trim() !== "")
+
+      return parts.join(", ")
+    }
+
+    // If it's a location object from context
+    return address.formattedAddress || address.address || ""
   }
 
   const selectedAddress = addresses.find(addr => (addr.id || addr._id) === selectedAddressId) || null
@@ -150,11 +172,29 @@ export default function CheckoutPage() {
         const addressesData = response?.data?.data?.addresses || response?.data?.addresses || []
         setAddresses(addressesData)
 
-        const defaultAddress = addressesData.find(addr => addr.isDefault) || addressesData[0]
-        if (defaultAddress) {
-          const id = defaultAddress.id || defaultAddress._id
+        // Prioritize selection:
+        // 1. Current address from global location context (marked as manual selection)
+        // 2. Default address from DB
+        // 3. First address in list
+
+        const globalAddressId = globalLocation?.id || globalLocation?._id || globalLocation?.addressId;
+
+        let initialAddress = null;
+        if (globalAddressId) {
+          initialAddress = addressesData.find(addr => (addr.id || addr._id) === globalAddressId);
+        }
+
+        if (!initialAddress) {
+          initialAddress = addressesData.find(addr => addr.isDefault) || addressesData[0];
+        }
+
+        if (initialAddress) {
+          const id = initialAddress.id || initialAddress._id
           setSelectedAddressId(id)
-          setAddressLabel(defaultAddress.label || "Other")
+          setAddressLabel(initialAddress.label || "Other")
+        } else if (globalLocation?.formattedAddress) {
+          // If no saved address matches but we have a custom location, keep track of that
+          // Note: In this case selectedAddressId remains null, handled in fallback UI
         }
       } catch (error) {
         console.error("Error fetching user addresses:", error)
@@ -165,37 +205,38 @@ export default function CheckoutPage() {
     }
 
     fetchAddresses()
-  }, [])
+  }, [globalLocation?.id, globalLocation?._id, globalLocation?.addressId])
 
   const [validationError, setValidationError] = useState(false)
 
   // Save order data to localStorage before navigating to payment
   const handleProceedToPayment = () => {
-    // Validation: Check if a saved address is selected
-    if (!selectedAddressId) {
+    // Validation: Check if a delivery address is available
+    const finalAddress = selectedAddress || globalLocation;
+    const finalAddressText = formatAddress(finalAddress);
+
+    if (!finalAddressText || finalAddressText === "Select location") {
       setValidationError(true)
-      alert("Please select a saved address to proceed to payment.")
+      alert("Please select or add a delivery address to proceed.")
       return
     }
 
     setValidationError(false)
-    const deliveryAddressText = formatAddress(selectedAddress)
 
     const orderDataWithDetails = {
       ...orderSummary,
-      deliveryAddress: deliveryAddressText,
-      additionalAddressDetails: selectedAddress?.additionalDetails || "",
-      addressLabel: selectedAddress?.label || addressLabel,
+      deliveryAddress: finalAddressText,
+      additionalAddressDetails: selectedAddress?.additionalDetails || globalLocation?.area || "",
+      addressLabel: selectedAddress?.label || addressLabel || globalLocation?.area || "Current Location",
       customerName: userData?.name || "Guest",
-      customerPhone: userData?.phone || ""
+      customerPhone: userData?.phone || "",
+      latitude: selectedAddress?.latitude || globalLocation?.latitude,
+      longitude: selectedAddress?.longitude || globalLocation?.longitude
     }
 
     localStorage.setItem('usermain_current_order', JSON.stringify(orderDataWithDetails))
-    if (paymentMethod === "cash") {
-      navigate(`/usermain/payment?method=cash`)
-    } else {
-      navigate(`/usermain/payment?method=card`)
-    }
+    const targetMethod = paymentMethod === "cash" ? "cash" : "card";
+    navigate(`/usermain/payment?method=${targetMethod}`)
   }
 
   const handleAddressFieldChange = (field, value) => {
@@ -271,47 +312,119 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Delivery Address - tap to choose */}
+      {/* Delivery Address - Clearer Selection */}
       <div className="px-4 py-4">
-        <div className={`bg-white rounded-xl p-4 shadow-sm transition-all ${validationError ? "ring-2 ring-red-500" : ""}`}>
-          <div className="flex items-start justify-between mb-3">
+        <div className={`bg-white rounded-2xl p-4 shadow-sm transition-all ${validationError ? "ring-2 ring-red-500" : ""}`}>
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Delivery Address</h3>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#ff8100]" />
+                Delivery Address
+              </h3>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                Tap to choose where your order will be delivered
+                Confirm which address you want your order delivered to
               </p>
             </div>
+            <button
+              onClick={() => setIsAddressSelectorOpen(true)}
+              className="text-xs font-bold text-[#ff8100] px-3 py-1.5 bg-[#fff7ed] rounded-lg border border-[#ff8100]/20"
+            >
+              + Add New
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddressSelectorOpen(true)
-              setValidationError(false)
-            }}
-            className={`w-full flex items-start gap-2 rounded-xl border border-dashed px-3 py-3 transition-colors ${validationError ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-[#ff8100] hover:bg-[#fff7ed]"
-              }`}
-          >
-            <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 text-left">
-              {selectedAddress ? (
-                <>
-                  <p className="text-xs text-gray-900">
-                    {formatAddress(selectedAddress)}
-                  </p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">
-                    {selectedAddress.label || addressLabel}
-                  </p>
-                </>
-              ) : addressesLoading ? (
-                <p className="text-xs text-gray-500">Loading addresses...</p>
-              ) : (
-                <p className="text-xs text-gray-500">
-                  No saved address found. Tap to add a new address.
-                </p>
-              )}
+
+          {addressesLoading ? (
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl animate-pulse">
+              <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+              </div>
             </div>
-            <ArrowLeft className="w-4 h-4 rotate-180 text-gray-400 flex-shrink-0" />
-          </button>
+          ) : addresses.length === 0 ? (
+            <button
+              onClick={() => setIsAddressSelectorOpen(true)}
+              className="w-full flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors gap-2"
+            >
+              <Plus className="w-6 h-6 text-gray-400" />
+              <p className="text-sm font-medium text-gray-600">Add a delivery address</p>
+            </button>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+              {addresses.map((addr) => {
+                const id = addr.id || addr._id;
+                const isSelected = id === selectedAddressId;
+                const Icon = getAddressIcon(addr);
+
+                return (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      setSelectedAddressId(id);
+                      setAddressLabel(addr.label || "Other");
+                      setValidationError(false);
+                    }}
+                    className={`flex-shrink-0 w-[180px] p-3 rounded-xl border-2 transition-all relative ${isSelected
+                      ? "border-[#ff8100] bg-[#fff7ed]/50 shadow-md shadow-[#ff8100]/5"
+                      : "border-gray-100 bg-white hover:border-gray-200"
+                      }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute -top-2 -right-2 bg-[#ff8100] text-white p-1 rounded-full shadow-lg">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`p-1.5 rounded-lg ${isSelected ? "bg-[#ff8100] text-white" : "bg-gray-100 text-gray-500"}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${isSelected ? "text-[#ff8100]" : "text-gray-500"}`}>
+                        {addr.label || "Home"}
+                      </span>
+                    </div>
+                    <p className={`text-[11px] leading-relaxed line-clamp-2 text-left ${isSelected ? "text-gray-900 font-medium" : "text-gray-600"}`}>
+                      {formatAddress(addr)}
+                    </p>
+                    {addr.phone && (
+                      <p className="text-[10px] text-gray-400 mt-1.5 text-left truncate">
+                        {addr.phone}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => {
+                  setIsAddressFormOpen(true);
+                  setIsAddressSelectorOpen(true);
+                }}
+                className="flex-shrink-0 w-[100px] flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-colors gap-1.5 group"
+              >
+                <div className="p-2 bg-white rounded-full shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
+                  <Plus className="w-4 h-4 text-gray-400" />
+                </div>
+                <span className="text-[10px] font-bold text-gray-500">Add New</span>
+              </button>
+            </div>
+          )}
+
+          {selectedAddress && (
+            <div className="mt-2 pt-3 border-t border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                <p className="text-[10px] font-medium text-gray-500">
+                  Delivering to <span className="text-gray-900">{selectedAddress.label || "Home"}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddressSelectorOpen(true)}
+                className="text-[10px] font-bold text-[#ff8100] hover:underline"
+              >
+                Change
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -400,6 +513,47 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Final Delivery Confirmation - Before Payment */}
+      {(selectedAddress || globalLocation) && (
+        <div className="px-4 mb-4">
+          <div className="bg-[#fff7ed] border border-[#ff8100]/30 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-bold text-[#ff8100] uppercase tracking-wider">Confirm Your Address</span>
+              <button
+                onClick={() => {
+                  setIsAddressSelectorOpen(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-xs font-bold text-[#ff8100] bg-white px-3 py-1 rounded-full border border-[#ff8100]/20 shadow-sm"
+              >
+                Change
+              </button>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="bg-[#ff8100] text-white p-2.5 rounded-xl shadow-lg shadow-orange-200">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 mb-0.5">
+                  {selectedAddress?.label || (globalLocation?.isManual ? "Selected Location" : "Current Location")}
+                </p>
+                <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                  {formatAddress(selectedAddress || globalLocation)}
+                </p>
+              </div>
+            </div>
+            {paymentMethod === "cash" && (
+              <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-xl flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                <p className="text-[10px] text-amber-900 font-bold leading-tight">
+                  Verify above address carefully! Your order will be delivered here for Cash on Delivery.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Payment Method */}
       <div className="px-4 mb-4">
@@ -532,55 +686,79 @@ export default function CheckoutPage() {
             ) : (
               <form
                 onSubmit={handleSaveAddress}
-                className="space-y-3 max-h-[80vh] overflow-y-auto"
+                className="space-y-4 max-h-[70vh] overflow-y-auto pb-60 px-1"
               >
                 <div className="space-y-2">
                   <Input
                     placeholder="Flat/Room No"
                     value={addressFormData.flatRoom}
                     onChange={(e) => handleAddressFieldChange("flatRoom", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Floor"
                     value={addressFormData.floor}
                     onChange={(e) => handleAddressFieldChange("floor", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Building/Chawl Name"
                     value={addressFormData.building}
                     onChange={(e) => handleAddressFieldChange("building", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Landmark"
                     value={addressFormData.landmark}
                     onChange={(e) => handleAddressFieldChange("landmark", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Your Name"
                     value={addressFormData.name}
                     onChange={(e) => handleAddressFieldChange("name", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Phone Number"
                     value={addressFormData.phone}
                     onChange={(e) => handleAddressFieldChange("phone", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Pin code"
                     value={addressFormData.pinCode}
                     onChange={(e) => handleAddressFieldChange("pinCode", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                   <Input
                     placeholder="Add Location"
                     value={addressFormData.addLocation}
                     onChange={(e) => handleAddressFieldChange("addLocation", e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+                    }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
                   />
                 </div>

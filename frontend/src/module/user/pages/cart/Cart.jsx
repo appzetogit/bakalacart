@@ -809,7 +809,7 @@ export default function Cart() {
       // This removes the "Lag" or "Loading" feeling
       localStorage.setItem("userLocation", JSON.stringify(locationData))
       updateLocation(locationData)
-      toast.success(`Address selected!`)
+      toast.success(`Address selected!`, { id: "address-selection" })
 
       // --- BACKGROUND SYNC: Update backend without blocking UI ---
       // We don't await this to keep the UI snappy
