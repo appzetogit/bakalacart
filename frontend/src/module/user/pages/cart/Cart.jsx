@@ -206,6 +206,22 @@ export default function Cart() {
     return null
   }, [restaurantData])
 
+  // --- AUTO-SELECT FIX ---
+  // Auto-select the default address if none is currently selected in the UI
+  // This ensures the red checkmark appears on the first load if an address exists.
+  useEffect(() => {
+    // If we have saved addresses but nothing is explicitly selected (no id in currentLocation)
+    // and we have a default saved address, select it automatically
+    // This solves the issue of user "not knowing" which address is used.
+    if (!loadingRestaurant && addresses && addresses.length > 0 &&
+      !currentLocation?.id && !currentLocation?.addressId &&
+      savedAddress && savedAddress.id) {
+
+      console.log("📍 [AUTO-SELECT] Synchronizing currentLocation with default saved address");
+      handleSelectAddress(savedAddress);
+    }
+  }, [addresses, currentLocation?.id, currentLocation?.addressId, savedAddress, loadingRestaurant]);
+
 
 
   // Lock body scroll and scroll to top when any full-screen modal opens
@@ -913,8 +929,17 @@ export default function Cart() {
   const handlePlaceOrder = async (methodOverride = null) => {
     const finalPaymentMethod = methodOverride || selectedPaymentMethod;
 
-    if (!defaultAddress) {
-      alert("Please add a delivery address")
+    // --- STRICT ADDRESS VALIDATION ---
+    // Ensure both defaultAddress (data) and currentLocation.id (UI selection highlight) are consistent
+    const hasSelection = !!currentLocation?.id || !!currentLocation?.addressId || (currentLocation?.formattedAddress && currentLocation?.formattedAddress !== "Select location");
+
+    if (!defaultAddress || !hasSelection) {
+      alert("Please select a delivery address to proceed. Click on one of your saved addresses or add a new one.")
+
+      // Scroll to the address section if possible
+      const section = document.getElementById('delivery-address-section');
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
       return
     }
 
@@ -2008,12 +2033,12 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Address Selection Check for Button State */}
+              {/* Address Selection Check for Button State - REQUIRED FOR PREVENTING ORDERS WITHOUT ADDRESS */}
               {(() => {
-                const isAddressSelected = !!defaultAddress && (
-                  defaultAddress.id ||
-                  defaultAddress._id ||
-                  (defaultAddress.formattedAddress && defaultAddress.formattedAddress !== "Select location")
+                const isAddressSelected = !!defaultAddress && !!(
+                  currentLocation?.id ||
+                  currentLocation?.addressId ||
+                  (currentLocation?.formattedAddress && currentLocation?.formattedAddress !== "Select location")
                 );
 
                 const isRestaurantClosed = restaurantData && restaurantData.isAcceptingOrders === false;
@@ -2061,7 +2086,12 @@ export default function Cart() {
           >
             <div className="px-6 py-8">
               {/* Title */}
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Placing your order</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Confirm Order Details</h2>
+                {selectedPaymentMethod === "cash" && (
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full border border-amber-200 uppercase tracking-tighter animate-pulse">COD Verification</span>
+                )}
+              </div>
 
               {/* Payment Info */}
               <div className="flex items-center gap-4 mb-5">
@@ -2086,12 +2116,13 @@ export default function Cart() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">Delivering to Location</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address") : "Add address"}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {defaultAddress ? (formatFullAddress(defaultAddress) || "Address") : "Address"}
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-lg font-bold text-gray-900">VERIFY DELIVERY ADDRESS</p>
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-800 leading-snug">
+                    {defaultAddress?.label ? `${defaultAddress.label.toUpperCase()}: ` : ""}
+                    {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Address") : "Select an address"}
                   </p>
                 </div>
               </div>
@@ -2269,7 +2300,33 @@ export default function Cart() {
               <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-6" />
 
               <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-1">Payment Method</h2>
-              <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-8">Choose your preferred payment option</p>
+              <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-6">Choose your preferred payment option</p>
+
+              {/* Delivery Address Preview in Payment Sheet - CRITICAL FOR VERIFICATION */}
+              <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-800 rounded-2xl p-4 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="h-4 w-4 text-orange-600" />
+                  <span className="text-[10px] md:text-xs font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Confirming Delivery Address</span>
+                </div>
+                <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                  {defaultAddress?.label ? `${defaultAddress.label.toUpperCase()}: ` : ""}
+                  {[defaultAddress?.street, defaultAddress?.city].filter(Boolean).join(', ')}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
+                  {formatFullAddress(defaultAddress)}
+                </p>
+                {/* Manual Address Selector Link */}
+                <button
+                  onClick={() => {
+                    setShowPaymentSheet(false);
+                    const section = document.getElementById('delivery-address-section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="mt-2 text-xs font-bold text-red-600 dark:text-red-400 underline decoration-red-600/30 underline-offset-4"
+                >
+                  NOT THE RIGHT ADDRESS? CHANGE
+                </button>
+              </div>
 
               <div className="space-y-4">
                 {/* Online Payment Option */}
@@ -2305,12 +2362,16 @@ export default function Cart() {
                     setTimeout(() => handlePlaceOrder("cash"), 300);
                   }}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative">
                     <Banknote className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                    {/* COD Label indicator */}
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900"></div>
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-gray-900 dark:text-white">Cash on Delivery</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Pay when you receive your order</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-gray-900 dark:text-white">Cash on Delivery</p>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Place order now, pay later</p>
                   </div>
                   {selectedPaymentMethod === "cash" && (
                     <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center">
