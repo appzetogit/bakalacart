@@ -120,6 +120,46 @@ export default function TripHistory() {
 
   const recentDates = generateRecentDates()
 
+  // Generate recent weeks for picker
+  const generateRecentWeeks = () => {
+    const weeks = []
+    for (let i = 0; i < 12; i++) {
+      const date = new Date()
+      date.setDate(date.getDate() - (i * 7))
+      weeks.push(date)
+    }
+    return weeks
+  }
+  const recentWeeks = generateRecentWeeks()
+
+  // Generate recent months for picker
+  const generateRecentMonths = () => {
+    const months = []
+    for (let i = 0; i < 6; i++) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      months.push(date)
+    }
+    return months
+  }
+  const recentMonths = generateRecentMonths()
+
+  const getWeekRange = (date) => {
+    const start = new Date(date)
+    const day = start.getDay()
+    const diff = start.getDate() - day + (day === 0 ? -6 : 1)
+    start.setDate(diff)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    end.setHours(23, 59, 59, 999)
+    return { start, end }
+  }
+
+  const formatMonth = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
   // Fetch bonus transactions when modal opens
   useEffect(() => {
     const fetchBonusTransactions = async () => {
@@ -274,7 +314,12 @@ export default function TripHistory() {
             className="flex-1 flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <span className="text-sm font-medium text-black">
-              {formatDateDisplay(selectedDate)}: {selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+              {activeTab === "daily"
+                ? `${formatDateDisplay(selectedDate)}: ${selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                : activeTab === "weekly"
+                  ? `${getWeekRange(selectedDate).start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${getWeekRange(selectedDate).end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                  : formatMonth(selectedDate)
+              }
             </span>
             <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
           </button>
@@ -311,7 +356,7 @@ export default function TripHistory() {
       {/* Date Picker Dropdown */}
       {showDatePicker && (
         <div className="fixed left-4 right-4 top-[201px] bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-          {recentDates.map((date, index) => (
+          {activeTab === "daily" && recentDates.map((date, index) => (
             <button
               key={index}
               onClick={() => {
@@ -326,6 +371,41 @@ export default function TripHistory() {
               </span>
             </button>
           ))}
+          {activeTab === "weekly" && recentWeeks.map((date, index) => {
+            const range = getWeekRange(date)
+            const isSelected = getWeekRange(selectedDate).start.toDateString() === range.start.toDateString()
+            return (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedDate(date)
+                  setShowDatePicker(false)
+                }}
+                className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-gray-50 font-medium' : ''
+                  }`}
+              >
+                <span className="text-sm text-black">
+                  {range.start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - {range.end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                </span>
+              </button>
+            )
+          })}
+          {activeTab === "monthly" && recentMonths.map((date, index) => {
+            const isSelected = selectedDate.getMonth() === date.getMonth() && selectedDate.getFullYear() === date.getFullYear()
+            return (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedDate(date)
+                  setShowDatePicker(false)
+                }}
+                className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-gray-50 font-medium' : ''
+                  }`}
+              >
+                <span className="text-sm text-black">{formatMonth(date)}</span>
+              </button>
+            )
+          })}
         </div>
       )}
 

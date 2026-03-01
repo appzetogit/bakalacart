@@ -114,6 +114,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       ]),
       // 2. Order Status Stats
       Order.aggregate([
+        ...(Object.keys(dateFilter).length > 0 ? [{ $match: { createdAt: dateFilter } }] : []),
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       // 3. Active Partners
@@ -192,7 +193,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         }
       }),
       // 10. Total ALL-status order count
-      Order.countDocuments({}),
+      Order.countDocuments(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
       // 11. Top riders by delivered orders this month
       Order.aggregate([
         {

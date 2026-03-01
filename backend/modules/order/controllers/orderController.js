@@ -9,6 +9,7 @@ import winston from 'winston';
 import { calculateOrderPricing } from '../services/orderCalculationService.js';
 import { getRazorpayCredentials } from '../../../shared/utils/envService.js';
 import { notifyRestaurantNewOrder } from '../services/restaurantNotificationService.js';
+import { notifyAdminNewOrder } from '../services/adminNotificationService.js';
 import { sendOrderPushNotification, sendAdminPushNotification } from '../services/pushNotificationService.js';
 import { calculateOrderSettlement } from '../services/orderSettlementService.js';
 import { holdEscrow } from '../services/escrowWalletService.js';
@@ -545,6 +546,16 @@ export const createOrder = async (req, res) => {
           logger.error('❌ Error notifying restaurant about wallet payment order:', notifyError);
         }
 
+        // Notify Admin about new Wallet order via Socket.IO
+        try {
+          await notifyAdminNewOrder(order);
+          logger.info('✅ Wallet payment order notification sent to Admin Socket.IO', {
+            orderId: order.orderId
+          });
+        } catch (adminNotifyError) {
+          logger.error('❌ Error notifying admin about Wallet order Socket.IO:', adminNotifyError);
+        }
+
         // Respond to client
         return res.status(201).json({
           success: true,
@@ -627,6 +638,16 @@ export const createOrder = async (req, res) => {
           error: notifyError.message,
           stack: notifyError.stack
         });
+      }
+
+      // Notify Admin about new COD order via Socket.IO
+      try {
+        await notifyAdminNewOrder(order);
+        logger.info('✅ COD order notification sent to Admin Socket.IO', {
+          orderId: order.orderId
+        });
+      } catch (adminNotifyError) {
+        logger.error('❌ Error notifying admin about COD order Socket.IO:', adminNotifyError);
       }
 
       // Notify user about order placement (FCM)
@@ -960,6 +981,16 @@ export const verifyOrderPayment = async (req, res) => {
       // Don't fail payment verification if notification fails
       // Order is still saved and restaurant can fetch it via API
       // But log it as critical for debugging
+    }
+
+    // Notify Admin about new Online order via Socket.IO
+    try {
+      await notifyAdminNewOrder(order);
+      logger.info('✅ Online order notification sent to Admin Socket.IO', {
+        orderId: order.orderId
+      });
+    } catch (adminNotifyError) {
+      logger.error('❌ Error notifying admin about Online order Socket.IO:', adminNotifyError);
     }
 
     // FIREBASE NOTIFICATION TO USER

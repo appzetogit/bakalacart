@@ -1877,7 +1877,7 @@ export default function Home() {
                     whileHover={{ scale: 1.1, y: -5 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Link to={`/user/search?q=${encodeURIComponent(category.name)}`}>
+                    <Link to={`/category/${category.slug || category.id}`}>
                       <div className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28">
                         <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-gray-100 dark:bg-gray-800">
                           {category.image && category.image.trim() !== '' && category.image !== 'https://via.placeholder.com/40' ? (
@@ -1959,7 +1959,7 @@ export default function Home() {
                     whileHover={{ scale: 1.1, y: -5 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Link to={`/user/category/${category.slug || category.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <Link to={`/category/${category.slug || category.label.toLowerCase().replace(/\s+/g, '-')}`}>
                       <div className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28">
                         <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-gray-100 dark:bg-gray-800">
                           {category.imageUrl && category.imageUrl.trim() !== '' && category.imageUrl !== 'https://via.placeholder.com/40' ? (

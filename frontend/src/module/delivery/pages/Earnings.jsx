@@ -137,8 +137,8 @@ export default function Earnings() {
               )
               const dayOrders = uniqueOrdersDay.size
 
-              // Calculate time for this day
-              let dayMinutes = dayOrders * 30 // Average 30 minutes per unique order
+              // Calculate time for this day from backend data
+              const dayMinutes = dayEarnings.reduce((sum, e) => sum + (e.timeMinutes || 0), 0)
 
               dailyBreakdown.push({
                 date,
@@ -172,6 +172,7 @@ export default function Earnings() {
             while (currentWeekStart <= lastDay) {
               const weekEnd = new Date(currentWeekStart)
               weekEnd.setDate(currentWeekStart.getDate() + 6)
+              weekEnd.setHours(23, 59, 59, 999) // Set to end of day to include all Sunday transactions
 
               if (weekEnd >= firstDay && currentWeekStart <= lastDay) {
                 // Find earnings for this week
@@ -190,8 +191,8 @@ export default function Earnings() {
                 )
                 const weekOrders = uniqueOrdersWeek.size
 
-                // Calculate time for this week
-                let weekMinutes = weekOrders * 30 // Average 30 minutes per order
+                // Calculate time for this week from backend data
+                const weekMinutes = weekEarnings.reduce((sum, e) => sum + (e.timeMinutes || 0), 0)
 
                 weeklyBreakdown.push({
                   weekStart: new Date(currentWeekStart),

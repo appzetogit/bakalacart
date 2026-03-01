@@ -170,21 +170,21 @@ export default function OrderDetails() {
       let yPosition = 20
 
       // Header - Restaurant Name
-      doc.setFontSize(18)
+      doc.setFontSize(22)
       doc.setFont("helvetica", "bold")
       doc.text(orderData.restaurant, pageWidth / 2, yPosition, { align: "center" })
-      yPosition += 7
+      yPosition += 10
 
-      doc.setFontSize(10)
+      doc.setFontSize(12)
       doc.setFont("helvetica", "normal")
       doc.text(orderData.address, pageWidth / 2, yPosition, { align: "center" })
-      yPosition += 15
+      yPosition += 20
 
       // Order Receipt Title
-      doc.setFontSize(16)
+      doc.setFontSize(20)
       doc.setFont("helvetica", "bold")
       doc.text("ORDER RECEIPT", pageWidth / 2, yPosition, { align: "center" })
-      yPosition += 10
+      yPosition += 12
 
       // Horizontal line
       doc.setLineWidth(0.5)
@@ -192,18 +192,16 @@ export default function OrderDetails() {
       yPosition += 10
 
       // Order Information
-      doc.setFontSize(11)
+      doc.setFontSize(14)
       doc.setFont("helvetica", "bold")
       doc.text("Order ID:", 15, yPosition)
-      doc.setFont("helvetica", "normal")
-      doc.text(orderData.id, 50, yPosition)
-      yPosition += 7
+      doc.text(orderData.id, 60, yPosition)
+      yPosition += 10
 
       doc.setFont("helvetica", "bold")
       doc.text("Date & Time:", 15, yPosition)
-      doc.setFont("helvetica", "normal")
-      doc.text(`${orderData.date}, ${orderData.time}`, 50, yPosition)
-      yPosition += 7
+      doc.text(`${orderData.date}, ${orderData.time}`, 60, yPosition)
+      yPosition += 10
 
       doc.setFont("helvetica", "bold")
       doc.text("Status:", 15, yPosition)
@@ -302,11 +300,11 @@ export default function OrderDetails() {
         headStyles: {
           fillColor: [55, 65, 81],
           textColor: [255, 255, 255],
-          fontSize: 10,
+          fontSize: 12,
           fontStyle: "bold"
         },
         bodyStyles: {
-          fontSize: 9
+          fontSize: 11
         },
         margin: { left: 15, right: 15 }
       })
@@ -340,10 +338,10 @@ export default function OrderDetails() {
       doc.setLineDash([]) // Reset to solid line
 
       doc.setFont("helvetica", "bold")
-      doc.setFontSize(11)
+      doc.setFontSize(14)
       doc.text("Total Bill:", 15, yPosition)
       doc.text(`Rs. ${orderData.billing.total}`, pageWidth - 15, yPosition, { align: "right" })
-      yPosition += 6
+      yPosition += 10
 
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
@@ -534,9 +532,9 @@ export default function OrderDetails() {
             <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-gray-900">Order details</h1>
-            <p className="text-xs text-gray-600 truncate">
-              ID: {orderData.id}, {orderData.restaurant?.substring(0, 20) || 'Restaurant'}...
+            <h1 className="text-xl font-black text-gray-900">Order details</h1>
+            <p className="text-sm font-bold text-gray-600 truncate">
+              ID: {orderData.id}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -572,20 +570,21 @@ export default function OrderDetails() {
           </div>
 
           {/* Order ID */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-base font-bold text-gray-900">ID: {orderData.id}</span>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl font-black text-gray-900">Order ID: {orderData.id}</span>
             <button
               onClick={handleCopyOrderId}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
               aria-label="Copy order ID"
             >
-              <Copy className="w-4 h-4 text-gray-500" />
+              <Copy className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
           {/* Restaurant Info */}
-          <p className="text-sm text-gray-900 mb-3">
-            {orderData.restaurant}, {orderData.address}
+          <p className="text-lg font-bold text-gray-800 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
+            {orderData.restaurant}<br />
+            <span className="text-sm font-medium text-gray-500">{orderData.address}</span>
           </p>
 
           {/* Divider */}
@@ -608,17 +607,17 @@ export default function OrderDetails() {
                 <User className="w-5 h-5 text-gray-600" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">{orderData.customer.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{orderData.customer.orderCount} order with you</p>
+                <p className="text-xl font-black text-gray-900">{orderData.customer.name}</p>
+                <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-tighter">Verified Customer</p>
               </div>
 
               <hr className="border-gray-200 my-3" />
 
             </div>
             <div className="flex items-center gap-3">
-              <MapPin className="w-5 h-5 text-gray-600" />
+              <MapPin className="w-6 h-6 text-red-600" />
               <div className="flex-1">
-                <p className="text-sm text-gray-900">{orderData.customer.location}</p>
+                <p className="text-lg font-bold text-gray-900">{orderData.customer.location}</p>
               </div>
               {orderData.customer.distance && orderData.customer.distance !== 'N/A' && (
                 <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
@@ -641,8 +640,11 @@ export default function OrderDetails() {
                   <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-blue-800 font-bold uppercase tracking-wider mb-1">IMPORTANT: Customer Instructions</p>
-                  <p className="text-base text-gray-900 font-semibold italic leading-relaxed bg-white/50 p-3 rounded-lg border border-blue-100">
+                  <p className="text-xl text-blue-800 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <FileText className="w-6 h-6" />
+                    IMPORTANT: CUSTOMER INSTRUCTIONS
+                  </p>
+                  <p className="text-2xl text-gray-900 font-black italic leading-tight bg-white p-5 rounded-2xl border-4 border-blue-200 shadow-inner">
                     "{orderData.customer.note}"
                   </p>
                 </div>
@@ -664,32 +666,34 @@ export default function OrderDetails() {
         </div>
 
         {/* Item Details Section */}
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Item details</h2>
+        <div className="mb-8">
+          <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">Item details</h2>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[300px]">
-                <thead className="bg-gray-50 border-b border-gray-100">
+              <table className="w-full text-left border-collapse min-w-[350px]">
+                <thead className="bg-gray-100 border-b-2 border-gray-200">
                   <tr>
-                    <th className="py-4 px-4 text-base font-black text-gray-800 w-20">Qty</th>
-                    <th className="py-4 px-4 text-base font-black text-gray-800">Item Details</th>
-                    <th className="py-4 px-4 text-base font-black text-gray-800 text-right w-28">Price</th>
+                    <th className="py-5 px-6 text-lg font-black text-gray-800 uppercase tracking-wider w-24">Qty</th>
+                    <th className="py-5 px-6 text-lg font-black text-gray-800 uppercase tracking-wider">Item Details</th>
+                    <th className="py-5 px-6 text-lg font-black text-gray-800 uppercase tracking-wider text-right w-36">Price</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y-2 divide-gray-100">
                   {orderData.items.map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors bg-white">
-                      <td className="py-4 px-4 align-top w-20">
-                        <span className="text-lg font-bold text-gray-900 bg-gray-100 px-3 py-1.5 rounded inline-block whitespace-nowrap">{item.quantity} x</span>
+                    <tr key={index} className="hover:bg-gray-50/80 transition-colors bg-white">
+                      <td className="py-6 px-6 align-top w-24">
+                        <span className="text-2xl font-black text-white bg-gray-900 px-4 py-2 rounded-lg shadow-sm inline-block whitespace-nowrap min-w-[3.5rem] text-center">
+                          {item.quantity}
+                        </span>
                       </td>
-                      <td className="py-4 px-4 align-top">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-start gap-2">
-                            <div className={`w-4 h-4 mt-1 rounded-sm border flex items-center justify-center shrink-0 ${item.type === 'Non-Veg' ? 'border-red-500 bg-red-50' : 'border-green-500 bg-green-50'}`}>
-                              <div className={`w-2 h-2 rounded-full ${item.type === 'Non-Veg' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                      <td className="py-6 px-6 align-top">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center shrink-0 ${item.type === 'Non-Veg' ? 'border-red-600 bg-red-50' : 'border-green-600 bg-green-50'}`}>
+                              <div className={`w-2.5 h-2.5 rounded-full ${item.type === 'Non-Veg' ? 'bg-red-600' : 'bg-green-600'}`}></div>
                             </div>
-                            <span className="text-lg font-bold text-gray-900 leading-tight">
+                            <span className="text-2xl font-extrabold text-gray-900 leading-tight">
                               {item.name}
                             </span>
                           </div>
@@ -699,30 +703,37 @@ export default function OrderDetails() {
                             const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
                             const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
                             return displayParts.length > 0 ? (
-                              <span className="text-base font-bold text-[#ff8100] ml-6 block mt-0.5">
+                              <span className="text-xl font-bold text-[#ff8100] ml-8 block">
                                 ({displayParts.join(' ')})
                               </span>
                             ) : null
                           })()}
 
                           {item.variation && (
-                            <span className="text-sm font-semibold text-gray-600 ml-6 block mt-0.5">
+                            <span className="text-lg font-bold text-gray-600 ml-8 block bg-gray-50 px-3 py-1 rounded w-fit">
                               {item.variation}
                             </span>
                           )}
 
                           {item.description && (
-                            <div className="ml-6 mt-1.5 p-3 bg-blue-50/50 rounded-lg border border-blue-100 border-l-4 border-l-blue-500">
-                              <p className="text-base text-gray-800 font-semibold whitespace-pre-wrap">
-                                <span className="font-bold text-gray-900">Note: </span>
-                                {item.description}
+                            <div className="ml-8 mt-2 p-4 bg-orange-50/50 rounded-xl border border-orange-100 border-l-4 border-l-[#ff8100]">
+                              <p className="text-lg text-gray-800 font-bold italic leading-relaxed">
+                                <span className="text-[#ff8100] uppercase text-xs font-black block mb-1">Item Note:</span>
+                                "{item.description}"
                               </p>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="py-4 px-4 align-top text-right w-28">
-                        <span className="text-lg font-bold text-gray-900">₹{item.price}</span>
+                      <td className="py-6 px-6 align-top text-right w-36">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-2xl font-black text-gray-900">₹{(item.price * item.quantity).toFixed(2)}</span>
+                          {item.quantity > 1 && (
+                            <span className="text-sm font-bold text-gray-500">
+                              (₹{item.price} &times; {item.quantity})
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -733,22 +744,27 @@ export default function OrderDetails() {
         </div>
 
         {/* Bill Details Section */}
-        <div>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Bill details</h2>
+        <div className="pb-10">
+          <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">Bill details</h2>
 
-          <div className="bg-white  rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-base text-gray-600">Item subtotal</span>
-              <span className="text-base font-medium text-gray-900">₹{orderData.billing.itemSubtotal}</span>
+          <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-lg font-bold text-gray-600">Item subtotal</span>
+              <span className="text-xl font-extrabold text-gray-900">₹{orderData.billing.itemSubtotal}</span>
             </div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-base text-gray-600">Taxes</span>
-              <span className="text-base font-medium text-gray-900">₹{orderData.billing.taxes}</span>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-lg font-bold text-gray-600">Taxes</span>
+              <span className="text-xl font-extrabold text-gray-900">₹{orderData.billing.taxes}</span>
             </div>
-            <div className="my-3 border-t border-dashed border-gray-200"></div>
+
+            <div className="my-5 border-t-2 border-dashed border-gray-200"></div>
+
             <div className="flex items-center justify-between">
-              <span className="text-xl font-bold text-gray-900">Total bill</span>
-              <span className="text-2xl font-black text-[#ff8100]">₹{orderData.billing.total}</span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-black text-gray-900">Total bill</span>
+                <span className="text-xs font-bold text-green-600 uppercase tracking-widest">{orderData.billing.paymentMethod}</span>
+              </div>
+              <span className="text-4xl font-black text-[#ff8100] drop-shadow-sm">₹{orderData.billing.total}</span>
             </div>
           </div>
         </div>

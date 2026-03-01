@@ -81,6 +81,9 @@ export default function OrdersPage({ statusKey = "all" }) {
         cancelledBy: statusKey === "restaurant-cancelled" ? "restaurant" : undefined,
         search: searchQuery || undefined,
         paymentStatus: filters.paymentStatus || undefined,
+        deliveryType: filters.deliveryType || undefined,
+        minAmount: filters.minAmount || undefined,
+        maxAmount: filters.maxAmount || undefined,
         restaurant: filters.restaurant || undefined,
         fromDate: filters.fromDate || undefined,
         toDate: filters.toDate || undefined,
@@ -116,6 +119,9 @@ export default function OrdersPage({ statusKey = "all" }) {
   useEffect(() => {
     let count = 0;
     if (filters.paymentStatus) count++;
+    if (filters.deliveryType) count++;
+    if (filters.minAmount) count++;
+    if (filters.maxAmount) count++;
     if (filters.restaurant) count++;
     if (filters.fromDate) count++;
     if (filters.toDate) count++;

@@ -757,9 +757,9 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     console.log(`✅ Order ${order.orderId} accepted by delivery partner ${delivery._id}`);
     console.log(`📍 Route calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
 
-    // Notify user about delivery partner assignment
+    // Notify user about delivery partner assignment asynchronously
     if (updatedOrder.userId) {
-      await notifyUserSafely(
+      notifyUserSafely(
         updatedOrder.userId,
         'Delivery Partner Assigned',
         `Your delivery partner ${delivery.name} has accepted your order and is on the way to the restaurant.`,
@@ -972,9 +972,9 @@ export const denyOrder = asyncHandler(async (req, res) => {
       };
       console.log(`🔄 Unassigned order ${order.orderId} from delivery partner ${deliveryId}`);
 
-      // Notify user that we're finding a new partner
+      // Notify user that we're finding a new partner asynchronously
       if (order.userId) {
-        await notifyUserSafely(
+        notifyUserSafely(
           order.userId._id || order.userId,
           'Updating Delivery Partner',
           'Your delivery partner had to cancel. We are assigning a new one for you right now.',
@@ -1428,23 +1428,20 @@ export const confirmOrderId = asyncHandler(async (req, res) => {
       .populate('restaurantId', 'name location address')
       .lean();
 
-    // --- FIREBASE SYNC ---
-    try {
-      const { syncActiveOrderToFirebase } = await import('../../../shared/services/firebaseAdmin.js');
-      await syncActiveOrderToFirebase(order.orderId, {
+    // --- FIREBASE SYNC (Asynchronous) ---
+    import('../../../shared/services/firebaseAdmin.js').then(({ syncActiveOrderToFirebase }) => {
+      syncActiveOrderToFirebase(order.orderId, {
         status: 'out_for_delivery',
         boy_id: deliveryId.toString()
-      });
-    } catch (fbErr) {
-      console.warn('⚠️ Firebase Sync Failed (confirmOrderId):', fbErr.message);
-    }
+      }).catch(fbErr => console.warn('⚠️ Firebase Sync Failed (confirmOrderId):', fbErr.message));
+    }).catch(err => console.warn('⚠️ Module load failed (confirmOrderId):', err.message));
 
     console.log(`✅ Order ID confirmed for order ${order.orderId}`);
     console.log(`📍 Route to delivery calculated: ${routeData.distance.toFixed(2)} km, ${routeData.duration.toFixed(1)} mins`);
 
-    // Notify user
+    // Notify user asynchronously
     if (updatedOrder.userId) {
-      await notifyUserSafely(
+      notifyUserSafely(
         updatedOrder.userId,
         'Order Picked Up!',
         'Your order has been picked up and is on the way to you.',
@@ -1661,7 +1658,7 @@ export const confirmReachedDrop = asyncHandler(async (req, res) => {
 
     const userIdForDrop = finalOrder.userId;
     if (userIdForDrop) {
-      await notifyUserSafely(
+      notifyUserSafely(
         userIdForDrop,
         'Delivery Partner Arrived',
         'Your delivery partner has reached your location.',
@@ -1903,7 +1900,7 @@ export const completeDelivery = asyncHandler(async (req, res) => {
 
     const userIdForComplete = updatedOrder.userId;
     if (userIdForComplete) {
-      await notifyUserSafely(
+      notifyUserSafely(
         userIdForComplete,
         'Order Delivered!',
         'Your order has been successfully delivered. Enjoy your meal!',

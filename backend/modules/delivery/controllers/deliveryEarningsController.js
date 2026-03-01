@@ -116,6 +116,18 @@ export const getEarnings = asyncHandler(async (req, res) => {
     // Combine transaction and order data
     const earnings = transactions.map(transaction => {
       const order = transaction.orderId ? orderMap[transaction.orderId.toString()] : null;
+
+      // Calculate individual order duration if timestamps are available
+      let timeMinutes = 0;
+      if (order && order.createdAt && order.deliveredAt) {
+        const start = new Date(order.createdAt);
+        const end = new Date(order.deliveredAt);
+        const diffMs = end - start;
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        // Sanity check: cap order time between 10 and 120 minutes for realistic display
+        timeMinutes = Math.min(Math.max(diffMins, 10), 120);
+      }
+
       return {
         transactionId: transaction._id?.toString(),
         orderId: order?.orderId || transaction.orderId?.toString() || 'Incentive',
@@ -123,9 +135,10 @@ export const getEarnings = asyncHandler(async (req, res) => {
         amount: transaction.amount || 0,
         type: transaction.type,
         description: transaction.description || '',
-        deliveredAt: order?.deliveredAt || transaction.processedAt || transaction.createdAt,
-        createdAt: transaction.createdAt || transaction.processedAt,
-        paymentCollected: transaction.paymentCollected || false
+        deliveredAt: order?.deliveredAt || transaction.processedAt || transaction.createdAt || transaction.date,
+        createdAt: transaction.createdAt || transaction.processedAt || transaction.date,
+        paymentCollected: transaction.paymentCollected || false,
+        timeMinutes // Include the calculated time for this specific order for frontend charts
       };
     });
 

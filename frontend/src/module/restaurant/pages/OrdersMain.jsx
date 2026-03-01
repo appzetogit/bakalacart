@@ -498,6 +498,8 @@ export default function OrdersMain() {
   const audioRef = useRef(null)
 
   // Initialise audio object once on mount (programmatic, not via JSX ref — more reliable)
+  // Audio object moved to Global RestaurantLayout
+  /*
   useEffect(() => {
     const audio = new Audio(notificationSound)
     audio.loop = true
@@ -508,6 +510,7 @@ export default function OrdersMain() {
       audioRef.current = null
     }
   }, [])
+  */
   const shownOrdersRef = useRef(new Set()) // Track orders already shown in popup
   const [restaurantStatus, setRestaurantStatus] = useState({
     isActive: null,
@@ -682,12 +685,13 @@ export default function OrdersMain() {
     if (newOrder) {
       console.log('📦 New order received via Socket.IO:', newOrder)
       const orderId = newOrder.orderId || newOrder.orderMongoId
-      if (orderId && !shownOrdersRef.current.has(orderId)) {
-        shownOrdersRef.current.add(orderId)
-        setPopupOrder(newOrder)
-        setShowNewOrderPopup(true)
-        setCountdown(240) // Reset countdown to 4 minutes
-      }
+      /* Popup logic handled by Global RestaurantLayout */
+      // if (orderId && !shownOrdersRef.current.has(orderId)) {
+      //   shownOrdersRef.current.add(orderId)
+      //   setPopupOrder(newOrder)
+      //   setShowNewOrderPopup(true)
+      //   setCountdown(240) // Reset countdown to 4 minutes
+      // }
     }
   }, [newOrder])
 

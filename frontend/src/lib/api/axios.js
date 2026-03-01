@@ -281,9 +281,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Determine which module's refresh endpoint to use based on the REQUEST URL
-        const requestUrl = originalRequest.url || '';
-        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(requestUrl);
+        // Determine which module's refresh endpoint to use based on the CURRENT PAGE (not the failing request URL)
+        // Background API calls (like zones or notifications) shouldn't define the module for token refresh
+        const currentAppPath = window.location.pathname;
+        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(currentAppPath);
 
         // Try to refresh the token
         // The refresh token is sent via httpOnly cookie automatically

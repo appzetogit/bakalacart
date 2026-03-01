@@ -300,7 +300,7 @@ export default function CategoryPage() {
                 slug: restaurant.slug || restaurant.name?.toLowerCase().replace(/\s+/g, '-'),
                 restaurantId: restaurantId,
                 hasPaneer: false,
-                category: 'all',
+                category: restaurant.category || 'all',
               }
             })
 
@@ -468,31 +468,32 @@ export default function CategoryPage() {
 
   // Filter restaurants based on active filters and selected category
   // If category is selected, expand restaurants into dish cards (one card per matching dish)
+  // Filter restaurants based on active filters and selected category
   const filteredRecommended = useMemo(() => {
-    const sourceData = restaurantsData.length > 0 ? restaurantsData : []
+    const sourceData = Array.isArray(restaurantsData) ? restaurantsData : []
     let filtered = [...sourceData]
 
-    // Filter by category - Dynamic filtering based on menu items
+    // Filter by category - Dynamic filtering
     if (selectedCategory && selectedCategory !== 'all') {
       const expandedDishes = []
+      const keywords = categoryKeywords[selectedCategory] || [selectedCategory]
+      const selectedCategoryLower = selectedCategory.toLowerCase()
 
       filtered.forEach(r => {
         if (r.menu) {
-          // Menu loaded — use proper keyword-based filtering
           const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
           if (hasCategoryItem) {
-            // Get ALL matching dishes for this category
             const categoryDishes = getAllCategoryDishesFromMenu(r.menu, selectedCategory)
-
             if (categoryDishes.length > 0) {
-              // Create one card per dish
               categoryDishes.forEach((dish, index) => {
+                // Apply vegMode filter if enabled
+                if (vegMode && dish.foodType !== "Veg") {
+                  return
+                }
                 expandedDishes.push({
                   ...r,
-                  // Unique ID for each dish card
                   id: `${r.id}-dish-${dish.itemId || index}`,
                   dishId: dish.itemId || `${r.id}-dish-${index}`,
-                  // Category dish info for this specific dish
                   categoryDish: dish,
                   categoryDishName: dish.name,
                   categoryDishPrice: dish.price,
@@ -500,133 +501,35 @@ export default function CategoryPage() {
                 })
               })
             }
-            // No matching dishes found in menu → skip restaurant
           }
         } else {
-          // Menu still loading (null) — keep restaurant visible temporarily
-          // so the UI doesn't show empty results while menus are being fetched.
-          // Once menus load, this restaurant will be replaced by proper filtered results.
-          const keywords = categoryKeywords[selectedCategory] || []
-          if (keywords.length > 0) {
-            const featuredDishLower = (r.featuredDish || '').toLowerCase()
-            const cuisineLower = (r.cuisine || '').toLowerCase()
-            const nameLower = (r.name || '').toLowerCase()
+          // Menu still loading or no menu - filter by keywords in metadata
+          const featuredDishLower = (r.featuredDish || '').toLowerCase()
+          const cuisineLower = (r.cuisine || '').toLowerCase()
+          const nameLower = (r.name || '').toLowerCase()
+          const restaurantCategoryLower = (r.category || '').toLowerCase()
 
-            if (keywords.some(keyword =>
+          // Check for matches in keywords OR direct category match
+          const matchesCategory =
+            restaurantCategoryLower === selectedCategoryLower ||
+            restaurantCategoryLower.includes(selectedCategoryLower) ||
+            selectedCategoryLower.includes(restaurantCategoryLower) ||
+            (keywords.length > 0 && keywords.some(keyword =>
               featuredDishLower.includes(keyword) ||
               cuisineLower.includes(keyword) ||
-              nameLower.includes(keyword)
-            )) {
-              expandedDishes.push(r)
-            } else {
-              // Show restaurant while menu loads so page isn't blank
-              expandedDishes.push(r)
-            }
-          } else {
-            // No keywords yet (categories still loading) — show all restaurants
+              nameLower.includes(keyword) ||
+              restaurantCategoryLower.includes(keyword)
+            ))
+
+          if (matchesCategory) {
             expandedDishes.push(r)
           }
         }
       })
-
       filtered = expandedDishes
     }
 
-    // Apply filters
-    if (activeFilters.has('under-30-mins')) {
-      filtered = filtered.filter(r => {
-        if (!r.deliveryTime) return false
-        const timeMatch = r.deliveryTime.match(/(\d+)/)
-        return timeMatch && parseInt(timeMatch[1]) <= 30
-      })
-    }
-    if (activeFilters.has('rating-4-plus')) {
-      filtered = filtered.filter(r => r.rating && r.rating >= 4.0)
-    }
-    if (activeFilters.has('flat-50-off')) {
-      filtered = filtered.filter(r => r.offer && r.offer.includes('50%'))
-    }
-
-    // Filter by search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(r =>
-        r.name?.toLowerCase().includes(query) ||
-        r.cuisine?.toLowerCase().includes(query) ||
-        r.featuredDish?.toLowerCase().includes(query)
-      )
-    }
-
-    return filtered
-  }, [selectedCategory, activeFilters, searchQuery, restaurantsData, categoryKeywords, vegMode])
-
-  const filteredAllRestaurants = useMemo(() => {
-    const sourceData = restaurantsData.length > 0 ? restaurantsData : []
-    let filtered = [...sourceData]
-
-    // Filter by category - Dynamic filtering based on menu items
-    // If category is selected, expand restaurants into dish cards (one card per matching dish)
-    if (selectedCategory && selectedCategory !== 'all') {
-      const expandedDishes = []
-
-      filtered.forEach(r => {
-        if (r.menu) {
-          const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
-          if (hasCategoryItem) {
-            // Get ALL matching dishes for this category
-            const categoryDishes = getAllCategoryDishesFromMenu(r.menu, selectedCategory)
-
-            if (categoryDishes.length > 0) {
-              // Create one card per dish
-              categoryDishes.forEach((dish, index) => {
-                // Filter by vegMode if enabled
-                if (vegMode && dish.foodType !== "Veg") {
-                  return // Skip non-veg dishes when vegMode is ON
-                }
-
-                expandedDishes.push({
-                  ...r,
-                  // Unique ID for each dish card
-                  id: `${r.id}-dish-${dish.itemId || index}`,
-                  dishId: dish.itemId || `${r.id}-dish-${index}`,
-                  // Category dish info for this specific dish
-                  categoryDish: dish,
-                  categoryDishName: dish.name,
-                  categoryDishPrice: dish.price,
-                  categoryDishImage: dish.image,
-                })
-              })
-            }
-          }
-        } else {
-          // No menu - check other criteria
-          if (r.category === selectedCategory) {
-            expandedDishes.push(r)
-          } else if (selectedCategory === 'paneer-tikka' && r.hasPaneer) {
-            expandedDishes.push(r)
-          } else {
-            const keywords = categoryKeywords[selectedCategory] || []
-            if (keywords.length > 0) {
-              const featuredDishLower = (r.featuredDish || '').toLowerCase()
-              const cuisineLower = (r.cuisine || '').toLowerCase()
-              const nameLower = (r.name || '').toLowerCase()
-
-              if (keywords.some(keyword =>
-                featuredDishLower.includes(keyword) ||
-                cuisineLower.includes(keyword) ||
-                nameLower.includes(keyword)
-              )) {
-                expandedDishes.push(r)
-              }
-            }
-          }
-        }
-      })
-
-      filtered = expandedDishes
-    }
-
-    // Apply filters
+    // Apply active filters
     if (activeFilters.has('under-30-mins')) {
       filtered = filtered.filter(r => {
         if (!r.deliveryTime) return false
@@ -638,7 +541,10 @@ export default function CategoryPage() {
       filtered = filtered.filter(r => r.rating && r.rating >= 4.0)
     }
     if (activeFilters.has('under-250')) {
-      filtered = filtered.filter(r => r.featuredPrice && r.featuredPrice <= 250)
+      filtered = filtered.filter(r => {
+        const price = r.categoryDishPrice || r.featuredPrice
+        return price && price <= 250
+      })
     }
     if (activeFilters.has('flat-50-off')) {
       filtered = filtered.filter(r => r.offer && r.offer.includes('50%'))
@@ -650,21 +556,27 @@ export default function CategoryPage() {
       filtered = filtered.filter(r =>
         r.name?.toLowerCase().includes(query) ||
         r.cuisine?.toLowerCase().includes(query) ||
-        r.featuredDish?.toLowerCase().includes(query)
+        (r.categoryDishName && r.categoryDishName.toLowerCase().includes(query)) ||
+        (r.featuredDish && r.featuredDish.toLowerCase().includes(query))
       )
     }
 
     return filtered
   }, [selectedCategory, activeFilters, searchQuery, restaurantsData, categoryKeywords, vegMode])
 
+  const filteredAllRestaurants = useMemo(() => {
+    // Re-use logic for consistency
+    return filteredRecommended;
+  }, [filteredRecommended])
+
   const handleCategorySelect = (category) => {
     const categorySlug = category.slug || category.id
     setSelectedCategory(categorySlug)
     // Update URL to reflect category change
     if (categorySlug === 'all') {
-      navigate('/user/category/all')
+      navigate('/category/all')
     } else {
-      navigate(`/user/category/${categorySlug}`)
+      navigate(`/category/${categorySlug}`)
     }
   }
 

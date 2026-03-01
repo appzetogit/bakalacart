@@ -1,12 +1,40 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Outlet } from "react-router-dom"
 import AdminSidebar from "./AdminSidebar"
 import AdminNavbar from "./AdminNavbar"
 import { initializePushNotifications, registerFCMToken } from "@/services/pushNotificationService"
+import { useAdminNotifications } from "../hooks/useAdminNotifications";
+import AdminNewOrderNotification from "./AdminNewOrderNotification";
+import { AnimatePresence } from "framer-motion";
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { newOrder, clearNewOrder } = useAdminNotifications();
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+  const audioInitializedRef = useRef(false);
+
+  // Audio unlocking for browser autoplay policies
+  useEffect(() => {
+    if (audioInitializedRef.current) return;
+
+    const unlockAudio = () => {
+      // Play a tiny silent sound or just create and play/pause
+      const audio = new Audio();
+      audio.play().then(() => {
+        audio.pause();
+        setIsAudioUnlocked(true);
+        audioInitializedRef.current = true;
+        window.removeEventListener('click', unlockAudio);
+        console.log('🔊 Admin Audio Unlocked');
+      }).catch(() => {
+        // Still locked
+      });
+    };
+
+    window.addEventListener('click', unlockAudio);
+    return () => window.removeEventListener('click', unlockAudio);
+  }, []);
 
   // Get initial collapsed state from localStorage to set initial margin
   useEffect(() => {
@@ -68,6 +96,15 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <AnimatePresence>
+        {newOrder && (
+          <AdminNewOrderNotification
+            order={newOrder}
+            onClose={clearNewOrder}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

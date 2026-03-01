@@ -37,28 +37,28 @@ function dijkstra(nodes, edges, startId, endId) {
   const distances = {};
   const previous = {};
   const unvisited = new Set(nodes.map(n => n.id));
-  
+
   // Initialize distances
   nodes.forEach(node => {
     distances[node.id] = node.id === startId ? 0 : Infinity;
   });
-  
+
   while (unvisited.size > 0) {
     // Find unvisited node with smallest distance
     let current = null;
     let minDistance = Infinity;
-    
+
     for (const nodeId of unvisited) {
       if (distances[nodeId] < minDistance) {
         minDistance = distances[nodeId];
         current = nodeId;
       }
     }
-    
+
     if (current === null || distances[current] === Infinity) {
       break; // No path found
     }
-    
+
     if (current === endId) {
       // Reconstruct path
       const path = [];
@@ -69,9 +69,9 @@ function dijkstra(nodes, edges, startId, endId) {
       }
       return { path, distance: distances[endId] };
     }
-    
+
     unvisited.delete(current);
-    
+
     // Update distances to neighbors
     const neighbors = edges.filter(e => e.from === current);
     for (const edge of neighbors) {
@@ -82,7 +82,7 @@ function dijkstra(nodes, edges, startId, endId) {
       }
     }
   }
-  
+
   return { path: [], distance: Infinity };
 }
 
@@ -97,15 +97,16 @@ function dijkstra(nodes, edges, startId, endId) {
 export async function calculateRouteOSRM(startLat, startLng, endLat, endLng) {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-    const response = await fetch(url);
+    // Add a 3-second timeout so the API doesn't hold up order status updates
+    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
     const data = await response.json();
-    
+
     if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
       const route = data.routes[0];
       const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng, lat] to [lat, lng]
       const distance = route.distance / 1000; // Convert meters to kilometers
       const duration = route.duration / 60; // Convert seconds to minutes
-      
+
       return {
         success: true,
         coordinates,
@@ -156,7 +157,7 @@ export async function calculateRouteDijkstra(startLat, startLng, endLat, endLng,
       ...waypoints.map((wp, i) => ({ id: `wp${i}`, lat: wp.lat, lng: wp.lng })),
       { id: 'end', lat: endLat, lng: endLng }
     ];
-    
+
     // Create edges with weights (distances)
     const edges = [];
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -172,16 +173,16 @@ export async function calculateRouteDijkstra(startLat, startLng, endLat, endLng,
         });
       }
     }
-    
+
     // Calculate shortest path
     const result = dijkstra(nodes, edges, 'start', 'end');
-    
+
     // Convert path to coordinates
     const coordinates = result.path.map(nodeId => {
       const node = nodes.find(n => n.id === nodeId);
       return [node.lat, node.lng];
     });
-    
+
     return {
       success: true,
       coordinates,
@@ -215,7 +216,7 @@ export async function calculateRouteDijkstra(startLat, startLng, endLat, endLng,
  */
 export async function calculateRoute(startLat, startLng, endLat, endLng, options = {}) {
   const { useDijkstra = false, waypoints = [] } = options;
-  
+
   if (useDijkstra && waypoints.length > 0) {
     return await calculateRouteDijkstra(startLat, startLng, endLat, endLng, waypoints);
   } else {

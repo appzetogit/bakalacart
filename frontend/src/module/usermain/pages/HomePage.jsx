@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import Toast from "../components/Toast"
 import { useLocation } from "@/module/user/hooks/useLocation"
-import { 
-  MapPin, 
-  Bell, 
-  Search, 
+import {
+  MapPin,
+  Bell,
+  Search,
   ArrowRight,
   Home,
   Heart,
@@ -56,10 +56,10 @@ export default function HomePage() {
       }
       return { main: "Select location", sub: "" }
     }
-    
+
     // Split address by comma
     const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part.length > 0)
-    
+
     // Main location: First 2 parts only (e.g., "Mama Loca, G-2")
     let mainLocation = ""
     if (parts.length >= 2) {
@@ -67,7 +67,7 @@ export default function HomePage() {
     } else if (parts.length >= 1) {
       mainLocation = parts[0]
     }
-    
+
     // Sub location: City and State (prefer from location object, fallback to address parts)
     let subLocation = ""
     if (city && state) {
@@ -79,8 +79,8 @@ export default function HomePage() {
     } else if (parts.length >= 5) {
       // Fallback: Try to extract city and state from address parts
       // Usually city and state are in the middle/end of address
-      const cityIndex = parts.findIndex(p => 
-        p.toLowerCase().includes('indore') || 
+      const cityIndex = parts.findIndex(p =>
+        p.toLowerCase().includes('indore') ||
         p.toLowerCase().includes('city') ||
         (p.length > 3 && !p.match(/^\d/))
       )
@@ -88,7 +88,7 @@ export default function HomePage() {
         subLocation = `${parts[cityIndex]}, ${parts[cityIndex + 1]}`
       }
     }
-    
+
     return {
       main: mainLocation || "Select location",
       sub: subLocation
@@ -97,7 +97,7 @@ export default function HomePage() {
 
   // Get location from localStorage as fallback
   const [storedLocation, setStoredLocation] = useState(null)
-  
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('userLocation')
@@ -119,7 +119,7 @@ export default function HomePage() {
   const locationDisplay = (() => {
     let mainLocation = ""
     let subLocation = ""
-    
+
     // Get main location from address (first 2 parts)
     if (currentLocation?.formattedAddress) {
       const parts = currentLocation.formattedAddress.split(',').map(part => part.trim()).filter(part => part.length > 0)
@@ -142,12 +142,12 @@ export default function HomePage() {
     } else {
       mainLocation = "Select location"
     }
-    
+
     // Sub location: ALWAYS use city and state from location object (never from address parts)
     // Check if city and state exist in location object
     const hasCity = currentLocation?.city && currentLocation.city.trim() !== "" && currentLocation.city !== "Unknown City"
     const hasState = currentLocation?.state && currentLocation.state.trim() !== ""
-    
+
     if (hasCity && hasState) {
       subLocation = `${currentLocation.city}, ${currentLocation.state}`
     } else if (hasCity) {
@@ -159,27 +159,27 @@ export default function HomePage() {
       // This is a fallback - formattedAddress format: "Mama Loca, G-2, Princess Center 6/3, Opposite Manpasand Garden, New Palasia, Indore, 452001, India"
       if (currentLocation?.formattedAddress) {
         const parts = currentLocation.formattedAddress.split(',').map(part => part.trim()).filter(part => part.length > 0)
-        
+
         // For Indian addresses: city and state are usually before pincode (which is a 6-digit number)
         if (parts.length >= 4) {
           // Find pincode index (6-digit number)
           const pincodeIndex = parts.findIndex(part => /^\d{6}$/.test(part))
-          
+
           if (pincodeIndex > 1) {
             // City is 2 positions before pincode, State is 1 position before pincode
             const cityPart = parts[pincodeIndex - 2]
             const statePart = parts[pincodeIndex - 1]
-            
+
             // Validate: both should be non-empty and not numbers
-            if (cityPart && statePart && 
-                !cityPart.match(/^\d+$/) && 
-                !statePart.match(/^\d+$/) &&
-                cityPart.length > 2 && 
-                statePart.length > 2) {
+            if (cityPart && statePart &&
+              !cityPart.match(/^\d+$/) &&
+              !statePart.match(/^\d+$/) &&
+              cityPart.length > 2 &&
+              statePart.length > 2) {
               subLocation = `${cityPart}, ${statePart}`
             }
           }
-          
+
           // Method 2: Direct extraction - if we have 8 parts, city and state are at index 4 and 5
           // Format: "Mama Loca, G-2, Princess Center 6/3, Opposite Manpasand Garden, New Palasia, Indore, 452001, India"
           // parts[4] = "New Palasia" (city), parts[5] = "Indore" (state)
@@ -188,43 +188,43 @@ export default function HomePage() {
             if (pincodeIndex === 6 && parts.length >= 7) {
               const cityPart = parts[4]
               const statePart = parts[5]
-              
-              if (cityPart && statePart && 
-                  !cityPart.match(/^\d+$/) && 
-                  !statePart.match(/^\d+$/) &&
-                  cityPart.length > 2 && 
-                  statePart.length > 2) {
+
+              if (cityPart && statePart &&
+                !cityPart.match(/^\d+$/) &&
+                !statePart.match(/^\d+$/) &&
+                cityPart.length > 2 &&
+                statePart.length > 2) {
                 subLocation = `${cityPart}, ${statePart}`
               }
             }
           }
-          
+
           // Method 3: Simple fallback - if we have 6+ parts, always try parts[4] and parts[5]
           // This is the most reliable method for the given address format
           if (!subLocation && parts.length >= 6) {
             // Directly use parts[4] and parts[5] if they look like city/state
             const cityPart = parts[4]
             const statePart = parts[5]
-            
-            if (cityPart && statePart && 
-                !cityPart.match(/^\d+$/) && 
-                !statePart.match(/^\d+$/) &&
-                cityPart.length > 2 && 
-                statePart.length > 2 &&
-                !cityPart.toLowerCase().includes("center") &&
-                !cityPart.toLowerCase().includes("princess") &&
-                !cityPart.toLowerCase().includes("opposite") &&
-                !cityPart.toLowerCase().includes("garden")) {
+
+            if (cityPart && statePart &&
+              !cityPart.match(/^\d+$/) &&
+              !statePart.match(/^\d+$/) &&
+              cityPart.length > 2 &&
+              statePart.length > 2 &&
+              !cityPart.toLowerCase().includes("center") &&
+              !cityPart.toLowerCase().includes("princess") &&
+              !cityPart.toLowerCase().includes("opposite") &&
+              !cityPart.toLowerCase().includes("garden")) {
               subLocation = `${cityPart}, ${statePart}`
             }
           }
-          
+
           // Method 4: Fallback - If pincode not found or extraction failed, try alternative method
           if (!subLocation && parts.length >= 4) {
             // Last part is usually "India", second last might be pincode
             const lastPart = parts[parts.length - 1]
             const secondLastPart = parts[parts.length - 2]
-            
+
             // If last part is "India" and second last is pincode (6-digit)
             if (lastPart === "India" && /^\d{6}$/.test(secondLastPart)) {
               // City and state are 3 and 4 positions before "India"
@@ -235,31 +235,31 @@ export default function HomePage() {
               // parts[length-4] = "New Palasia" (city)
               const cityPart = parts[parts.length - 4]
               const statePart = parts[parts.length - 3]
-              
-              if (cityPart && statePart && 
-                  !cityPart.match(/^\d+$/) && 
-                  !statePart.match(/^\d+$/) &&
-                  cityPart.length > 2 && 
-                  statePart.length > 2) {
+
+              if (cityPart && statePart &&
+                !cityPart.match(/^\d+$/) &&
+                !statePart.match(/^\d+$/) &&
+                cityPart.length > 2 &&
+                statePart.length > 2) {
                 subLocation = `${cityPart}, ${statePart}`
               }
             }
           }
         }
       }
-      
+
       // If still empty, leave it empty
       if (!subLocation) {
         subLocation = ""
       }
     }
-    
+
     return {
       main: mainLocation,
       sub: subLocation
     }
   })()
-  
+
   // Debug: Log location data
   useEffect(() => {
     console.log("📍 HomePage - Location state:", {
@@ -362,7 +362,7 @@ export default function HomePage() {
       originalId: item.id, // Store original ID separately
       ...restItem
     }
-    
+
     setWishlist((prev) => {
       const isInWishlist = prev.some((w) => w.id === itemId)
       if (isInWishlist) {
@@ -370,9 +370,9 @@ export default function HomePage() {
       } else {
         // Show toast notification
         const itemName = type === 'food' ? item.name : item.name
-        setToast({ 
-          show: true, 
-          message: `Your ${type === 'food' ? 'food item' : 'restaurant'} "${itemName}" is added to wishlist` 
+        setToast({
+          show: true,
+          message: `Your ${type === 'food' ? 'food item' : 'restaurant'} "${itemName}" is added to wishlist`
         })
         setTimeout(() => {
           setToast({ show: false, message: '' })
@@ -409,9 +409,9 @@ export default function HomePage() {
 
   // Popular Restaurants data
   const popularRestaurants = [
-    { 
-      id: 1, 
-      name: "Hungry Puppets", 
+    {
+      id: 1,
+      name: "Hungry Puppets",
       foodImage: "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=300&fit=crop",
       restaurantIcon: UtensilsCrossed,
       cuisines: "Bengali, Indian, Pizza, Pasta",
@@ -419,9 +419,9 @@ export default function HomePage() {
       deliveryTime: "30-40 min",
       rating: 4.7
     },
-    { 
-      id: 2, 
-      name: "Pizza Paradise", 
+    {
+      id: 2,
+      name: "Pizza Paradise",
       foodImage: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
       restaurantIcon: ChefHat,
       cuisines: "Italian, Pizza, Pasta",
@@ -429,9 +429,9 @@ export default function HomePage() {
       deliveryTime: "20-25 min",
       rating: 4.8
     },
-    { 
-      id: 3, 
-      name: "Burger King", 
+    {
+      id: 3,
+      name: "Burger King",
       foodImage: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
       restaurantIcon: Store,
       cuisines: "American, Fast Food, Burgers",
@@ -439,9 +439,9 @@ export default function HomePage() {
       deliveryTime: "30-35 min",
       rating: 4.6
     },
-    { 
-      id: 4, 
-      name: "Sushi Express", 
+    {
+      id: 4,
+      name: "Sushi Express",
       foodImage: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop",
       restaurantIcon: ChefHat,
       cuisines: "Japanese, Sushi, Asian",
@@ -449,9 +449,9 @@ export default function HomePage() {
       deliveryTime: "35-40 min",
       rating: 4.9
     },
-    { 
-      id: 5, 
-      name: "Taco Bell", 
+    {
+      id: 5,
+      name: "Taco Bell",
       foodImage: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400&h=300&fit=crop",
       restaurantIcon: Coffee,
       cuisines: "Mexican, Fast Food, Tacos",
@@ -508,8 +508,8 @@ export default function HomePage() {
         {/* Search Bar - Half above header, half below, more rounded, less width */}
         <div className="bg-white rounded-2xl flex items-center gap-3 px-4 py-3 shadow-lg mx-auto max-w-[90%] relative z-10">
           <Search className="w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder={placeholderTexts[currentPlaceholderIndex]}
             className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 transition-all duration-300"
           />
@@ -518,7 +518,7 @@ export default function HomePage() {
 
       {/* Promotional Banner Carousel - Full Image Background */}
       <div className="px-4 mb-6">
-        <div 
+        <div
           className="relative rounded-xl overflow-hidden h-36 md:h-48 cursor-pointer"
           onClick={() => navigate(`/usermain/food/${carouselSlides[currentSlide].id}`)}
         >
@@ -528,30 +528,30 @@ export default function HomePage() {
               initial={{ opacity: 0, x: 300 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -300 }}
-              transition={{ 
+              transition={{
                 duration: 0.6,
                 ease: [0.4, 0, 0.2, 1]
               }}
               className="absolute inset-0"
             >
               {/* Full Banner Image */}
-            <OptimizedImage 
-              src={carouselSlides[currentSlide].image} 
-              alt={carouselSlides[currentSlide].title}
-              className="w-full h-full"
-              sizes="100vw"
-              objectFit="cover"
-              priority={currentSlide === 0}
-              placeholder="blur"
-            />
-              
+              <OptimizedImage
+                src={carouselSlides[currentSlide].image}
+                alt={carouselSlides[currentSlide].title}
+                className="w-full h-full"
+                sizes="100vw"
+                objectFit="cover"
+                priority={currentSlide === 0}
+                placeholder="blur"
+              />
+
               {/* Gradient Overlay for better text readability */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
-              
+
               {/* Content Overlay */}
               <div className="absolute inset-0 flex items-center px-4 py-3">
                 <div className="flex-1 z-10">
-                  <motion.h2 
+                  <motion.h2
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2, duration: 0.5 }}
@@ -565,7 +565,7 @@ export default function HomePage() {
                     transition={{ delay: 0.3, duration: 0.5 }}
                     className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3"
                   >
-                    <Button 
+                    <Button
                       className="bg-transparent border-2 border-[#ff8100] text-white hover:bg-[#ff8100] rounded-full px-3 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-semibold transition-colors"
                     >
                       Order Now
@@ -576,11 +576,11 @@ export default function HomePage() {
                       </span>
                     )}
                   </motion.div>
-          </div>
-        </div>
-              
+                </div>
+              </div>
+
               {/* Discount Tag */}
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
@@ -591,19 +591,18 @@ export default function HomePage() {
             </motion.div>
           </AnimatePresence>
 
-        {/* Carousel Indicators */}
+          {/* Carousel Indicators */}
           <div className="absolute bottom-2 md:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-          {carouselSlides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-                className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${
-                  index === currentSlide ? 'bg-[#ff8100] w-5 md:w-6' : 'bg-white/50 w-1.5 md:w-2 hover:bg-white/70'
-                }`}
-              aria-label={`Go to slide ${index + 1}`}
-              aria-current={index === currentSlide ? 'true' : 'false'}
-            />
-          ))}
+            {carouselSlides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`h-1.5 md:h-2 rounded-full transition-all duration-300 ${index === currentSlide ? 'bg-[#ff8100] w-5 md:w-6' : 'bg-white/50 w-1.5 md:w-2 hover:bg-white/70'
+                  }`}
+                aria-label={`Go to slide ${index + 1}`}
+                aria-current={index === currentSlide ? 'true' : 'false'}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -612,7 +611,7 @@ export default function HomePage() {
       <div className="px-4 mb-6 -mt-2">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base md:text-lg font-bold text-gray-900">What's on Your Mind?</h3>
-          <button 
+          <button
             onClick={() => navigate("/usermain/categories")}
             className="bg-[#ff8100] rounded-full p-1.5 hover:bg-[#e67300] transition-colors"
             aria-label="View all categories"
@@ -620,7 +619,7 @@ export default function HomePage() {
             <ChevronRight className="w-4 h-4 text-white" aria-hidden="true" />
           </button>
         </div>
-        
+
         <div className="overflow-hidden -mx-4">
           <div className="flex gap-3 animate-scroll">
             {/* Duplicate categories for seamless loop */}
@@ -628,21 +627,21 @@ export default function HomePage() {
               <div
                 key={`${category.id}-${index}`}
                 className="flex-shrink-0 w-20 flex flex-col items-center gap-1.5 cursor-pointer"
-                onClick={() => navigate(`/user/search?q=${encodeURIComponent(category.name)}`)}
+                onClick={() => navigate(`/usermain/category/${encodeURIComponent(category.name)}`)}
               >
                 <div className="w-20 h-20 rounded-full overflow-hidden">
-                <OptimizedImage 
-                  src={category.image} 
-                  alt={category.name}
-                  className="w-full h-full"
-                  sizes="80px"
-                  objectFit="cover"
-                  placeholder="blur"
-                />
-              </div>
+                  <OptimizedImage
+                    src={category.image}
+                    alt={category.name}
+                    className="w-full h-full"
+                    sizes="80px"
+                    objectFit="cover"
+                    placeholder="blur"
+                  />
+                </div>
                 <p className="text-[10px] font-medium text-gray-700 text-center leading-tight">{category.name}</p>
-            </div>
-          ))}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -651,7 +650,7 @@ export default function HomePage() {
       <div className="px-4 mb-6">
         <h3 className="text-lg font-bold text-[#ff8100] mb-1">Today's Trends</h3>
         <p className="text-sm text-gray-600 mb-4">Here's what you might like to taste</p>
-        
+
         <div className="grid grid-cols-2 gap-3">
           {trendsItems.map((item) => (
             <motion.div
@@ -665,8 +664,8 @@ export default function HomePage() {
             >
               {/* Image Container */}
               <div className="relative flex-shrink-0">
-                <OptimizedImage 
-                  src={item.image} 
+                <OptimizedImage
+                  src={item.image}
                   alt={item.name}
                   className="w-full h-32 rounded-t-xl"
                   sizes="(max-width: 640px) 50vw, 33vw"
@@ -678,7 +677,7 @@ export default function HomePage() {
                   <span className="text-[10px] font-bold text-gray-900">{item.price}</span>
                 </div>
                 {/* Favorite Icon - Top Right */}
-                <button 
+                <button
                   className="absolute top-1.5 right-1.5 p-0.5 hover:scale-110 transition-transform z-10"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -686,17 +685,16 @@ export default function HomePage() {
                   }}
                   aria-label={isInWishlist(item, 'food') ? `Remove ${item.name} from wishlist` : `Add ${item.name} to wishlist`}
                 >
-                  <Heart 
-                    className={`w-4 h-4 transition-all ${
-                      isInWishlist(item, 'food') 
-                        ? 'text-red-500 fill-red-500' 
+                  <Heart
+                    className={`w-4 h-4 transition-all ${isInWishlist(item, 'food')
+                        ? 'text-red-500 fill-red-500'
                         : 'text-gray-400 hover:text-red-500'
-                    }`}
+                      }`}
                     aria-hidden="true"
                   />
                 </button>
               </div>
-              
+
               {/* Content */}
               <div className="p-2.5 flex flex-col flex-1">
                 {/* Title and Rating - Same Row */}
@@ -708,9 +706,9 @@ export default function HomePage() {
                     <span className="text-[10px] text-gray-500">({item.reviews}+)</span>
                   </div>
                 </div>
-                
+
                 {/* Add Button */}
-                <Button 
+                <Button
                   className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white text-xs font-semibold py-1.5 rounded-lg"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -730,14 +728,14 @@ export default function HomePage() {
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-900">Popular Restaurants</h3>
-          <button 
+          <button
             className="w-8 h-8 rounded-full border-2 border-[#ff8100] flex items-center justify-center hover:bg-[#ff8100]/10 transition-colors"
             aria-label="View all popular restaurants"
           >
             <ArrowRight className="w-4 h-4 text-[#ff8100]" aria-hidden="true" />
           </button>
         </div>
-        
+
         <div className="flex gap-4 overflow-x-auto scrollbar-hide -mx-4 px-4">
           {popularRestaurants.map((restaurant) => (
             <motion.div
@@ -754,8 +752,8 @@ export default function HomePage() {
             >
               {/* Food Image - Large */}
               <div className="relative w-full h-40 rounded-t-xl overflow-hidden">
-                <OptimizedImage 
-                  src={restaurant.foodImage} 
+                <OptimizedImage
+                  src={restaurant.foodImage}
                   alt={restaurant.name}
                   className="w-full h-full"
                   sizes="200px"
@@ -763,7 +761,7 @@ export default function HomePage() {
                   placeholder="blur"
                 />
                 {/* Heart Icon - Top Right */}
-                <button 
+                <button
                   className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm rounded-full hover:scale-110 transition-transform z-10"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -771,12 +769,11 @@ export default function HomePage() {
                   }}
                   aria-label={isInWishlist(restaurant, 'restaurant') ? `Remove ${restaurant.name} from wishlist` : `Add ${restaurant.name} to wishlist`}
                 >
-                  <Heart 
-                    className={`w-4 h-4 transition-all ${
-                      isInWishlist(restaurant, 'restaurant') 
-                        ? 'text-amber-700 fill-amber-700' 
+                  <Heart
+                    className={`w-4 h-4 transition-all ${isInWishlist(restaurant, 'restaurant')
+                        ? 'text-amber-700 fill-amber-700'
                         : 'text-gray-400 hover:text-amber-700'
-                    }`}
+                      }`}
                     aria-hidden="true"
                   />
                 </button>
@@ -785,7 +782,7 @@ export default function HomePage() {
                   <span className="text-[10px] font-bold text-gray-900">{restaurant.distance}</span>
                 </div>
               </div>
-              
+
               {/* Restaurant Details */}
               <div className="p-3 pt-2 relative">
                 {/* Restaurant Icon - Half on image, half below (Overlapping) */}
@@ -794,13 +791,13 @@ export default function HomePage() {
                     <restaurant.restaurantIcon className="w-5 h-5 text-[#ff8100]" />
                   )}
                 </div>
-                
+
                 {/* Restaurant Name and Cuisines */}
                 <div className="ml-14 mb-2">
                   <h4 className="text-sm font-bold text-gray-900 mb-1 line-clamp-1">{restaurant.name}</h4>
                   <p className="text-[10px] text-gray-600 line-clamp-2 leading-tight">{restaurant.cuisines}</p>
                 </div>
-                
+
                 {/* Rating and Time - Bottom Row with Orange Icons */}
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-1">
@@ -903,7 +900,7 @@ export default function HomePage() {
             <Home className="w-6 h-6" />
             <span className="text-xs text-[#ff8100] font-medium">Home</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/wishlist')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >
@@ -915,7 +912,7 @@ export default function HomePage() {
               <ChefHat className="w-6 h-6 text-gray-600" />
             </div>
           </button>
-          <button 
+          <button
             onClick={() => navigate('/usermain/orders')}
             className="flex flex-col items-center gap-1 p-2 text-gray-600 hover:text-[#ff8100] transition-colors"
           >

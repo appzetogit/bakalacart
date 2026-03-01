@@ -92,8 +92,28 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
     const handleSubmit = async (e) => {
         e.preventDefault()
 
-        if (!formData.buildingName || !formData.name || !formData.phone) {
-            toast.error("Please fill in required fields")
+        if (!formData.flatNo.trim()) {
+            toast.error("Flat/Room No is required")
+            return
+        }
+
+        if (!formData.floor.trim()) {
+            toast.error("Floor is required")
+            return
+        }
+
+        if (!formData.buildingName.trim()) {
+            toast.error("Building/Chawl Name is required")
+            return
+        }
+
+        if (!formData.name.trim()) {
+            toast.error("Your name is required")
+            return
+        }
+
+        if (!formData.phone) {
+            toast.error("Phone number is required")
             return
         }
 
@@ -157,19 +177,21 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     <div className="space-y-2">
                         <Input
                             name="flatNo"
-                            placeholder="Flat/Room No"
+                            placeholder="Flat/Room No *"
                             value={formData.flatNo}
                             onChange={handleChange}
-                            className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
+                            required
+                            className={`h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700 ${!formData.flatNo.trim() && formData.flatNo !== undefined ? '' : ''}`}
                         />
                     </div>
 
                     <div className="space-y-2">
                         <Input
                             name="floor"
-                            placeholder="Floor"
+                            placeholder="Floor *"
                             value={formData.floor}
                             onChange={handleChange}
+                            required
                             className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
                         />
                     </div>
@@ -177,7 +199,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     <div className="space-y-2">
                         <Input
                             name="buildingName"
-                            placeholder="Building/Chawl Name"
+                            placeholder="Building/Chawl Name *"
                             value={formData.buildingName}
                             onChange={handleChange}
                             required

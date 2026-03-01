@@ -20,6 +20,9 @@ export const getOrders = asyncHandler(async (req, res) => {
       toDate,
       restaurant,
       paymentStatus,
+      deliveryType,
+      minAmount,
+      maxAmount,
       zone,
       customer,
       cancelledBy,
@@ -85,6 +88,25 @@ export const getOrders = asyncHandler(async (req, res) => {
         'processing': 'processing'
       };
       query['payment.status'] = pmfMap[paymentStatus.toLowerCase()] || paymentStatus.toLowerCase();
+    }
+
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      query['pricing.total'] = {};
+      if (minAmount) query['pricing.total'].$gte = parseFloat(minAmount);
+      if (maxAmount) query['pricing.total'].$lte = parseFloat(maxAmount);
+    }
+
+    // Delivery Type filter
+    if (deliveryType) {
+      if (deliveryType === 'Home Delivery') {
+        query.deliveryFleet = { $in: ['standard', 'fast', null, ''] };
+        if (!query.status) query.status = { $ne: 'dine_in' };
+      } else if (deliveryType === 'Dine In') {
+        query.status = 'dine_in';
+      } else if (deliveryType === 'Take Away') {
+        query.status = 'takeaway';
+      }
     }
 
     // Date range filter

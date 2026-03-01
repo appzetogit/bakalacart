@@ -1159,7 +1159,9 @@ export default function DeliveryHome() {
       if ((t.type !== 'payment' && t.type !== 'earning_addon') || t.status !== 'Completed') return false
       const now = new Date()
       const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() - now.getDay())
+      const day = now.getDay()
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Start of week (Monday)
+      startOfWeek.setDate(diff)
       startOfWeek.setHours(0, 0, 0, 0)
       const transactionDate = t.date ? new Date(t.date) : (t.createdAt ? new Date(t.createdAt) : null)
       if (!transactionDate) return false
@@ -1175,7 +1177,9 @@ export default function DeliveryHome() {
 
     const now = new Date()
     const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - now.getDay()) // Start of week (Sunday)
+    const day = now.getDay()
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Start of week (Monday)
+    startOfWeek.setDate(diff)
     startOfWeek.setHours(0, 0, 0, 0)
 
     return walletState.transactions.filter(t => {
@@ -3854,43 +3858,43 @@ export default function DeliveryHome() {
               console.log('📦 Background: Completing delivery for order:', orderIdForApi)
               const response = await deliveryAPI.completeDelivery(orderIdForApi, null, '')
 
-                if (response.data?.success) {
-                  console.log('✅ Delivery completed successfully in background')
-                  
-                  // Play Audio
-                  try {
-                    const audio = new Audio(originalSound)
-                    audio.play().catch(e => console.log('Audio play failed', e))
-                  } catch (e) {
-                    console.log('Audio init failed', e)
-                  }
+              if (response.data?.success) {
+                console.log('✅ Delivery completed successfully in background')
 
-                  // CRITICAL: Clear all polylines
-                  if (routePolylineRef.current) { routePolylineRef.current.setMap(null); routePolylineRef.current = null; }
-                  if (directionsRendererRef.current) { directionsRendererRef.current.setMap(null); }
-                  if (liveTrackingPolylineRef.current) { liveTrackingPolylineRef.current.setMap(null); liveTrackingPolylineRef.current = null; }
-                  if (liveTrackingPolylineShadowRef.current) {
-                    liveTrackingPolylineShadowRef.current.setMap(null);
-                    liveTrackingPolylineShadowRef.current = null;
-                  }
-
-                  // Navigate to completed page directly for the 3rd step
-                  const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || 0;
-                  navigate('/delivery/order-completed', {
-                    state: {
-                      earnings: earnings,
-                      orderId: orderIdForApi
-                    }
-                  });
-
-                  // Clear states
-                  setSelectedRestaurant(null);
-                  localStorage.removeItem('deliveryActiveOrder');
-                  setShowreachedPickupPopup(false);
-                  setShowOrderIdConfirmationPopup(false);
-                  setShowReachedDropPopup(false);
+                // Play Audio
+                try {
+                  const audio = new Audio(originalSound)
+                  audio.play().catch(e => console.log('Audio play failed', e))
+                } catch (e) {
+                  console.log('Audio init failed', e)
                 }
- else {
+
+                // CRITICAL: Clear all polylines
+                if (routePolylineRef.current) { routePolylineRef.current.setMap(null); routePolylineRef.current = null; }
+                if (directionsRendererRef.current) { directionsRendererRef.current.setMap(null); }
+                if (liveTrackingPolylineRef.current) { liveTrackingPolylineRef.current.setMap(null); liveTrackingPolylineRef.current = null; }
+                if (liveTrackingPolylineShadowRef.current) {
+                  liveTrackingPolylineShadowRef.current.setMap(null);
+                  liveTrackingPolylineShadowRef.current = null;
+                }
+
+                // Navigate to completed page directly for the 3rd step
+                const earnings = response.data.data?.earnings?.amount || response.data.data?.totalEarning || 0;
+                navigate('/delivery/order-completed', {
+                  state: {
+                    earnings: earnings,
+                    orderId: orderIdForApi
+                  }
+                });
+
+                // Clear states
+                setSelectedRestaurant(null);
+                localStorage.removeItem('deliveryActiveOrder');
+                setShowreachedPickupPopup(false);
+                setShowOrderIdConfirmationPopup(false);
+                setShowReachedDropPopup(false);
+              }
+              else {
                 console.error('❌ Failed to confirm reached drop:', response.data)
                 toast.error(response.data?.message || 'Failed to confirm reached drop. Please try again.')
               }

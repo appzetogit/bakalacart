@@ -222,8 +222,8 @@ export default function AdminHome() {
         <div className="flex flex-col gap-4 border-b border-neutral-200 bg-linear-to-br from-white via-neutral-50 to-neutral-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Admin Overview</p>
-              <h1 className="text-2xl font-semibold text-neutral-900">Operations Command</h1>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Admin Analytics & Overview</p>
+              <h1 className="text-2xl font-semibold text-neutral-900">Dashboard & Analytics</h1>
             </div>
 
           </div>
@@ -452,7 +452,8 @@ export default function AdminHome() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="month" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
+                      <YAxis yAxisId="left" stroke="#6b7280" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#ef4444" />
                       <Tooltip
                         contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12 }}
                         labelStyle={{ color: "#111827" }}
@@ -460,6 +461,7 @@ export default function AdminHome() {
                       />
                       <Legend />
                       <Area
+                        yAxisId="left"
                         type="monotone"
                         dataKey="revenue"
                         stroke="#0ea5e9"
@@ -468,6 +470,7 @@ export default function AdminHome() {
                         name="Gross revenue"
                       />
                       <Area
+                        yAxisId="left"
                         type="monotone"
                         dataKey="commission"
                         stroke="#a855f7"
@@ -476,6 +479,7 @@ export default function AdminHome() {
                         name="Commission"
                       />
                       <Bar
+                        yAxisId="right"
                         dataKey="orders"
                         fill="#ef4444"
                         radius={[6, 6, 0, 0]}
@@ -557,15 +561,16 @@ export default function AdminHome() {
                     <BarChart data={monthlyData.slice(-6)}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="month" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
+                      <YAxis yAxisId="left" stroke="#6b7280" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#0ea5e9" />
                       <Tooltip
                         contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12 }}
                         labelStyle={{ color: "#111827" }}
                         itemStyle={{ color: "#111827" }}
                       />
                       <Legend />
-                      <Bar dataKey="orders" fill="#0ea5e9" radius={[8, 8, 0, 0]} name="Orders" />
-                      <Bar dataKey="commission" fill="#a855f7" radius={[8, 8, 0, 0]} name="Commission" />
+                      <Bar yAxisId="right" dataKey="orders" fill="#0ea5e9" radius={[8, 8, 0, 0]} name="Orders" />
+                      <Bar yAxisId="left" dataKey="commission" fill="#a855f7" radius={[8, 8, 0, 0]} name="Commission" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

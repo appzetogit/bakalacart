@@ -415,6 +415,32 @@ deliveryNamespace.on('connection', (socket) => {
   });
 });
 
+// Admin namespace for global order notifications
+const adminNamespace = io.of('/admin');
+
+adminNamespace.on('connection', (socket) => {
+  console.log('👑 Admin client connected:', socket.id);
+
+  // Admin joins the global admin room to receive ALL order notifications
+  socket.on('join-admin', () => {
+    socket.join('admin-room');
+    console.log(`✅ Admin socket ${socket.id} joined admin-room`);
+
+    socket.emit('admin-room-joined', {
+      room: 'admin-room',
+      socketId: socket.id
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log('👑 Admin client disconnected:', socket.id);
+  });
+
+  socket.on('error', (error) => {
+    console.error('👑 Admin socket error:', error);
+  });
+});
+
 // Make io available to routes
 app.set('io', io);
 
