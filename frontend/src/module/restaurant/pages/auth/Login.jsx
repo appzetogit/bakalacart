@@ -312,7 +312,7 @@ export default function RestaurantLogin() {
       }
 
       // Store auth data for restaurant module using utility function
-      setAuthData("restaurant", accessToken, restaurant)
+      setAuthData("restaurant", accessToken, restaurant, data.refreshToken)
 
       // Register FCM Token (Still call it to ensure sync status is updated in localStorage)
       await registerFCMToken('restaurant', accessToken);

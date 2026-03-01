@@ -8,7 +8,7 @@ export default function RestaurantGoogleCallback() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  
+
   // Get the page user was trying to access before login
   const from = location.state?.from || "/restaurant"
   const [status, setStatus] = useState("loading") // "loading", "success", "error"
@@ -41,6 +41,8 @@ export default function RestaurantGoogleCallback() {
           return
         }
 
+        const refreshToken = searchParams.get("refreshToken")
+
         // Check if we have token and user data
         if (!token || !userParam) {
           setStatus("error")
@@ -59,7 +61,7 @@ export default function RestaurantGoogleCallback() {
         }
 
         // Store authentication data using utility function
-        setAuthData("restaurant", token, user)
+        setAuthData("restaurant", token, user, refreshToken)
 
         // Notify any listeners that auth state has changed
         window.dispatchEvent(new Event("restaurantAuthChanged"))

@@ -70,7 +70,7 @@ export const adminSignup = asyncHandler(async (req, res) => {
     res.cookie('admin_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
@@ -139,7 +139,7 @@ export const adminLogin = asyncHandler(async (req, res) => {
   res.cookie('admin_refreshToken', tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
   });
 
@@ -151,6 +151,7 @@ export const adminLogin = asyncHandler(async (req, res) => {
 
   return successResponse(res, 200, 'Login successful', {
     accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
     admin: adminResponse
   });
 });
@@ -220,7 +221,7 @@ export const adminSignupWithOTP = asyncHandler(async (req, res) => {
     res.cookie('admin_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
@@ -232,6 +233,7 @@ export const adminSignupWithOTP = asyncHandler(async (req, res) => {
 
     return successResponse(res, 201, 'Admin registered successfully', {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       admin: adminResponse
     });
   } catch (error) {
@@ -280,7 +282,7 @@ export const adminLogout = asyncHandler(async (req, res) => {
     res.cookie(name, '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 0
     });
   });
@@ -296,7 +298,7 @@ export const adminLogout = asyncHandler(async (req, res) => {
  */
 export const refreshToken = asyncHandler(async (req, res) => {
   // Try to find the refresh token in admin-specific cookie or generic cookie
-  const refreshToken = req.cookies?.admin_refreshToken || req.cookies?.refreshToken;
+  const refreshToken = req.cookies?.admin_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');

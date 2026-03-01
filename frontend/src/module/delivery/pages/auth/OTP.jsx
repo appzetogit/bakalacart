@@ -217,7 +217,7 @@ export default function DeliveryOTP() {
         // Store auth data using utility function
         try {
           console.log("Storing auth data for signup flow:", { hasToken: !!accessToken, hasUser: !!user })
-          storeAuthData("delivery", accessToken, user)
+          storeAuthData("delivery", accessToken, user, data.refreshToken)
           console.log("Auth data stored successfully for signup")
 
           console.log("🔔 [Delivery OTP] Attempting to register FCM token (Signup)...");
@@ -261,7 +261,7 @@ export default function DeliveryOTP() {
       // The setAuthData function includes error handling and verification
       try {
         console.log("Storing auth data for delivery:", { hasToken: !!accessToken, hasUser: !!user })
-        storeAuthData("delivery", accessToken, user)
+        storeAuthData("delivery", accessToken, user, data.refreshToken)
         console.log("Auth data stored successfully")
       } catch (storageError) {
         console.error("Failed to store authentication data:", storageError)
@@ -366,7 +366,7 @@ export default function DeliveryOTP() {
       // The setAuthData function includes error handling and verification
       try {
         console.log("Storing auth data for delivery (with name):", { hasToken: !!accessToken, hasUser: !!user })
-        storeAuthData("delivery", accessToken, user)
+        storeAuthData("delivery", accessToken, user, data.refreshToken)
         console.log("Auth data stored successfully")
       } catch (storageError) {
         console.error("Failed to store authentication data:", storageError)

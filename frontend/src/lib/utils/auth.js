@@ -149,6 +149,7 @@ export function isModuleAuthenticated(module, strict = false) {
  */
 export function clearModuleAuth(module) {
   localStorage.removeItem(`${module}_accessToken`);
+  localStorage.removeItem(`${module}_refreshToken`);
   localStorage.removeItem(`${module}_authenticated`);
   localStorage.removeItem(`${module}_user`);
   // Also clear any sessionStorage data
@@ -298,6 +299,15 @@ export function setAuthData(module, token, user) {
 
     localStorage.setItem(tokenKey, token);
     localStorage.setItem(authKey, 'true');
+
+    // Store refresh token if provided (e.g., as response.data.refreshToken)
+    const refreshToken = user?.refreshToken || (typeof token === 'object' ? token.refreshToken : null);
+    if (refreshToken) {
+      localStorage.setItem(`${module}_refreshToken`, refreshToken);
+    } else if (typeof arguments[3] === 'string') {
+      // Allow passing refreshToken as 4th argument if needed
+      localStorage.setItem(`${module}_refreshToken`, arguments[3]);
+    }
 
     if (user) {
       try {

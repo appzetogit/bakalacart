@@ -45,7 +45,7 @@ export default function AdminSignup() {
             setLogoUrl(cached.logo.url)
           }
         }
-        
+
         // Always try to load fresh data to ensure we have the latest
         const settings = await loadBusinessSettings()
         if (settings) {
@@ -57,9 +57,9 @@ export default function AdminSignup() {
         console.error('Error loading logo:', error)
       }
     }
-    
+
     loadLogo()
-    
+
     // Listen for business settings updates
     const handleSettingsUpdate = () => {
       const cached = getCachedSettings()
@@ -70,7 +70,7 @@ export default function AdminSignup() {
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    
+
     return () => {
       window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
     }
@@ -135,7 +135,7 @@ export default function AdminSignup() {
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return
-    
+
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
@@ -172,7 +172,7 @@ export default function AdminSignup() {
   const handleOtpSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    
+
     const otpCode = otp.join("")
     if (otpCode.length !== 6) {
       setError("Please enter the complete OTP")
@@ -190,12 +190,12 @@ export default function AdminSignup() {
       )
 
       const data = response?.data?.data || response?.data
-      
+
       // If registration successful, store tokens and redirect
       if (data.accessToken && data.admin) {
         // Store admin token and data
-        setAuthData("admin", data.accessToken, data.admin)
-        
+        setAuthData("admin", data.accessToken, data.admin, data.refreshToken)
+
         // Navigate to admin dashboard
         navigate("/admin", { replace: true })
       } else {
@@ -217,7 +217,7 @@ export default function AdminSignup() {
 
   const handleResendOtp = async () => {
     if (resendTimer > 0) return
-    
+
     setIsLoading(true)
     setError("")
     try {

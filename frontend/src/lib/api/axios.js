@@ -287,12 +287,16 @@ apiClient.interceptors.response.use(
         const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(currentAppPath);
 
         // Try to refresh the token
-        // The refresh token is sent via httpOnly cookie automatically
+        // Get role-specific refresh token from localStorage for hybrid/app support
+        const refreshToken = localStorage.getItem(`${expectedRole}_refreshToken`) ||
+          localStorage.getItem('refreshToken');
+
         const response = await axios.post(
           `${API_BASE_URL}${refreshEndpoint}`,
           {},
           {
             withCredentials: true,
+            headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {}
           }
         );
 

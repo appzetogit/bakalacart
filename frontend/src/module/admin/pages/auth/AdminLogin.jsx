@@ -97,7 +97,7 @@ export default function AdminLogin() {
 
       if (data.accessToken && data.admin) {
         // Store admin token and data
-        setAuthData("admin", data.accessToken, data.admin)
+        setAuthData("admin", data.accessToken, data.admin, data.refreshToken)
 
         // Navigate to intended destination or admin dashboard after successful login
         const params = new URLSearchParams(window.location.search);

@@ -281,18 +281,17 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       phone: user.phone
     });
 
-    // Set refresh token in httpOnly cookie with role-specific name
-    const cookieName = jwtService.getCookieName(user.role);
     res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
     // Return access token and user info
     return successResponse(res, 200, 'Authentication successful', {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user._id,
         name: user.name,
@@ -316,7 +315,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  */
 export const refreshToken = asyncHandler(async (req, res) => {
   // Prioritize user-specific refresh token cookie or generic refreshToken cookie
-  const refreshToken = req.cookies?.user_refreshToken || req.cookies?.refreshToken;
+  const refreshToken = req.cookies?.user_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -383,7 +382,7 @@ export const logout = asyncHandler(async (req, res) => {
     res.clearCookie(name, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      sameSite: 'lax'
     });
   });
 
@@ -450,7 +449,7 @@ export const register = asyncHandler(async (req, res) => {
   res.cookie(cookieName, tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
   });
 
@@ -458,6 +457,7 @@ export const register = asyncHandler(async (req, res) => {
 
   return successResponse(res, 201, 'Registration successful', {
     accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
     user: {
       id: user._id,
       name: user.name,
@@ -547,7 +547,7 @@ export const login = asyncHandler(async (req, res) => {
   res.cookie(cookieName, tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
   });
 
@@ -555,6 +555,7 @@ export const login = asyncHandler(async (req, res) => {
 
   return successResponse(res, 200, 'Login successful', {
     accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
     user: {
       id: user._id,
       name: user.name,
@@ -822,12 +823,13 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
     res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
     return successResponse(res, 200, 'Firebase Google authentication successful', {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user._id,
         name: user.name,
@@ -932,7 +934,7 @@ export const googleAuth = asyncHandler(async (req, res) => {
     res.cookie('oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 10 * 60 * 1000 // 10 minutes
     });
 
@@ -1047,8 +1049,8 @@ export const googleCallback = asyncHandler(async (req, res) => {
     res.cookie(cookieName, jwtTokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
     // Clear OAuth state cookie
@@ -1071,7 +1073,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
       signupMethod: user.signupMethod
     };
 
-    const redirectUrl = `${frontendUrl}${redirectPath}?token=${jwtTokens.accessToken}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+    const redirectUrl = `${frontendUrl}${redirectPath}?token=${jwtTokens.accessToken}&refreshToken=${jwtTokens.refreshToken}&user=${encodeURIComponent(JSON.stringify(userData))}`;
 
     return res.redirect(redirectUrl);
   } catch (error) {

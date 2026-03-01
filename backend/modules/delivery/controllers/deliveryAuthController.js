@@ -180,7 +180,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
         res.cookie('delivery_refreshToken', tokens.refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'lax',
           maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
         });
 
@@ -240,7 +240,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     res.cookie('delivery_refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
@@ -251,6 +251,7 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     // Return access token and delivery boy info
     return successResponse(res, 200, 'Authentication successful', {
       accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: delivery._id,
         deliveryId: delivery.deliveryId,
@@ -337,7 +338,7 @@ export const logout = asyncHandler(async (req, res) => {
     res.clearCookie(name, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      sameSite: 'lax'
     });
   });
 

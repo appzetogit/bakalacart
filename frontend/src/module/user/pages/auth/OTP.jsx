@@ -234,7 +234,7 @@ export default function OTP() {
       }
 
       // Replace old token with new one (handles cross-module login)
-      setUserAuthData("user", accessToken, user)
+      setUserAuthData("user", accessToken, user, data.refreshToken)
 
       // Dispatch custom event for same-tab updates
       window.dispatchEvent(new Event("userAuthChanged"))
@@ -328,7 +328,7 @@ export default function OTP() {
       }
 
       // Replace old token with new one (handles cross-module login)
-      setUserAuthData("user", accessToken, user)
+      setUserAuthData("user", accessToken, user, data.refreshToken)
 
       // Dispatch custom event for same-tab updates
       window.dispatchEvent(new Event("userAuthChanged"))

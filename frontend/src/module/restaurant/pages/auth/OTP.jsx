@@ -215,7 +215,7 @@ export default function RestaurantOTP() {
       }
 
       // Store auth data using utility function to ensure proper module-specific token storage
-      setRestaurantAuthData("restaurant", accessToken, restaurant)
+      setRestaurantAuthData("restaurant", accessToken, restaurant, data.refreshToken)
 
       // Dispatch custom event for same-tab updates
       window.dispatchEvent(new Event("restaurantAuthChanged"))
@@ -360,7 +360,7 @@ export default function RestaurantOTP() {
       }
 
       // Store auth data using utility function to ensure proper module-specific token storage
-      setRestaurantAuthData("restaurant", accessToken, restaurant)
+      setRestaurantAuthData("restaurant", accessToken, restaurant, data.refreshToken)
 
       // Dispatch custom event for same-tab updates
       window.dispatchEvent(new Event("restaurantAuthChanged"))
