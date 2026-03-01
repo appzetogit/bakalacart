@@ -81,11 +81,18 @@ export default function Orders() {
   // Get order status text
   const getOrderStatus = (order) => {
     const status = order.status
+    const paymentMethod = (order.payment?.method || order.paymentMethod || '').toLowerCase()
+    const isOnline = paymentMethod === 'razorpay' || paymentMethod === 'online'
+    const isPaid = order.payment?.status === 'completed'
+
     if (status === 'delivered' || status === 'completed') return 'delivered'
     if (status === 'out_for_delivery' || status === 'outForDelivery') return 'outForDelivery'
     if (status === 'ready') return 'preparing'
     if (status === 'preparing') return 'preparing'
     if (status === 'confirmed') return 'confirmed'
+    if (status === 'pending') {
+      return isOnline && !isPaid ? 'payment_pending' : 'pending'
+    }
     return status || 'confirmed'
   }
 
@@ -751,6 +758,11 @@ Order again from this restaurant in the Bakalaa app.`
                             {order.payment.status}
                           </span>
                         )}
+                      </p>
+                    )}
+                    {order.status === 'payment_pending' && (
+                      <p className="text-xs font-semibold text-yellow-600 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Awaiting Payment
                       </p>
                     )}
                     {isDelivered && !paymentFailed && (
