@@ -281,6 +281,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       phone: user.phone
     });
 
+    // Set refresh token in httpOnly cookie
+    const cookieName = jwtService.getCookieName(user.role);
     res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
