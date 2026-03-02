@@ -18,6 +18,7 @@ import AddressFormModal from "../../components/AddressFormModal"
 import DeliveryAddressSelectionModal from "../../components/DeliveryAddressSelectionModal"
 import { useLocation } from "../../hooks/useLocation"
 import { useEffect } from "react"
+import { toast } from "sonner"
 
 export default function Checkout() {
   const navigate = useNavigate()
@@ -98,13 +99,27 @@ export default function Checkout() {
   }, [addresses])
 
   const handlePlaceOrder = async () => {
-    if (!selectedAddress || !selectedPayment) {
-      alert("Please select a delivery address and payment method")
+    if (!selectedAddress) {
+      toast.error("Please add or select a delivery address")
+      setShowAddressSelection(true) // Open selection if missing
+      return
+    }
+
+    const isComplete = defaultAddress && defaultAddress.street && defaultAddress.city && defaultAddress.zipCode;
+
+    if (!isComplete) {
+      toast.error("Your selected address is incomplete. Please edit it to include Building, City, and Pin Code.")
+      setShowAddressSelection(true)
+      return
+    }
+
+    if (!selectedPayment) {
+      toast.error("Please select a payment method")
       return
     }
 
     if (cart.length === 0) {
-      alert("Your cart is empty")
+      toast.error("Your cart is empty")
       return
     }
 
@@ -137,6 +152,7 @@ export default function Checkout() {
       navigate(`/user/orders/${orderId}?confirmed=true`)
     }, 1500)
   }
+
 
   if (cart.length === 0) {
     return (
@@ -182,8 +198,8 @@ export default function Checkout() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery address details</p>
-                  <div className="bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-gray-800 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm">
-                    <p className="text-gray-800 dark:text-white font-medium line-clamp-1 flex-1 pr-4">
+                  <div className={`bg-white dark:bg-[#1a1a1a] border ${!defaultAddress ? 'border-red-300 bg-red-50/30' : 'border-gray-100 dark:border-gray-800'} rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm`}>
+                    <p className={`font-medium line-clamp-1 flex-1 pr-4 ${!defaultAddress ? 'text-red-500 italic' : 'text-gray-800 dark:text-white'}`}>
                       {defaultAddress ? (
                         [
                           defaultAddress.street,
@@ -191,14 +207,14 @@ export default function Checkout() {
                           `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.zipCode}`
                         ].filter(Boolean).join(", ")
                       ) : (
-                        "No delivery address selected"
+                        "No delivery address selected (Required)"
                       )}
                     </p>
                     <button
                       onClick={() => setShowAddressSelection(true)}
                       className="text-gray-400 dark:text-gray-500 font-medium flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     >
-                      Change <ChevronRight className="h-4 w-4" />
+                      {defaultAddress ? 'Change' : 'Select'} <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

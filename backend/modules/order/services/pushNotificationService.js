@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { sendPushNotification } from '../../../shared/services/firebaseAdmin.js';
+import Admin from '../../admin/models/Admin.js';
 import User from '../../auth/models/User.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import Delivery from '../../delivery/models/Delivery.js';
@@ -6,7 +8,7 @@ import Delivery from '../../delivery/models/Delivery.js';
 /**
  * Send push notification to a user
  * @param {string} userId - User, Restaurant, or Delivery ID
- * @param {string} userType - 'user' | 'restaurant' | 'delivery'
+ * @param {string} userType - 'user' | 'restaurant' | 'delivery' | 'admin'
  * @param {Object} payload - { title, body, data }
  */
 export const sendOrderPushNotification = async (userId, userType, payload) => {
@@ -17,10 +19,26 @@ export const sendOrderPushNotification = async (userId, userType, payload) => {
         if (userType === 'user') model = User;
         else if (userType === 'restaurant') model = Restaurant;
         else if (userType === 'delivery') model = Delivery;
+        else if (userType === 'admin') model = Admin;
 
-        const record = await model.findById(userId).select('fcmTokens fcmTokenMobile');
+        let record = null;
+
+        // 1. Try finding by MongoDB _id first (standard for all models)
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+            record = await model.findById(userId).select('fcmTokens fcmTokenMobile');
+        }
+
+        // 2. Fallback: Try finding by model-specific custom ID fields if findById failed
         if (!record) {
-            console.warn(`[Push Notification] ${userType} not found with ID: ${userId}`);
+            if (userType === 'restaurant') {
+                record = await model.findOne({ restaurantId: userId }).select('fcmTokens fcmTokenMobile');
+            } else if (userType === 'delivery') {
+                record = await model.findOne({ deliveryId: userId }).select('fcmTokens fcmTokenMobile');
+            }
+        }
+
+        if (!record) {
+            console.warn(`[Push Notification] ${userType} not found with identifier: ${userId}`);
             return;
         }
 
@@ -65,12 +83,23 @@ export const sendOrderPushNotification = async (userId, userType, payload) => {
         if (response && response.cleanupTokens && response.cleanupTokens.length > 0) {
             console.log(`🧹 [Push Notification] ${response.cleanupTokens.length} tokens are invalid for ${userType} ${userId}. Removing them.`);
 
-            await model.findByIdAndUpdate(userId, {
+            const pullQuery = {
                 $pull: {
                     fcmTokens: { $in: response.cleanupTokens },
                     fcmTokenMobile: { $in: response.cleanupTokens }
                 }
-            });
+            };
+
+            // 1. Try updating by MongoDB _id first
+            if (mongoose.Types.ObjectId.isValid(userId)) {
+                await model.findByIdAndUpdate(userId, pullQuery);
+            } else {
+                // 2. Fallback: Update by custom ID for Restaurant/Delivery
+                const customIdField = userType === 'restaurant' ? 'restaurantId' : (userType === 'delivery' ? 'deliveryId' : null);
+                if (customIdField) {
+                    await model.findOneAndUpdate({ [customIdField]: userId }, pullQuery);
+                }
+            }
             console.log(`✨ [Push Notification] Cleanup complete for ${userType} ${userId}`);
         } else if (response && response.failedTokens && response.failedTokens.length > 0) {
             console.log(`🧹 [Push Notification] ${response.failedTokens.length} tokens failed (but might be temporary).`);

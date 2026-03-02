@@ -110,43 +110,60 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
 
     // Normalize restaurantId to string (handle both ObjectId and string)
     const normalizedRestaurantId = restaurantId?.toString() || restaurantId;
+    const mongoId = restaurant?._id?.toString();
+    const customId = restaurant?.restaurantId?.toString();
 
     // Try multiple room formats to ensure we find the restaurant
-    const roomVariations = [
+    const roomVariations = new Set([
       `restaurant:${normalizedRestaurantId}`,
-      `restaurant:${restaurantId}`,
-      ...(mongoose.Types.ObjectId.isValid(normalizedRestaurantId)
-        ? [`restaurant:${new mongoose.Types.ObjectId(normalizedRestaurantId).toString()}`]
-        : [])
-    ];
+      `restaurant:${restaurantId}`
+    ]);
 
-    // Get all connected sockets in the restaurant room
+    if (mongoId) roomVariations.add(`restaurant:${mongoId}`);
+    if (customId) roomVariations.add(`restaurant:${customId}`);
+
+    // Also add ObjectId string format variants
+    [mongoId, customId, normalizedRestaurantId].forEach(id => {
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
+        roomVariations.add(`restaurant:${new mongoose.Types.ObjectId(id).toString()}`);
+      }
+    });
+
+    const roomVariationsArray = Array.from(roomVariations);
+
+    // Get all connected sockets in any of the restaurant rooms
     let socketsInRoom = [];
-    for (const room of roomVariations) {
+    for (const room of roomVariationsArray) {
       const sockets = await restaurantNamespace.in(room).fetchSockets();
       if (sockets.length > 0) {
-        socketsInRoom = sockets;
+        socketsInRoom = [...socketsInRoom, ...sockets];
         console.log(`📢 Found ${sockets.length} socket(s) in room: ${room}`);
-        break;
       }
     }
+    // De-duplicate sockets
+    const uniqueSocketIds = new Set();
+    socketsInRoom = socketsInRoom.filter(s => {
+      if (uniqueSocketIds.has(s.id)) return false;
+      uniqueSocketIds.add(s.id);
+      return true;
+    });
 
-    const primaryRoom = roomVariations[0];
+    const primaryRoom = roomVariationsArray[0];
 
     console.log(`📢 CRITICAL: Attempting to notify restaurant about new order:`);
     console.log(`📢 Order ID: ${order.orderId}`);
     console.log(`📢 Order MongoDB ID: ${order._id?.toString()}`);
     console.log(`📢 Restaurant ID (normalized): ${normalizedRestaurantId}`);
+    console.log(`📢 Restaurant MongoID: ${mongoId}`);
+    console.log(`📢 Restaurant CustomID: ${customId}`);
     console.log(`📢 Restaurant Name: ${order.restaurantName}`);
-    console.log(`📢 Restaurant ID from order: ${order.restaurantId}`);
-    console.log(`📢 Room variations to try:`, roomVariations);
-    console.log(`📢 Connected sockets in primary room ${primaryRoom}: ${socketsInRoom.length}`);
+    console.log(`📢 Rooms attempted:`, roomVariationsArray);
+    console.log(`📢 Total unique connected sockets: ${socketsInRoom.length}`);
 
-    // CRITICAL: Only emit to the specific restaurant room - NEVER broadcast to all restaurants
-    // This ensures orders only go to the correct restaurant
+    // CRITICAL: Only emit to the specific restaurant rooms
     if (socketsInRoom.length > 0) {
-      // Found sockets in the restaurant room - send notification only to that room
-      roomVariations.forEach(room => {
+      // Found sockets - send notification to all relevant rooms
+      roomVariationsArray.forEach(room => {
         restaurantNamespace.to(room).emit('new_order', orderNotification);
         restaurantNamespace.to(room).emit('play_notification_sound', {
           type: 'new_order',
@@ -155,20 +172,14 @@ export async function notifyRestaurantNewOrder(order, restaurantId, paymentMetho
         });
         console.log(`📤 Sent notification to room: ${room}`);
       });
-      console.log(`✅ Notified restaurant ${normalizedRestaurantId} about new order ${order.orderId} (${socketsInRoom.length} socket(s) connected)`);
+      console.log(`✅ Notified restaurant ${normalizedRestaurantId} about new order ${order.orderId} (${socketsInRoom.length} unique socket(s) connected)`);
     } else {
       // No sockets found in restaurant room - log warning but DO NOT broadcast to all restaurants
-      console.warn(`⚠️ No active socket connection for restaurant ${normalizedRestaurantId} (User might be offline)`);
+      console.warn(`⚠️ No active socket connection for restaurant ${normalizedRestaurantId} (Rooms checked: ${roomVariationsArray.join(', ')})`);
       console.warn(`⚠️ Order ${order.orderId} notification will be sent via Push Notification`);
 
-      // Log all connected restaurant sockets for debugging (but don't send to them)
-      const allSockets = await restaurantNamespace.fetchSockets();
-      if (allSockets.length === 0) {
-        console.log(`📊 No restaurant sockets connected to server at all.`);
-      }
-
       // Still try to emit to room variations (in case socket connects later/buffered)
-      roomVariations.forEach(room => {
+      roomVariationsArray.forEach(room => {
         restaurantNamespace.to(room).emit('new_order', orderNotification);
         restaurantNamespace.to(room).emit('play_notification_sound', {
           type: 'new_order',
@@ -234,16 +245,40 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
       return;
     }
 
-    // Get restaurant namespace
-    const restaurantNamespace = io.of('/restaurant');
+    // Get restaurant info to expand room variations
+    let mongoId = order.restaurantId;
+    let customId = null;
+
+    try {
+      const restaurant = await Restaurant.findOne({
+        $or: [
+          { _id: mongoose.isValidObjectId(mongoId) ? mongoId : null },
+          { restaurantId: mongoId }
+        ]
+      }).select('_id restaurantId').lean();
+
+      if (restaurant) {
+        mongoId = restaurant._id.toString();
+        customId = restaurant.restaurantId;
+      }
+    } catch (e) { /* ignore */ }
 
     // Try multiple room formats to ensure we find the restaurant
-    const roomVariations = [
-      `restaurant:${restaurantId}`,
-      ...(mongoose.Types.ObjectId.isValid(restaurantId)
-        ? [`restaurant:${new mongoose.Types.ObjectId(restaurantId).toString()}`]
-        : [])
-    ];
+    const roomVariations = new Set([
+      `restaurant:${restaurantId}`
+    ]);
+
+    if (mongoId) roomVariations.add(`restaurant:${mongoId}`);
+    if (customId) roomVariations.add(`restaurant:${customId}`);
+
+    // Add ObjectId variants
+    [mongoId, customId, restaurantId].forEach(id => {
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
+        roomVariations.add(`restaurant:${new mongoose.Types.ObjectId(id).toString()}`);
+      }
+    });
+
+    const roomVariationsArray = Array.from(roomVariations);
 
     const updateData = {
       orderId: order.orderId,
@@ -254,7 +289,7 @@ export async function notifyRestaurantOrderUpdate(orderId, status) {
     };
 
     // Emit to all room variations
-    roomVariations.forEach(room => {
+    roomVariationsArray.forEach(room => {
       restaurantNamespace.to(room).emit('order_status_update', updateData);
       console.log(`📤 Sent order status update to room: ${room}`);
     });

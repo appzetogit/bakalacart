@@ -47,7 +47,7 @@ export default function ProfileDetails() {
         }
       } catch (error) {
         console.error("Error fetching profile:", error)
-        
+
         // More detailed error handling
         if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
           toast.error("Cannot connect to server. Please check if backend is running.")
@@ -126,258 +126,274 @@ export default function ProfileDetails() {
                   {profile?.name || "N/A"} ({profile?.deliveryId || "N/A"})
                 </p>
               </div>
-            <div className="divide-y divide-gray-200">
-            <div className="p-2 px-3 flex items-center justify-between">
-                <p className="text-sm text-gray-900">Zone</p>
-                <p className="text-base text-gray-900">
-                  {profile?.availability?.zones?.length > 0 ? "Assigned" : "Not assigned"}
-                </p>
-              </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-                <p className="text-sm text-gray-900">City</p>
-                <p className="text-base text-gray-900">
-                  {profile?.location?.city || "N/A"}
-                </p>
-              </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-                <p className="text-sm text-gray-900">Vehicle type</p>
-                <p className="text-base text-gray-900 capitalize">
-                  {profile?.vehicle?.type || "N/A"}
-                </p>
-              </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-                <p className="text-sm text-gray-900">Vehicle number</p>
-                {vehicleNumber ? (
-                  <div className="flex items-center gap-2">
-                    <p className="text-base text-gray-900">{vehicleNumber}</p>
+              <div className="divide-y divide-gray-200">
+                <div className="p-2 px-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-900">Zone</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.availability?.zones?.length > 0 ? "Assigned" : "Not assigned"}
+                  </p>
+                </div>
+                <div className="p-2 px-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-900">City</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.location?.city || "N/A"}
+                  </p>
+                </div>
+                <div className="p-2 px-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-900">Vehicle type</p>
+                  <p className="text-base text-gray-900 capitalize">
+                    {profile?.vehicle?.type || "N/A"}
+                  </p>
+                </div>
+                <div className="p-2 px-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-900">Vehicle number</p>
+                  {vehicleNumber ? (
+                    <div className="flex items-center gap-2">
+                      <p className="text-base text-gray-900">{vehicleNumber}</p>
+                      <button
+                        onClick={() => {
+                          setVehicleInput(vehicleNumber)
+                          setShowVehiclePopup(true)
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4 text-green-600" />
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       onClick={() => {
-                        setVehicleInput(vehicleNumber)
+                        setVehicleInput("")
                         setShowVehiclePopup(true)
                       }}
-                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      className="flex items-center gap-2 text-green-600 font-medium"
                     >
-                      <Edit2 className="w-4 h-4 text-green-600" />
+                      <Plus className="w-4 h-4" />
+                      <span>Add</span>
                     </button>
-                  </div>
-                ) : (
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div>
+            <h2 className="text-base font-medium text-gray-900 mb-3">Documents</h2>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              {/* Aadhar Card */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-medium text-gray-900">Aadhar Card</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {profile?.status === "approved" || profile?.documents?.aadhar?.verified
+                      ? "Verified"
+                      : profile?.documents?.aadhar?.document
+                        ? "Not verified"
+                        : "Not uploaded"}
+                  </p>
+                </div>
+                {profile?.documents?.aadhar?.document && (
                   <button
                     onClick={() => {
-                      setVehicleInput("")
-                      setShowVehiclePopup(true)
+                      setSelectedDocument({
+                        name: "Aadhar Card",
+                        url: profile.documents.aadhar.document
+                      })
+                      setShowDocumentModal(true)
                     }}
-                    className="flex items-center gap-2 text-green-600 font-medium"
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Add</span>
+                    <Eye className="w-5 h-5 text-gray-600" />
+                  </button>
+                )}
+              </div>
+
+              {/* PAN Card */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-medium text-gray-900">PAN Card</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {profile?.status === "approved" || profile?.documents?.pan?.verified
+                      ? "Verified"
+                      : profile?.documents?.pan?.document
+                        ? "Not verified"
+                        : "Not uploaded"}
+                  </p>
+                </div>
+                {profile?.documents?.pan?.document && (
+                  <button
+                    onClick={() => {
+                      setSelectedDocument({
+                        name: "PAN Card",
+                        url: profile.documents.pan.document
+                      })
+                      setShowDocumentModal(true)
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <Eye className="w-5 h-5 text-gray-600" />
+                  </button>
+                )}
+              </div>
+
+              {/* Driving License */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-medium text-gray-900">Driving License</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {profile?.status === "approved" || profile?.documents?.drivingLicense?.verified
+                      ? "Verified"
+                      : profile?.documents?.drivingLicense?.document
+                        ? "Not verified"
+                        : "Not uploaded"}
+                  </p>
+                </div>
+                {profile?.documents?.drivingLicense?.document && (
+                  <button
+                    onClick={() => {
+                      setSelectedDocument({
+                        name: "Driving License",
+                        url: profile.documents.drivingLicense.document
+                      })
+                      setShowDocumentModal(true)
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <Eye className="w-5 h-5 text-gray-600" />
                   </button>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Documents Section */}
-        <div>
-          <h2 className="text-base font-medium text-gray-900 mb-3">Documents</h2>
-          <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
-            {/* Aadhar Card */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-base font-medium text-gray-900">Aadhar Card</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {profile?.status === "approved" || profile?.documents?.aadhar?.verified 
-                    ? "Verified" 
-                    : profile?.documents?.aadhar?.document 
-                      ? "Not verified" 
-                      : "Not uploaded"}
-                </p>
+          {/* Personal Details Section */}
+          <div>
+            <h2 className="text-base font-medium text-gray-900 mb-3">Personal details</h2>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Phone</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.phone || "N/A"}
+                  </p>
+                </div>
               </div>
-              {profile?.documents?.aadhar?.document && (
-                <button
-                  onClick={() => {
-                    setSelectedDocument({
-                      name: "Aadhar Card",
-                      url: profile.documents.aadhar.document
-                    })
-                    setShowDocumentModal(true)
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <Eye className="w-5 h-5 text-gray-600" />
-                </button>
-              )}
-            </div>
-
-            {/* PAN Card */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-base font-medium text-gray-900">PAN Card</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {profile?.status === "approved" || profile?.documents?.pan?.verified 
-                    ? "Verified" 
-                    : profile?.documents?.pan?.document 
-                      ? "Not verified" 
-                      : "Not uploaded"}
-                </p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Email</p>
+                  <p className="text-base text-gray-900">{profile?.email || "-"}</p>
+                </div>
               </div>
-              {profile?.documents?.pan?.document && (
-                <button
-                  onClick={() => {
-                    setSelectedDocument({
-                      name: "PAN Card",
-                      url: profile.documents.pan.document
-                    })
-                    setShowDocumentModal(true)
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <Eye className="w-5 h-5 text-gray-600" />
-                </button>
-              )}
-            </div>
-
-            {/* Driving License */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-base font-medium text-gray-900">Driving License</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {profile?.status === "approved" || profile?.documents?.drivingLicense?.verified 
-                    ? "Verified" 
-                    : profile?.documents?.drivingLicense?.document 
-                      ? "Not verified" 
-                      : "Not uploaded"}
-                </p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Aadhar Card Number</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.aadhar?.number || "-"}
+                  </p>
+                </div>
               </div>
-              {profile?.documents?.drivingLicense?.document && (
-                <button
-                  onClick={() => {
-                    setSelectedDocument({
-                      name: "Driving License",
-                      url: profile.documents.drivingLicense.document
-                    })
-                    setShowDocumentModal(true)
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <Eye className="w-5 h-5 text-gray-600" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Personal Details Section */}
-        <div>
-          <h2 className="text-base font-medium text-gray-900 mb-3">Personal details</h2>
-          <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Phone</p>
-                <p className="text-base text-gray-900">
-                  {profile?.phone || "N/A"}
-                </p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Rating</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.metrics?.rating ? profile.metrics.rating.toFixed(1) : "-"}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Email</p>
-                <p className="text-base text-gray-900">{profile?.email || "-"}</p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Total Orders</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.metrics?.completedOrders || 0}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Aadhar Card Number</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.aadhar?.number || "-"}
-                </p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Career Earnings</p>
+                  <p className="text-base text-gray-900 font-semibold">
+                    {profile?.metrics?.totalEarned ? `₹${profile.metrics.totalEarned.toFixed(2)}` : "₹0.00"}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Rating</p>
-                <p className="text-base text-gray-900">
-                  {profile?.metrics?.rating ? profile.metrics.rating.toFixed(1) : "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Status</p>
-                <p className="text-base text-gray-900 capitalize">
-                  {profile?.status || "N/A"}
-                </p>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Status</p>
+                  <p className="text-base text-gray-900 capitalize">
+                    {profile?.status || "N/A"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-900">Bank details</h2>
-            <button
-              onClick={() => {
-                setShowBankDetailsPopup(true)
-                // Pre-fill form with existing data
-                setBankDetails({
-                  accountHolderName: profile?.documents?.bankDetails?.accountHolderName || "",
-                  accountNumber: profile?.documents?.bankDetails?.accountNumber || "",
-                  ifscCode: profile?.documents?.bankDetails?.ifscCode || "",
-                  bankName: profile?.documents?.bankDetails?.bankName || ""
-                })
-                setBankDetailsErrors({})
-              }}
-              className="text-green-600 font-medium text-sm flex items-center gap-1 hover:text-green-700"
-            >
-              <Edit2 className="w-4 h-4" />
-              <span>Edit</span>
-            </button>
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-gray-900">Bank details</h2>
+              <button
+                onClick={() => {
+                  setShowBankDetailsPopup(true)
+                  // Pre-fill form with existing data
+                  setBankDetails({
+                    accountHolderName: profile?.documents?.bankDetails?.accountHolderName || "",
+                    accountNumber: profile?.documents?.bankDetails?.accountNumber || "",
+                    ifscCode: profile?.documents?.bankDetails?.ifscCode || "",
+                    bankName: profile?.documents?.bankDetails?.bankName || ""
+                  })
+                  setBankDetailsErrors({})
+                }}
+                className="text-green-600 font-medium text-sm flex items-center gap-1 hover:text-green-700"
+              >
+                <Edit2 className="w-4 h-4" />
+                <span>Edit</span>
+              </button>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Account Holder Name</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.bankDetails?.accountHolderName || "-"}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Account Number</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.bankDetails?.accountNumber
+                      ? `****${profile.documents.bankDetails.accountNumber.slice(-4)}`
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">IFSC Code</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.bankDetails?.ifscCode || "-"}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Bank Name</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.bankDetails?.bankName || "-"}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 px-3 flex items-center justify-between">
+                <div className="w-full align-center flex content-center justify-between">
+                  <p className="text-sm text-gray-900 mb-1">Pan Card Number</p>
+                  <p className="text-base text-gray-900">
+                    {profile?.documents?.pan?.number || "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Account Holder Name</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.bankDetails?.accountHolderName || "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Account Number</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.bankDetails?.accountNumber 
-                    ? `****${profile.documents.bankDetails.accountNumber.slice(-4)}`
-                    : "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">IFSC Code</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.bankDetails?.ifscCode || "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Bank Name</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.bankDetails?.bankName || "-"}
-                </p>
-              </div>
-            </div>
-            <div className="p-2 px-3 flex items-center justify-between">
-              <div className="w-full align-center flex content-center justify-between">
-                <p className="text-sm text-gray-900 mb-1">Pan Card Number</p>
-                <p className="text-base text-gray-900">
-                  {profile?.documents?.pan?.number || "-"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
         </div>
       ) : null}
 
@@ -448,12 +464,12 @@ export default function ProfileDetails() {
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>
-            
+
             {/* Document Title */}
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">{selectedDocument.name}</h3>
             </div>
-            
+
             {/* Document Image */}
             <div className="p-4">
               <img
@@ -493,9 +509,8 @@ export default function ProfileDetails() {
                 setBankDetailsErrors(prev => ({ ...prev, accountHolderName: "" }))
               }}
               placeholder="Enter account holder name"
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                bankDetailsErrors.accountHolderName ? "border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${bankDetailsErrors.accountHolderName ? "border-red-500" : "border-gray-300"
+                }`}
             />
             {bankDetailsErrors.accountHolderName && (
               <p className="text-red-500 text-xs mt-1">{bankDetailsErrors.accountHolderName}</p>
@@ -517,9 +532,8 @@ export default function ProfileDetails() {
               }}
               placeholder="Enter account number"
               maxLength={18}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                bankDetailsErrors.accountNumber ? "border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${bankDetailsErrors.accountNumber ? "border-red-500" : "border-gray-300"
+                }`}
             />
             {bankDetailsErrors.accountNumber && (
               <p className="text-red-500 text-xs mt-1">{bankDetailsErrors.accountNumber}</p>
@@ -541,9 +555,8 @@ export default function ProfileDetails() {
               }}
               placeholder="Enter IFSC code"
               maxLength={11}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                bankDetailsErrors.ifscCode ? "border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${bankDetailsErrors.ifscCode ? "border-red-500" : "border-gray-300"
+                }`}
             />
             {bankDetailsErrors.ifscCode && (
               <p className="text-red-500 text-xs mt-1">{bankDetailsErrors.ifscCode}</p>
@@ -563,9 +576,8 @@ export default function ProfileDetails() {
                 setBankDetailsErrors(prev => ({ ...prev, bankName: "" }))
               }}
               placeholder="Enter bank name"
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                bankDetailsErrors.bankName ? "border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${bankDetailsErrors.bankName ? "border-red-500" : "border-gray-300"
+                }`}
             />
             {bankDetailsErrors.bankName && (
               <p className="text-red-500 text-xs mt-1">{bankDetailsErrors.bankName}</p>
@@ -628,11 +640,10 @@ export default function ProfileDetails() {
               }
             }}
             disabled={isUpdatingBankDetails}
-            className={`w-full py-3 rounded-lg font-medium text-white transition-colors ${
-              isUpdatingBankDetails
+            className={`w-full py-3 rounded-lg font-medium text-white transition-colors ${isUpdatingBankDetails
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#00B761] hover:bg-[#00A055]"
-            }`}
+              }`}
           >
             {isUpdatingBankDetails ? "Updating..." : "Save Bank Details"}
           </button>

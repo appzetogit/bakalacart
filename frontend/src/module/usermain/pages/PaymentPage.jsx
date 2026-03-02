@@ -157,7 +157,7 @@ export default function PaymentPage() {
             <CheckCircle className="w-10 h-10 md:w-12 md:h-12 text-white" />
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
-            {paymentMethod === "cash" ? "Order Placed!" : "Payment Successful!"}
+            {(paymentMethod === "cash" || paymentMethod === "cod") ? "Order Confirmed!" : "Payment Successful!"}
           </h2>
           <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
             {paymentMethod === "cash"

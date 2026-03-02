@@ -413,6 +413,8 @@ export default function DeliveryHome() {
     transactions: [],
     joiningBonusClaimed: false
   })
+  const [dashboardData, setDashboardData] = useState(null)
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false)
   const [activeOrder, setActiveOrder] = useState(() => {
     const stored = localStorage.getItem('deliveryActiveOrder')
     return stored ? JSON.parse(stored) : null
@@ -1127,13 +1129,14 @@ export default function DeliveryHome() {
   const hasStoreDataForToday = hasDateData(today)
   const todayData = hasStoreDataForToday ? getDateData(today) : null
 
-  // Calculate today's earnings (prefer store, then calculated; default to 0 so UI is not empty)
+  // Calculate today's earnings (prefer dashboard, then store, then calculated)
   const calculatedEarnings = calculatePeriodEarnings(walletState, 'today') || 0
-  const todayEarnings = hasStoreDataForToday && todayData
-    ? (todayData.earnings ?? calculatedEarnings)
-    : calculatedEarnings
+  const dashboardTodayEarnings = dashboardData?.wallet?.todayEarnings
+  const todayEarnings = dashboardTodayEarnings !== undefined
+    ? dashboardTodayEarnings
+    : (hasStoreDataForToday && todayData ? (todayData.earnings ?? calculatedEarnings) : calculatedEarnings)
 
-  // Calculate today's trips (prefer store, then calculated; default to 0)
+  // Calculate today's trips (prefer dashboard, then store, then calculated)
   const allOrders = getAllDeliveryOrders()
   const calculatedTrips = allOrders.filter(order => {
     const orderId = order.orderId || order.id
@@ -1144,9 +1147,10 @@ export default function DeliveryHome() {
     orderDate.setHours(0, 0, 0, 0)
     return orderDate.getTime() === today.getTime()
   }).length
-  const todayTrips = hasStoreDataForToday && todayData
-    ? (todayData.trips ?? calculatedTrips)
-    : calculatedTrips
+  const dashboardTodayTrips = dashboardData?.stats?.todayOrders
+  const todayTrips = dashboardTodayTrips !== undefined
+    ? dashboardTodayTrips
+    : (hasStoreDataForToday && todayData ? (todayData.trips ?? calculatedTrips) : calculatedTrips)
 
   // Calculate today's gigs count
   const todayGigsCount = bookedGigs.filter(gig => gig.date === todayDateKey).length
@@ -5516,6 +5520,45 @@ export default function DeliveryHome() {
       fetchWalletData()
     }
   }, [deliveryStatus])
+
+  // Fetch dashboard data (stats, earnings, etc.)
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      if (deliveryStatus === 'pending') return
+
+      try {
+        setIsDashboardLoading(true)
+        const response = await deliveryAPI.getDashboard()
+        if (response?.data?.success && response?.data?.data) {
+          const data = response.data.data
+          setDashboardData(data)
+
+          // Update progress store with latest today's stats from backend
+          if (data.stats && data.wallet) {
+            updateTodayProgress({
+              earnings: data.wallet.todayEarnings || 0,
+              trips: data.stats.todayOrders || 0,
+              timeOnOrders: data.stats.todayHours || (data.stats.totalHours || 0) // Fallback if todayHours not present
+            })
+          }
+        }
+      } catch (error) {
+        if (error.code !== 'ERR_NETWORK') {
+          console.error('Error fetching dashboard data:', error)
+        }
+      } finally {
+        setIsDashboardLoading(false)
+      }
+    }
+
+    if (deliveryStatus !== 'pending') {
+      fetchDashboard()
+    }
+
+    // Refresh dashboard every 5 minutes
+    const intervalId = setInterval(fetchDashboard, 5 * 60 * 1000)
+    return () => clearInterval(intervalId)
+  }, [deliveryStatus, updateTodayProgress])
 
   // Fetch assigned orders from API when delivery person goes online
   const fetchAssignedOrders = useCallback(async () => {
@@ -11934,6 +11977,52 @@ export default function DeliveryHome() {
                         <ArrowRight className="w-4 h-4" />
                       </div>
                     </button>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Overall Performance Card */}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+                className="w-full rounded-xl overflow-hidden shadow-lg bg-white mt-4"
+              >
+                {/* Header */}
+                <div className="bg-gray-100 px-4 py-3 flex items-center gap-3">
+                  <div className="relative">
+                    <TrendingUp className="w-5 h-5 text-gray-700" />
+                  </div>
+                  <span className="text-gray-700 font-semibold">Overall performance</span>
+                </div>
+
+                {/* Content */}
+                <div className="p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-xl font-bold text-gray-900">
+                        {dashboardData?.stats?.completedOrders || 0}
+                      </span>
+                      <span className="text-xs text-gray-600">Total orders</span>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xl font-bold text-gray-900">
+                        {formatCurrency(dashboardData?.wallet?.totalEarned || 0)}
+                      </span>
+                      <span className="text-xs text-gray-600">Career earnings</span>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-xl font-bold text-gray-900">
+                        {dashboardData?.stats?.rating ? dashboardData.stats.rating.toFixed(1) : "0.0"}
+                      </span>
+                      <span className="text-xs text-gray-600">Rider rating</span>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xl font-bold text-gray-900">
+                        {dashboardData?.stats?.onTimeDeliveryRate ? `${dashboardData.stats.onTimeDeliveryRate}%` : "0%"}
+                      </span>
+                      <span className="text-xs text-gray-600">On-time rate</span>
+                    </div>
                   </div>
                 </div>
               </motion.div>

@@ -234,22 +234,36 @@ export async function proactiveTokenRefresh(module) {
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
 
-    // Call refresh endpoint with credentials
+    const refreshToken = localStorage.getItem(`${module}_refreshToken`);
+
+    // Call refresh endpoint with credentials and refresh token header (for hybrid app/WebView support)
     const response = await axios.post(
       `${API_BASE_URL}${refreshEndpoint}`,
       {},
-      { withCredentials: true }
+      {
+        withCredentials: true,
+        headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {}
+      }
     );
 
-    const { accessToken } = response.data.data || response.data;
+    const { accessToken, refreshToken: newRefreshToken } = response.data.data || response.data;
 
     if (accessToken) {
       // Verify role matches
+      // Use 'admin' check for all admin-like roles to be consistent with getModuleInfo
       const role = getRoleFromToken(accessToken);
-      if (role === module) {
-        // Store new token
+      const isCorrectModule = (module === 'admin' && ['admin', 'super_admin', 'moderator'].includes(role)) || (role === module);
+
+      if (isCorrectModule) {
+        // Store new access token
         localStorage.setItem(`${module}_accessToken`, accessToken);
-        console.log(`✅ [Proactive Refresh] Token refreshed for ${module}`);
+
+        // If backend returned a new refresh token, store it as well
+        if (newRefreshToken) {
+          localStorage.setItem(`${module}_refreshToken`, newRefreshToken);
+        }
+
+        console.log(`✅ [Proactive Refresh] Tokens refreshed for ${module}`);
         return true;
       } else {
         console.warn(`[Proactive Refresh] Role mismatch for ${module}: expected ${module}, got ${role}`);

@@ -340,293 +340,259 @@ export default function AcceptedOrderDetails() {
           </div>
         </div> */}
 
-        {/* Restaurant Details */}
-        <div>
-          <h3 className="text-gray-900 font-semibold mb-3">Restaurant Details</h3>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-[#ff8100] rounded-lg flex items-center justify-center">
-                <ChefHat className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-gray-900 font-medium mb-1">{orderData.restaurant.name}</p>
-                {orderData.restaurant.phone && (
-                  <p className="text-gray-600 text-xs mb-1">{orderData.restaurant.phone}</p>
-                )}
-                <p className="text-gray-600 text-sm mb-1 break-words">{orderData.restaurant.address}</p>
-                {orderData.restaurant.rating > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-[#ff8100] rounded-full flex items-center justify-center">
-                      <span className="text-white text-[8px]">★</span>
+        {/* Main Content */}
+        <div className="px-4 py-4 space-y-6">
+          {/* Restaurant Details */}
+          <div>
+            <h3 className="text-gray-900 font-black text-2xl mb-4 px-1 uppercase tracking-tight">Restaurant Details</h3>
+            <div className="bg-white rounded-2xl p-6 shadow-md border-2 border-gray-100">
+              <div className="flex items-start gap-5">
+                <div className="w-16 h-16 bg-[#ff8100] rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+                  <ChefHat className="w-9 h-9 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-3xl font-black text-gray-900 mb-2 leading-tight">{orderData.restaurant.name}</p>
+                  {orderData.restaurant.phone && (
+                    <p className="text-xl font-bold text-gray-500 mb-2 flex items-center gap-2">
+                      <Phone className="w-5 h-5" />
+                      {orderData.restaurant.phone}
+                    </p>
+                  )}
+                  <p className="text-xl font-bold text-gray-700 leading-snug break-words bg-gray-50 p-4 rounded-xl border border-gray-100 italic">
+                    {orderData.restaurant.address}
+                  </p>
+                  {orderData.restaurant.rating > 0 && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <div className="w-6 h-6 bg-[#ff8100] rounded-full flex items-center justify-center shadow-sm">
+                        <span className="text-white text-[10px] font-black">★</span>
+                      </div>
+                      <span className="text-gray-600 font-bold text-lg">({orderData.restaurant.rating})</span>
                     </div>
-                    <span className="text-gray-600 text-sm">({orderData.restaurant.rating})</span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="flex items-center gap-4 mt-6 pt-6 border-t border-gray-100">
                 <button
-                  onClick={() => {
-                    navigate("/delivery/profile/conversation")
-                  }}
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#ff8100] flex items-center justify-center hover:bg-[#e67300] transition-colors flex-shrink-0"
+                  onClick={() => navigate("/delivery/profile/conversation")}
+                  className="flex-1 h-14 rounded-xl bg-[#ff8100] flex items-center justify-center gap-2 hover:bg-[#e67300] transition-all active:scale-95 shadow-md"
                 >
-                  <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                  <MessageCircle className="w-6 h-6 text-white" />
+                  <span className="text-white font-black text-lg">Message</span>
                 </button>
                 <button
                   onClick={() => {
                     const phone = orderData.restaurant.phone || orderData.customer.phone
-                    if (phone) {
-                      window.open(`tel:${phone}`, '_self')
-                    } else {
-                      window.open(`tel:+8801700000000`, '_self')
-                    }
+                    if (phone) window.open(`tel:${phone}`, '_self')
                   }}
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center hover:bg-green-600 transition-colors flex-shrink-0"
+                  className="flex-1 h-14 rounded-xl bg-green-500 flex items-center justify-center gap-2 hover:bg-green-600 transition-all active:scale-95 shadow-md"
                 >
-                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                  <Phone className="w-6 h-6 text-white" />
+                  <span className="text-white font-black text-lg">Call</span>
                 </button>
                 <button
                   onClick={() => {
                     const address = encodeURIComponent(orderData.restaurant.address)
                     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
                   }}
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-300 flex items-center justify-center hover:bg-gray-400 transition-colors flex-shrink-0"
+                  className="w-14 h-14 rounded-xl bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-all active:scale-95 shadow-sm"
                 >
-                  <MapPin className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
+                  <MapPin className="w-6 h-6 text-gray-600" />
                 </button>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Item Info */}
-        <div>
-          <h3 className="text-gray-900 font-semibold mb-3">Item Info ({orderData.items.length})</h3>
-          <div className="space-y-4">
-            {orderData.items.map((item) => (
-              <div key={item.id} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-start gap-4">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-16 h-16 rounded-lg object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="text-gray-900 font-medium mb-1">
-                      {item.name}
-                      {(() => {
-                        const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
-                        const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
-                        const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
-                        return displayParts.length > 0 ? (
-                          <span className="text-xs font-bold ml-2 italic text-[#ff8100]">
-                            ({displayParts.join(' ')})
-                          </span>
-                        ) : null
-                      })()}
-                    </p>
-                    {item.description && (
-                      <p className="text-[11px] text-gray-600 mt-1 pl-1 border-l-2 border-gray-200 leading-tight">
-                        {item.description}
+          {/* Item Info */}
+          <div>
+            <h3 className="text-gray-900 font-black text-2xl mb-4 px-1 uppercase tracking-tight">Order Items ({orderData.items.length})</h3>
+            <div className="space-y-4">
+              {orderData.items.map((item) => (
+                <div key={item.id} className="bg-white rounded-2xl p-6 shadow-sm border-2 border-gray-100">
+                  <div className="flex items-start gap-5">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-20 h-20 rounded-2xl object-cover shadow-sm border border-gray-100"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-2xl font-black text-gray-900 mb-2 leading-tight">
+                        {item.name}
+                        {(() => {
+                          const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
+                          const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                          const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                          return displayParts.length > 0 ? (
+                            <span className="text-lg font-black ml-2 italic text-[#ff8100]">
+                              ({displayParts.join(' ')})
+                            </span>
+                          ) : null
+                        })()}
                       </p>
-                    )}
-                    <p className="text-gray-900 font-semibold mb-1">₹ {item.price.toFixed(2)}</p>
-                    <p className="text-gray-600 text-sm">Variations: {item.variation}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-900 font-medium mb-2">Quantity: {item.quantity}</p>
-                    <span className="inline-block bg-[#ff8100] text-white text-xs font-medium px-3 py-1 rounded">
-                      {item.type}
-                    </span>
+                      {item.description && (
+                        <p className="text-sm text-gray-700 italic border-l-4 border-orange-200 pl-3 mb-3 font-bold leading-relaxed">
+                          "{item.description}"
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-2xl font-black text-gray-900">₹ {item.price.toFixed(2)}</span>
+                        <span className="text-lg font-black bg-gray-100 px-3 py-1 rounded-lg text-gray-600">Qty: {item.quantity}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Cutlery */}
-        <div className="flex items-center justify-between py-2">
-          <span className="text-gray-900 font-medium">Cutlery:</span>
-          <span className="text-gray-900 font-medium">{orderData.cutlery}</span>
-        </div>
-
-        {/* Special Instructions */}
-        {orderData.note && orderData.note.trim() && (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 shadow-sm">
-            <h3 className="text-blue-900 font-bold mb-2 flex items-center gap-2 text-base">
-              <FileText className="w-5 h-5 text-blue-600" />
-              CUSTOMER INSTRUCTIONS
-            </h3>
-            <p className="text-blue-900 text-sm font-medium leading-relaxed bg-white/50 p-2 rounded border border-blue-100 italic">
-              "{orderData.note}"
-            </p>
-          </div>
-        )}
-
-        {/* Payment Method */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-gray-900 font-medium">Payment Method</span>
-            <span className="text-red-600 font-medium">{orderData.paymentMethod.status}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-gray-900 font-medium">{orderData.paymentMethod.method}</span>
-          </div>
-        </div>
-
-        {/* Billing Info */}
-        <div>
-          <h3 className="text-gray-900 font-semibold mb-3">Billing Info</h3>
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            {orderData.billing.subtotal > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="text-gray-900 font-medium">₹ {orderData.billing.subtotal.toFixed(2)}</span>
-              </div>
-            )}
-            {orderData.billing.deliveryFee > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Delivery Fee</span>
-                <span className="text-green-600 font-medium">₹ {orderData.billing.deliveryFee.toFixed(2)}</span>
-              </div>
-            )}
-            {orderData.billing.tax > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Tax</span>
-                <span className="text-gray-900 font-medium">₹ {orderData.billing.tax.toFixed(2)}</span>
-              </div>
-            )}
-            {orderData.billing.discount > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Discount</span>
-                <span className="text-red-600 font-medium">-₹ {orderData.billing.discount.toFixed(2)}</span>
-              </div>
-            )}
-            {orderData.billing.deliverymanTips > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Deliveryman Tips</span>
-                <span className="text-gray-900 font-medium">(+) ₹ {orderData.billing.deliverymanTips.toFixed(2)}</span>
-              </div>
-            )}
-            {orderData.earnings > 0 && (
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-green-600 font-semibold">Earnings</span>
-                <span className="text-green-600 font-bold">₹ {orderData.earnings.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-300">
-              <span className="text-[#ff8100] font-semibold">Total Amount</span>
-              <span className="text-[#ff8100] font-bold text-lg">₹ {orderData.billing.total.toFixed(2)}</span>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom Navigation Bar - Mobile Only */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
-        <div className="flex items-center justify-around py-2 px-4">
-          <button
-            onClick={() => navigate("/delivery")}
-            className="flex flex-col items-center gap-1 p-2 text-gray-600"
-          >
-            <Home className="w-6 h-6" />
-            <span className="text-[10px] text-gray-600 font-medium">Home</span>
-          </button>
-          <button
-            onClick={() => navigate("/delivery/requests")}
-            className="flex flex-col items-center gap-1 p-2 text-gray-600 relative"
-          >
-            <div className="relative">
-              <FileText className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                5
-              </span>
+          {/* Special Instructions */}
+          {orderData.note && orderData.note.trim() && (
+            <div className="bg-blue-50 border-4 border-dashed border-blue-200 rounded-2xl p-6 shadow-inner">
+              <h3 className="text-blue-900 font-black text-xl mb-3 flex items-center gap-3 uppercase tracking-widest">
+                <FileText className="w-7 h-7 text-blue-600" />
+                CUSTOMER INSTRUCTIONS
+              </h3>
+              <p className="text-2xl text-blue-900 font-black italic underline decoration-blue-200 underline-offset-4 leading-snug">
+                "{orderData.note}"
+              </p>
             </div>
-            <span className="text-[10px] text-gray-600 font-medium">Request</span>
-          </button>
-          <button
-            onClick={() => navigate("/delivery/orders")}
-            className="flex flex-col items-center gap-1 p-2 text-gray-600"
-          >
-            <UtensilsCrossed className="w-6 h-6" />
-            <span className="text-[10px] text-gray-600 font-medium">Orders</span>
-          </button>
-          <button
-            onClick={() => navigate("/delivery/profile")}
-            className="flex flex-col items-center gap-1 p-2 text-gray-600"
-          >
-            <User className="w-6 h-6" />
-            <span className="text-[10px] text-gray-600 font-medium">Profile</span>
-          </button>
-        </div>
-      </div>
+          )}
 
-      {/* Status Update Buttons - Above Status Bar */}
-      {(() => {
-        const normalizedStatus = normalizeDeliveryStatus(orderStatus)
-        const isDelivered = normalizedStatus === DELIVERY_ORDER_STATUS.DELIVERED
-        const isCancelled = normalizedStatus === DELIVERY_ORDER_STATUS.CANCELLED
-
-        // Don't show buttons if order is delivered or cancelled
-        if (isDelivered || isCancelled) return null
-
-        return (
-          <div className="fixed bottom-28 md:bottom-12 left-0 right-0 px-4 z-[60]">
-            <div className="bg-white rounded-lg shadow-lg p-3 space-y-2">
-              {normalizedStatus === DELIVERY_ORDER_STATUS.ACCEPTED && (
-                <button
-                  onClick={() => {
-                    saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.PICKED_UP)
-                    setOrderStatus(DELIVERY_ORDER_STATUS.PICKED_UP)
-                  }}
-                  className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg transition-colors"
-                >
-                  Mark as Picked Up
-                </button>
+          {/* Billing Info */}
+          <div className="pb-10">
+            <h3 className="text-gray-900 font-black text-2xl mb-4 px-1 uppercase tracking-tight">Billing Info</h3>
+            <div className="bg-white rounded-2xl p-6 shadow-md border-2 border-gray-100 space-y-4">
+              {orderData.billing.subtotal > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-bold text-gray-500">Subtotal</span>
+                  <span className="text-2xl font-black text-gray-900">₹ {orderData.billing.subtotal.toFixed(2)}</span>
+                </div>
               )}
-
-              {normalizedStatus === DELIVERY_ORDER_STATUS.PICKED_UP && (
-                <button
-                  onClick={() => {
-                    saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.ON_THE_WAY)
-                    setOrderStatus(DELIVERY_ORDER_STATUS.ON_THE_WAY)
-                  }}
-                  className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg transition-colors"
-                >
-                  Mark as On the Way
-                </button>
+              {orderData.billing.deliveryFee > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-bold text-gray-500">Delivery Fee</span>
+                  <span className="text-2xl font-black text-green-600">₹ {orderData.billing.deliveryFee.toFixed(2)}</span>
+                </div>
               )}
+              {orderData.earnings > 0 && (
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+                  <span className="text-xl font-black text-green-700">Your Earnings</span>
+                  <span className="text-3xl font-black text-green-800">₹ {orderData.earnings.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="pt-6 border-t-4 border-dashed border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-2xl font-black text-gray-900">Total Amount</span>
+                    <span className="text-xs font-black text-orange-600 uppercase tracking-[0.2em]">{orderData.paymentMethod.method}</span>
+                  </div>
+                  <span className="text-5xl font-black text-[#ff8100] drop-shadow-sm">₹ {orderData.billing.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              {normalizedStatus === DELIVERY_ORDER_STATUS.ON_THE_WAY && (
-                <button
-                  onClick={() => {
-                    saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.DELIVERED)
-                    setOrderStatus(DELIVERY_ORDER_STATUS.DELIVERED)
-                    // Remove from activeOrder when delivered
-                    const activeOrder = localStorage.getItem('activeOrder')
-                    if (activeOrder) {
-                      const activeOrderData = JSON.parse(activeOrder)
-                      if (activeOrderData.orderId === orderId) {
-                        localStorage.removeItem('activeOrder')
-                        window.dispatchEvent(new CustomEvent('activeOrderUpdated'))
+        {/* Bottom Navigation Bar - Mobile Only */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+          <div className="flex items-center justify-around py-2 px-4">
+            <button
+              onClick={() => navigate("/delivery")}
+              className="flex flex-col items-center gap-1 p-2 text-gray-600"
+            >
+              <Home className="w-6 h-6" />
+              <span className="text-[10px] text-gray-600 font-medium">Home</span>
+            </button>
+            <button
+              onClick={() => navigate("/delivery/requests")}
+              className="flex flex-col items-center gap-1 p-2 text-gray-600 relative"
+            >
+              <div className="relative">
+                <FileText className="w-6 h-6" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  5
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-600 font-medium">Request</span>
+            </button>
+            <button
+              onClick={() => navigate("/delivery/orders")}
+              className="flex flex-col items-center gap-1 p-2 text-gray-600"
+            >
+              <UtensilsCrossed className="w-6 h-6" />
+              <span className="text-[10px] text-gray-600 font-medium">Orders</span>
+            </button>
+            <button
+              onClick={() => navigate("/delivery/profile")}
+              className="flex flex-col items-center gap-1 p-2 text-gray-600"
+            >
+              <User className="w-6 h-6" />
+              <span className="text-[10px] text-gray-600 font-medium">Profile</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Update Buttons - Above Status Bar */}
+        {(() => {
+          const normalizedStatus = normalizeDeliveryStatus(orderStatus)
+          const isDelivered = normalizedStatus === DELIVERY_ORDER_STATUS.DELIVERED
+          const isCancelled = normalizedStatus === DELIVERY_ORDER_STATUS.CANCELLED
+
+          // Don't show buttons if order is delivered or cancelled
+          if (isDelivered || isCancelled) return null
+
+          return (
+            <div className="fixed bottom-28 md:bottom-12 left-0 right-0 px-4 z-[60]">
+              <div className="bg-white rounded-lg shadow-lg p-3 space-y-2">
+                {normalizedStatus === DELIVERY_ORDER_STATUS.ACCEPTED && (
+                  <button
+                    onClick={() => {
+                      saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.PICKED_UP)
+                      setOrderStatus(DELIVERY_ORDER_STATUS.PICKED_UP)
+                    }}
+                    className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg transition-colors"
+                  >
+                    Mark as Picked Up
+                  </button>
+                )}
+
+                {normalizedStatus === DELIVERY_ORDER_STATUS.PICKED_UP && (
+                  <button
+                    onClick={() => {
+                      saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.ON_THE_WAY)
+                      setOrderStatus(DELIVERY_ORDER_STATUS.ON_THE_WAY)
+                    }}
+                    className="w-full bg-[#ff8100] hover:bg-[#e67300] text-white font-semibold py-3 rounded-lg transition-colors"
+                  >
+                    Mark as On the Way
+                  </button>
+                )}
+
+                {normalizedStatus === DELIVERY_ORDER_STATUS.ON_THE_WAY && (
+                  <button
+                    onClick={() => {
+                      saveDeliveryOrderStatus(orderId, DELIVERY_ORDER_STATUS.DELIVERED)
+                      setOrderStatus(DELIVERY_ORDER_STATUS.DELIVERED)
+                      // Remove from activeOrder when delivered
+                      const activeOrder = localStorage.getItem('activeOrder')
+                      if (activeOrder) {
+                        const activeOrderData = JSON.parse(activeOrder)
+                        if (activeOrderData.orderId === orderId) {
+                          localStorage.removeItem('activeOrder')
+                          window.dispatchEvent(new CustomEvent('activeOrderUpdated'))
+                        }
                       }
-                    }
-                  }}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors"
-                >
-                  Mark as Delivered
-                </button>
-              )}
+                    }}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors"
+                  >
+                    Mark as Delivered
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
 
-      {/* Bottom Status Bar - Above Navigation - REMOVED */}
+      </div>
     </div>
   )
 }

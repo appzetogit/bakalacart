@@ -567,6 +567,10 @@ export default function OrderTracking() {
             setOrderStatus('pickup');
           } else if (apiOrder.status === 'delivered') {
             setOrderStatus('delivered');
+          } else if (apiOrder.status === 'confirmed' || apiOrder.status === 'placed') {
+            setOrderStatus('confirmed');
+          } else if (apiOrder.status === 'pending') {
+            setOrderStatus('pending');
           }
         } else {
           throw new Error('Order not found')
@@ -809,6 +813,10 @@ export default function OrderTracking() {
           setOrderStatus('pickup')
         } else if (apiOrder.status === 'delivered') {
           setOrderStatus('delivered')
+        } else if (apiOrder.status === 'confirmed' || apiOrder.status === 'placed') {
+          setOrderStatus('confirmed')
+        } else if (apiOrder.status === 'pending') {
+          setOrderStatus('pending')
         }
       }
     } catch (err) {
@@ -866,8 +874,18 @@ export default function OrderTracking() {
   }
 
   const statusConfig = {
+    pending: {
+      title: "Order Received",
+      subtitle: "Waiting for restaurant to confirm",
+      color: "bg-amber-500"
+    },
     placed: {
-      title: "Order placed",
+      title: "Order Confirmed",
+      subtitle: "Food preparation will begin shortly",
+      color: "bg-green-700"
+    },
+    confirmed: {
+      title: "Order Confirmed",
       subtitle: "Food preparation will begin shortly",
       color: "bg-green-700"
     },

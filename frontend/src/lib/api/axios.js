@@ -253,9 +253,9 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Check for access token in standard successResponse (response.data.data.accessToken)
-    // or direct responses (response.data.accessToken)
+    // Check for access token and refresh token
     const token = response.data?.data?.accessToken || response.data?.accessToken;
+    const refreshToken = response.data?.data?.refreshToken || response.data?.refreshToken;
 
     if (token) {
       const currentPath = window.location.pathname;
@@ -264,11 +264,20 @@ apiClient.interceptors.response.use(
       const role = getRoleFromToken(token);
 
       // Only store the token if the role matches the current module or is a valid fallback
-      if (role && role === expectedRole) {
+      const isCorrectModule = (expectedRole === 'admin' && ['admin', 'super_admin', 'moderator'].includes(role)) || (role === expectedRole);
+
+      if (role && isCorrectModule) {
         localStorage.setItem(tokenKey, token);
+        // Also store refresh token if provided
+        if (refreshToken) {
+          localStorage.setItem(`${expectedRole}_refreshToken`, refreshToken);
+        }
       } else if (role === 'user' && (tokenKey === 'accessToken' || !tokenKey)) {
         // Handle legacy case
         localStorage.setItem('user_accessToken', token);
+        if (refreshToken) {
+          localStorage.setItem('user_refreshToken', refreshToken);
+        }
       }
     }
     return response;
@@ -300,19 +309,26 @@ apiClient.interceptors.response.use(
           }
         );
 
-        const { accessToken } = response.data.data || response.data;
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data || response.data;
 
         if (accessToken) {
           const role = getRoleFromToken(accessToken);
 
-          // Only store token if role matches expected module; otherwise treat as invalid for this module
-          if (!role || role !== expectedRole) {
+          // Only store token if role matches expected module or valid admin alternate; otherwise treat as invalid
+          const isCorrectModule = (expectedRole === 'admin' && ['admin', 'super_admin', 'moderator'].includes(role)) || (role === expectedRole);
+
+          if (!role || !isCorrectModule) {
             clearModuleAuth(tokenKey.replace('_accessToken', ''));
             throw new Error('Role mismatch on refreshed token');
           }
 
           // Store new access token for the current module
           localStorage.setItem(tokenKey, accessToken);
+
+          // If backend returned a new refresh token, store it as well
+          if (newRefreshToken) {
+            localStorage.setItem(`${expectedRole}_refreshToken`, newRefreshToken);
+          }
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;

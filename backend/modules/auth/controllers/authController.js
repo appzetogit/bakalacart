@@ -355,16 +355,25 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Invalid refresh token');
     }
 
-    // Generate new access token
-    const accessToken = jwtService.generateAccessToken({
+    // Generate new access and refresh tokens
+    const tokens = jwtService.generateTokens({
       userId: user._id.toString(),
       role: role || user.role,
       phone: user.phone,
       email: user.email
     });
 
+    // Set new refresh token in httpOnly cookie
+    res.cookie('user_refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
+    });
+
     return successResponse(res, 200, 'Token refreshed successfully', {
-      accessToken
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
   } catch (error) {
     return errorResponse(res, 401, error.message || 'Invalid refresh token');

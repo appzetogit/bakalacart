@@ -303,17 +303,28 @@ export const refreshToken = asyncHandler(async (req, res) => {
     }
 
     // For delivery partners, allow multiple devices by skipping the database token match check
-    // if (role === 'delivery' && delivery.refreshToken && delivery.refreshToken !== refreshToken) {
-    //   return errorResponse(res, 401, 'Invalid refresh token');
-    // }
-    const accessToken = jwtService.generateAccessToken({
+    // Generate new access and refresh tokens
+    const tokens = jwtService.generateTokens({
       userId: delivery._id.toString(),
       role: 'delivery',
       email: delivery.email || delivery.phone || delivery.deliveryId
     });
 
+    // Update refresh token in database
+    delivery.refreshToken = tokens.refreshToken;
+    await delivery.save();
+
+    // Set new refresh token in httpOnly cookie
+    res.cookie('delivery_refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
+    });
+
     return successResponse(res, 200, 'Token refreshed successfully', {
-      accessToken
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
   } catch (error) {
     return errorResponse(res, 401, error.message || 'Invalid refresh token');

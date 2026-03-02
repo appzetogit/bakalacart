@@ -15,10 +15,10 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
     const restaurant = req.restaurant;
     const { status, page = 1, limit = 50 } = req.query;
 
-    // Get restaurant ID - normalize to string (Order.restaurantId is String type)
-    const restaurantIdString = restaurant._id?.toString() ||
-      restaurant.restaurantId?.toString() ||
-      restaurant.id?.toString();
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdString = mongoId || customId || restaurant.id?.toString();
 
     if (!restaurantIdString) {
       console.error('❌ No restaurant ID found:', restaurant);
@@ -27,29 +27,20 @@ export const getRestaurantOrders = asyncHandler(async (req, res) => {
 
     // Query orders by restaurantId (stored as String in Order model)
     // Try multiple restaurantId formats to handle different storage formats
-    const restaurantIdVariations = [restaurantIdString];
+    const restaurantIdVariations = [];
+    if (mongoId) restaurantIdVariations.push(mongoId);
+    if (customId) restaurantIdVariations.push(customId);
 
     // Also add ObjectId string format if valid (both directions)
-    if (mongoose.Types.ObjectId.isValid(restaurantIdString)) {
-      const objectIdString = new mongoose.Types.ObjectId(restaurantIdString).toString();
-      if (!restaurantIdVariations.includes(objectIdString)) {
-        restaurantIdVariations.push(objectIdString);
-      }
-
-      // Also try the original ObjectId if restaurantIdString is already a string
-      try {
-        const objectId = new mongoose.Types.ObjectId(restaurantIdString);
-        const objectIdStr = objectId.toString();
-        if (!restaurantIdVariations.includes(objectIdStr)) {
-          restaurantIdVariations.push(objectIdStr);
+    const allIdsToCheck = [mongoId, customId].filter(Boolean);
+    for (const idToVar of allIdsToCheck) {
+      if (mongoose.Types.ObjectId.isValid(idToVar)) {
+        const objectIdString = new mongoose.Types.ObjectId(idToVar).toString();
+        if (!restaurantIdVariations.includes(objectIdString)) {
+          restaurantIdVariations.push(objectIdString);
         }
-      } catch (e) {
-        // Ignore if not a valid ObjectId
       }
     }
-
-    // Also try direct match without ObjectId conversion
-    restaurantIdVariations.push(restaurantIdString);
 
     // Build query - search for orders with any matching restaurantId variation
     // Use $in for multiple variations and also try direct match as fallback
@@ -163,29 +154,30 @@ export const getRestaurantOrderById = asyncHandler(async (req, res) => {
     const restaurant = req.restaurant;
     const { id } = req.params;
 
-    const restaurantId = restaurant._id?.toString() ||
-      restaurant.restaurantId ||
-      restaurant.id;
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdVariations = [mongoId, customId].filter(Boolean);
 
     // Try to find order by MongoDB _id or orderId (custom order ID)
     let order = null;
 
+    // Build query with restaurantId variations
+    const buildQuery = (idSearchObj) => ({
+      ...idSearchObj,
+      restaurantId: { $in: restaurantIdVariations }
+    });
+
     // First try MongoDB _id if it's a valid ObjectId
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
-      order = await Order.findOne({
-        _id: id,
-        restaurantId
-      })
+      order = await Order.findOne(buildQuery({ _id: id }))
         .populate('userId', 'name email phone')
         .lean();
     }
 
     // If not found, try by orderId (custom order ID like "ORD-123456-789")
     if (!order) {
-      order = await Order.findOne({
-        orderId: id,
-        restaurantId
-      })
+      order = await Order.findOne(buildQuery({ orderId: id }))
         .populate('userId', 'name email phone')
         .lean();
     }
@@ -223,12 +215,10 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { preparationTime } = req.body;
 
-    // Note: Removed isAcceptingOrders check - restaurants can manually accept individual orders
-    // even if their general status is set to not accepting orders
-
-    const restaurantId = restaurant._id?.toString() ||
-      restaurant.restaurantId ||
-      restaurant.id;
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdVariations = [mongoId, customId].filter(Boolean);
 
     // Try to find order by MongoDB _id or orderId (custom order ID)
     let order = null;
@@ -237,7 +227,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
       order = await Order.findOne({
         _id: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -245,7 +235,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     if (!order) {
       order = await Order.findOne({
         orderId: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -259,15 +249,15 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     // If order is already 'preparing', it means it was already accepted - allow re-acceptance
     // If order is 'cancelled' but was cancelled by restaurant (not by user/admin), allow reactivation
     const allowedStatuses = ['pending', 'confirmed', 'preparing'];
-    const isRestaurantCancelled = order.status === 'cancelled' && 
-                                  (order.cancelledBy === 'restaurant' || 
-                                   order.cancellationReason?.includes('time limit') ||
-                                   order.cancellationReason?.includes('not accepted'));
-    
+    const isRestaurantCancelled = order.status === 'cancelled' &&
+      (order.cancelledBy === 'restaurant' ||
+        order.cancellationReason?.includes('time limit') ||
+        order.cancellationReason?.includes('not accepted'));
+
     if (!allowedStatuses.includes(order.status) && !isRestaurantCancelled) {
       return errorResponse(res, 400, `Order cannot be accepted. Current status: ${order.status}. Only orders with status 'pending', 'confirmed', or 'preparing' can be accepted.`);
     }
-    
+
     // If order was cancelled by restaurant or auto-cancelled, reactivate it
     if (isRestaurantCancelled) {
       console.log(`🔄 Reactivating cancelled order ${order.orderId} (cancelled by: ${order.cancelledBy})`);
@@ -531,9 +521,10 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
     const restaurant = req.restaurant;
     const { id } = req.params;
 
-    const restaurantId = restaurant._id?.toString() ||
-      restaurant.restaurantId ||
-      restaurant.id;
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdVariations = [mongoId, customId].filter(Boolean);
 
     // Try to find order by MongoDB _id or orderId (custom order ID)
     let order = null;
@@ -542,7 +533,7 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
       order = await Order.findOne({
         _id: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -550,7 +541,7 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
     if (!order) {
       order = await Order.findOne({
         orderId: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -583,16 +574,6 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
       }
     }
 
-    // CRITICAL: Don't assign delivery partner if order is cancelled
-    if (freshOrder.status === 'cancelled') {
-      console.log(`⚠️ Order ${freshOrder.orderId} is cancelled. Cannot assign delivery partner.`);
-      return successResponse(res, 200, 'Order is cancelled. Cannot assign delivery partner.', {
-        order: freshOrder
-      });
-    }
-
-    // Assign order to nearest delivery boy and notify them (if not already assigned)
-    // This is critical - even if order is already preparing, we need to assign delivery partner
     // Reload order first to get the latest state (in case it was updated elsewhere)
     const freshOrder = await Order.findById(order._id);
     if (!freshOrder) {
@@ -608,24 +589,20 @@ export const markOrderPreparing = asyncHandler(async (req, res) => {
       });
     }
 
+    const restaurantId = mongoId; // Use MongoDB ID for finding restaurant and zone
+
     // Check if delivery partner is already assigned (after reload)
     if (!freshOrder.deliveryPartnerId) {
       try {
         console.log(`🔄 Attempting to assign order ${freshOrder.orderId} to delivery boy (status: ${freshOrder.status})...`);
 
         // Get restaurant location
-        let restaurantDoc = null;
-        if (mongoose.Types.ObjectId.isValid(restaurantId)) {
-          restaurantDoc = await Restaurant.findById(restaurantId).lean();
-        }
-        if (!restaurantDoc) {
-          restaurantDoc = await Restaurant.findOne({
-            $or: [
-              { restaurantId: restaurantId },
-              { _id: restaurantId }
-            ]
-          }).lean();
-        }
+        let restaurantDoc = await Restaurant.findOne({
+          $or: [
+            { _id: mongoose.isValidObjectId(mongoId) ? mongoId : null },
+            { restaurantId: customId }
+          ]
+        }).lean();
 
         if (!restaurantDoc) {
           console.error(`❌ Restaurant not found for restaurantId: ${restaurantId}`);
@@ -777,9 +754,10 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     const restaurant = req.restaurant;
     const { id } = req.params;
 
-    const restaurantId = restaurant._id?.toString() ||
-      restaurant.restaurantId ||
-      restaurant.id;
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdVariations = [mongoId, customId].filter(Boolean);
 
     // Try to find order by MongoDB _id or orderId (custom order ID)
     let order = null;
@@ -788,7 +766,7 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
       order = await Order.findOne({
         _id: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -796,7 +774,7 @@ export const markOrderReady = asyncHandler(async (req, res) => {
     if (!order) {
       order = await Order.findOne({
         orderId: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -863,9 +841,10 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     const restaurant = req.restaurant;
     const { id } = req.params;
 
-    const restaurantId = restaurant._id?.toString() ||
-      restaurant.restaurantId ||
-      restaurant.id;
+    // Get both MongoDB _id and custom restaurantId
+    const mongoId = restaurant._id?.toString();
+    const customId = restaurant.restaurantId?.toString();
+    const restaurantIdVariations = [mongoId, customId].filter(Boolean);
 
     // Try to find order by MongoDB _id or orderId
     let order = null;
@@ -873,14 +852,14 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id) && id.length === 24) {
       order = await Order.findOne({
         _id: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
     if (!order) {
       order = await Order.findOne({
         orderId: id,
-        restaurantId
+        restaurantId: { $in: restaurantIdVariations }
       });
     }
 
@@ -894,7 +873,12 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
     }
 
     // Get restaurant location
-    const restaurantDoc = await Restaurant.findById(restaurantId)
+    const restaurantDoc = await Restaurant.findOne({
+      $or: [
+        { _id: mongoose.isValidObjectId(mongoId) ? mongoId : null },
+        { restaurantId: customId }
+      ]
+    })
       .select('location')
       .lean();
 
@@ -904,11 +888,13 @@ export const resendDeliveryNotification = asyncHandler(async (req, res) => {
 
     const [restaurantLng, restaurantLat] = restaurantDoc.location.coordinates;
 
+    const restaurantId = mongoId;
+
     // Find nearest delivery boys
     const priorityDeliveryBoys = await findNearestDeliveryBoys(
       restaurantLat,
       restaurantLng,
-      restaurantId,
+      mongoId,
       20, // 20km radius for priority
       10  // Top 10 nearest
     );

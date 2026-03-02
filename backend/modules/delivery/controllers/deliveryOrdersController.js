@@ -2124,6 +2124,20 @@ export const completeDelivery = asyncHandler(async (req, res) => {
       // But log it for investigation
     }
 
+    // Update delivery partner metrics (overall statistics)
+    try {
+      await Delivery.findByIdAndUpdate(delivery._id, {
+        $inc: {
+          'metrics.totalOrders': 1,
+          'metrics.completedOrders': 1,
+          'metrics.totalEarned': totalEarning
+        }
+      });
+      console.log(`✅ Overall statistics (metrics) updated for delivery ${delivery._id}`);
+    } catch (metricsError) {
+      console.warn('⚠️ Could not update delivery metrics:', metricsError.message);
+    }
+
     // Check and award earning addon bonuses if delivery boy qualifies
     let earningAddonBonus = null;
     try {

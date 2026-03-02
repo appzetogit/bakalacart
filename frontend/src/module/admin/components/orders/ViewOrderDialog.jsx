@@ -114,37 +114,37 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
         <div className="px-6 py-6 space-y-6">
           {/* Basic Order Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                  <Package className="w-4 h-4" />
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Package className="w-5 h-5" />
                   Order ID
                 </p>
-                <p className="text-sm font-medium text-slate-900">{order.orderId || order.id || order.subscriptionId}</p>
+                <p className="text-2xl font-black text-slate-900">{order.orderId || order.id || order.subscriptionId}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
                   Order Date
                 </p>
-                <p className="text-sm font-medium text-slate-900">{order.date}{order.time ? `, ${order.time}` : ""}</p>
+                <p className="text-xl font-bold text-slate-900">{order.date}{order.time ? `, ${order.time}` : ""}</p>
               </div>
               {order.estimatedDeliveryTime && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
                     Estimated Delivery Time
                   </p>
-                  <p className="text-sm font-medium text-slate-900">{order.estimatedDeliveryTime} minutes</p>
+                  <p className="text-xl font-bold text-slate-900">{order.estimatedDeliveryTime} minutes</p>
                 </div>
               )}
               {order.deliveredAt && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
                     Delivered At
                   </p>
-                  <p className="text-sm font-medium text-slate-900">
+                  <p className="text-xl font-bold text-slate-900">
                     {new Date(order.deliveredAt).toLocaleString('en-GB', {
                       day: '2-digit',
                       month: 'short',
@@ -157,24 +157,24 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {order.orderStatus && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Order Status</p>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.orderStatus)}`}>
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Order Status</p>
+                  <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold ${getStatusColor(order.orderStatus)}`}>
                     {order.orderStatus}
                   </span>
                   {order.cancellationReason && (
-                    <p className="text-xs text-red-600 mt-1">
-                      <span className="font-medium">
-                        {order.cancelledBy === 'user' ? 'Cancelled by User - ' :
-                          order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' :
-                            'Cancellation '}Reason:
+                    <p className="text-sm text-red-600 mt-2 p-3 bg-red-50 rounded-lg border border-red-100 font-bold">
+                      <span className="text-xs uppercase tracking-wider block mb-1">
+                        {order.cancelledBy === 'user' ? 'Cancelled by User' :
+                          order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant' :
+                            'Cancellation Reason'}
                       </span> {order.cancellationReason}
                     </p>
                   )}
                   {order.cancelledAt && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1 font-bold italic">
                       Cancelled: {new Date(order.cancelledAt).toLocaleString('en-GB', {
                         day: '2-digit',
                         month: 'short',
@@ -187,12 +187,12 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
                 </div>
               )}
               {(order.paymentStatus || order.paymentCollectionStatus != null) && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
                     Payment Status
                   </p>
-                  <p className={`text-sm font-medium ${getPaymentStatusColor(
+                  <p className={`text-xl font-black ${getPaymentStatusColor(
                     order.paymentType === 'Cash on Delivery' || order.payment?.method === 'cash' || order.payment?.method === 'cod'
                       ? (order.paymentCollectionStatus ?? (order.status === 'delivered' ? 'Collected' : 'Not Collected'))
                       : order.paymentStatus
@@ -204,44 +204,44 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
                 </div>
               )}
               {order.deliveryType && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Truck className="w-4 h-4" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
                     Delivery Type
                   </p>
-                  <p className="text-sm font-medium text-slate-900">{order.deliveryType}</p>
+                  <p className="text-xl font-bold text-slate-900">{order.deliveryType}</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Customer Information */}
-          <div className="border-t border-slate-200 pt-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Customer Information
+          <div className="border-t-4 border-slate-100 pt-6">
+            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <User className="w-6 h-6 text-orange-600" />
+              CUSTOMER INFORMATION
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Name</p>
-                <p className="text-sm font-medium text-slate-900">{order.customerName || "N/A"}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Customer Name</p>
+                <p className="text-2xl font-black text-slate-900">{order.customerName || "N/A"}</p>
               </div>
               {order.customerPhone && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Phone className="w-5 h-5" />
                     Phone
                   </p>
-                  <p className="text-sm font-medium text-slate-900">{order.customerPhone}</p>
+                  <p className="text-2xl font-black text-slate-900">{order.customerPhone}</p>
                 </div>
               )}
               {order.customerEmail && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Mail className="w-5 h-5" />
                     Email
                   </p>
-                  <p className="text-sm font-medium text-slate-900">{order.customerEmail}</p>
+                  <p className="text-xl font-bold text-slate-900">{order.customerEmail}</p>
                 </div>
               )}
             </div>
@@ -249,69 +249,93 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
 
           {/* Restaurant Information */}
           {order.restaurant && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">Restaurant Information</h3>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Restaurant Name</p>
-                <p className="text-sm font-medium text-slate-900">{order.restaurant}</p>
+            <div className="border-t-4 border-slate-100 pt-6">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <Package className="w-6 h-6 text-orange-600" />
+                RESTAURANT INFORMATION
+              </h3>
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Restaurant Name</p>
+                <p className="text-2xl font-black text-slate-900">{order.restaurant}</p>
               </div>
             </div>
           )}
 
           {/* Order Items */}
           {order.items && Array.isArray(order.items) && order.items.length > 0 && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                Order Items ({order.items.length})
+            <div className="border-t-4 border-slate-100 pt-6">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <Package className="w-6 h-6 text-orange-600" />
+                ORDER ITEMS ({order.items.length})
               </h3>
-              <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div key={index} className="flex items-start justify-between p-3 bg-slate-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700 bg-white px-2 py-1 rounded">
-                          {item.quantity || 1}x
-                        </span>
-                        <p className="text-sm font-medium text-slate-900">
-                          {item.name || "Unknown Item"}
-                          {(() => {
-                            const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
-                            const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
-                            const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
-                            return displayParts.length > 0 ? (
-                              <span className="text-xs font-bold text-[#ff8100] ml-2">
-                                ({displayParts.join(' ')})
-                              </span>
-                            ) : null
-                          })()}
-                        </p>
-                        {item.isVeg !== undefined && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${item.isVeg ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {item.isVeg ? 'Veg' : 'Non-Veg'}
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                <table className="w-full text-left border-collapse bg-white">
+                  <thead>
+                    <tr className="bg-slate-100 border-b-2 border-slate-200">
+                      <th className="py-4 px-6 text-sm font-black text-slate-700 uppercase tracking-wider w-24">Qty</th>
+                      <th className="py-4 px-6 text-sm font-black text-slate-700 uppercase tracking-wider">Item Details</th>
+                      <th className="py-4 px-6 text-sm font-black text-slate-700 uppercase tracking-wider text-right w-36">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {order.items.map((item, index) => (
+                      <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-5 px-6 align-top">
+                          <span className="text-xl font-black text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 min-w-[3rem] text-center inline-block">
+                            {item.quantity || 1}
                           </span>
-                        )}
-                      </div>
-                      {item.description && (
-                        <p className="text-xs text-slate-600 mt-1.5 ml-8 pl-2 border-l-2 border-slate-200 leading-relaxed font-medium italic">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                    </p>
-                  </div>
-                ))}
+                        </td>
+                        <td className="py-5 px-6 align-top">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-3">
+                              <span className={`w-3 h-3 rounded-full shrink-0 ${item.isVeg ? 'bg-green-600' : 'bg-red-600'}`}></span>
+                              <p className="text-xl font-black text-slate-900 leading-tight">
+                                {item.name || "Unknown Item"}
+                              </p>
+                            </div>
+                            {(() => {
+                              const sizeUnit = item.itemSizeUnit || item.unit || item.itemSize
+                              const isPiece = sizeUnit && sizeUnit.trim().toLowerCase() === 'piece'
+                              const displayParts = [item.itemSizeQuantity, !isPiece ? sizeUnit : null].filter(Boolean)
+                              return displayParts.length > 0 ? (
+                                <p className="text-base font-bold text-[#ff8100] ml-6">
+                                  ({displayParts.join(' ')})
+                                </p>
+                              ) : null
+                            })()}
+                            {item.description && (
+                              <div className="ml-6 mt-2 p-3 bg-orange-50 border-l-4 border-orange-400 rounded-r-lg">
+                                <p className="text-sm text-slate-800 font-bold italic leading-relaxed">
+                                  "{item.description}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-5 px-6 align-top text-right">
+                          <p className="text-xl font-black text-slate-900">
+                            ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                          </p>
+                          {item.quantity > 1 && (
+                            <p className="text-xs font-bold text-slate-500 mt-1">
+                              (₹{item.price.toFixed(2)} × {item.quantity})
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
               {order.note && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-xl border-2 border-blue-100 flex items-start gap-4 shadow-sm">
-                  <div className="bg-blue-100 p-2 rounded-full shrink-0">
-                    <FileText className="w-5 h-5 text-blue-600" />
+                <div className="mt-6 p-6 bg-blue-50 rounded-2xl border-2 border-blue-200 flex items-start gap-4 shadow-sm">
+                  <div className="bg-blue-100 p-3 rounded-full shrink-0">
+                    <FileText className="w-8 h-8 text-blue-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">CUSTOMER INSTRUCTIONS</p>
-                    <p className="text-sm text-blue-900 leading-relaxed font-medium italic bg-white/50 p-2 rounded border border-blue-50">
+                    <p className="text-sm font-black text-blue-800 uppercase tracking-[0.2em] mb-3">IMPORTANT: CUSTOMER INSTRUCTIONS</p>
+                    <p className="text-2xl text-blue-900 leading-tight font-black italic bg-white p-5 rounded-2xl border-2 border-dashed border-blue-200 shadow-inner">
                       "{order.note}"
                     </p>
                   </div>
@@ -374,35 +398,38 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
 
           {/* Delivery Address */}
           {order.address && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Delivery Address
+            <div className="border-t-4 border-slate-100 pt-6">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <MapPin className="w-6 h-6 text-orange-600" />
+                DELIVERY ADDRESS
               </h3>
-              <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-900">{formatAddress(order.address, order)}</p>
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-inner">
+                <p className="text-2xl font-black text-slate-900 leading-snug">{formatAddress(order.address, order)}</p>
               </div>
             </div>
           )}
 
           {/* Delivery Partner Information */}
           {(order.deliveryPartnerName || order.deliveryPartnerPhone) && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Delivery Partner
+            <div className="border-t-4 border-slate-100 pt-6">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <Truck className="w-6 h-6 text-orange-600" />
+                DELIVERY PARTNER
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 {order.deliveryPartnerName && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</p>
-                    <p className="text-sm font-medium text-slate-900">{order.deliveryPartnerName}</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Name</p>
+                    <p className="text-2xl font-black text-slate-900">{order.deliveryPartnerName}</p>
                   </div>
                 )}
                 {order.deliveryPartnerPhone && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone</p>
-                    <p className="text-sm font-medium text-slate-900">{order.deliveryPartnerPhone}</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      <Phone className="w-5 h-5" />
+                      Phone
+                    </p>
+                    <p className="text-2xl font-black text-slate-900">{order.deliveryPartnerPhone}</p>
                   </div>
                 )}
               </div>
@@ -410,53 +437,61 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onMarkPic
           )}
 
           {/* Pricing Breakdown */}
-          <div className="border-t border-slate-200 pt-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-4">Pricing Breakdown</h3>
-            <div className="space-y-2">
+          <div className="border-t-4 border-slate-100 pt-6">
+            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <Receipt className="w-6 h-6 text-orange-600" />
+              PRICING BREAKDOWN
+            </h3>
+            <div className="space-y-4 p-6 bg-white rounded-2xl border-2 border-slate-100 shadow-sm">
               {order.totalItemAmount !== undefined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Subtotal</span>
-                  <span className="font-medium text-slate-900">₹{order.totalItemAmount.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-slate-600 font-bold">Item Subtotal</span>
+                  <span className="font-black text-slate-900">₹{order.totalItemAmount.toFixed(2)}</span>
                 </div>
               )}
               {order.itemDiscount !== undefined && order.itemDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Discount</span>
-                  <span className="font-medium text-emerald-600">-₹{order.itemDiscount.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-slate-600 font-bold">Discount</span>
+                  <span className="font-black text-emerald-600">-₹{order.itemDiscount.toFixed(2)}</span>
                 </div>
               )}
               {order.couponDiscount !== undefined && order.couponDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Coupon Discount</span>
-                  <span className="font-medium text-emerald-600">-₹{order.couponDiscount.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-slate-600 font-bold">Coupon Discount</span>
+                  <span className="font-black text-emerald-600">-₹{order.couponDiscount.toFixed(2)}</span>
                 </div>
               )}
               {order.deliveryCharge !== undefined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Delivery Charge</span>
-                  <span className="font-medium text-slate-900">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-slate-600 font-bold">Delivery Charge</span>
+                  <span className="font-black text-slate-900">
                     {order.deliveryCharge > 0 ? `₹${order.deliveryCharge.toFixed(2)}` : <span className="text-emerald-600">Free delivery</span>}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Platform Fee</span>
-                <span className="font-medium text-slate-900">
+              <div className="flex justify-between items-center text-lg">
+                <span className="text-slate-600 font-bold">Platform Fee</span>
+                <span className="font-black text-slate-900">
                   {order.platformFee !== undefined && order.platformFee > 0
                     ? `₹${order.platformFee.toFixed(2)}`
                     : <span className="text-slate-400">₹0.00</span>}
                 </span>
               </div>
               {order.vatTax !== undefined && order.vatTax > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Tax (GST)</span>
-                  <span className="font-medium text-slate-900">₹{order.vatTax.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-slate-600 font-bold">Tax (GST)</span>
+                  <span className="font-black text-slate-900">₹{order.vatTax.toFixed(2)}</span>
                 </div>
               )}
-              <div className="pt-2 border-t border-slate-200">
+              <div className="pt-6 mt-2 border-t-4 border-dashed border-slate-100">
                 <div className="flex justify-between items-center">
-                  <span className="text-base font-semibold text-slate-700">Total Amount</span>
-                  <span className="text-xl font-bold text-emerald-600">
+                  <div className="space-y-1">
+                    <span className="text-xl font-black text-slate-900 block">Total Amount</span>
+                    <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-widest leading-none">
+                      {order.paymentType || order.payment?.method || 'ONLINE'}
+                    </span>
+                  </div>
+                  <span className="text-5xl font-black text-[#ff8100] drop-shadow-sm">
                     ₹{(order.totalAmount || order.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>

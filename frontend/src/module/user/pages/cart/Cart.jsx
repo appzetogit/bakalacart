@@ -932,13 +932,21 @@ export default function Cart() {
     // --- STRICT ADDRESS VALIDATION ---
     // Ensure both defaultAddress (data) and currentLocation.id (UI selection highlight) are consistent
     const hasSelection = !!currentLocation?.id || !!currentLocation?.addressId || (currentLocation?.formattedAddress && currentLocation?.formattedAddress !== "Select location");
+    const isComplete = defaultAddress && defaultAddress.street && defaultAddress.city && defaultAddress.zipCode;
 
-    if (!defaultAddress || !hasSelection) {
-      alert("Please select a delivery address to proceed. Click on one of your saved addresses or add a new one.")
+    if (!defaultAddress || !hasSelection || !isComplete) {
+      toast.error("Please select a complete delivery address (Building, City, and Pin Code are required).", {
+        description: !isComplete && defaultAddress ? "Your selected address is missing some details. Please edit it." : "No address selected."
+      })
 
       // Scroll to the address section if possible
       const section = document.getElementById('delivery-address-section');
-      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add a temporary highlight effect
+        section.classList.add('ring-2', 'ring-red-500', 'animate-pulse');
+        setTimeout(() => section.classList.remove('ring-2', 'ring-red-500', 'animate-pulse'), 3000);
+      }
 
       return
     }
@@ -2268,7 +2276,9 @@ export default function Cart() {
               className="mt-12 text-center"
               style={{ animation: 'slideUp 0.5s ease-out 0.8s both' }}
             >
-              <h3 className="text-3xl font-bold text-green-600 mb-2">Order Placed!</h3>
+              <h3 className="text-3xl font-bold text-green-600 mb-2">
+                {(selectedPaymentMethod === "cash" || selectedPaymentMethod === "cod") ? "Order Confirmed!" : "Payment Successful!"}
+              </h3>
               <p className="text-gray-600">Your delicious food is on its way</p>
             </div>
 

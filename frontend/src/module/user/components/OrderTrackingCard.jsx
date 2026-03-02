@@ -221,11 +221,13 @@ export default function OrderTrackingCard() {
   }
 
   const restaurantName = activeOrder.restaurant || activeOrder.restaurantName || activeOrder.restaurantName || 'Restaurant';
-  const statusText = orderStatus === 'preparing' || orderStatus === 'confirmed' || orderStatus === 'pending'
+  const statusText = orderStatus === 'preparing'
     ? 'Preparing your order'
-    : orderStatus === 'out_for_delivery' || orderStatus === 'outfordelivery' || orderStatus === 'on_way'
-      ? 'On the way'
-      : 'Preparing your order';
+    : (orderStatus === 'confirmed' || orderStatus === 'pending' || orderStatus === 'placed')
+      ? 'Order Confirmed'
+      : (orderStatus === 'out_for_delivery' || orderStatus === 'outfordelivery' || orderStatus === 'on_way')
+        ? 'On the way'
+        : 'Preparing your order';
 
   console.log('✅ OrderTrackingCard - Rendering card:', {
     restaurantName,

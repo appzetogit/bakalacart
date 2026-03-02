@@ -23,7 +23,7 @@ export default function SwitchOutlet() {
         setLoading(true)
         setError(null)
         const response = await restaurantAPI.getRestaurantOutlets()
-        
+
         if (response?.data?.success && response?.data?.data?.outlets) {
           const outletsData = response.data.data.outlets
           setOutlets(outletsData)
@@ -45,8 +45,8 @@ export default function SwitchOutlet() {
   const mappedOutletsCount = outlets.length
 
   // Filter outlets based on showOffline checkbox
-  const visibleOutlets = showOffline 
-    ? outlets 
+  const visibleOutlets = showOffline
+    ? outlets
     : outlets.filter(outlet => outlet.status === "online")
 
   // Lenis smooth scrolling
@@ -71,9 +71,9 @@ export default function SwitchOutlet() {
 
   const handleLogout = async () => {
     if (isLoggingOut) return // Prevent multiple clicks
-    
+
     setIsLoggingOut(true)
-    
+
     try {
       // Call backend logout API to invalidate refresh token
       try {
@@ -97,17 +97,17 @@ export default function SwitchOutlet() {
 
       // Clear restaurant module authentication data
       clearModuleAuth("restaurant")
-      
+
       // Clear any onboarding data from localStorage
       localStorage.removeItem("restaurant_onboarding")
       localStorage.removeItem("restaurant_accessToken")
-      
+
       // Dispatch auth change event to notify other components
       window.dispatchEvent(new Event("restaurantAuthChanged"))
 
       // Small delay for UX, then navigate to welcome page
       setTimeout(() => {
-        navigate("/restaurant/welcome", { replace: true })
+        navigate("/restaurant/login", { replace: true })
       }, 300)
     } catch (error) {
       // Even if there's an error, we should still clear local data and logout
@@ -115,7 +115,7 @@ export default function SwitchOutlet() {
       clearModuleAuth("restaurant")
       localStorage.removeItem("restaurant_onboarding")
       window.dispatchEvent(new Event("restaurantAuthChanged"))
-      navigate("/restaurant/welcome", { replace: true })
+      navigate("/restaurant/login", { replace: true })
     } finally {
       setIsLoggingOut(false)
     }
@@ -133,17 +133,17 @@ export default function SwitchOutlet() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ 
+      transition={{
         duration: 0.2,
         ease: [0.25, 0.1, 0.25, 1]
       }}
       className="min-h-screen bg-white overflow-x-hidden"
     >
       {/* Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ 
+        transition={{
           duration: 0.25,
           ease: [0.25, 0.1, 0.25, 1]
         }}
@@ -221,66 +221,64 @@ export default function SwitchOutlet() {
               </div>
             ) : (
               visibleOutlets.map((outlet, index) => (
-            <motion.div
-              key={outlet.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 + (index * 0.05) }}
-              onClick={() => handleOutletClick(outlet.id)}
-              className="bg-blue-50 rounded-lg  cursor-pointer hover:bg-blue-100 border-blue-200 border transition-colors"
-            >
-              <div className="flex items-start gap-4 p-2 pb-1  rounded-t-lg">
-                {/* Outlet Image */}
-                <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center shrink-0 overflow-hidden shadow-sm border border-gray-200">
-                  {outlet.image && outlet.image !== "/api/placeholder/80/80" ? (
-                    <img 
-                      src={outlet.image} 
-                      alt={outlet.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'flex'
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <div 
-                    className="w-full h-full bg-gray-100 flex items-center justify-center" 
-                    style={{ display: (outlet.image && outlet.image !== "/api/placeholder/80/80") ? 'none' : 'flex' }}
-                  >
-                    <span className="text-3xl">🍔</span>
-                  </div>
-                </div>
+                <motion.div
+                  key={outlet.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 + (index * 0.05) }}
+                  onClick={() => handleOutletClick(outlet.id)}
+                  className="bg-blue-50 rounded-lg  cursor-pointer hover:bg-blue-100 border-blue-200 border transition-colors"
+                >
+                  <div className="flex items-start gap-4 p-2 pb-1  rounded-t-lg">
+                    {/* Outlet Image */}
+                    <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center shrink-0 overflow-hidden shadow-sm border border-gray-200">
+                      {outlet.image && outlet.image !== "/api/placeholder/80/80" ? (
+                        <img
+                          src={outlet.image}
+                          alt={outlet.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                            if (e.target.nextSibling) {
+                              e.target.nextSibling.style.display = 'flex'
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className="w-full h-full bg-gray-100 flex items-center justify-center"
+                        style={{ display: (outlet.image && outlet.image !== "/api/placeholder/80/80") ? 'none' : 'flex' }}
+                      >
+                        <span className="text-3xl">🍔</span>
+                      </div>
+                    </div>
 
-                {/* Outlet Details */}
-                <div className="flex-1 my-auto  min-w-0">
-                  <h3 className="text-base font-bold text-gray-900 ">
-                    {outlet.name}
-                  </h3>
-                  <p className="text-sm text-gray-700 ">
-                    {outlet.address}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Outlet ID: {outlet.restaurantId || outlet.id}
-                  </p>
-                  
-                </div>
-              </div>
+                    {/* Outlet Details */}
+                    <div className="flex-1 my-auto  min-w-0">
+                      <h3 className="text-base font-bold text-gray-900 ">
+                        {outlet.name}
+                      </h3>
+                      <p className="text-sm text-gray-700 ">
+                        {outlet.address}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        Outlet ID: {outlet.restaurantId || outlet.id}
+                      </p>
+
+                    </div>
+                  </div>
                   {/* Status Indicator */}
                   <div className="flex p-2 rounded-b-lg items-center w-full bg-gray-200 border border-blue-200 gap-1.5 mt-3">
-                    <Power 
-                      className={`w-4 h-4 ${
-                        outlet.status === "offline" ? "text-red-600" : "text-green-600"
-                      }`} 
+                    <Power
+                      className={`w-4 h-4 ${outlet.status === "offline" ? "text-red-600" : "text-green-600"
+                        }`}
                     />
-                    <span className={`text-sm font-medium ${
-                      outlet.status === "offline" ? "text-red-600" : "text-green-600"
-                    }`}>
+                    <span className={`text-sm font-medium ${outlet.status === "offline" ? "text-red-600" : "text-green-600"
+                      }`}>
                       {outlet.status === "offline" ? "Offline" : "Online"}
                     </span>
                   </div>
-            </motion.div>
+                </motion.div>
               ))
             )}
           </div>

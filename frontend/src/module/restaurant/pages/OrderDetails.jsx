@@ -558,111 +558,115 @@ export default function OrderDetails() {
       </div>
 
       {/* Main Content */}
-      <div className="px-4 py-4 space-y-4">
-        {/* Order Summary Card */}
-        <div className="bg-white rounded-lg p-4">
-          {/* Status and Order ID Row */}
-          <div className="flex items-start justify-between mb-3 flex-wrap gap-y-2">
-            <span className={`px-2.5 py-1 rounded text-xs font-bold ${getStatusColor(orderData.status)}`}>
-              {orderData.status}
-            </span>
-            <span className="text-xs text-gray-500">{orderData.date}, {orderData.time}</span>
-          </div>
-
-          {/* Order ID */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl font-black text-gray-900">Order ID: {orderData.id}</span>
-            <button
-              onClick={handleCopyOrderId}
-              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-              aria-label="Copy order ID"
-            >
-              <Copy className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-
-          {/* Restaurant Info */}
-          <p className="text-lg font-bold text-gray-800 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
-            {orderData.restaurant}<br />
-            <span className="text-sm font-medium text-gray-500">{orderData.address}</span>
-          </p>
-
-          {/* Divider */}
-          <div className="border-t border-gray-200 my-3"></div>
-
-          {/* Rejection Reason */}
-          {orderData.reason && (
-            <p className="text-sm text-red-600">{orderData.reason}</p>
-          )}
+      <div className="px-4 py-4 space-y-6">
+        {/* Order Info Table */}
+        <div className="overflow-hidden border-2 border-gray-200 rounded-xl mb-6 shadow-sm">
+          <table className="w-full border-collapse bg-white text-left">
+            <tbody>
+              <tr className="border-b-2 border-gray-100">
+                <td className="p-5 bg-gray-50/50 w-1/3 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Status</td>
+                <td className="p-5">
+                  <span className={`px-4 py-2 rounded-lg text-lg font-black shadow-sm inline-block ${getStatusColor(orderData.status)}`}>
+                    {orderData.status}
+                  </span>
+                </td>
+              </tr>
+              <tr className="border-b-2 border-gray-100">
+                <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Order ID</td>
+                <td className="p-5">
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl font-black text-gray-900 drop-shadow-sm">{orderData.id}</span>
+                    <button
+                      onClick={handleCopyOrderId}
+                      className="p-2 hover:bg-gray-100 rounded-xl transition-all border-2 border-gray-200 active:scale-95"
+                      aria-label="Copy order ID"
+                    >
+                      <Copy className="w-6 h-6 text-gray-600" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr className="border-b-2 border-gray-100">
+                <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Date & Time</td>
+                <td className="p-5 text-2xl font-bold text-gray-800">{orderData.date}, {orderData.time}</td>
+              </tr>
+              <tr>
+                <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Restaurant</td>
+                <td className="p-5">
+                  <p className="text-2xl font-black text-[#ff8100]">{orderData.restaurant}</p>
+                  <p className="text-lg font-bold text-gray-500 mt-1">{orderData.address}</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* Customer Details Section */}
         <div>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Customer details</h2>
-
-          {/* Customer Card */}
-          <div className="bg-white rounded-lg p-4 gap-8 flex flex-col mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xl font-black text-gray-900">{orderData.customer.name}</p>
-                <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-tighter">Verified Customer</p>
-              </div>
-
-              <hr className="border-gray-200 my-3" />
-
-            </div>
-            <div className="flex items-center gap-3">
-              <MapPin className="w-6 h-6 text-red-600" />
-              <div className="flex-1">
-                <p className="text-lg font-bold text-gray-900">{orderData.customer.location}</p>
-              </div>
-              {orderData.customer.distance && orderData.customer.distance !== 'N/A' && (
-                <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
-              )}
-            </div>
-            {orderData.customer.deliveryAddressDetails && (
-              <div className="flex items-start gap-3 mt-2">
-                <MapPin className="w-5 h-5 text-gray-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500 mb-1">Additional Address Details</p>
-                  <p className="text-sm text-gray-900">{orderData.customer.deliveryAddressDetails}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Customer Note */}
-            {orderData.customer.note && (
-              <div className="flex items-start gap-3 mt-2 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg shadow-sm">
-                <div className="w-8 h-8 flex items-center justify-center bg-blue-100 rounded-full shrink-0">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xl text-blue-800 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <FileText className="w-6 h-6" />
-                    IMPORTANT: CUSTOMER INSTRUCTIONS
-                  </p>
-                  <p className="text-2xl text-gray-900 font-black italic leading-tight bg-white p-5 rounded-2xl border-4 border-blue-200 shadow-inner">
-                    "{orderData.customer.note}"
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Cutlery Preference */}
-            <div className="flex items-center gap-3 mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-              <div className={`w-2 h-2 rounded-full ${orderData.customer.sendCutlery ? 'bg-blue-500' : 'bg-red-500'}`}></div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">
-                  {orderData.customer.sendCutlery ? 'Send Cutlery' : 'Don\'t Send Cutlery'}
-                </p>
-                <p className="text-[10px] text-gray-500">Customer prefers {orderData.customer.sendCutlery ? 'to have' : 'no'} disposable cutlery</p>
-              </div>
-            </div>
+          <h2 className="text-3xl font-black text-gray-900 mb-4 px-1">Customer details</h2>
+          <div className="overflow-hidden border-2 border-gray-200 rounded-xl shadow-sm mb-3">
+            <table className="w-full border-collapse bg-white text-left">
+              <tbody>
+                <tr className="border-b-2 border-gray-100">
+                  <td className="p-5 bg-gray-50/50 w-1/3 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Customer Name</td>
+                  <td className="p-5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                        <User className="w-6 h-6 text-[#ff8100]" />
+                      </div>
+                      <div>
+                        <p className="text-3xl font-black text-gray-900">{orderData.customer.name}</p>
+                        <p className="text-xs font-black text-orange-600 uppercase tracking-[0.2em] mt-1">Verified Customer</p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="border-b-2 border-gray-100">
+                  <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Delivery Address</td>
+                  <td className="p-5">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-8 h-8 text-red-600 shrink-0 mt-1" />
+                      <div>
+                        <p className="text-2xl font-black text-gray-900 leading-snug">{orderData.customer.location}</p>
+                        {orderData.customer.distance && orderData.customer.distance !== 'N/A' && (
+                          <p className="text-sm font-bold text-gray-500 mt-2 bg-gray-100 w-fit px-3 py-1 rounded-full">{orderData.customer.distance} away</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {orderData.customer.deliveryAddressDetails && (
+                  <tr className="border-b-2 border-gray-100">
+                    <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Extra Address Info</td>
+                    <td className="p-5 text-xl font-bold text-gray-800">{orderData.customer.deliveryAddressDetails}</td>
+                  </tr>
+                )}
+                {orderData.customer.note && (
+                  <tr className="border-b-2 border-gray-100">
+                    <td className="p-5 bg-blue-100 text-lg font-black text-blue-800 uppercase tracking-wider border-r-2 border-blue-200">Customer Note</td>
+                    <td className="p-5 bg-blue-50">
+                      <p className="text-2xl font-black text-blue-900 italic leading-tight">
+                        "{orderData.customer.note}"
+                      </p>
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Cutlery Preference</td>
+                  <td className="p-5">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full ${orderData.customer.sendCutlery ? 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]' : 'bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.4)]'}`}></div>
+                      <div>
+                        <p className="text-xl font-black text-gray-900">
+                          {orderData.customer.sendCutlery ? 'SEND CUTLERY' : 'NO CUTLERY'}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-
         </div>
 
         {/* Item Details Section */}
@@ -745,87 +749,95 @@ export default function OrderDetails() {
 
         {/* Bill Details Section */}
         <div className="pb-10">
-          <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">Bill details</h2>
+          <h2 className="text-3xl font-black text-gray-900 mb-4 px-1">Bill details</h2>
 
-          <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-lg font-bold text-gray-600">Item subtotal</span>
-              <span className="text-xl font-extrabold text-gray-900">₹{orderData.billing.itemSubtotal}</span>
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-lg font-bold text-gray-600">Taxes</span>
-              <span className="text-xl font-extrabold text-gray-900">₹{orderData.billing.taxes}</span>
-            </div>
-
-            <div className="my-5 border-t-2 border-dashed border-gray-200"></div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-2xl font-black text-gray-900">Total bill</span>
-                <span className="text-xs font-bold text-green-600 uppercase tracking-widest">{orderData.billing.paymentMethod}</span>
-              </div>
-              <span className="text-4xl font-black text-[#ff8100] drop-shadow-sm">₹{orderData.billing.total}</span>
-            </div>
+          <div className="overflow-hidden border-2 border-gray-200 rounded-xl shadow-sm bg-white">
+            <table className="w-full border-collapse text-left">
+              <tbody>
+                <tr className="border-b-2 border-gray-100">
+                  <td className="p-5 bg-gray-50/50 w-1/3 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Item Subtotal</td>
+                  <td className="p-5 text-2xl font-black text-gray-900">₹{orderData.billing.itemSubtotal}</td>
+                </tr>
+                <tr className="border-b-2 border-gray-100">
+                  <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Taxes</td>
+                  <td className="p-5 text-2xl font-black text-gray-900">₹{orderData.billing.taxes}</td>
+                </tr>
+                <tr className="border-b-4 border-dashed border-gray-200">
+                  <td className="p-5 bg-gray-50/50 text-lg font-black text-gray-500 uppercase tracking-wider border-r-2 border-gray-100">Payment Mode</td>
+                  <td className="p-5">
+                    <span className="inline-block px-4 py-1.5 rounded-lg bg-green-100 text-green-800 text-base font-black uppercase tracking-wider border border-green-200">
+                      {orderData.billing.paymentMethod}
+                    </span>
+                  </td>
+                </tr>
+                <tr className="bg-orange-50/30">
+                  <td className="p-6 bg-orange-50 text-xl font-black text-orange-800 uppercase tracking-wider border-r-2 border-orange-100">TOTAL BILL</td>
+                  <td className="p-6">
+                    <span className="text-5xl font-black text-[#ff8100] drop-shadow-sm">₹{orderData.billing.total}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Restaurant Earning Section */}
         {orderData.settlement && (
           <div>
-            <h2 className="text-base font-bold text-gray-900 mb-3">Your Earnings</h2>
-            <div className="bg-green-50  rounded-lg p-4 border border-green-100">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-700">Food Price (Subtotal - Discount)</span>
-                <span className="text-sm font-medium text-gray-900">₹{orderData.settlement.restaurantEarning?.foodPrice || 0}</span>
+            <h2 className="text-3xl font-black text-gray-900 mb-4 px-1">Your Earnings</h2>
+            <div className="bg-green-50 rounded-2xl p-6 border-2 border-green-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xl font-bold text-gray-700">Food Price (Subtotal - Discount)</span>
+                <span className="text-2xl font-black text-gray-900">₹{orderData.settlement.restaurantEarning?.foodPrice || 0}</span>
               </div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-gray-700">Commission</span>
-                  <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">-{orderData.settlement.restaurantEarning?.commissionPercentage || 0}%</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-gray-700">Commission</span>
+                  <span className="text-xs font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full border border-red-200 uppercase tracking-widest">-{orderData.settlement.restaurantEarning?.commissionPercentage || 0}%</span>
                 </div>
-                <span className="text-sm font-medium text-red-600">-₹{orderData.settlement.restaurantEarning?.commission || 0}</span>
+                <span className="text-2xl font-black text-red-600">-₹{orderData.settlement.restaurantEarning?.commission || 0}</span>
               </div>
-              <div className="border-t border-green-200 my-3"></div>
+              <div className="border-t-4 border-dashed border-green-200 my-6"></div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-green-800">Final Earning</span>
-                <span className="text-lg font-bold text-green-800">₹{orderData.settlement.restaurantEarning?.netEarning || 0}</span>
+                <span className="text-2xl font-black text-green-800">Final Earning</span>
+                <span className="text-5xl font-black text-green-900 drop-shadow-sm">₹{orderData.settlement.restaurantEarning?.netEarning || 0}</span>
               </div>
-              <p className="text-[10px] text-gray-500 mt-2 italic">* Amounts shown are calculated based on admin commission rules.</p>
+              <p className="text-xs text-green-600 mt-4 italic font-bold uppercase tracking-tight">* Amounts shown are calculated based on admin commission rules.</p>
             </div>
           </div>
         )}
 
         {/* Order Timeline Section */}
         <div>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Order timeline</h2>
+          <h2 className="text-3xl font-black text-gray-900 mb-4 px-1">Order timeline</h2>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border-2 border-gray-100 rounded-2xl p-8 shadow-sm">
             <div className="relative">
               {/* Timeline Line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-300"></div>
+              <div className="absolute left-5 top-0 bottom-0 w-1 bg-gray-200"></div>
 
               {/* Timeline Events */}
-              <div className="space-y-4">
+              <div className="space-y-8">
                 {orderData.timeline.map((event, index) => (
-                  <div key={index} className="relative flex items-start gap-3">
+                  <div key={index} className="relative flex items-center gap-6">
                     {/* Icon */}
-                    <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${event.status === "completed"
+                    <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-md ${event.status === "completed"
                       ? "bg-gray-900"
                       : event.status === "rejected"
                         ? "bg-red-600"
                         : "bg-gray-400"
                       }`}>
                       {event.status === "completed" ? (
-                        <CheckCircle className="w-4 h-4 text-white" />
+                        <CheckCircle className="w-5 h-5 text-white" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-white" />
+                        <XCircle className="w-5 h-5 text-white" />
                       )}
                     </div>
 
                     {/* Event Details */}
-                    <div className="flex-1 pt-1">
-                      <p className="text-sm text-gray-900">{event.event}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{event.timestamp}</p>
+                    <div className="flex-1">
+                      <p className="text-2xl font-black text-gray-900 leading-tight">{event.event}</p>
+                      <p className="text-sm font-bold text-gray-500 mt-1 uppercase tracking-widest">{event.timestamp}</p>
                     </div>
                   </div>
                 ))}

@@ -864,15 +864,24 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant not found');
     }
 
-    // Generate new access token
-    const accessToken = jwtService.generateAccessToken({
+    // Generate new access and refresh tokens
+    const tokens = jwtService.generateTokens({
       userId: restaurant._id.toString(),
       role: 'restaurant',
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
 
+    // Set new refresh token in httpOnly cookie
+    res.cookie('restaurant_refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
+    });
+
     return successResponse(res, 200, 'Token refreshed successfully', {
-      accessToken
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
   } catch (error) {
     return errorResponse(res, 401, error.message || 'Invalid refresh token');

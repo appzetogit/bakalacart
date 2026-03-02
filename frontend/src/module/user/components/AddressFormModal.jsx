@@ -108,7 +108,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
         }
 
         if (!formData.name.trim()) {
-            toast.error("Your name is required")
+            toast.error("Receiver's name is required")
             return
         }
 
@@ -119,6 +119,11 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
 
         if (formData.phone.length !== 10) {
             toast.error("Please enter a valid 10-digit phone number")
+            return
+        }
+
+        if (!formData.pinCode || formData.pinCode.length !== 6) {
+            toast.error("A valid 6-digit Pin Code is required")
             return
         }
 
@@ -256,9 +261,10 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     <div className="space-y-2">
                         <Input
                             name="pinCode"
-                            placeholder="Pin code"
+                            placeholder="Pin code *"
                             value={formData.pinCode}
                             onChange={handleChange}
+                            required
                             className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
                         />
                     </div>
