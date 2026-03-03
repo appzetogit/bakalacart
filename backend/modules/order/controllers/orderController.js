@@ -83,6 +83,21 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // STRICT ADDRESS VALIDATION: Ensure all core fields are present
+    const { street, city, zipCode } = address;
+    if (!street || !city || !zipCode) {
+      const missing = [];
+      if (!street) missing.push('Building/Street Name');
+      if (!city) missing.push('City');
+      if (!zipCode) missing.push('Pin Code');
+
+      return res.status(400).json({
+        success: false,
+        message: `Incomplete address. Missing: ${missing.join(', ')}`,
+        error: 'ADDRESS_INCOMPLETE'
+      });
+    }
+
     if (!deliveryAddressDetails || !deliveryAddressDetails.trim()) {
       return res.status(400).json({
         success: false,

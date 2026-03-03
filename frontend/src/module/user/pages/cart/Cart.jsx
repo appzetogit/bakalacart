@@ -32,21 +32,20 @@ import AddressFormModal from "../../components/AddressFormModal"
 const formatFullAddress = (address) => {
   if (!address) return ""
 
-  // Priority 1: Use formattedAddress if available (for live location addresses)
-  if (address.formattedAddress && address.formattedAddress !== "Select location") {
-    return address.formattedAddress
+  // IF STREET (BUILDING NAME) IS PRESENT, ALWAYS USE PARTS TO ENSURE EDITS SHOW
+  if (address.street) {
+    const addressParts = []
+    if (address.street) addressParts.push(address.street)
+    if (address.additionalDetails) addressParts.push(address.additionalDetails)
+    if (address.city) addressParts.push(address.city)
+    if (address.state) addressParts.push(address.state)
+    if (address.zipCode) addressParts.push(address.zipCode)
+    return addressParts.filter(Boolean).join(', ')
   }
 
-  // Priority 2: Build address from parts
-  const addressParts = []
-  if (address.street) addressParts.push(address.street)
-  if (address.additionalDetails) addressParts.push(address.additionalDetails)
-  if (address.city) addressParts.push(address.city)
-  if (address.state) addressParts.push(address.state)
-  if (address.zipCode) addressParts.push(address.zipCode)
-
-  if (addressParts.length > 0) {
-    return addressParts.join(', ')
+  // Priority 2: Use formattedAddress if available (for live location addresses)
+  if (address.formattedAddress && address.formattedAddress !== "Select location") {
+    return address.formattedAddress
   }
 
   // Priority 3: Use address field if available
@@ -931,8 +930,9 @@ export default function Cart() {
 
     // --- STRICT ADDRESS VALIDATION ---
     // Ensure both defaultAddress (data) and currentLocation.id (UI selection highlight) are consistent
-    const hasSelection = !!currentLocation?.id || !!currentLocation?.addressId || (currentLocation?.formattedAddress && currentLocation?.formattedAddress !== "Select location");
-    const isComplete = defaultAddress && defaultAddress.street && defaultAddress.city && defaultAddress.zipCode;
+    const hasSelection = !!(currentLocation?.id || currentLocation?.addressId);
+    // A complete address MUST be a saved address (has ID) and have all core fields
+    const isComplete = !!(defaultAddress?.id && defaultAddress?.street && defaultAddress?.city && defaultAddress?.zipCode);
 
     if (!defaultAddress || !hasSelection || !isComplete) {
       toast.error("Please select a complete delivery address (Building, City, and Pin Code are required).", {
@@ -1174,16 +1174,25 @@ export default function Cart() {
         return;
       }
 
+      // BUILD COMPLETE ADDRESS STRING FOR BACKEND LOGS AND RIDER VIEW
+      const fullAddressString = [
+        defaultAddress?.street,
+        defaultAddress?.additionalDetails
+      ].filter(Boolean).join(", ").trim();
+
       const orderPayload = {
         items: orderItems,
-        address: defaultAddress,
+        address: {
+          ...defaultAddress,
+          formattedAddress: formatFullAddress(defaultAddress)
+        },
         restaurantId: finalRestaurantId,
         restaurantName: finalRestaurantName,
         pricing: orderPricing,
         deliveryFleet: deliveryFleet || 'standard',
         note: note || "",
         sendCutlery: sendCutlery !== false,
-        deliveryAddressDetails: (defaultAddress?.additionalDetails || defaultAddress?.address || "").trim(),
+        deliveryAddressDetails: fullAddressString || formatFullAddress(defaultAddress) || "",
         paymentMethod: finalPaymentMethod,
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
@@ -2049,15 +2058,28 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Address Selection Check for Button State - REQUIRED FOR PREVENTING ORDERS WITHOUT ADDRESS */}
+              {/* Address Selection & Completion Check for Button State - REQUIRED FOR PREVENTING ORDERS WITHOUT ADDRESS */}
               {(() => {
-                const isAddressSelected = !!defaultAddress && !!(
+                // Check if an address is selected at all
+                // Note: We now prioritize SAVED addresses for the selection to be valid
+                const isAddressSelected = !!(
                   currentLocation?.id ||
-                  currentLocation?.addressId ||
-                  (currentLocation?.formattedAddress && currentLocation?.formattedAddress !== "Select location")
+                  currentLocation?.addressId
+                );
+
+                // Check if the selected address is complete (Required for delivery)
+                // It must be a saved address (has ID) and contain all required delivery details
+                const isAddressComplete = !!(
+                  defaultAddress?.id &&
+                  defaultAddress?.street &&
+                  defaultAddress?.city &&
+                  defaultAddress?.zipCode
                 );
 
                 const isRestaurantClosed = restaurantData && restaurantData.isAcceptingOrders === false;
+
+                // Final check: Must be selected AND complete
+                const canPlaceOrder = isAddressSelected && isAddressComplete && !isRestaurantClosed;
 
                 return (
                   <Button
@@ -2066,7 +2088,7 @@ export default function Cart() {
                       if (isPlacingOrder) return
                       setShowPaymentSheet(true)
                     }}
-                    disabled={isPlacingOrder || !isAddressSelected || isRestaurantClosed}
+                    disabled={isPlacingOrder || !canPlaceOrder}
                     className="w-full bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 text-white px-6 md:px-10 h-14 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="text-left mr-3 md:mr-4">
@@ -2076,9 +2098,15 @@ export default function Cart() {
                     <span className="font-bold text-base md:text-lg">
                       {isPlacingOrder
                         ? "Processing..."
-                        : selectedPaymentMethod === "razorpay"
-                          ? "Select Payment"
-                          : "Place Order"}
+                        : isRestaurantClosed
+                          ? "Closed"
+                          : !isAddressSelected
+                            ? "Select Address"
+                            : !isAddressComplete
+                              ? "Complete Address"
+                              : selectedPaymentMethod === "razorpay"
+                                ? "Select Payment"
+                                : "Place Order"}
                     </span>
                     <ChevronRight className="h-5 w-5 md:h-6 md:w-6 ml-2" />
                   </Button>

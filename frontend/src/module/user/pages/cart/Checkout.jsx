@@ -355,13 +355,34 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  <Button
-                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white mt-4 md:mt-6 h-11 md:h-12 text-sm md:text-base"
-                    onClick={handlePlaceOrder}
-                    disabled={isPlacingOrder || !selectedAddress || !selectedPayment}
-                  >
-                    {isPlacingOrder ? "Placing Order..." : "Place Order"}
-                  </Button>
+                  {(() => {
+                    const isAddressSelected = !!selectedAddress && !!defaultAddress?.id;
+                    const isAddressComplete = !!(
+                      defaultAddress?.id &&
+                      defaultAddress?.street &&
+                      defaultAddress?.city &&
+                      defaultAddress?.zipCode
+                    );
+                    const canPlaceOrder = isAddressSelected && isAddressComplete && !!selectedPayment;
+
+                    return (
+                      <Button
+                        className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white mt-4 md:mt-6 h-11 md:h-12 text-sm md:text-base border-none shadow-md"
+                        onClick={handlePlaceOrder}
+                        disabled={isPlacingOrder || !canPlaceOrder}
+                      >
+                        {isPlacingOrder
+                          ? "Placing Order..."
+                          : !isAddressSelected
+                            ? "Select Address"
+                            : !isAddressComplete
+                              ? "Complete Address"
+                              : !selectedPayment
+                                ? "Select Payment"
+                                : "Place Order"}
+                      </Button>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </ScrollReveal>
