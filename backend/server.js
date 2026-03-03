@@ -1036,12 +1036,19 @@ function initializeScheduledTasks() {
 }
 
 // Handle unhandled promise rejections
+// ⚠️ We log the error but do NOT crash the server.
+// Crashing on every unhandled rejection caused 502 Bad Gateway on production.
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Promise Rejection:', err);
-  // Close server & exit process
-  httpServer.close(() => {
-    process.exit(1);
-  });
+  console.error('⚠️ [SERVER] Unhandled Promise Rejection (server kept alive):', err?.message || err);
+  console.error('Stack:', err?.stack);
+  // DO NOT call process.exit() here - it crashes the whole server causing 502 errors
+});
+
+// Handle uncaught exceptions - log but keep server alive
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [SERVER] Uncaught Exception (server kept alive):', err?.message || err);
+  console.error('Stack:', err?.stack);
+  // DO NOT call process.exit() here - it crashes the whole server causing 502 errors
 });
 
 export default app;
