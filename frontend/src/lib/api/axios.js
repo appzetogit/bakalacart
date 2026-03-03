@@ -300,12 +300,23 @@ apiClient.interceptors.response.use(
         const refreshToken = localStorage.getItem(`${expectedRole}_refreshToken`) ||
           localStorage.getItem('refreshToken');
 
+        // Only attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
+        if (!refreshToken) {
+          if (import.meta.env.DEV) {
+            console.warn(`[Axios Interceptor] No refresh token found in localStorage for ${expectedRole}. Skipping refresh to avoid 401 spam.`);
+          }
+          // Mark as expired to trigger redirect below
+          const noTokenError = new Error('No refresh token available');
+          noTokenError._isAuthError = true;
+          throw noTokenError;
+        }
+
         const response = await axios.post(
           `${API_BASE_URL}${refreshEndpoint}`,
           {},
           {
             withCredentials: true,
-            headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {}
+            headers: { 'X-Refresh-Token': refreshToken }
           }
         );
 
@@ -319,7 +330,9 @@ apiClient.interceptors.response.use(
 
           if (!role || !isCorrectModule) {
             clearModuleAuth(tokenKey.replace('_accessToken', ''));
-            throw new Error('Role mismatch on refreshed token');
+            const roleError = new Error('Role mismatch on refreshed token');
+            roleError._isAuthError = true;
+            throw roleError;
           }
 
           // Store new access token for the current module
@@ -328,6 +341,8 @@ apiClient.interceptors.response.use(
           // If backend returned a new refresh token, store it as well
           if (newRefreshToken) {
             localStorage.setItem(`${expectedRole}_refreshToken`, newRefreshToken);
+            // Also update the generic 'refreshToken' to keep it in sync for general requests
+            localStorage.setItem('refreshToken', newRefreshToken);
           }
 
           // Retry original request with new token
@@ -337,12 +352,12 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Check if it's a network error or truly expired token
         const isNetworkError = refreshError.code === 'ERR_NETWORK' || refreshError.message === 'Network Error';
-        const isTokenExpired = refreshError.response?.status === 401 &&
+        const isTokenExpired = refreshError._isAuthError || (refreshError.response?.status === 401 &&
           (refreshError.response?.data?.message?.includes('expired') ||
             refreshError.response?.data?.message?.includes('Invalid refresh token') ||
             refreshError.response?.data?.message?.includes('Refresh token not found') ||
             refreshError.response?.data?.message?.includes('User not found or inactive') ||
-            refreshError.response?.data?.message?.includes('Invalid token for'));
+            refreshError.response?.data?.message?.includes('Invalid token for')));
 
         // Show error toast in development mode for refresh errors
         if (import.meta.env.DEV && !isNetworkError) {

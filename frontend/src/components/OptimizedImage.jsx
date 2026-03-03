@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
+import { API_BASE_URL } from '@/lib/api/config'
+import { getResilientImageUrl } from '@/lib/utils'
 
 /**
  * OptimizedImage Component
@@ -32,6 +34,9 @@ const OptimizedImage = ({
   const imgRef = useRef(null)
   const observerRef = useRef(null)
 
+  // Use the resilient version of the src - API_BASE_URL is imported from config
+  const finalSrc = getResilientImageUrl(src, API_BASE_URL)
+
   // Check if image URL supports optimization (external URLs or Vite-processed imports)
   const supportsOptimization = (imageSrc) => {
     if (!imageSrc || typeof imageSrc !== 'string' || imageSrc === '') return false
@@ -54,7 +59,7 @@ const OptimizedImage = ({
   // Optimize Cloudinary URL with proper transformations
   const optimizeCloudinaryUrl = (url, width, quality = 'auto') => {
     if (!isCloudinary(url)) return url
-    
+
     try {
       // Check if URL already has transformations (contains /w_, /h_, /c_, etc.)
       // If it does, return as-is to avoid breaking existing transformations
@@ -62,29 +67,29 @@ const OptimizedImage = ({
         // URL already has transformations, return as-is
         return url
       }
-      
+
       // Parse Cloudinary URL structure: 
       // https://res.cloudinary.com/account/image/upload/v123/path.png?w=800&q=80
       // or: https://res.cloudinary.com/account/image/upload/v123/path.png
-      
+
       const urlParts = url.split('/image/upload/')
       if (urlParts.length !== 2) return url
-      
+
       const baseUrl = urlParts[0] + '/image/upload/'
       const afterUpload = urlParts[1]
-      
+
       // Remove query params to get clean path
       const pathWithVersion = afterUpload.split('?')[0]
-      
+
       // Split version and actual path
       // Format: v123/path/to/image.png or path/to/image.png
       const pathSegments = pathWithVersion.split('/')
       const hasVersion = pathSegments[0]?.startsWith('v')
-      
+
       // Extract version if present
       const version = hasVersion ? pathSegments[0] : null
       const imagePath = hasVersion ? pathSegments.slice(1).join('/') : pathWithVersion
-      
+
       // Build optimized URL with Cloudinary transformations
       // f_auto: auto format (WebP/AVIF when supported by browser)
       // q_auto: auto quality (Cloudinary optimizes based on image content)
@@ -98,10 +103,10 @@ const OptimizedImage = ({
         'c_limit',
         'fl_progressive'
       ].join(',')
-      
-      // Reconstruct URL: baseUrl + (version/) + transformations + / + imagePath
+
+      // Reconstruct URL: baseUrl + transformations + / + (version/) + imagePath
       if (version) {
-        return `${baseUrl}${version}/${transformations}/${imagePath}`
+        return `${baseUrl}${transformations}/${version}/${imagePath}`
       } else {
         return `${baseUrl}${transformations}/${imagePath}`
       }
@@ -120,14 +125,14 @@ const OptimizedImage = ({
     // Local images are typically icons/small images, so use smaller breakpoints
     const localImageSizes = [80, 112, 150, 200]
     const cloudinarySizes = [320, 480, 640, 800, 1024, 1280, 1600]
-    
+
     if (isCloudinary(imageSrc)) {
       // Use Cloudinary transformations for better optimization
       return cloudinarySizes
         .map(size => `${optimizeCloudinaryUrl(imageSrc, size, 'auto')} ${size}w`)
         .join(', ')
     }
-    
+
     // For local images (Vite-processed), we can't transform them at runtime
     // But we can still provide srcset for responsive loading
     // Vite will handle the actual image optimization during build
@@ -136,7 +141,7 @@ const OptimizedImage = ({
       // The browser will still benefit from proper sizes attribute
       return undefined
     }
-    
+
     // Fallback for other CDNs
     return cloudinarySizes
       .map(size => `${imageSrc}?w=${size}&q=75 ${size}w`)
@@ -146,14 +151,14 @@ const OptimizedImage = ({
   // Generate WebP/AVIF srcset (Cloudinary handles this automatically with f_auto)
   const generateWebPSrcSet = (imageSrc) => {
     if (!supportsOptimization(imageSrc)) return undefined
-    
+
     const sizes = [320, 480, 640, 800, 1024, 1280, 1600]
-    
+
     if (isCloudinary(imageSrc)) {
       // Cloudinary f_auto already serves WebP/AVIF, so use same URLs
       return generateSrcSet(imageSrc)
     }
-    
+
     // For non-Cloudinary URLs, try to add format parameter
     return sizes
       .map(size => `${imageSrc}?w=${size}&q=75&format=webp ${size}w`)
@@ -166,7 +171,7 @@ const OptimizedImage = ({
       // For category images (small circular), use smaller width
       // Check if this is a category image based on sizes prop
       const isCategoryImage = sizes && (sizes.includes('56px') || sizes.includes('80px') || sizes.includes('96px') || sizes.includes('112px'))
-      
+
       // For category images, use simpler optimization or return original if it already has transformations
       if (isCategoryImage) {
         // If URL already has transformations, return as-is
@@ -176,7 +181,7 @@ const OptimizedImage = ({
         // For category images, use smaller width (200px) with fill crop for circular images
         return optimizeCloudinaryUrl(imageSrc, 200, 'auto')
       }
-      
+
       const width = 800
       return optimizeCloudinaryUrl(imageSrc, width, 'auto')
     }
@@ -217,11 +222,11 @@ const OptimizedImage = ({
 
   // Preload critical images
   useEffect(() => {
-    if (priority && src && !src.startsWith('data:')) {
+    if (priority && finalSrc && !finalSrc.startsWith('data:')) {
       const link = document.createElement('link')
       link.rel = 'preload'
       link.as = 'image'
-      link.href = src
+      link.href = finalSrc
       link.fetchPriority = 'high'
       document.head.appendChild(link)
 
@@ -229,7 +234,7 @@ const OptimizedImage = ({
         document.head.removeChild(link)
       }
     }
-  }, [priority, src])
+  }, [priority, finalSrc])
 
   const handleLoad = (e) => {
     setIsLoaded(true)
@@ -239,15 +244,15 @@ const OptimizedImage = ({
   const handleError = (e) => {
     // If the image failed to load and it's a Cloudinary URL that was optimized,
     // try loading the original URL without optimizations
-    if (src && isCloudinary(src) && e.target.src !== src && !hasError) {
+    if (finalSrc && isCloudinary(finalSrc) && e.target.src !== finalSrc && !hasError) {
       // Try original URL without optimizations
-      const originalUrl = src
+      const originalUrl = finalSrc
       e.target.src = originalUrl
       // Reset error state to allow retry
       setHasError(false)
       return // Don't set error state yet, try original URL first
     }
-    
+
     // If we've already tried the original URL or it's not Cloudinary, show error
     // Silently handle error - component already shows fallback UI
     setHasError(true)
@@ -257,9 +262,8 @@ const OptimizedImage = ({
   // Default blur placeholder (tiny gray square)
   const defaultBlurDataURL = blurDataURL || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjwvc3ZnPg=='
 
-  // Don't render if src is empty or null
-  // But allow 'https://via.placeholder.com/40' as it's a valid placeholder
-  if (!src || (typeof src === 'string' && src.trim() === '')) {
+  // Don't render if finalSrc is empty or placeholder-only
+  if (!finalSrc || finalSrc === "/bakalalogo.png" || (typeof finalSrc === 'string' && finalSrc.trim() === '')) {
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -269,7 +273,7 @@ const OptimizedImage = ({
     )
   }
 
-  const imageSrc = hasError ? 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle"%3EImage not found%3C/text%3E%3C/svg%3E' : src
+  const imageSrc = hasError ? 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle"%3EImage not found%3C/text%3E%3C/svg%3E' : finalSrc
 
   return (
     <div className={`relative overflow-hidden ${className}`} ref={imgRef}>
@@ -306,7 +310,7 @@ const OptimizedImage = ({
               type="image/webp"
             />
           )}
-          
+
           {/* Fallback to original format */}
           <motion.img
             src={getOptimizedSrc(imageSrc)}

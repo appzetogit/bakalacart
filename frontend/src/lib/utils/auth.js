@@ -83,7 +83,14 @@ export function hasModuleAccess(role, module) {
  * @returns {string|null} - Access token or null
  */
 export function getModuleToken(module) {
-  return localStorage.getItem(`${module}_accessToken`) || localStorage.getItem('accessToken');
+  // If module is specified, it should ONLY return that specific module's token
+  // to avoid cross-module token confusion (e.g., customer token used for delivery refresh)
+  if (module) {
+    return localStorage.getItem(`${module}_accessToken`);
+  }
+
+  // Default fallback for general purpose or legacy code
+  return localStorage.getItem('accessToken');
 }
 
 /**
@@ -236,13 +243,22 @@ export async function proactiveTokenRefresh(module) {
 
     const refreshToken = localStorage.getItem(`${module}_refreshToken`);
 
+    // ONLY attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
+    // This dramatically reduces "Refresh token not found" 401 errors from backend
+    if (!refreshToken) {
+      if (import.meta.env.DEV) {
+        console.warn(`[Proactive Refresh] No refresh token for ${module}. Skipping refresh.`);
+      }
+      return false;
+    }
+
     // Call refresh endpoint with credentials and refresh token header (for hybrid app/WebView support)
     const response = await axios.post(
       `${API_BASE_URL}${refreshEndpoint}`,
       {},
       {
         withCredentials: true,
-        headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {}
+        headers: { 'X-Refresh-Token': refreshToken }
       }
     );
 

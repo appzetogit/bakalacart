@@ -716,7 +716,7 @@ export default function SearchResults() {
                   ) : (
                     <div className={`w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-2 transition-all ${isSelected ? 'border-green-600 dark:border-green-500 shadow-lg bg-green-50 dark:bg-green-900/20' : 'border-transparent'
                       }`}>
-                      <span className="text-xl">🍽️</span>
+                      <img src="/bakalalogo.png" alt="Bakalaa Logo" className="w-8 h-8 opacity-50" />
                     </div>
                   )}
                   <span className={`text-xs font-medium whitespace-nowrap ${isSelected ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'

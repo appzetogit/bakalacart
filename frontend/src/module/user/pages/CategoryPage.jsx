@@ -642,14 +642,14 @@ export default function CategoryPage() {
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             // Fallback to placeholder if category image fails to load
-                            e.target.src = 'https://via.placeholder.com/100'
+                            e.target.src = '/bakalalogo.png'
                           }}
                         />
                       </div>
                     ) : (
                       <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-2 transition-all ${isSelected ? 'border-green-600 shadow-lg bg-green-50 dark:bg-green-900/20' : 'border-transparent'
                         }`}>
-                        <span className="text-xl md:text-2xl">🍽️</span>
+                        <img src="/bakalalogo.png" alt="Bakalaa Logo" className="w-8 h-8 opacity-50" />
                       </div>
                     )}
                     <span className={`text-xs md:text-sm font-medium whitespace-nowrap ${isSelected ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'

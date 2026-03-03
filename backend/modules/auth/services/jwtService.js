@@ -19,8 +19,8 @@ class JWTService {
     }
 
     this.secret = secret;
-    this.accessTokenExpiry = process.env.JWT_ACCESS_EXPIRY || '30d';
-    this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRY || '90d';
+    this.accessTokenExpiry = process.env.JWT_ACCESS_EXPIRY || '365d';
+    this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRY || '365d';
   }
 
   /**

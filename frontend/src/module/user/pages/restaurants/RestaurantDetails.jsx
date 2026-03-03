@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
@@ -48,49 +48,79 @@ import FoodCustomizationModal from "../../components/FoodCustomizationModal"
 const RESTAURANT_DATA_CACHE = new Map();
 
 // Carousel component for dish images
-const DishImageCarousel = ({ images, name, className, onClick }) => {
+const DishImageCarousel = memo(({ images, name, className, onClick }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [failedImages, setFailedImages] = useState(new Set())
 
-  // Memoize valid images
-  const validImages = Array.isArray(images) && images.length > 0
-    ? images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-    : []
+  // Memoize valid images and handle both strings and objects
+  const validImages = useMemo(() => {
+    if (!Array.isArray(images)) return []
+    return images.map(img => {
+      if (typeof img === 'string') return img.trim()
+      if (img && typeof img === 'object') {
+        return img.url?.trim() || img.secure_url?.trim() || null
+      }
+      return null
+    }).filter(img => img && img !== '')
+  }, [images])
 
   if (validImages.length === 0) {
     return (
-      <div className={`bg-gray-200 dark:bg-gray-700 flex items-center justify-center ${className}`} onClick={onClick}>
-        <span className="text-xs text-gray-400">No image</span>
+      <div className={`bg-gray-100 dark:bg-gray-800 flex items-center justify-center ${className}`} onClick={onClick}>
+        <img src="/bakalalogo.png" alt="Fallback logo" className="w-10 h-10 object-contain opacity-40" />
       </div>
     )
   }
 
-  // Auto-rotate if multiple images (only if not hovered/interacted to avoid annoying user)
-  // implementing basic swipe/click for now
-
   const handleNext = (e) => {
-    e.stopPropagation()
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setCurrentIndex((prev) => (prev + 1) % validImages.length)
   }
 
   const handlePrev = (e) => {
-    e.stopPropagation()
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setCurrentIndex((prev) => (prev - 1 + validImages.length) % validImages.length)
   }
 
+  const currentImage = validImages[currentIndex]
+  const hasFailed = failedImages.has(currentImage)
+
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div className={`relative overflow-hidden bg-gray-50 dark:bg-gray-900 ${className}`}>
       <AnimatePresence mode='wait' initial={false}>
-        <motion.img
-          key={currentIndex}
-          src={validImages[currentIndex]}
-          alt={name}
-          className="w-full h-full object-cover"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          onClick={onClick}
-        />
+        {!hasFailed ? (
+          <motion.img
+            key={`${currentIndex}-${currentImage}`}
+            src={currentImage}
+            alt={name}
+            className="w-full h-full object-cover"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onClick}
+            onError={() => {
+              console.error(`❌ Menu image failed to load: ${currentImage}`)
+              setFailedImages(prev => new Set([...prev, currentImage]))
+            }}
+          />
+        ) : (
+          <motion.div
+            key="fallback"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"
+            onClick={onClick}
+          >
+            <img src="/bakalalogo.png" alt="Fallback logo" className="w-10 h-10 object-contain opacity-40" />
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Indicators and Controls for multiple images */}
@@ -101,19 +131,19 @@ const DishImageCarousel = ({ images, name, className, onClick }) => {
             {validImages.map((_, idx) => (
               <div
                 key={idx}
-                className={`h-1.5 w-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
+                className={`h-1 w-1 rounded-full transition-all duration-300 ${idx === currentIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
               />
             ))}
           </div>
 
           {/* Navigation Areas - Left/Right invisible click zones */}
           <div
-            className="absolute inset-y-0 left-0 w-1/4 z-[5] cursor-pointer"
+            className="absolute inset-y-0 left-0 w-1/3 z-[5] cursor-pointer"
             onClick={handlePrev}
             aria-label="Previous image"
           />
           <div
-            className="absolute inset-y-0 right-0 w-1/4 z-[5] cursor-pointer"
+            className="absolute inset-y-0 right-0 w-1/3 z-[5] cursor-pointer"
             onClick={handleNext}
             aria-label="Next image"
           />
@@ -121,7 +151,7 @@ const DishImageCarousel = ({ images, name, className, onClick }) => {
       )}
     </div>
   )
-}
+})
 
 export default function RestaurantDetails() {
   const { slug } = useParams()
@@ -394,7 +424,7 @@ export default function RestaurantDetails() {
                 : null)
               || actualRestaurant?.image
               || apiRestaurant?.image
-              || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop",
+              || "/bakalalogo.png",
             priceRange: apiRestaurant?.priceRange || "$$",
             offers: Array.isArray(apiRestaurant?.offers) ? apiRestaurant.offers : [], // Will be populated from menu/offers API later
             offerText: (apiRestaurant?.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(apiRestaurant.offer.trim()))

@@ -899,6 +899,7 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
  * Remove FCM Token
  * DELETE /api/auth/fcm-token
  */
+
 export const removeFcmToken = asyncHandler(async (req, res) => {
   const { token, platform = 'web' } = req.body;
   const userId = req.user.id;

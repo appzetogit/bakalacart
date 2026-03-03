@@ -1,5 +1,6 @@
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { useRef, useEffect, useState, useMemo, useCallback } from "react"
+import { cn, getResilientImageUrl, normalizeImages } from "@/lib/utils"
 import { createPortal } from "react-dom"
 // Lenis will be lazy loaded
 import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react"
@@ -74,40 +75,8 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
   const touchEndX = useRef(0)
   const isSwiping = useRef(false)
 
-  // SUPER SIMPLE Normalize images array - handle both string URLs and objects with url property
-  const normalizeImages = (imgArray) => {
-    if (!imgArray || !Array.isArray(imgArray)) return []
-
-    const urls = []
-    imgArray.forEach(img => {
-      // Handle string URLs directly
-      if (typeof img === 'string' && img.trim() !== '') {
-        urls.push(img.trim())
-        return
-      }
-      // Handle objects with url property
-      if (img && typeof img === 'object') {
-        if (img.url && typeof img.url === 'string' && img.url.trim() !== '') {
-          urls.push(img.url.trim())
-          return
-        }
-        if (img.secure_url && typeof img.secure_url === 'string' && img.secure_url.trim() !== '') {
-          urls.push(img.secure_url.trim())
-          return
-        }
-      }
-    })
-
-    return urls.filter(url => url && url !== 'null' && url !== 'undefined')
-  }
-
-  // Filter out invalid/empty image URLs
-  const validImages = normalizeImages(images)
-
-  // Use fallback if no valid images - always ensure we have at least one image
-  const displayImages = validImages.length > 0
-    ? validImages
-    : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"]
+  // Filter out invalid/empty image URLs - API_BASE_URL is available from top level import
+  const displayImages = normalizeImages(images, API_BASE_URL)
 
   // Reset loading state when image changes (for carousel swipe or new image)
   useEffect(() => {
@@ -124,16 +93,6 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
       restaurantName,
       restaurantId,
       rawImages: images,
-      rawImagesType: typeof images,
-      rawImagesIsArray: Array.isArray(images),
-      rawImagesLength: images?.length,
-      firstRawImage: images?.[0],
-      firstRawImageType: typeof images?.[0],
-      firstRawImageUrl: images?.[0]?.url || images?.[0],
-      normalizedImages: validImages,
-      normalizedImagesLength: validImages.length,
-      normalizedFirstImage: validImages[0],
-      displayImages: displayImages,
       displayImagesLength: displayImages.length,
       displayFirstImage: displayImages[0],
       currentIndex: currentIndex,
@@ -495,7 +454,7 @@ export default function Home() {
               // Update cache
               HOME_PAGE_CACHE.heroBanners = validBanners;
               // Extract image URLs for display
-              const imageUrls = validBanners.map(b => b.imageUrl)
+              const imageUrls = validBanners.map(b => getResilientImageUrl(b.imageUrl, API_BASE_URL))
               console.log('🖼️ [Hero Banners] Setting banner images:', imageUrls)
               setHeroBannerImages(imageUrls)
             } else {
@@ -569,16 +528,13 @@ export default function Home() {
         const response = await api.get('/categories/public')
         if (response.data.success && response.data.data.categories) {
           const adminCategories = response.data.data.categories.map(cat => {
-            // Check if image is valid (not empty, not placeholder, and is a valid URL)
-            const isValidImage = cat.image &&
-              cat.image.trim() !== '' &&
-              cat.image !== 'https://via.placeholder.com/40' &&
-              (cat.image.startsWith('http://') || cat.image.startsWith('https://'))
+            // Use resilient URL helper for category images
+            const imageUrl = getResilientImageUrl(cat.image, API_BASE_URL)
 
             return {
               id: cat.id,
               name: cat.name,
-              image: isValidImage ? cat.image : '', // Use empty string - images should come from backend
+              image: imageUrl !== '/bakalalogo.png' ? imageUrl : '',
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               label: cat.name // For compatibility with existing code
             }
@@ -1603,115 +1559,8 @@ export default function Home() {
         `}</style>
       </div>
 
-      {/* Unified Navbar & Hero Section */}
-      <div className="relative w-full overflow-hidden min-h-[39vh] lg:min-h-[50vh] md:pt-16">
-        {/* Hero Banner Carousel Background */}
-        {loadingBanners ? (
-          <div className="absolute top-0 left-0 right-0 bottom-0 z-0 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-            <div className="text-white text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-              <p className="text-sm">Loading banners...</p>
-            </div>
-          </div>
-        ) : heroBannerImages.length > 0 ? (
-          <div
-            className="absolute top-0 left-0 right-0 bottom-0 z-0 cursor-grab active:cursor-grabbing overflow-hidden"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            style={{ minHeight: '39vh' }}
-          >
-            <motion.div
-              className="flex h-full"
-              animate={{
-                x: `-${currentBannerIndex * 100}vw`
-              }}
-              transition={{
-                duration: 0.6,
-                ease: "easeInOut"
-              }}
-              style={{
-                width: `${heroBannerImages.length * 100}vw`,
-                height: '100%'
-              }}
-            >
-              {heroBannerImages.map((image, index) => {
-                const bannerData = heroBannersData[index]
-                const linkedRestaurants = bannerData?.linkedRestaurants || []
-                const hasLinkedRestaurants = linkedRestaurants.length > 0
-
-                console.log(`🖼️ [Hero Banners] Rendering banner ${index + 1}:`, {
-                  imageUrl: image,
-                  hasImage: !!image,
-                  imageType: typeof image
-                })
-
-                return (
-                  <div
-                    key={index}
-                    className="h-full flex-shrink-0 relative"
-                    style={{
-                      width: '100vw',
-                      cursor: hasLinkedRestaurants ? 'pointer' : 'default',
-                      minHeight: '39vh'
-                    }}
-                    onClick={() => {
-                      if (hasLinkedRestaurants) {
-                        // Redirect to first linked restaurant
-                        const firstRestaurant = linkedRestaurants[0]
-                        const restaurantSlug = firstRestaurant.slug || firstRestaurant.restaurantId || firstRestaurant._id
-                        navigate(`/restaurants/${restaurantSlug}`)
-                      } else if (bannerData?.linkUrl) {
-                        // If banner has a link URL (for offers/promotions), navigate to it
-                        if (bannerData.linkUrl.startsWith('http')) {
-                          window.open(bannerData.linkUrl, '_blank')
-                        } else {
-                          navigate(bannerData.linkUrl)
-                        }
-                      } else if (bannerData?.linkType === 'offer' || bannerData?.linkType === 'promotion') {
-                        // Navigate to offers page if banner type is offer/promotion
-                        navigate('/user/offers')
-                      }
-                    }}
-                  >
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={`Hero Banner ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        style={{
-                          objectFit: 'cover',
-                          display: 'block',
-                          minHeight: '100%',
-                          width: '100%'
-                        }}
-                        loading={index === 0 ? 'eager' : 'lazy'}
-                        onError={(e) => {
-                          console.error(`🖼️ [Hero Banners] Image ${index + 1} failed to load:`, image, e)
-                          e.target.style.display = 'none'
-                        }}
-                        onLoad={() => {
-                          console.log(`🖼️ [Hero Banners] Image ${index + 1} loaded successfully:`, image)
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-white flex items-center justify-center">
-                        <p className="text-gray-600">Banner image not available</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </motion.div>
-          </div>
-        ) : (
-          <div className="absolute top-0 left-0 right-0 bottom-0 z-0 bg-white" />
-        )}
-
+      {/* Navbar & Search Section */}
+      <div className="relative w-full overflow-hidden bg-white dark:bg-[#0a0a0a]">
         {/* Navbar */}
         <motion.div
           className="relative z-20 pt-2 sm:pt-3 lg:pt-4"
@@ -1722,26 +1571,24 @@ export default function Home() {
           <PageNavbar textColor="black" zIndex={20} />
         </motion.div>
 
-        {/* Hero Section */}
-        <section className="relative z-20 w-full py-4 sm:py-6 md:py-12 lg:py-12">
-          {/* Content */}
+        {/* Search Bar Section */}
+        <section className="relative z-20 w-full pt-2 pb-4 sm:pt-4 sm:pb-6">
           <div className="relative z-20 max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
-            {/* Search Bar and VEG MODE Container - Sticky */}
             <motion.div
-              className="sticky top-4 md:top-20 z-30 flex items-center gap-3 sm:gap-4 lg:gap-6"
-              initial={{ opacity: 0, y: 20 }}
+              className="flex items-center gap-3 sm:gap-4 lg:gap-6"
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+              transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
             >
               {/* Enhanced Search Bar */}
               <motion.div
                 className="flex-1 relative"
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.01 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
-                <div className="relative bg-white dark:bg-[#1a1a1a] rounded-xl lg:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-1 sm:p-1.5 lg:p-2 transition-all duration-300 hover:shadow-xl">
+                <div className="relative bg-gray-50 dark:bg-[#1a1a1a] rounded-xl lg:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-1 sm:p-1.5 transition-all duration-300 hover:shadow-md">
                   <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-                    <Search className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600 flex-shrink-0 ml-2 sm:ml-3 lg:ml-4" strokeWidth={2.5} />
+                    <Search className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-gray-400 flex-shrink-0 ml-2 sm:ml-3" strokeWidth={2.5} />
                     <div className="flex-1 relative">
                       <div className="relative w-full">
                         <Input
@@ -1756,9 +1603,8 @@ export default function Home() {
                             }
                           }}
                           aria-label="Search for restaurants and food"
-                          className="pl-0 pr-2 h-8 sm:h-9 lg:h-11 w-full bg-white dark:bg-[#1a1a1a] border-0 text-sm sm:text-base lg:text-lg font-semibold text-gray-700 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                          className="pl-0 pr-2 h-8 sm:h-9 lg:h-10 w-full bg-transparent border-0 text-sm sm:text-base lg:text-lg font-medium text-gray-700 dark:text-white focus-visible:ring-0 focus-visible:ring-offset-0 rounded-full placeholder:text-gray-400 dark:placeholder:text-gray-500"
                         />
-                        {/* Animated placeholder - same animation as RestaurantDetails highlight offer */}
                         {!heroSearch && (
                           <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none h-5 lg:h-6 overflow-hidden">
                             <AnimatePresence mode="wait">
@@ -1768,7 +1614,7 @@ export default function Home() {
                                 animate={{ y: 0, opacity: 1 }}
                                 exit={{ y: -16, opacity: 0 }}
                                 transition={{ duration: 0.3 }}
-                                className="text-sm sm:text-base lg:text-lg font-semibold text-gray-400 dark:text-gray-500 inline-block"
+                                className="text-sm sm:text-base lg:text-lg font-medium text-gray-400 dark:text-gray-500 inline-block"
                               >
                                 {placeholders[placeholderIndex]}
                               </motion.span>
@@ -1784,26 +1630,109 @@ export default function Home() {
               {/* VEG MODE Toggle */}
               <motion.div
                 ref={vegModeToggleRef}
-                className="flex flex-col items-center gap-0.5 sm:gap-1 lg:gap-1.5 flex-shrink-0 relative"
+                className="flex flex-col items-center gap-0.5 sm:gap-1 flex-shrink-0 relative"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
               >
                 <div className="flex flex-col items-center">
-                  <span className="text-white text-[13px] sm:text-[11px] lg:text-sm font-black leading-none">VEG</span>
-                  <span className="text-white text-[9.5px] sm:text-[10px] lg:text-xs font-black leading-none">MODE</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-[9px] sm:text-[10px] font-bold leading-none">VEG</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-[8px] sm:text-[9px] font-bold leading-none">MODE</span>
                 </div>
                 <Switch
                   checked={vegMode}
                   onCheckedChange={handleVegModeChange}
-                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300 w-9 h-4 sm:w-10 sm:h-5 lg:w-12 lg:h-6 shadow-lg [&_[data-slot=switch-thumb]]:bg-white [&_[data-slot=switch-thumb]]:h-3 [&_[data-slot=switch-thumb]]:w-3 sm:[&_[data-slot=switch-thumb]]:h-4 sm:[&_[data-slot=switch-thumb]]:w-4 lg:[&_[data-slot=switch-thumb]]:h-5 lg:[&_[data-slot=switch-thumb]]:w-5 [&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-5 sm:[&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-5 lg:[&_[data-slot=switch-thumb]]:data-[state=checked]:translate-x-6 [&_[data-slot=switch-thumb]]:data-[state=unchecked]:translate-x-0"
+                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-200 w-8 h-4 sm:w-10 sm:h-5 [&_[data-slot=switch-thumb]]:bg-white [&_[data-slot=switch-thumb]]:h-3 [&_[data-slot=switch-thumb]]:w-3 sm:[&_[data-slot=switch-thumb]]:h-4 sm:[&_[data-slot=switch-thumb]]:w-4"
                 />
               </motion.div>
             </motion.div>
           </div>
         </section>
+
+        {/* Hero Banner Carousel (Rounded corners, dots) */}
+        {!loadingBanners && heroBannerImages.length > 0 && (
+          <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mb-4 sm:mb-6">
+            <div
+              className="relative w-full h-[180px] sm:h-[250px] md:h-[300px] lg:h-[350px] overflow-hidden rounded-2xl sm:rounded-3xl shadow-md cursor-grab active:cursor-grabbing"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <motion.div
+                className="flex h-full"
+                animate={{
+                  x: `-${currentBannerIndex * 100}%`
+                }}
+                transition={{
+                  duration: 0.6,
+                  ease: [0.32, 0.72, 0, 1]
+                }}
+                style={{
+                  width: `${heroBannerImages.length * 100}%`
+                }}
+              >
+                {heroBannerImages.map((image, index) => {
+                  const bannerData = heroBannersData[index]
+                  const linkedRestaurants = bannerData?.linkedRestaurants || []
+                  const hasLinkedRestaurants = linkedRestaurants.length > 0
+
+                  return (
+                    <div
+                      key={index}
+                      className="h-full relative overflow-hidden"
+                      style={{
+                        width: `${100 / heroBannerImages.length}%`,
+                        cursor: (hasLinkedRestaurants || bannerData?.linkUrl) ? 'pointer' : 'default',
+                      }}
+                      onClick={() => {
+                        if (hasLinkedRestaurants) {
+                          const firstRestaurant = linkedRestaurants[0]
+                          const restaurantSlug = firstRestaurant.slug || firstRestaurant.restaurantId || firstRestaurant._id
+                          navigate(`/restaurants/${restaurantSlug}`)
+                        } else if (bannerData?.linkUrl) {
+                          if (bannerData.linkUrl.startsWith('http')) {
+                            window.open(bannerData.linkUrl, '_blank')
+                          } else {
+                            navigate(bannerData.linkUrl)
+                          }
+                        }
+                      }}
+                    >
+                      <img
+                        src={getResilientImageUrl(image, API_BASE_URL)}
+                        alt={`Hero Banner ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </motion.div>
+
+              {/* Pagination Dots */}
+              {heroBannerImages.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {heroBannerImages.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${index === currentBannerIndex
+                        ? "w-4 bg-white"
+                        : "w-1.5 bg-white/50"
+                        }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Rest of Content - Container Width with Unified Background */}
@@ -1882,7 +1811,7 @@ export default function Home() {
                         <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-md transition-all bg-gray-100 dark:bg-gray-800">
                           {category.image && category.image.trim() !== '' && category.image !== 'https://via.placeholder.com/40' ? (
                             <img
-                              src={category.image}
+                              src={getResilientImageUrl(category.image, API_BASE_URL)}
                               alt={category.name}
                               className="w-full h-full object-cover rounded-full"
                               loading="lazy"
@@ -3285,12 +3214,10 @@ export default function Home() {
                             <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden shadow-md transition-all hover:shadow-lg flex-shrink-0 bg-gray-100 dark:bg-gray-800">
                               {categoryData.image && categoryData.image.trim() !== '' && categoryData.image !== 'https://via.placeholder.com/40' ? (
                                 <img
-                                  src={categoryData.image}
+                                  src={getResilientImageUrl(categoryData.image, API_BASE_URL)}
                                   alt={categoryData.name}
                                   className="w-full h-full object-cover rounded-full"
                                   loading="lazy"
-                                  referrerPolicy="no-referrer"
-                                  crossOrigin="anonymous"
                                   onError={(e) => {
                                     console.error(`❌ Image failed to load for category "${categoryData.name}":`, categoryData.image)
                                     // If image fails, show emoji
