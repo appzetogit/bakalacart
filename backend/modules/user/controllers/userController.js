@@ -432,7 +432,14 @@ export const addUserAddress = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error(`Error adding address: ${error.message}`, { error: error.stack });
-    return errorResponse(res, 500, error.message || 'Failed to add address');
+
+    // Better error message extraction for Mongoose errors
+    let message = error.message || 'Failed to add address';
+    if (error.name === 'ValidationError') {
+      message = Object.values(error.errors).map(val => val.message).join(', ');
+    }
+
+    return errorResponse(res, 500, message);
   }
 });
 
@@ -509,7 +516,14 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error(`Error updating address: ${error.message}`, { error: error.stack });
-    return errorResponse(res, 500, error.message || 'Failed to update address');
+
+    // Better error message extraction for Mongoose errors
+    let message = error.message || 'Failed to update address';
+    if (error.name === 'ValidationError') {
+      message = Object.values(error.errors).map(val => val.message).join(', ');
+    }
+
+    return errorResponse(res, 500, message);
   }
 });
 

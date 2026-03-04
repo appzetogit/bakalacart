@@ -301,7 +301,11 @@ export default function CheckoutPage() {
         additionalDetails: additionalParts.join(", "),
         city,
         state,
-        zipCode: (addressFormData.pinCode || "").trim()
+        zipCode: (addressFormData.pinCode || "").trim(),
+        latitude: globalLocation?.latitude || 0,
+        longitude: globalLocation?.longitude || 0,
+        receiverName: addressFormData.name || userData?.name || "",
+        phone: addressFormData.phone || userData?.phone || ""
       }
 
       const response = await userAPI.addAddress(payload)
