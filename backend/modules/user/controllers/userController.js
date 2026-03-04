@@ -427,11 +427,12 @@ export const addUserAddress = asyncHandler(async (req, res) => {
     });
 
     return successResponse(res, 201, 'Address added successfully', {
-      address: addressResponse
+      address: addressResponse,
+      addresses: user.addresses // Return the full list for consistency
     });
   } catch (error) {
     logger.error(`Error adding address: ${error.message}`, { error: error.stack });
-    return errorResponse(res, 500, 'Failed to add address');
+    return errorResponse(res, 500, error.message || 'Failed to add address');
   }
 });
 
@@ -503,11 +504,12 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     });
 
     return successResponse(res, 200, 'Address updated successfully', {
-      address: addressResponse
+      address: addressResponse,
+      addresses: user.addresses // Return the full list for consistency
     });
   } catch (error) {
     logger.error(`Error updating address: ${error.message}`, { error: error.stack });
-    return errorResponse(res, 500, 'Failed to update address');
+    return errorResponse(res, 500, error.message || 'Failed to update address');
   }
 });
 
