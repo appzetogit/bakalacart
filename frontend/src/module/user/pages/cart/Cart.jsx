@@ -87,7 +87,7 @@ export default function Cart() {
   }
 
   const { cart, updateQuantity, addToCart, getCartCount, clearCart, cleanCartForRestaurant } = cartContext;
-  const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile, deleteAddress } = useProfile()
+  const { getDefaultAddress, getDefaultPaymentMethod, addresses, paymentMethods, userProfile, deleteAddress, loading: profileLoading } = useProfile()
   const { createOrder } = useOrders()
   const { location: currentLocation, updateLocation } = useUserLocation() // Get live location address
   const { openLocationSelector } = useLocationSelector()
@@ -1866,7 +1866,18 @@ export default function Cart() {
 
                 {/* Address List - Horizontal Scroll */}
                 <div className="mb-2">
-                  {addresses && addresses.length > 0 ? (
+                  {profileLoading ? (
+                    // Loading skeleton while addresses are being fetched
+                    <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
+                      {[1, 2].map(i => (
+                        <div key={i} className="flex-shrink-0 w-[240px] p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 animate-pulse">
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-3"></div>
+                          <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+                          <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : addresses && addresses.length > 0 ? (
                     <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 md:-mx-6 px-4 md:px-6 scrollbar-hide">
                       {addresses.map((address) => {
                         const isSelected = currentLocation?.id === address.id || currentLocation?.addressId === address.id || currentLocation?.id === address._id || currentLocation?.addressId === address._id;
@@ -1910,6 +1921,7 @@ export default function Cart() {
                     <div className="text-center py-8 bg-gray-50/50 dark:bg-gray-800/20 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
                       <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">No saved addresses found</p>
+                      <p className="text-xs text-gray-400 mt-1">Click "+ Add New" to add your delivery address</p>
                     </div>
                   )}
                 </div>

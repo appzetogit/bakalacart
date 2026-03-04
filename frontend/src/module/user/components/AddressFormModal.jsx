@@ -136,12 +136,35 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                 formData.autoAddress ? `Location: ${formData.autoAddress}` : ""
             ].filter(Boolean).join(", ")
 
+            // Try to get city/state from location context, then localStorage fallback
+            let city = location?.city || editAddress?.city || ""
+            let state = location?.state || editAddress?.state || ""
+
+            if (!city || !state) {
+                try {
+                    const savedLocation = localStorage.getItem("userLocation")
+                    if (savedLocation) {
+                        const parsed = JSON.parse(savedLocation)
+                        city = city || parsed.city || ""
+                        state = state || parsed.state || ""
+                    }
+                } catch (e) {
+                    // ignore parse error
+                }
+            }
+
+            // Backend requires city and state - show specific error if missing
+            if (!city || !state) {
+                toast.error("City/State not detected. Please set your location first before saving an address.")
+                return
+            }
+
             const addressData = {
                 label: formData.label,
                 street: formData.buildingName,
                 additionalDetails: additionalDetails,
-                city: location?.city || editAddress?.city || "",
-                state: location?.state || editAddress?.state || "",
+                city,
+                state,
                 zipCode: formData.pinCode || location?.postalCode || editAddress?.zipCode || "",
                 latitude: location?.latitude || editAddress?.latitude || 22.7196,
                 longitude: location?.longitude || editAddress?.longitude || 75.8577,
@@ -161,7 +184,9 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             onClose()
         } catch (error) {
             console.error("Error saving address:", error)
-            toast.error("Failed to save address. Please try again.")
+            // Show backend error message if available
+            const backendMsg = error?.response?.data?.message
+            toast.error(backendMsg || "Failed to save address. Please try again.")
         }
     }
 

@@ -46,7 +46,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
   const inputRef = useRef(null)
   const [searchValue, setSearchValue] = useState("")
   const { location, loading, requestLocation, updateLocation } = useGeoLocation()
-  const { addresses = [], addAddress, updateAddress, userProfile } = useProfile()
+  const { addresses = [], addAddress, updateAddress, userProfile, loading: profileLoading } = useProfile()
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [mapPosition, setMapPosition] = useState([22.7196, 75.8577]) // Default Indore coordinates [lat, lng]
   const [addressFormData, setAddressFormData] = useState({
@@ -721,9 +721,12 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
             types: ["geocode", "establishment"]
           },
           (results, status) => {
+            console.log("🔍 Google Places Status:", status);
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              console.log(`✅ Found ${results.length} predictions`);
               setPredictions(results)
             } else {
+              if (status !== 'OK') console.warn(`⚠️ Google Places returned: ${status}`);
               setPredictions([])
             }
             setIsSearching(false)
@@ -2774,7 +2777,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
       </div>
 
       {/* Search Bar */}
-      <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full relative">
+      <div className="flex-shrink-0 bg-white dark:bg-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full relative z-[10002]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#bc005d] z-10" />
           <Input
@@ -2788,7 +2791,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
 
         {/* Search Results Overlay */}
         {searchValue && predictions.length > 0 && (
-          <div className="absolute left-4 right-4 sm:left-6 sm:right-6 lg:left-8 lg:right-8 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10001] max-h-80 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-2xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10010] max-h-80 overflow-y-auto">
             {predictions.map((prediction) => (
               <button
                 key={prediction.place_id}
@@ -2809,16 +2812,17 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
           </div>
         )}
 
-        {searchValue && predictions.length === 0 && isSearching && (
-          <div className="absolute left-4 right-4 sm:left-6 sm:right-6 lg:left-8 lg:right-8 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10001] p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#bc005d] mx-auto mb-2"></div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Searching...</p>
+        {searchValue && searchValue.length >= 3 && predictions.length === 0 && !isSearching && !isGoogleLoading && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-[#1a1a1a] shadow-2xl border border-gray-100 dark:border-gray-800 rounded-xl z-[10010] p-6 text-center">
+            <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">No results found for "{searchValue}"</p>
+            <p className="text-xs text-gray-400 mt-1">Try a different name or check your connection</p>
           </div>
         )}
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
+      <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 relative z-[1]">
         <div className="max-w-7xl mx-auto w-full pb-6">
           {/* Delivery Address + Use Current Location + Add New Address */}
           <div
@@ -2838,7 +2842,21 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
           </div>
 
           {/* Saved Addresses Section */}
-          {addresses.length > 0 && (
+          {profileLoading ? (
+            // Skeleton loader while profile loads
+            <div className="mt-2 px-4 sm:px-6 lg:px-8 space-y-3 py-3">
+              <p className="text-xs font-semibold text-gray-400 tracking-wider uppercase mb-3">Saved Addresses</p>
+              {[1, 2].map(i => (
+                <div key={i} className="flex items-start gap-4 animate-pulse py-3">
+                  <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2"></div>
+                    <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : addresses.length > 0 && (
             <div
               className="mt-2"
               style={{ animation: 'slideDown 0.3s ease-out 0.2s both' }}

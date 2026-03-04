@@ -29,9 +29,31 @@ export function ProfileProvider({ children }) {
     return null
   })
 
-  const [loading, setLoading] = useState(true)
+  const [addresses, setAddresses] = useState(() => {
+    // Pre-load from localStorage so addresses are immediately available on render
+    const saved = localStorage.getItem("userAddresses")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed
+      } catch (e) { /* ignore */ }
+    }
+    return []
+  })
 
-  const [addresses, setAddresses] = useState([])
+  // If we already have addresses from localStorage, no need to show loading
+  const hasLocalAddresses = (() => {
+    try {
+      const saved = localStorage.getItem("userAddresses")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return Array.isArray(parsed) && parsed.length > 0
+      }
+    } catch (e) { /* ignore */ }
+    return false
+  })()
+
+  const [loading, setLoading] = useState(!hasLocalAddresses)
 
   // Helper function to deduplicate addresses by ID
   const deduplicateAddresses = useCallback((addressList) => {

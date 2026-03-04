@@ -371,8 +371,8 @@ export const addUserAddress = asyncHandler(async (req, res) => {
   try {
     const { label, street, additionalDetails, city, state, zipCode, latitude, longitude, isDefault, receiverName, phone } = req.body;
 
-    if (!street || !city || !state || !zipCode) {
-      return errorResponse(res, 400, 'Street, city, state, and pincode are required');
+    if (!street || !city || !state) {
+      return errorResponse(res, 400, 'Street, city, and state are required');
     }
 
     const user = await User.findById(req.user._id);

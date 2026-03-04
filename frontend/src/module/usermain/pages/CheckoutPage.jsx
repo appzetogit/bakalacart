@@ -267,12 +267,40 @@ export default function CheckoutPage() {
 
     setSavingAddress(true)
     try {
+      // Try to get city/state from default city state, then globalLocation, then localStorage
+      let city = defaultCityState.city
+      let state = defaultCityState.state
+
+      if (!city || !state) {
+        // Try globalLocation
+        city = city || globalLocation?.city || ""
+        state = state || globalLocation?.state || ""
+      }
+
+      if (!city || !state) {
+        // Try localStorage userLocation
+        try {
+          const locationStr = localStorage.getItem("userLocation")
+          if (locationStr) {
+            const loc = JSON.parse(locationStr)
+            city = city || loc.city || ""
+            state = state || loc.state || ""
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      if (!city || !state) {
+        alert("City/State not detected. Please update your location from the home screen before saving an address.")
+        setSavingAddress(false)
+        return
+      }
+
       const payload = {
         label: addressLabel || "Other",
         street: streetParts.join(", "),
         additionalDetails: additionalParts.join(", "),
-        city: defaultCityState.city,
-        state: defaultCityState.state,
+        city,
+        state,
         zipCode: (addressFormData.pinCode || "").trim()
       }
 
