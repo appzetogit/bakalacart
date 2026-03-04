@@ -16,9 +16,10 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
         floor: "",
         buildingName: "",
         landmark: "",
-        name: "",
         phone: "",
         pinCode: "",
+        city: "",
+        state: "",
         label: "Home",
         autoAddress: "" // Hidden from typing, used for bottom box
     })
@@ -43,6 +44,8 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     name: editAddress.receiverName || editAddress.name || "",
                     phone: (editAddress.phone || "").replace(/^\+91\s?/, "").replace(/\D/g, "").slice(0, 10),
                     pinCode: editAddress.zipCode || "",
+                    city: editAddress.city || "",
+                    state: editAddress.state || "",
                     label: editAddress.label || "Home",
                     autoAddress: locationMatch ? locationMatch[1].trim() : ""
                 })
@@ -55,6 +58,8 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     name: "",
                     phone: "",
                     pinCode: "",
+                    city: location?.city || "",
+                    state: location?.state || "",
                     label: "Home",
                     autoAddress: ""
                 })
@@ -137,8 +142,9 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             ].filter(Boolean).join(", ")
 
             // Try to get city/state from location context, then localStorage fallback
-            let city = location?.city || editAddress?.city || ""
-            let state = location?.state || editAddress?.state || ""
+            // Priority: Manual form field -> Location hook -> Edit address -> fallback
+            let city = formData.city || location?.city || editAddress?.city || ""
+            let state = formData.state || location?.state || editAddress?.state || ""
 
             if (!city || !state) {
                 try {
@@ -280,6 +286,29 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                                     <X className="h-4 w-4" />
                                 </button>
                             )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Input
+                                name="city"
+                                placeholder="City *"
+                                value={formData.city}
+                                onChange={handleChange}
+                                required
+                                className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Input
+                                name="state"
+                                placeholder="State *"
+                                value={formData.state}
+                                onChange={handleChange}
+                                required
+                                className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
+                            />
                         </div>
                     </div>
 

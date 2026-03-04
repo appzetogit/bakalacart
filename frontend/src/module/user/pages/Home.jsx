@@ -324,6 +324,8 @@ export default function Home() {
   const [heroBannerImages, setHeroBannerImages] = useState([])
   const [heroBannersData, setHeroBannersData] = useState([]) // Store full banner data with linked restaurants
   const [loadingBanners, setLoadingBanners] = useState(true)
+  const [under250Banners, setUnder250Banners] = useState([])
+  const [loadingUnder250Banners, setLoadingUnder250Banners] = useState(true)
   const [landingCategories, setLandingCategories] = useState([])
   const [landingExploreMore, setLandingExploreMore] = useState([])
   const [exploreMoreHeading, setExploreMoreHeading] = useState("Explore More")
@@ -454,7 +456,8 @@ export default function Home() {
               // Update cache
               HOME_PAGE_CACHE.heroBanners = validBanners;
               // Extract image URLs for display
-              const imageUrls = validBanners.map(b => getResilientImageUrl(b.imageUrl, API_BASE_URL))
+              // IMPORTANT: Extract raw imageUrl from validBanners, we'll resilient-ify in render
+              const imageUrls = validBanners.map(b => b.imageUrl)
               console.log('🖼️ [Hero Banners] Setting banner images:', imageUrls)
               setHeroBannerImages(imageUrls)
             } else {
@@ -476,6 +479,20 @@ export default function Home() {
           })
           setHeroBannerImages([])
           setHeroBannersData([])
+        }
+
+        // Fetch Under-250 Banners too
+        try {
+          console.log('🖼️ [Under 250 Banners] Fetching...')
+          const under250Response = await api.get('/hero-banners/under-250/public')
+          if (under250Response.data?.success && under250Response.data?.data?.banners) {
+            setUnder250Banners(under250Response.data.data.banners)
+            console.log('🖼️ [Under 250 Banners] Loaded:', under250Response.data.data.banners.length)
+          }
+        } catch (uErr) {
+          console.warn('🖼️ [Under 250 Banners] Optional fetch failed:', uErr)
+        } finally {
+          setLoadingUnder250Banners(false)
         }
       } catch (error) {
         console.error('🖼️ [Hero Banners] ❌ Error fetching hero banners:', error)
@@ -1663,7 +1680,7 @@ export default function Home() {
               onMouseLeave={handleMouseUp}
             >
               <motion.div
-                className="flex h-full"
+                className="flex h-full transition-all"
                 animate={{
                   x: `-${currentBannerIndex * 100}%`
                 }}
@@ -1672,7 +1689,7 @@ export default function Home() {
                   ease: [0.32, 0.72, 0, 1]
                 }}
                 style={{
-                  width: `${heroBannerImages.length * 100}%`
+                  width: "100%"
                 }}
               >
                 {heroBannerImages.map((image, index) => {
@@ -1683,9 +1700,8 @@ export default function Home() {
                   return (
                     <div
                       key={index}
-                      className="h-full relative overflow-hidden"
+                      className="h-full w-full flex-shrink-0 relative overflow-hidden"
                       style={{
-                        width: `${100 / heroBannerImages.length}%`,
                         cursor: (hasLinkedRestaurants || bannerData?.linkUrl) ? 'pointer' : 'default',
                       }}
                       onClick={() => {
@@ -1708,7 +1724,16 @@ export default function Home() {
                         className="w-full h-full object-cover"
                         loading={index === 0 ? 'eager' : 'lazy'}
                         onError={(e) => {
+                          console.error(`❌ Hero Banner image failed for index ${index}:`, image)
+                          // fallback to placeholder emoji instead of hiding
                           e.target.style.display = 'none'
+                          const parent = e.target.parentElement
+                          if (parent && !parent.querySelector('.banner-fallback')) {
+                            const fallback = document.createElement('div')
+                            fallback.className = 'banner-fallback absolute inset-0 flex items-center justify-center bg-gray-100'
+                            fallback.innerHTML = '<span class="text-4xl">🍽️</span>'
+                            parent.appendChild(fallback)
+                          }
                         }}
                       />
                     </div>
@@ -2176,6 +2201,53 @@ export default function Home() {
             )}
           </div>
         </motion.section>
+
+        {/* Under 250 Banners Section - Now Styled as a Premium Hero-style Section */}
+        {under250Banners.length > 0 && (
+          <motion.section
+            className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mb-4 sm:mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex flex-col gap-0.5 mb-3 px-1">
+              <h2 className="text-[10px] sm:text-xs font-semibold text-gray-400 tracking-[0.2em] uppercase">
+                Special Offers
+              </h2>
+              <span className="text-lg sm:text-xl lg:text-2xl text-gray-800 font-bold dark:text-white">Under ₹250</span>
+            </div>
+
+            <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] overflow-hidden rounded-2xl shadow-sm bg-gray-50 dark:bg-gray-900/40">
+              <div className="flex h-full overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth">
+                {under250Banners.map((banner, index) => (
+                  <div
+                    key={banner._id || index}
+                    className="flex-shrink-0 w-full h-full snap-start relative cursor-pointer"
+                    onClick={() => navigate("/user/under-250")}
+                  >
+                    <img
+                      src={getResilientImageUrl(banner.imageUrl || banner, API_BASE_URL)}
+                      alt={`Special Offer ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        const parent = e.target.parentElement
+                        if (parent && !parent.querySelector('.banner-fallback')) {
+                          const fallback = document.createElement('div')
+                          fallback.className = 'banner-fallback absolute inset-0 flex items-center justify-center bg-gray-100'
+                          fallback.innerHTML = '<span class="text-3xl text-gray-300">🏪</span>'
+                          parent.appendChild(fallback)
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-60 pointer-events-none" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
 
         {/* Featured Foods - Horizontal Scroll */}
 

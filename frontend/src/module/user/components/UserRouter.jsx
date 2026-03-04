@@ -186,6 +186,22 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/user/orders/:orderId"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
+                <OrderTracking />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user/orders/:orderId/details"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
+                <UserOrderDetails />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Offers */}
           <Route path="/offers" element={<Offers />} />
