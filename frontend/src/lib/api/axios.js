@@ -85,8 +85,16 @@ function getModuleInfo(path) {
       refreshEndpoint: '/delivery/auth/refresh-token',
       loginPath: '/delivery/sign-in'
     };
+  } else if (isUserPath) {
+    // Force user module if isUserPath is detected (mobile fix)
+    return {
+      tokenKey: 'user_accessToken',
+      expectedRole: 'user',
+      refreshEndpoint: '/auth/refresh-token',
+      loginPath: '/auth/sign-in'
+    };
   } else {
-    // Default to user module for all other paths (home, profile, usermain, cart, etc.)
+    // Default fallback
     return {
       tokenKey: 'user_accessToken',
       expectedRole: 'user',
