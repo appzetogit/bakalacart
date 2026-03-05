@@ -105,12 +105,29 @@ function getModuleInfo(path) {
 }
 
 /**
- * Get the appropriate module token based on the current route
+ * Get the appropriate module token based on the current route or request URL
+ * @param {string} requestUrl - Optional URL of the request being made
  * @returns {string|null} - Access token for the current module or null
  */
-function getTokenForCurrentRoute() {
-  const path = window.location.pathname;
-  const { tokenKey } = getModuleInfo(path);
+function getTokenForCurrentRoute(requestUrl = null) {
+  const currentPath = window.location.pathname;
+
+  // FIX: Determine module based on BOTH current path AND request URL
+  // This ensures correct token is used even if path detection fails on mobile
+  let moduleInfo;
+  const urlToCheck = requestUrl || currentPath;
+
+  if (urlToCheck.includes('/restaurant/') || urlToCheck.includes('/restaurant-')) {
+    moduleInfo = getModuleInfo('/restaurant');
+  } else if (urlToCheck.includes('/admin/')) {
+    moduleInfo = getModuleInfo('/admin');
+  } else if (urlToCheck.includes('/delivery/')) {
+    moduleInfo = getModuleInfo('/delivery');
+  } else {
+    moduleInfo = getModuleInfo(currentPath);
+  }
+
+  const { tokenKey } = moduleInfo;
 
   let token = localStorage.getItem(tokenKey);
 
@@ -129,8 +146,8 @@ function getTokenForCurrentRoute() {
  */
 apiClient.interceptors.request.use(
   (config) => {
-    // Get access token for the current module based on route
-    let accessToken = getTokenForCurrentRoute();
+    // Get access token for the current module based on route OR request URL (more reliable)
+    let accessToken = getTokenForCurrentRoute(config.url);
 
     // Fallback to legacy token if module-specific token not found
     if (!accessToken || accessToken.trim() === '') {
@@ -316,23 +333,42 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Determine which module's refresh endpoint to use based on the CURRENT PAGE (not the failing request URL)
-        // Background API calls (like zones or notifications) shouldn't define the module for token refresh
+        // Determine which module's refresh endpoint to use
         const currentAppPath = window.location.pathname;
-        const { refreshEndpoint, tokenKey, expectedRole } = getModuleInfo(currentAppPath);
+        const requestUrl = originalRequest.url || '';
+
+        // Prioritize failed request URL for module detection
+        let moduleInfo;
+        if (requestUrl.includes('/restaurant/')) {
+          moduleInfo = getModuleInfo('/restaurant');
+        } else if (requestUrl.includes('/admin/')) {
+          moduleInfo = getModuleInfo('/admin');
+        } else if (requestUrl.includes('/delivery/')) {
+          moduleInfo = getModuleInfo('/delivery');
+        } else {
+          moduleInfo = getModuleInfo(currentAppPath);
+        }
+
+        const { refreshEndpoint, tokenKey, expectedRole } = moduleInfo;
 
         // Try to refresh the token
-        // Get role-specific refresh token from localStorage for hybrid/app support
+        // Look in ALL possible keys to ensure we never get "No refresh token available"
         const refreshToken = localStorage.getItem(`${expectedRole}_refreshToken`) ||
-          localStorage.getItem('refreshToken');
+          localStorage.getItem('refreshToken') ||
+          localStorage.getItem('user_refreshToken') ||
+          localStorage.getItem('restaurant_refreshToken') ||
+          localStorage.getItem('delivery_refreshToken');
 
-        // Only attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
+        // Only attempt refresh if we have a refresh token
         if (!refreshToken) {
           if (import.meta.env.DEV) {
-            console.warn(`[Axios Interceptor] No refresh token found in localStorage for ${expectedRole}. Skipping refresh to avoid 401 spam.`);
+            console.warn(`[Axios Interceptor] No refresh token found in any storage for ${expectedRole}.`);
           }
-          // Mark as expired to trigger redirect below
-          const noTokenError = new Error('No refresh token available');
+
+          // Before giving up, check if we can actually proceed without refresh (maybe the user session is still okay but got a false 401)
+          // But for now, if truly no token, we have to throw. 
+          // However, we'll change the error message to be more helpful.
+          const noTokenError = new Error('Session expired, please log in again');
           noTokenError._isAuthError = true;
           throw noTokenError;
         }
@@ -438,11 +474,12 @@ apiClient.interceptors.response.use(
               localStorage.removeItem(`${moduleName}_accessToken`);
               localStorage.removeItem(`${moduleName}_authenticated`);
               localStorage.removeItem(`${moduleName}_user`);
+              localStorage.removeItem(`${moduleName}_refreshToken`);
 
-              // Also clear generic user keys if it's the user module
-              if (moduleName === 'user' || moduleName === 'accessToken') {
-                localStorage.removeItem('user');
-              }
+              // Also clear generic keys
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
+              localStorage.removeItem('user');
 
               window.location.href = `${loginPath}${returnToParam}`;
             } else {
