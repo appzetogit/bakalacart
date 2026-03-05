@@ -2202,52 +2202,7 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Under 250 Banners Section - Now Styled as a Premium Hero-style Section */}
-        {under250Banners.length > 0 && (
-          <motion.section
-            className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mb-4 sm:mb-6"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="flex flex-col gap-0.5 mb-3 px-1">
-              <h2 className="text-[10px] sm:text-xs font-semibold text-gray-400 tracking-[0.2em] uppercase">
-                Special Offers
-              </h2>
-              <span className="text-lg sm:text-xl lg:text-2xl text-gray-800 font-bold dark:text-white">Under ₹250</span>
-            </div>
 
-            <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] overflow-hidden rounded-2xl shadow-sm bg-gray-50 dark:bg-gray-900/40">
-              <div className="flex h-full overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth">
-                {under250Banners.map((banner, index) => (
-                  <div
-                    key={banner._id || index}
-                    className="flex-shrink-0 w-full h-full snap-start relative cursor-pointer"
-                    onClick={() => navigate("/user/under-250")}
-                  >
-                    <img
-                      src={getResilientImageUrl(banner.imageUrl || banner, API_BASE_URL)}
-                      alt={`Special Offer ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        const parent = e.target.parentElement
-                        if (parent && !parent.querySelector('.banner-fallback')) {
-                          const fallback = document.createElement('div')
-                          fallback.className = 'banner-fallback absolute inset-0 flex items-center justify-center bg-gray-100'
-                          fallback.innerHTML = '<span class="text-3xl text-gray-300">🏪</span>'
-                          parent.appendChild(fallback)
-                        }
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-60 pointer-events-none" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.section>
-        )}
 
         {/* Featured Foods - Horizontal Scroll */}
 
