@@ -241,13 +241,15 @@ export async function proactiveTokenRefresh(module) {
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
 
-    const refreshToken = localStorage.getItem(`${module}_refreshToken`);
+    // FIX: Fallback to generic refreshToken if module-specific one is missing
+    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+      localStorage.getItem('refreshToken');
 
     // ONLY attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
     // This dramatically reduces "Refresh token not found" 401 errors from backend
     if (!refreshToken) {
       if (import.meta.env.DEV) {
-        console.warn(`[Proactive Refresh] No refresh token for ${module}. Skipping refresh.`);
+        console.warn(`[Proactive Refresh] No refresh token found for ${module} (checked ${module}_refreshToken and refreshToken). Skipping refresh.`);
       }
       return false;
     }
@@ -273,10 +275,13 @@ export async function proactiveTokenRefresh(module) {
       if (isCorrectModule) {
         // Store new access token
         localStorage.setItem(`${module}_accessToken`, accessToken);
+        // CRITICAL SYNC: Also update generic accessToken
+        localStorage.setItem('accessToken', accessToken);
 
         // If backend returned a new refresh token, store it as well
         if (newRefreshToken) {
           localStorage.setItem(`${module}_refreshToken`, newRefreshToken);
+          localStorage.setItem('refreshToken', newRefreshToken);
         }
 
         console.log(`✅ [Proactive Refresh] Tokens refreshed for ${module}`);
@@ -330,13 +335,19 @@ export function setAuthData(module, token, user) {
     localStorage.setItem(tokenKey, token);
     localStorage.setItem(authKey, 'true');
 
+    // SYNC: Also update legacy generic key to keep all modules in sync
+    localStorage.setItem('accessToken', token);
+
     // Store refresh token if provided (e.g., as response.data.refreshToken)
     const refreshToken = user?.refreshToken || (typeof token === 'object' ? token.refreshToken : null);
     if (refreshToken) {
       localStorage.setItem(`${module}_refreshToken`, refreshToken);
+      localStorage.setItem('refreshToken', refreshToken); // SYNC: Generic key
     } else if (typeof arguments[3] === 'string') {
       // Allow passing refreshToken as 4th argument if needed
-      localStorage.setItem(`${module}_refreshToken`, arguments[3]);
+      const rToken = arguments[3];
+      localStorage.setItem(`${module}_refreshToken`, rToken);
+      localStorage.setItem('refreshToken', rToken); // SYNC: Generic key
     }
 
     if (user) {

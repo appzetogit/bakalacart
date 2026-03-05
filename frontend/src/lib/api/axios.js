@@ -52,6 +52,18 @@ function getModuleInfo(path) {
   // Normalize path by removing /api prefix if present for API calls
   const normalizedPath = path.startsWith('/api') ? path.substring(4) : path;
 
+  // FIX: Handle mobile/hybrid paths like /index.html or empty paths
+  const isUserPath = normalizedPath === '' ||
+    normalizedPath === '/' ||
+    normalizedPath.toLowerCase().includes('index.html') ||
+    normalizedPath.startsWith('/usermain') ||
+    normalizedPath.startsWith('/cart') ||
+    normalizedPath.startsWith('/profile') ||
+    normalizedPath.startsWith('/home') ||
+    normalizedPath.startsWith('/orders') ||
+    normalizedPath.startsWith('/wallet') ||
+    normalizedPath.startsWith('/settings');
+
   if (normalizedPath.startsWith('/admin')) {
     return {
       tokenKey: 'admin_accessToken',
@@ -268,15 +280,21 @@ apiClient.interceptors.response.use(
 
       if (role && isCorrectModule) {
         localStorage.setItem(tokenKey, token);
+        // CRITICAL SYNC: Also update generic accessToken to prevent stale tokens in legacy components
+        localStorage.setItem('accessToken', token);
+
         // Also store refresh token if provided
         if (refreshToken) {
           localStorage.setItem(`${expectedRole}_refreshToken`, refreshToken);
+          localStorage.setItem('refreshToken', refreshToken);
         }
-      } else if (role === 'user' && (tokenKey === 'accessToken' || !tokenKey)) {
-        // Handle legacy case
+      } else if (role === 'user' && (tokenKey === 'accessToken' || !tokenKey || tokenKey === 'user_accessToken')) {
+        // Handle user case specifically to ensure synchronization
         localStorage.setItem('user_accessToken', token);
+        localStorage.setItem('accessToken', token);
         if (refreshToken) {
           localStorage.setItem('user_refreshToken', refreshToken);
+          localStorage.setItem('refreshToken', refreshToken);
         }
       }
     }
@@ -337,6 +355,8 @@ apiClient.interceptors.response.use(
 
           // Store new access token for the current module
           localStorage.setItem(tokenKey, accessToken);
+          // SYNC: Always update legacy key too
+          localStorage.setItem('accessToken', accessToken);
 
           // If backend returned a new refresh token, store it as well
           if (newRefreshToken) {
@@ -626,6 +646,50 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Token Migration & Synchronization
+ * Runs once on load to ensure old/legacy tokens are synced to the new module keys
+ * and to prevent "No token" issues in different app modules.
+ */
+(function migrateTokens() {
+  try {
+    const legacyToken = localStorage.getItem('accessToken');
+    const legacyRefresh = localStorage.getItem('refreshToken');
+    const legacyUser = localStorage.getItem('user');
+
+    if (legacyToken) {
+      // If we have a legacy token but no specific user token, migrate it
+      if (!localStorage.getItem('user_accessToken')) {
+        localStorage.setItem('user_accessToken', legacyToken);
+        localStorage.setItem('user_authenticated', 'true');
+        if (import.meta.env.DEV) console.log('✅ Migrated legacy accessToken to user_accessToken');
+      }
+
+      // If we have a legacy refresh token but no specific user refresh token, migrate it
+      if (legacyRefresh && !localStorage.getItem('user_refreshToken')) {
+        localStorage.setItem('user_refreshToken', legacyRefresh);
+        if (import.meta.env.DEV) console.log('✅ Migrated legacy refreshToken to user_refreshToken');
+      }
+
+      // If we have legacy user data, sync it to user_user if missing
+      if (legacyUser && !localStorage.getItem('user_user')) {
+        localStorage.setItem('user_user', legacyUser);
+      }
+    }
+
+    // Reverse sync: If we have user_accessToken but no legacy accessToken, sync it
+    // (Helps components that still rely on the legacy key)
+    const userToken = localStorage.getItem('user_accessToken');
+    if (userToken && !localStorage.getItem('accessToken')) {
+      localStorage.setItem('accessToken', userToken);
+      const userRefresh = localStorage.getItem('user_refreshToken');
+      if (userRefresh) localStorage.setItem('refreshToken', userRefresh);
+    }
+  } catch (e) {
+    console.error('Error during token migration:', e);
+  }
+})();
 
 export default apiClient;
 
