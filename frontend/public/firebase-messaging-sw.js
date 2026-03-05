@@ -12,6 +12,9 @@ const firebaseConfig = {
     measurementId: "G-TQVDSX2Z02"
 };
 
+// Simple version tag to help with debugging SW updates (no behavior change)
+const SW_VERSION = 'v1-cache-safe';
+
 firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
@@ -139,6 +142,20 @@ self.addEventListener('notificationclick', (event) => {
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }
+        })
+    );
+});
+
+// Make SW updates activate immediately and take control,
+// without touching cookies, localStorage, or adding any caching logic.
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        self.clients.claim().then(() => {
+            console.log('[SW] Activated firebase-messaging-sw.js', SW_VERSION);
         })
     );
 });
