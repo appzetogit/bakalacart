@@ -1349,7 +1349,7 @@ export default function Cart() {
             `cd bakalacart/backend && npm start`
         } else {
           // Cleaner message for customers in production
-          errorMessage = "Unable to connect to our server right now. Please check your internet connection and try again in a moment.";
+          errorMessage = "Unable to connect to server. Please try again.";
         }
 
         console.error("🔴 Network Error Details:", {
