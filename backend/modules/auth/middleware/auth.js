@@ -22,7 +22,7 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwtService.verifyAccessToken(token);
 
     // Get user from database
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await User.findById(decoded.userId).select('-password +forceLogoutAt');
     
     if (!user) {
       return errorResponse(res, 401, 'User not found');
@@ -30,6 +30,11 @@ export const authenticate = async (req, res, next) => {
 
     if (!user.isActive) {
       return errorResponse(res, 401, 'User account is inactive');
+    }
+
+    // Check if user has been force logged out
+    if (user.forceLogoutAt) {
+      return errorResponse(res, 401, 'Session expired. Please login again.');
     }
 
     // Attach user to request
