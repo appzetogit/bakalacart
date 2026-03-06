@@ -238,14 +238,23 @@ export default function CategoryPage() {
             return false
           }
 
-          // Transform restaurants - filter out default values
+          // Transform restaurants - filter out default values and remove duplicates
+          const seenIds = new Set() // Track restaurant IDs to prevent duplicates
           const restaurantsWithIds = restaurantsArray
             .filter((restaurant) => {
               const hasName = restaurant.name && restaurant.name.trim().length > 0
               const hasRealImage = restaurant.profileImage?.url ||
                 (restaurant.coverImages && restaurant.coverImages.length > 0) ||
                 (restaurant.menuImages && restaurant.menuImages.length > 0)
-              return hasName && hasRealImage
+              if (!hasName || !hasRealImage) return false
+              
+              // PERMANENT FIX: Remove duplicates by restaurant ID
+              const restaurantId = restaurant.restaurantId || restaurant._id
+              if (seenIds.has(restaurantId)) {
+                return false // Skip duplicate
+              }
+              seenIds.add(restaurantId)
+              return true
             })
             .map((restaurant) => {
               let deliveryTime = restaurant.estimatedDeliveryTime || null
@@ -346,10 +355,15 @@ export default function CategoryPage() {
                 }
 
                 // Update the specific restaurant in the state
+                // PERMANENT FIX: Use restaurantId for reliable matching and prevent duplicates
                 setRestaurantsData(prev => {
                   const updated = [...prev]
-                  const restaurantIndex = updated.findIndex(r => r.id === restaurant.id)
+                  const restaurantUniqueId = restaurant.restaurantId || restaurant.id
+                  const restaurantIndex = updated.findIndex(r => 
+                    (r.restaurantId || r.id) === restaurantUniqueId
+                  )
                   if (restaurantIndex !== -1) {
+                    // Update existing restaurant
                     updated[restaurantIndex] = {
                       ...updated[restaurantIndex],
                       menu: menu,
@@ -358,6 +372,10 @@ export default function CategoryPage() {
                       featuredPrice: featuredPrice || updated[restaurantIndex].featuredPrice,
                       categoryMatches: {},
                     }
+                  } else {
+                    // Restaurant not found - this shouldn't happen, but add it if needed
+                    // (This handles edge case where restaurant was filtered out but menu loads)
+                    console.warn(`Restaurant ${restaurantUniqueId} not found in state for menu update`)
                   }
                   return updated
                 })
@@ -476,12 +494,21 @@ export default function CategoryPage() {
     // Filter by category - Dynamic filtering
     if (selectedCategory && selectedCategory !== 'all') {
       const expandedDishes = []
+      const seenRestaurantIds = new Set() // Track restaurants to prevent duplicates
       const keywords = categoryKeywords[selectedCategory] || [selectedCategory]
       const selectedCategoryLower = selectedCategory.toLowerCase()
 
       filtered.forEach(r => {
         // CRITICAL: Only show restaurants that have menu loaded AND at least one matching dish
         // 1 restaurant = 1 card, showing a representative dish for that category
+        // PERMANENT FIX: Use unique restaurant ID to prevent duplicates
+        const restaurantUniqueId = r.restaurantId || r.id || `${r.name}-${r.slug}`
+        
+        // Skip if we've already added this restaurant
+        if (seenRestaurantIds.has(restaurantUniqueId)) {
+          return
+        }
+
         if (r.menu) {
           const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
           if (hasCategoryItem) {
@@ -491,11 +518,13 @@ export default function CategoryPage() {
               if (vegMode && dish.foodType !== "Veg") {
                 return
               }
+              // Mark restaurant as seen
+              seenRestaurantIds.add(restaurantUniqueId)
               expandedDishes.push({
                 ...r,
                 // Keep restaurant id stable so same restaurant does not appear multiple times
-                id: r.id,
-                dishId: dish.itemId || r.id,
+                id: restaurantUniqueId,
+                dishId: dish.itemId || restaurantUniqueId,
                 categoryDish: dish,
                 categoryDishName: dish.name,
                 categoryDishPrice: dish.price,
