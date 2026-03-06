@@ -22,6 +22,13 @@ const filterOptions = [
   { id: 'rating-4-plus', label: 'Rating 4.0+' },
 ]
 
+// Helper for exact word/phrase matching
+const exactMatch = (text, keyword) => {
+  if (!text || !keyword) return false;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i').test(text);
+};
+
 // Mock data removed - using backend data only
 
 export default function SearchResults() {
@@ -122,7 +129,7 @@ export default function SearchResults() {
     for (const section of menu.sections) {
       // Check section name
       const sectionNameLower = (section.name || '').toLowerCase()
-      if (keywords.some(keyword => sectionNameLower.includes(keyword))) {
+      if (keywords.some(keyword => exactMatch(sectionNameLower, keyword))) {
         return true
       }
 
@@ -131,12 +138,12 @@ export default function SearchResults() {
         for (const item of section.items) {
           // Check item name
           const itemNameLower = (item.name || '').toLowerCase()
-          if (keywords.some(keyword => itemNameLower.includes(keyword))) {
+          if (keywords.some(keyword => exactMatch(itemNameLower, keyword))) {
             return true
           }
           // Check item category
           const itemCategoryLower = (item.category || '').toLowerCase()
-          if (keywords.some(keyword => itemCategoryLower.includes(keyword))) {
+          if (keywords.some(keyword => exactMatch(itemCategoryLower, keyword))) {
             return true
           }
         }
@@ -148,11 +155,11 @@ export default function SearchResults() {
           if (subsection.items && Array.isArray(subsection.items)) {
             for (const item of subsection.items) {
               const itemNameLower = (item.name || '').toLowerCase()
-              if (keywords.some(keyword => itemNameLower.includes(keyword))) {
+              if (keywords.some(keyword => exactMatch(itemNameLower, keyword))) {
                 return true
               }
               const itemCategoryLower = (item.category || '').toLowerCase()
-              if (keywords.some(keyword => itemCategoryLower.includes(keyword))) {
+              if (keywords.some(keyword => exactMatch(itemCategoryLower, keyword))) {
                 return true
               }
             }
@@ -183,7 +190,7 @@ export default function SearchResults() {
           const itemCategoryLower = (item.category || '').toLowerCase()
 
           if (keywords.some(keyword =>
-            itemNameLower.includes(keyword) || itemCategoryLower.includes(keyword)
+            exactMatch(itemNameLower, keyword) || exactMatch(itemCategoryLower, keyword)
           )) {
             return item.name
           }
@@ -199,7 +206,7 @@ export default function SearchResults() {
               const itemCategoryLower = (item.category || '').toLowerCase()
 
               if (keywords.some(keyword =>
-                itemNameLower.includes(keyword) || itemCategoryLower.includes(keyword)
+                exactMatch(itemNameLower, keyword) || exactMatch(itemCategoryLower, keyword)
               )) {
                 return item.name
               }
@@ -459,7 +466,7 @@ export default function SearchResults() {
     const rInfo = `${restaurant.name || ""} ${restaurant.cuisine || ""} ${restaurant.featuredDish || ""} ${restaurant.offer || ""} ${restaurant.description || ""}`.toLowerCase();
 
     // 1. Direct Restaurant Match
-    if (queryWords.every(word => rInfo.includes(word))) return true;
+    if (queryWords.every(word => exactMatch(rInfo, word))) return true;
 
     // 2. Menu Item Match (Cumulative)
     if (restaurant.menu?.sections) {
@@ -467,24 +474,24 @@ export default function SearchResults() {
         const sInfo = `${rInfo} ${section.name || ""}`.toLowerCase();
 
         // Check if (Resto + Section) has all words
-        if (queryWords.every(word => sInfo.includes(word))) return true;
+        if (queryWords.every(word => exactMatch(sInfo, word))) return true;
 
         if (section.items) {
           for (const item of section.items) {
             const iInfo = `${sInfo} ${item.name || ""} ${item.category || ""} ${item.description || ""}`.toLowerCase();
-            if (queryWords.every(word => iInfo.includes(word))) return true;
+            if (queryWords.every(word => exactMatch(iInfo, word))) return true;
           }
         }
 
         if (section.subsections) {
           for (const subs of section.subsections) {
             const ssInfo = `${sInfo} ${subs.name || ""}`.toLowerCase();
-            if (queryWords.every(word => ssInfo.includes(word))) return true;
+            if (queryWords.every(word => exactMatch(ssInfo, word))) return true;
 
             if (subs.items) {
               for (const item of subs.items) {
                 const siInfo = `${ssInfo} ${item.name || ""} ${item.category || ""} ${item.description || ""}`.toLowerCase();
-                if (queryWords.every(word => siInfo.includes(word))) return true;
+                if (queryWords.every(word => exactMatch(siInfo, word))) return true;
               }
             }
           }
@@ -544,9 +551,9 @@ export default function SearchResults() {
           const nameLower = (r.name || '').toLowerCase()
 
           const matches = keywords.some(keyword =>
-            featuredDishLower.includes(keyword) ||
-            cuisineLower.includes(keyword) ||
-            nameLower.includes(keyword)
+            exactMatch(featuredDishLower, keyword) ||
+            exactMatch(cuisineLower, keyword) ||
+            exactMatch(nameLower, keyword)
           )
 
           if (matches) return true
@@ -627,9 +634,9 @@ export default function SearchResults() {
           const nameLower = (r.name || '').toLowerCase()
 
           const matches = keywords.some(keyword =>
-            featuredDishLower.includes(keyword) ||
-            cuisineLower.includes(keyword) ||
-            nameLower.includes(keyword)
+            exactMatch(featuredDishLower, keyword) ||
+            exactMatch(cuisineLower, keyword) ||
+            exactMatch(nameLower, keyword)
           )
 
           if (matches) return true
