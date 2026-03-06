@@ -353,11 +353,9 @@ export const refreshToken = asyncHandler(async (req, res) => {
     }
 
     // Check if user has been force logged out
+    // If forceLogoutAt is set, always logout regardless of token issue time
     if (role === 'user' && user.forceLogoutAt) {
-      const tokenIssuedAt = decoded.iat ? new Date(decoded.iat * 1000) : null;
-      if (tokenIssuedAt && user.forceLogoutAt >= tokenIssuedAt) {
-        return errorResponse(res, 401, 'Session expired. Please login again.');
-      }
+      return errorResponse(res, 401, 'Session expired. Please login again.');
     }
 
     // For delivery partners, verify refresh token matches stored token (original behavior)
