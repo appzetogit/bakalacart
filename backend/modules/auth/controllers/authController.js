@@ -345,11 +345,19 @@ export const refreshToken = asyncHandler(async (req, res) => {
     } else if (role === 'delivery') {
       user = await Delivery.findById(decoded.userId).select('-password +refreshToken');
     } else {
-      user = await User.findById(decoded.userId).select('-password');
+      user = await User.findById(decoded.userId).select('-password +forceLogoutAt');
     }
 
     if (!user || !user.isActive) {
       return errorResponse(res, 401, 'User not found or inactive');
+    }
+
+    // Check if user has been force logged out
+    if (role === 'user' && user.forceLogoutAt) {
+      const tokenIssuedAt = decoded.iat ? new Date(decoded.iat * 1000) : null;
+      if (tokenIssuedAt && user.forceLogoutAt >= tokenIssuedAt) {
+        return errorResponse(res, 401, 'Session expired. Please login again.');
+      }
     }
 
     // For delivery partners, verify refresh token matches stored token (original behavior)

@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { connectDB } from '../config/database.js';
 import User from '../modules/auth/models/User.js';
 
-const phoneNumber = '9009925021';
+const phoneNumber = '9167352382';
 
 async function logoutUser() {
   try {
@@ -58,15 +58,10 @@ async function logoutUser() {
     console.log(`   User ID: ${user._id}`);
     console.log(`   Role: ${user.role}`);
     console.log(`   Is Active: ${user.isActive}`);
-
-    // Note: For user role, refreshToken is stored in cookies (not in database)
-    // The user will be logged out when they try to use their refresh token
-    // as it will be invalidated on the next token refresh attempt
     
-    console.log(`\n✅ User logout process initiated`);
-    console.log(`   Note: User's refresh token is stored in cookies.`);
-    console.log(`   The user will be logged out on their next request when the refresh token is used.`);
-    console.log(`   Account is NOT deleted - only logout action performed.\n`);
+    console.log(`\n✅ User information retrieved`);
+    console.log(`   Account is NOT deleted - only information retrieved.`);
+    console.log(`   User can login normally.\n`);
 
     // Close database connection
     await mongoose.connection.close();

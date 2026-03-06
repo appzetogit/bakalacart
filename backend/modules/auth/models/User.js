@@ -211,6 +211,10 @@ const userSchema = new mongoose.Schema({
   fcmTokenMobile: {
     type: [String],
     default: []
+  },
+  forceLogoutAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
