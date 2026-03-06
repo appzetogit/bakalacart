@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { connectDB } from '../config/database.js';
 import User from '../modules/auth/models/User.js';
 
-const phoneNumber = '9167352382';
+const phoneNumber = '9009925021';
 
 async function logoutUser() {
   try {
