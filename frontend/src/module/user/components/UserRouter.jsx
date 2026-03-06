@@ -17,8 +17,8 @@ import Coffee from "../pages/Coffee"
 const Under250 = lazy(() => import("../pages/Under250"))
 import CategoryPage from "../pages/CategoryPage"
 import Restaurants from "../pages/restaurants/Restaurants"
-import RestaurantDetails from "../pages/restaurants/RestaurantDetails"
-import SearchResults from "../pages/SearchResults"
+const RestaurantDetails = lazy(() => import("../pages/restaurants/RestaurantDetails"))
+const SearchResults = lazy(() => import("../pages/SearchResults"))
 import ProductDetail from "../pages/ProductDetail"
 
 // Cart
@@ -114,9 +114,30 @@ export default function UserRouter() {
           />
           <Route path="/category/:category" element={<CategoryPage />} />
           <Route path="/restaurants" element={<Restaurants />} />
-          <Route path="/restaurants/:slug" element={<RestaurantDetails />} />
-          <Route path="/user/restaurants/:slug" element={<RestaurantDetails />} />
-          <Route path="/search" element={<SearchResults />} />
+          <Route
+            path="/restaurants/:slug"
+            element={
+              <Suspense fallback={<LoadingFallback />}>
+                <RestaurantDetails />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/user/restaurants/:slug"
+            element={
+              <Suspense fallback={<LoadingFallback />}>
+                <RestaurantDetails />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <Suspense fallback={<LoadingFallback />}>
+                <SearchResults />
+              </Suspense>
+            }
+          />
           <Route path="/product/:id" element={<ProductDetail />} />
 
           {/* Cart - Protected */}

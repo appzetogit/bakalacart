@@ -3,9 +3,26 @@
  * Centralized configuration for API base URL and endpoints
  */
 
-// Get API base URL from environment variable or use default
-// IMPORTANT: Backend runs on port 5000, frontend on port 5173
-let rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// Get API base URL from environment variable or use sensible defaults
+// - In development: default to local backend on port 5000
+// - In production: default to same-origin backend at /api (so deployed frontend
+//   talks to its own domain unless VITE_API_BASE_URL overrides it)
+let rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
+if (!rawApiBaseUrl) {
+  if (import.meta.env.MODE === 'development') {
+    rawApiBaseUrl = 'http://localhost:5000/api';
+  } else {
+    // Use same-origin backend by default in production builds
+    try {
+      const origin = window.location.origin.replace(/\/$/, '');
+      rawApiBaseUrl = `${origin}/api`;
+    } catch {
+      // Fallback (should rarely happen) – keep localhost to avoid empty URL
+      rawApiBaseUrl = 'http://localhost:5000/api';
+    }
+  }
+}
 
 // Normalize URL - fix common issues like double slashes, missing protocols
 if (rawApiBaseUrl && typeof rawApiBaseUrl === 'string') {

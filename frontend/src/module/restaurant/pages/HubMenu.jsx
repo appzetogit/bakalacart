@@ -73,6 +73,8 @@ export default function HubMenu() {
   const addonCameraInputRef = useRef(null)
   const addonGalleryInputRef = useRef(null)
   const [showAddonImageSourceMenu, setShowAddonImageSourceMenu] = useState(false)
+  // Track first auto-save run so we don't immediately re-save menu right after initial load
+  const hasPerformedInitialSyncRef = useRef(false)
 
   // Restaurant info - fetch from backend
   const restaurantName = restaurantData?.name || ""
@@ -158,6 +160,22 @@ export default function HubMenu() {
 
   // Menu groups are now directly from menuData (fetched from backend)
 
+  // Prime menu from cache (for faster perceived load) before hitting API
+  useEffect(() => {
+    try {
+      const cachedMenu = sessionStorage.getItem('restaurant_hub_menu_cache')
+      if (cachedMenu) {
+        const parsed = JSON.parse(cachedMenu)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMenuData(parsed)
+          setLoadingMenu(false)
+        }
+      }
+    } catch (e) {
+      console.error('Error loading cached restaurant menu:', e)
+    }
+  }, [])
+
   // Fetch restaurant data on mount
   useEffect(() => {
     const fetchRestaurantData = async () => {
@@ -190,6 +208,13 @@ export default function HubMenu() {
       if (response.data && response.data.success && response.data.data && response.data.data.menu) {
         const menuSections = response.data.data.menu.sections || []
         setMenuData(menuSections)
+
+        // Cache menu locally for faster subsequent loads
+        try {
+          sessionStorage.setItem('restaurant_hub_menu_cache', JSON.stringify(menuSections))
+        } catch (e) {
+          console.error('Error caching restaurant menu:', e)
+        }
 
         // Menu data is now directly from backend, no need to transform
       } else {
@@ -257,6 +282,12 @@ export default function HubMenu() {
   // Save menu to API whenever menuData changes (debounced)
   useEffect(() => {
     if (!loadingMenu && menuData.length >= 0) {
+      // Skip the very first run after initial load to avoid re-saving untouched menu
+      if (!hasPerformedInitialSyncRef.current) {
+        hasPerformedInitialSyncRef.current = true
+        return
+      }
+
       const timeoutId = setTimeout(async () => {
         try {
           // Normalize menuData before saving to ensure proper structure matching backend schema

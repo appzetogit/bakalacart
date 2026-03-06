@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -212,6 +212,70 @@ export default function SearchResults() {
     return null
   }
 
+  const hydrateMenus = useCallback((restaurants) => {
+    if (!restaurants || restaurants.length === 0) {
+      setMenusLoading(false)
+      return
+    }
+
+    setMenusLoading(true)
+    let completedCount = 0
+
+    const priorityResults = restaurants.slice(0, 20)
+    const remainingResults = restaurants.slice(20)
+
+    const processResults = (targets) => {
+      targets.forEach(restaurant => {
+        restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId || restaurant.id)
+          .then(menuResponse => {
+            if (menuResponse.data?.success && menuResponse.data?.data?.menu) {
+              const menu = menuResponse.data.data.menu
+              setRestaurantsData(prev => prev.map(r => {
+                if ((r.id !== restaurant.id && r.restaurantId !== restaurant.restaurantId) || r.menu) return r
+                
+                let fDish = r.featuredDish
+                let fPrice = r.featuredPrice
+                const sections = menu.sections || []
+                for (const s of sections) {
+                  const items = [...(s.items || []), ...(s.subsections?.flatMap(ss => ss.items || []) || [])]
+                  if (items.length > 0) {
+                    fDish = fDish || items[0].name
+                    if (!fPrice) {
+                      const p = items[0].originalPrice || items[0].price || 0
+                      const d = items[0].discountPercent || 0
+                      fPrice = d > 0 ? Math.round(p * (1 - d / 100)) : p
+                    }
+                    break
+                  }
+                }
+                
+                return { ...r, menu, featuredDish: fDish, featuredPrice: fPrice }
+              }))
+            }
+          })
+          .catch(() => { })
+          .finally(() => {
+            completedCount++
+            if (completedCount >= restaurants.length) setMenusLoading(false)
+          })
+      })
+    }
+
+    // Step 1: Priority results
+    processResults(priorityResults)
+
+    // Step 2: Remaining results with delay
+    if (remainingResults.length > 0) {
+      setTimeout(() => {
+        processResults(remainingResults)
+      }, 2000)
+    } else {
+      if (priorityResults.length === 0) setMenusLoading(false)
+    }
+  }, [])
+
+
+  
   // Fetch restaurants from API
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -331,65 +395,7 @@ export default function SearchResults() {
     }
 
     fetchRestaurants()
-  }, [zoneId, isOutOfService])
-
-  const hydrateMenus = (restaurants) => {
-    if (!restaurants || restaurants.length === 0) {
-      setMenusLoading(false)
-      return
-    }
-
-    setMenusLoading(true)
-    let completed = 0
-
-    restaurants.forEach((restaurant) => {
-      // Check if we already have this menu in state to avoid redundant calls
-      // Use a fast check against the latest ref or state if possible, but for simplicity:
-      restaurantAPI.getMenuByRestaurantId(restaurant.restaurantId)
-        .then(menuResponse => {
-          if (menuResponse.data?.success && menuResponse.data?.data?.menu) {
-            const menu = menuResponse.data.data.menu
-
-            setRestaurantsData(prev => prev.map(r => {
-              if (r.id !== restaurant.id || r.menu) return r
-
-              // Find featured info if missing
-              let fDish = r.featuredDish
-              let fPrice = r.featuredPrice
-              if (!fDish || !fPrice) {
-                const sections = menu.sections || []
-                for (const s of sections) {
-                  const items = [...(s.items || []), ...(s.subsections?.flatMap(ss => ss.items || []) || [])]
-                  if (items.length > 0) {
-                    fDish = fDish || items[0].name
-                    if (!fPrice) {
-                      const p = items[0].originalPrice || items[0].price || 0
-                      const d = items[0].discountPercent || 0
-                      fPrice = d > 0 ? Math.round(p * (1 - d / 100)) : p
-                    }
-                    break
-                  }
-                }
-              }
-
-              return {
-                ...r,
-                menu,
-                featuredDish: fDish || r.featuredDish,
-                featuredPrice: fPrice || r.featuredPrice,
-              }
-            }))
-          }
-        })
-        .catch(() => { })
-        .finally(() => {
-          completed++
-          if (completed >= restaurants.length) {
-            setMenusLoading(false)
-          }
-        })
-    })
-  }
+  }, [zoneId, isOutOfService, hydrateMenus])
 
   // Update search query when URL changes
   useEffect(() => {

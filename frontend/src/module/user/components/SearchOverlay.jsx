@@ -71,7 +71,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   const handleSuggestionClick = (suggestion) => {
     // Clicking a recent search fills the input and immediately navigates
     saveRecentSearch(suggestion)
-    navigate(`/user/search?q=${encodeURIComponent(suggestion)}`)
+    // Use canonical search route without /user prefix to avoid routing inconsistencies
+    navigate(`/search?q=${encodeURIComponent(suggestion)}`)
     onClose()
     onSearchChange("")
   }
@@ -81,7 +82,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     if (searchValue.trim()) {
       const searchTerm = searchValue.trim()
       saveRecentSearch(searchTerm)
-      navigate(`/user/search?q=${encodeURIComponent(searchTerm)}`)
+      // Use canonical search route without /user prefix to avoid routing inconsistencies
+      navigate(`/search?q=${encodeURIComponent(searchTerm)}`)
       onClose()
       onSearchChange("")
     }

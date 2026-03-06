@@ -21,6 +21,12 @@ export default function TripHistory() {
   const [bonusTransactions, setBonusTransactions] = useState([])
   const [bonusLoading, setBonusLoading] = useState(false)
   const [hasViewedBonus, setHasViewedBonus] = useState(false)
+  const [performanceStats, setPerformanceStats] = useState({
+    totalOrders: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    totalEarnings: 0
+  })
 
   const tripTypes = ["ALL TRIPS", "Completed", "Cancelled", "Pending"]
 
@@ -66,6 +72,22 @@ export default function TripHistory() {
           }
         } else {
           setTrips([])
+        }
+
+        // Also fetch general stats for this period for the summary cards
+        try {
+          const statsPeriod = activeTab === "daily" ? "today" : activeTab === "weekly" ? "week" : "month"
+          const statsResponse = await deliveryAPI.getOrderStats(statsPeriod)
+          if (statsResponse.data?.success) {
+            setPerformanceStats({
+              totalOrders: statsResponse.data.data.totalOrders || 0,
+              completedOrders: statsResponse.data.data.completedOrders || 0,
+              cancelledOrders: statsResponse.data.data.cancelledOrders || 0,
+              totalEarnings: statsResponse.data.data.totalEarnings || 0
+            })
+          }
+        } catch (statsError) {
+          console.warn("Error fetching order stats for TripHistory:", statsError)
         }
       } catch (error) {
         console.error("Error fetching trip history:", error)
@@ -338,19 +360,21 @@ export default function TripHistory() {
           </button>
         </div>
 
-        {/* Summary Stats */}
-        {!loading && !error && trips.length > 0 && (
-          <div className="flex gap-4 pt-4 border-t border-gray-100">
-            <div className="flex-1 bg-green-50 rounded-xl p-3 border border-green-100">
-              <p className="text-xs text-green-600 font-bold uppercase tracking-wider mb-1">Orders</p>
-              <p className="text-xl font-black text-gray-900">{trips.length}</p>
-            </div>
-            <div className="flex-1 bg-blue-50 rounded-xl p-3 border border-blue-100">
-              <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Earnings</p>
-              <p className="text-xl font-black text-gray-900">₹{Math.round(trips.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0))}</p>
-            </div>
+        {/* Stats Section */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
+            <span className="text-xl font-bold text-gray-900">{loading ? "..." : performanceStats.completedOrders}</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Completed</span>
           </div>
-        )}
+          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
+            <span className="text-xl font-bold text-red-600">{loading ? "..." : performanceStats.cancelledOrders}</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Cancelled</span>
+          </div>
+          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
+            <span className="text-xl font-bold text-green-600">₹{loading ? "..." : Math.round(performanceStats.totalEarnings)}</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Earning</span>
+          </div>
+        </div>
       </div>
 
       {/* Date Picker Dropdown */}

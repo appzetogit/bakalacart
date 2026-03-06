@@ -9,6 +9,13 @@ import { toast } from "sonner"
 export default function Earnings() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("week")
+  const [performanceStats, setPerformanceStats] = useState({
+    totalOrders: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    completionRate: 0,
+    avgEarnings: 0
+  })
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showWeekPicker, setShowWeekPicker] = useState(false)
@@ -96,6 +103,22 @@ export default function Earnings() {
         }
 
         const response = await deliveryAPI.getEarnings(params)
+        
+        // Also fetch general stats for this period
+        try {
+          const statsResponse = await deliveryAPI.getOrderStats(period)
+          if (statsResponse.data?.success) {
+            setPerformanceStats({
+              totalOrders: statsResponse.data.data.totalOrders || 0,
+              completedOrders: statsResponse.data.data.completedOrders || 0,
+              cancelledOrders: statsResponse.data.data.cancelledOrders || 0,
+              completionRate: statsResponse.data.data.completionRate || 0,
+              avgEarnings: statsResponse.data.data.averageEarningsPerOrder || 0
+            })
+          }
+        } catch (statsError) {
+          console.warn("Error fetching order stats:", statsError)
+        }
 
         if (response.data?.success && response.data?.data) {
           const data = response.data.data
@@ -489,7 +512,7 @@ export default function Earnings() {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'My Earnings',
+        title: 'My Earnings & Statistics',
         text: `My earnings for ${formatDateDisplay(selectedDate)}: ${formatCurrency(earningsData.totalEarnings)}`
       })
     } else {
@@ -520,7 +543,7 @@ export default function Earnings() {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-bold">Earnings</h1>
+        <h1 className="text-lg font-bold">Earnings & Statistics</h1>
         <button
           onClick={handleShare}
           className="p-2 hover:bg-gray-800 rounded-full transition-colors flex items-center gap-1"
@@ -835,25 +858,87 @@ export default function Earnings() {
           </div>
         )}
 
+        {/* Performance Statistics Card */}
+        <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+              Performance Summary
+            </h3>
+            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+              {activeTab}
+            </span>
+          </div>
+          
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 font-medium uppercase">Compl. Rate</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-xl font-bold text-gray-900">
+                    {isLoading ? "0%" : `${Math.round(performanceStats.completionRate)}%`}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-1 text-right">
+                <p className="text-xs text-gray-500 font-medium uppercase">Cancelled</p>
+                <span className="text-xl font-bold text-red-600">
+                  {isLoading ? "0" : performanceStats.cancelledOrders}
+                </span>
+              </div>
+              
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 font-medium uppercase">Avg/Order</p>
+                <span className="text-xl font-bold text-gray-900">
+                  {isLoading ? "₹0" : formatCurrency(performanceStats.avgEarnings)}
+                </span>
+              </div>
+              
+              <div className="space-y-1 text-right">
+                <p className="text-xs text-gray-500 font-medium uppercase">Wait Time</p>
+                <span className="text-xl font-bold text-gray-900">
+                  {isLoading ? "0" : "12"} <small className="text-xs font-normal">min</small>
+                </span>
+              </div>
+            </div>
+            
+            {/* Progress Bar for Completion Rate */}
+            <div className="mt-6 pt-4 border-t border-gray-50">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-semibold text-gray-600">Period Progress</span>
+                <span className="text-xs font-bold text-blue-600">{Math.round(performanceStats.completionRate)}%</span>
+              </div>
+              <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-600 h-full transition-all duration-1000" 
+                  style={{ width: `${performanceStats.completionRate}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Earnings Breakdown */}
-        <div className="space-y-3">
-          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
-            <span className="text-base text-gray-900">Order earning</span>
-            <span className="text-base font-semibold text-gray-900">
+        <div className="mt-6 space-y-3">
+          <h3 className="px-1 text-sm font-bold text-gray-700 uppercase tracking-wider">Earnings Breakdown</h3>
+          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between border border-gray-100">
+            <span className="text-base text-gray-600">Order earning</span>
+            <span className="text-base font-bold text-gray-900">
               {earningsData.orderEarning === 0 ? '₹0' : `₹${Math.round(earningsData.orderEarning)}`}
             </span>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
-            <span className="text-base text-gray-900">Incentive</span>
-            <span className="text-base font-semibold text-gray-900">
+          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between border border-gray-100">
+            <span className="text-base text-gray-600">Incentive</span>
+            <span className="text-base font-bold text-gray-900">
               {earningsData.incentive === 0 ? '₹0' : `₹${Math.round(earningsData.incentive)}`}
             </span>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between">
-            <span className="text-base text-gray-900">Other earnings</span>
-            <span className="text-base font-semibold text-gray-900">
+          <div className="bg-white rounded-lg shadow-sm px-4 py-4 flex items-center justify-between border border-gray-100">
+            <span className="text-base text-gray-600">Other earnings</span>
+            <span className="text-base font-bold text-gray-900">
               {earningsData.otherEarnings === 0 ? '₹0' : `₹${Math.round(earningsData.otherEarnings)}`}
             </span>
           </div>

@@ -280,8 +280,15 @@ export default function AdminHome() {
           {/* Today's Quick Stats Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
             <div className="flex flex-col items-center py-2">
-              <span className="text-2xl font-bold text-blue-700">{todayOrdersCount}</span>
-              <span className="text-xs text-blue-500 font-medium mt-0.5">Today's Orders</span>
+              <span className="text-2xl font-bold text-blue-700">{totalAllOrders}</span>
+              <span className="text-xs text-blue-500 font-medium mt-0.5 text-center">
+                {selectedPeriod === 'today' ? "Today's Orders" : 
+                 selectedPeriod === 'week' ? "This Week's Orders" : 
+                 selectedPeriod === 'month' ? "This Month's Orders" : 
+                 selectedPeriod === 'year' ? "This Year's Orders" : 
+                 selectedPeriod === 'custom' ? "Custom Date Orders" : 
+                 "Total Orders"}
+              </span>
             </div>
             <div className="flex flex-col items-center py-2 border-l border-blue-200">
               <span className="text-2xl font-bold text-amber-600">{pendingOrders}</span>

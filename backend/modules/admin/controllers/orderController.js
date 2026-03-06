@@ -1139,13 +1139,109 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
                   0
                 ]
               }
+            },
+            cashTotal: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$status", "delivered"] },
+                      { $eq: ["$payment.status", "completed"] },
+                      {
+                        $or: [
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }
+                        ]
+                      }
+                    ]
+                  },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0
+                ]
+              }
+            },
+            onlineTotal: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$status", "delivered"] },
+                      { $eq: ["$payment.status", "completed"] },
+                      {
+                        $or: [
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }
+                        ]
+                      }
+                    ]
+                  },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0
+                ]
+              }
+            },
+            cashCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$status", "delivered"] },
+                      { $eq: ["$payment.status", "completed"] },
+                      {
+                        $or: [
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }
+                        ]
+                      }
+                    ]
+                  },
+                  1,
+                  0
+                ]
+              }
+            },
+            onlineCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$status", "delivered"] },
+                      { $eq: ["$payment.status", "completed"] },
+                      {
+                        $or: [
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] },
+                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }
+                        ]
+                      }
+                    ]
+                  },
+                  1,
+                  0
+                ]
+              }
             }
           }
         }
       ])
     ]);
 
-    const summaryStats = aggregateResult[0] || { totalCompleted: 0, totalRefunded: 0, estimatedDeliveryEarnings: 0 };
+    const summaryStats = aggregateResult[0] || { 
+      totalCompleted: 0, 
+      totalRefunded: 0, 
+      estimatedDeliveryEarnings: 0,
+      cashTotal: 0,
+      onlineTotal: 0,
+      cashCount: 0,
+      onlineCount: 0
+    };
 
     // Get admin earning from AdminCommission
     const AdminCommission = (await import('../models/AdminCommission.js')).default;
@@ -1212,6 +1308,9 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
       // Order amount (final total)
       const orderAmount = order.pricing?.total || 0;
 
+      // Get payment method
+      const paymentMethod = order.payment?.method || 'unknown';
+
       return {
         id: order._id.toString(),
         orderId: order.orderId,
@@ -1225,6 +1324,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         vatTax: vatTax,
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
+        paymentMethod: paymentMethod,
         note: order.note || null
       };
     });
@@ -1235,7 +1335,11 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         refundedTransaction: summaryStats.totalRefunded,
         adminEarning,
         restaurantEarning,
-        deliverymanEarning
+        deliverymanEarning,
+        cashTotal: summaryStats.cashTotal || 0,
+        onlineTotal: summaryStats.onlineTotal || 0,
+        cashCount: summaryStats.cashCount || 0,
+        onlineCount: summaryStats.onlineCount || 0
       },
       transactions: transformedTransactions,
       pagination: {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
-import { BarChart3, ChevronDown, Info, Settings, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
+import { BarChart3, ChevronDown, Info, Settings, FileText, FileSpreadsheet, Code, Loader2, DollarSign, CreditCard } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { exportTransactionReportToCSV, exportTransactionReportToExcel, exportTransactionReportToPDF, exportTransactionReportToJSON } from "../../components/reports/reportsExportUtils"
@@ -26,7 +26,11 @@ export default function TransactionReport() {
     refundedTransaction: 0,
     adminEarning: 0,
     restaurantEarning: 0,
-    deliverymanEarning: 0
+    deliverymanEarning: 0,
+    cashTotal: 0,
+    onlineTotal: 0,
+    cashCount: 0,
+    onlineCount: 0
   })
   const [filters, setFilters] = useState({
     zone: "All Zones",
@@ -87,7 +91,7 @@ export default function TransactionReport() {
       }
 
       const params = {
-        search: searchQuery || undefined,
+        search: searchQuery?.trim() || undefined,
         zone: filters.zone !== "All Zones" ? filters.zone : undefined,
         restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
         fromDate: fromDate ? fromDate.toISOString() : undefined,
@@ -105,7 +109,11 @@ export default function TransactionReport() {
           refundedTransaction: 0,
           adminEarning: 0,
           restaurantEarning: 0,
-          deliverymanEarning: 0
+          deliverymanEarning: 0,
+          cashTotal: 0,
+          onlineTotal: 0,
+          cashCount: 0,
+          onlineCount: 0
         })
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1)
@@ -126,13 +134,20 @@ export default function TransactionReport() {
     }
   }
 
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1)
+    }
+  }, [searchQuery])
+
   useEffect(() => {
     fetchTransactionReport()
   }, [searchQuery, filters, currentPage])
 
-  const filteredTransactions = useMemo(() => {
-    return transactions // Backend already filters, so just return transactions
-  }, [transactions])
+  // Rely on backend search for filtering (by Order ID and other server-side logic)
+  // to keep behaviour stable and avoid hiding valid rows on the client.
+  const filteredTransactions = useMemo(() => transactions, [transactions])
 
   const handleExport = (format) => {
     if (filteredTransactions.length === 0) {
@@ -164,14 +179,38 @@ export default function TransactionReport() {
   const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
 
   const formatCurrency = (amount) => {
-    if (amount >= 1000) {
-      return `$ ${(amount / 1000).toFixed(2)}K`
-    }
-    return `$ ${amount.toFixed(2)}`
+    const value = Number(amount || 0)
+    return value.toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
   }
 
   const formatFullCurrency = (amount) => {
-    return `$ ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const value = Number(amount || 0)
+    return value.toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
+  const formatPaymentMethod = (method) => {
+    if (!method) return 'N/A'
+    const methodLower = method.toLowerCase()
+    if (methodLower === 'cash' || methodLower === 'cash_on_delivery' || methodLower === 'cod') {
+      return 'Cash'
+    }
+    if (methodLower === 'razorpay' || methodLower === 'online' || methodLower === 'card') {
+      return 'Online'
+    }
+    if (methodLower === 'wallet') {
+      return 'Wallet'
+    }
+    return method.charAt(0).toUpperCase() + method.slice(1).toLowerCase()
   }
 
   if (loading) {
@@ -356,6 +395,48 @@ export default function TransactionReport() {
                 <p className="text-base font-bold text-orange-600">{formatCurrency(summary.deliverymanEarning)}</p>
               </div>
             </div>
+
+            {/* Cash Payment */}
+            <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Cash Payment</p>
+                    <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                      <Info className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-base font-bold text-green-600">{formatFullCurrency(summary.cashTotal || 0)}</p>
+                  <p className="text-[10px] text-slate-500">{summary.cashCount || 0} orders</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Online Payment */}
+            <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <CreditCard className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Online Payment</p>
+                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Info className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-base font-bold text-blue-600">{formatFullCurrency(summary.onlineTotal || 0)}</p>
+                  <p className="text-[10px] text-slate-500">{summary.onlineCount || 0} orders</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -421,22 +502,23 @@ export default function TransactionReport() {
                 <tr>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '3%' }}>SI</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Order Id</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Restaurant</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '10%' }}>Customer Name</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '9%' }}>Total Item Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Item Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Coupon Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Referral Discount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Discounted Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Vat/Tax</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Delivery Charge</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Amount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '9%' }}>Restaurant</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '9%' }}>Customer Name</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Payment</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Total Item Amount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Item Discount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Coupon Discount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Referral Discount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Discounted Amount</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '6%' }}>Vat/Tax</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Delivery Charge</th>
+                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '7%' }}>Order Amount</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-20 text-center">
+                    <td colSpan={13} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No transactions match your search</p>
@@ -450,7 +532,7 @@ export default function TransactionReport() {
                       className="hover:bg-slate-50 transition-colors"
                     >
                       <td className="px-1.5 py-1">
-                        <span className="text-[10px] font-medium text-slate-700">{index + 1}</span>
+                        <span className="text-[10px] font-medium text-slate-700">{(currentPage - 1) * PAGE_SIZE + index + 1}</span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-slate-700">{transaction.orderId}</span>
@@ -464,6 +546,17 @@ export default function TransactionReport() {
                           : "text-slate-700"
                           }`}>
                           {transaction.customerName}
+                        </span>
+                      </td>
+                      <td className="px-1.5 py-1">
+                        <span className={`text-[10px] font-medium ${
+                          formatPaymentMethod(transaction.paymentMethod) === 'Cash'
+                            ? 'text-green-600'
+                            : formatPaymentMethod(transaction.paymentMethod) === 'Online'
+                            ? 'text-blue-600'
+                            : 'text-slate-700'
+                        }`}>
+                          {formatPaymentMethod(transaction.paymentMethod)}
                         </span>
                       </td>
                       <td className="px-1.5 py-1">
@@ -507,8 +600,8 @@ export default function TransactionReport() {
             <p className="text-[10px] text-slate-500">
               Showing{" "}
               <span className="font-semibold text-slate-700">
-                {transactions.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} -{" "}
-                {(currentPage - 1) * PAGE_SIZE + transactions.length}
+                {filteredTransactions.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {(currentPage - 1) * PAGE_SIZE + filteredTransactions.length}
               </span>{" "}
               of <span className="font-semibold text-slate-700">{totalRecords}</span> transactions
             </p>

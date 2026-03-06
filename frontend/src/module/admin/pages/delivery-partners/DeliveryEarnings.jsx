@@ -97,7 +97,31 @@ export default function DeliveryEarnings() {
   }, [fetchEarnings])
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
+    setFilters(prev => {
+      // When changing the high-level "period" filter, clear any manual from/to dates
+      if (key === 'period') {
+        return {
+          ...prev,
+          period: value,
+          fromDate: '',
+          toDate: ''
+        }
+      }
+
+      // When user sets a custom from/to date, we effectively switch to custom range
+      if (key === 'fromDate' || key === 'toDate') {
+        return {
+          ...prev,
+          [key]: value,
+          // Use "all" as neutral period so backend uses from/to exclusively
+          period: 'all'
+        }
+      }
+
+      return { ...prev, [key]: value }
+    })
+
+    // Always reset to first page when filters change
     setPagination(prev => ({ ...prev, page: 1 }))
   }
 
@@ -105,8 +129,28 @@ export default function DeliveryEarnings() {
     setPagination(prev => ({ ...prev, page: newPage }))
   }
 
+  // Case-insensitive client-side filtering for quick search by name / phone / order ID / restaurant
+  const filteredEarnings = useMemo(() => {
+    if (!searchQuery.trim()) return earnings
+    const q = searchQuery.trim().toLowerCase()
+
+    return earnings.filter((earning) => {
+      const name = (earning.deliveryPartnerName || '').toLowerCase()
+      const phone = (earning.deliveryPartnerPhone || '').toLowerCase()
+      const orderId = (earning.orderId || '').toString().toLowerCase()
+      const restaurant = (earning.restaurantName || '').toLowerCase()
+
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        orderId.includes(q) ||
+        restaurant.includes(q)
+      )
+    })
+  }, [earnings, searchQuery])
+
   const handleExport = (format) => {
-    if (earnings.length === 0) {
+    if (filteredEarnings.length === 0) {
       toast.info("No data to export")
       return
     }
@@ -124,7 +168,7 @@ export default function DeliveryEarnings() {
       { key: "createdAt", label: "Date" },
     ]
 
-    const data = earnings.map((earning, index) => ({
+    const data = filteredEarnings.map((earning, index) => ({
       sl: (pagination.page - 1) * pagination.limit + index + 1,
       deliveryPartnerName: earning.deliveryPartnerName || 'N/A',
       deliveryPartnerPhone: earning.deliveryPartnerPhone || 'N/A',
@@ -200,7 +244,7 @@ export default function DeliveryEarnings() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -231,6 +275,17 @@ export default function DeliveryEarnings() {
               </div>
               <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
                 <FileText className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Rider Daily Orders</p>
+                <p className="text-2xl font-bold text-orange-600">{summary.todayOrders || 0}</p>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-orange-600" />
               </div>
             </div>
           </div>
@@ -354,7 +409,7 @@ export default function DeliveryEarnings() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {earnings.length === 0 ? (
+                {filteredEarnings.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
@@ -364,7 +419,7 @@ export default function DeliveryEarnings() {
                     </td>
                   </tr>
                 ) : (
-                  earnings.map((earning, index) => (
+                  filteredEarnings.map((earning, index) => (
                     <tr key={earning.transactionId || index} className="hover:bg-slate-50">
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {(pagination.page - 1) * pagination.limit + index + 1}

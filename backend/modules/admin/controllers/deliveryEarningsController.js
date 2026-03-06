@@ -137,10 +137,24 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
       deliveryId: { $in: deliveryIds }
     }).lean();
 
-    console.log(`📊 Found ${wallets.length} wallets for ${deliveryIds.length} delivery partners`);
+    // Calculate today's orders directly from Order collection (to include deliveries that might be missing wallet transactions)
+    const tStart = new Date();
+    tStart.setHours(0, 0, 0, 0);
+    const tEnd = new Date();
+    tEnd.setHours(23, 59, 59, 999);
+    
+    const todayTotalOrdersCount = await Order.countDocuments({
+      deliveryPartnerId: { $in: deliveryIds },
+      status: 'delivered',
+      $or: [
+        { deliveredAt: { $gte: tStart, $lte: tEnd } },
+        { updatedAt: { $gte: tStart, $lte: tEnd } }
+      ]
+    });
 
-    // Get all earnings transactions
+    // 1. Get all earnings transactions from wallets
     let allEarnings = [];
+    const processedOrderIds = new Set();
     
     for (const wallet of wallets) {
       // Match wallet.deliveryId with delivery._id
@@ -162,8 +176,6 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
         t.type === 'payment' && 
         t.status === 'Completed'
       );
-
-      console.log(`💰 Found ${transactions.length} completed payment transactions for ${delivery.name}`);
 
       // Filter by date range
       if (startDate) {
@@ -217,6 +229,10 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
           return orderMongoId === transactionOrderId;
         });
 
+        // Track parsed orderMongoId string
+        const orderMongoIdStr = transaction.orderId?.toString();
+        if (orderMongoIdStr) processedOrderIds.add(orderMongoIdStr);
+
         // Get transaction date
         const transactionDate = transaction.createdAt || transaction.processedAt || new Date();
 
@@ -228,7 +244,7 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
           deliveryId: delivery.deliveryId || 'N/A',
           transactionId: transaction._id?.toString() || transaction.id || 'N/A',
           orderId: order?.orderId || 'N/A',
-          orderMongoId: transaction.orderId?.toString() || null,
+          orderMongoId: orderMongoIdStr || null,
           amount: transaction.amount || 0,
           status: transaction.status || 'Completed',
           createdAt: transactionDate,
@@ -242,6 +258,64 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
       }
 
       console.log(`✅ Added ${transactions.length} earnings entries for ${delivery.name}`);
+    }
+
+    // 2. Fetch missing delivered orders that have no wallet transactions
+    let missingOrderQuery = {
+      deliveryPartnerId: { $in: deliveryIds },
+      status: 'delivered'
+    };
+    
+    // Safely exclude already processed orders
+    const excludeIds = Array.from(processedOrderIds).filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (excludeIds.length > 0) {
+      missingOrderQuery._id = { $nin: excludeIds };
+    }
+
+    if (startDate) {
+      missingOrderQuery.$or = [
+        { deliveredAt: { $gte: startDate, $lte: endDate } },
+        { updatedAt: { $gte: startDate, $lte: endDate } }
+      ];
+    }
+
+    try {
+      const missingOrders = await Order.find(missingOrderQuery)
+        .select('orderId status createdAt deliveredAt updatedAt pricing.total pricing.deliveryFee restaurantName address deliveryPartnerId')
+        .lean();
+
+      console.log(`📦 Found ${missingOrders.length} missing delivered orders without wallet transactions`);
+
+      for (const order of missingOrders) {
+        const delivery = deliveries.find(d => d._id.toString() === order.deliveryPartnerId?.toString());
+        if (!delivery) continue;
+
+        // Fallback to deliveryFee if no transaction amount exists
+        const amount = order.pricing?.deliveryFee || 0;
+        const transactionDate = order.deliveredAt || order.updatedAt || new Date();
+
+        allEarnings.push({
+          deliveryPartnerId: delivery._id.toString(),
+          deliveryPartnerName: delivery.name || 'Unknown',
+          deliveryPartnerPhone: delivery.phone || 'N/A',
+          deliveryPartnerEmail: delivery.email || 'N/A',
+          deliveryId: delivery.deliveryId || 'N/A',
+          transactionId: `MISSING-TXN-${order._id}`,
+          orderId: order.orderId || 'N/A',
+          orderMongoId: order._id.toString(),
+          amount: amount,
+          status: 'Completed',
+          createdAt: transactionDate,
+          deliveredAt: order.deliveredAt || null,
+          orderStatus: order.status || 'unknown',
+          restaurantName: order.restaurantName || 'N/A',
+          orderTotal: order.pricing?.total || 0,
+          deliveryFee: order.pricing?.deliveryFee || 0,
+          customerAddress: order.address?.formattedAddress || 'N/A'
+        });
+      }
+    } catch (missingOrdersError) {
+      console.error(`❌ Error fetching missing orders:`, missingOrdersError);
     }
 
     // Sort by date (newest first)
@@ -272,7 +346,8 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
         endDate: endDate ? endDate.toISOString() : null,
         totalDeliveryPartners: uniqueDeliveryPartners,
         totalEarnings,
-        totalOrders
+        totalOrders,
+        todayOrders: todayTotalOrdersCount
       },
       pagination: {
         page: parseInt(page),

@@ -535,8 +535,8 @@ export default function Under250() {
               const isActive = activeCategory === category.id
               const categorySlug = category.slug || category.name.toLowerCase().replace(/\s+/g, '-')
               return (
-                <div key={category.id} className="flex-shrink-0">
-                  <Link to={`/user/category/${categorySlug}`}>
+               <div key={category.id} className="flex-shrink-0">
+                  <Link to={`/category/${categorySlug}`}>
                     <motion.div
                       className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28"
                       onClick={() => setActiveCategory(category.id)}

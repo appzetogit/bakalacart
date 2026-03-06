@@ -222,17 +222,32 @@ export default function RestaurantDetails() {
         return;
       }
 
+      // PERMANENT FIX: Check sessionStorage for Search Results cache to show info INSTANTLY
       try {
-        setLoadingRestaurant(true)
+        const cachedSearch = sessionStorage.getItem('search_restaurants_cache')
+        if (cachedSearch) {
+          const { data } = JSON.parse(cachedSearch)
+          const cachedResto = data.find(r => r.slug === slug || r.id === slug || r.restaurantId === slug)
+          if (cachedResto && !restaurant) {
+            console.log('🚀 Found restaurant in Search Cache, showing instantly')
+            setRestaurant(cachedResto)
+            setLoadingRestaurant(false) // Show the page immediately with basic info
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading search cache:', e)
+      }
+
+      try {
+        setLoadingRestaurant(prev => !restaurant ? true : prev) // Only show spinner if no cached data
         setRestaurantError(null)
 
-        let response = null
         let apiRestaurant = null
 
         // Try to get restaurant directly by slug (getRestaurantById supports both ID and slug)
         // This doesn't require zoneId, so it works even if zone is not detected
         try {
-          response = await restaurantAPI.getRestaurantById(slug)
+          const response = await restaurantAPI.getRestaurantById(slug)
           if (response.data && response.data.success && response.data.data) {
             apiRestaurant = response.data.data
           }

@@ -49,12 +49,39 @@ const apiClient = axios.create({
  * @returns {Object} - Module info object
  */
 function getModuleInfo(path) {
-  // Normalize path by removing /api prefix if present for API calls
-  const normalizedPath = path.startsWith('/api') ? path.substring(4) : path;
+  if (!path) return {
+    tokenKey: 'user_accessToken',
+    expectedRole: 'user',
+    refreshEndpoint: '/auth/refresh-token',
+    loginPath: '/auth/sign-in'
+  };
 
-  // FIX: Handle mobile/hybrid paths like /index.html or empty paths
-  const isUserPath = normalizedPath === '' ||
-    normalizedPath === '/' ||
+  // Normalize path: handle absolute URLs by extracting the pathname
+  let normalizedPath = path;
+  if (path.startsWith('http')) {
+    try {
+      normalizedPath = new URL(path).pathname;
+    } catch (e) {
+      // Fallback if URL parsing fails
+      const apiIndex = path.indexOf('/api');
+      if (apiIndex !== -1) {
+        normalizedPath = path.substring(apiIndex);
+      }
+    }
+  }
+
+  // Remove /api prefix if present
+  if (normalizedPath.startsWith('/api')) {
+    normalizedPath = normalizedPath.substring(4);
+  }
+
+  // Ensure leading slash for consistency
+  if (!normalizedPath.startsWith('/')) {
+    normalizedPath = '/' + normalizedPath;
+  }
+
+  // FIX: Handle mobile/hybrid paths like index.html, usermain, cart, etc.
+  const isUserPath = normalizedPath === '/' ||
     normalizedPath.toLowerCase().includes('index.html') ||
     normalizedPath.startsWith('/usermain') ||
     normalizedPath.startsWith('/cart') ||
@@ -62,7 +89,8 @@ function getModuleInfo(path) {
     normalizedPath.startsWith('/home') ||
     normalizedPath.startsWith('/orders') ||
     normalizedPath.startsWith('/wallet') ||
-    normalizedPath.startsWith('/settings');
+    normalizedPath.startsWith('/settings') ||
+    normalizedPath.startsWith('/auth');
 
   if (normalizedPath.startsWith('/admin')) {
     return {
@@ -71,7 +99,11 @@ function getModuleInfo(path) {
       refreshEndpoint: '/admin/auth/refresh-token',
       loginPath: '/admin/login'
     };
-  } else if (normalizedPath.startsWith('/restaurant') && !normalizedPath.startsWith('/restaurants') && !normalizedPath.startsWith('/restaurant/list') && !normalizedPath.startsWith('/restaurant/under-250')) {
+  } else if (normalizedPath.startsWith('/restaurant') &&
+    !normalizedPath.startsWith('/restaurants') &&
+    !normalizedPath.startsWith('/restaurant/list') &&
+    !normalizedPath.startsWith('/restaurant/under-250') &&
+    !normalizedPath.startsWith('/restaurant/offers/public')) {
     return {
       tokenKey: 'restaurant_accessToken',
       expectedRole: 'restaurant',
@@ -86,7 +118,6 @@ function getModuleInfo(path) {
       loginPath: '/delivery/sign-in'
     };
   } else if (isUserPath) {
-    // Force user module if isUserPath is detected (mobile fix)
     return {
       tokenKey: 'user_accessToken',
       expectedRole: 'user',
@@ -112,28 +143,25 @@ function getModuleInfo(path) {
 function getTokenForCurrentRoute(requestUrl = null) {
   const currentPath = window.location.pathname;
 
-  // FIX: Determine module based on BOTH current path AND request URL
-  // This ensures correct token is used even if path detection fails on mobile
+  // Determine module based on BOTH current path AND request URL
   let moduleInfo;
   const urlToCheck = requestUrl || currentPath;
 
-  if (urlToCheck.includes('/restaurant/') || urlToCheck.includes('/restaurant-')) {
-    moduleInfo = getModuleInfo('/restaurant');
-  } else if (urlToCheck.includes('/admin/')) {
-    moduleInfo = getModuleInfo('/admin');
-  } else if (urlToCheck.includes('/delivery/')) {
-    moduleInfo = getModuleInfo('/delivery');
-  } else {
-    moduleInfo = getModuleInfo(currentPath);
-  }
+  // Use the improved getModuleInfo
+  moduleInfo = getModuleInfo(urlToCheck);
 
-  const { tokenKey } = moduleInfo;
+  // CRITICAL: If we are physically on a restaurant/admin/delivery page, 
+  // prioritize that module's token even for generic-looking requests.
+  if (currentPath.startsWith('/restaurant')) moduleInfo = getModuleInfo('/restaurant');
+  else if (currentPath.startsWith('/admin')) moduleInfo = getModuleInfo('/admin');
+  else if (currentPath.startsWith('/delivery')) moduleInfo = getModuleInfo('/delivery');
 
+  const { tokenKey, expectedRole } = moduleInfo;
   let token = localStorage.getItem(tokenKey);
 
   // If module-specific token not found, fallback to legacy 'accessToken'
-  // But DO NOT fallback to 'user_accessToken' if we are on another module's route
-  if (!token) {
+  // BUT only if we aren't strict about the module (user fallback) or if it's explicitly needed
+  if (!token && expectedRole === 'user') {
     token = localStorage.getItem('accessToken');
   }
 
@@ -274,6 +302,51 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Module-aware refresh state management to prevent race conditions across apps
+const refreshManagers = {
+  user: { isRefreshing: false, subscribers: [] },
+  restaurant: { isRefreshing: false, subscribers: [] },
+  delivery: { isRefreshing: false, subscribers: [] },
+  admin: { isRefreshing: false, subscribers: [] }
+};
+
+// Helper to get manager for a role
+const getRefreshManager = (role) => {
+  // Map special roles like 'moderator' to 'admin' base module
+  const normalizedRole = ['admin', 'super_admin', 'moderator'].includes(role) ? 'admin' : role;
+  if (!refreshManagers[normalizedRole]) return refreshManagers.user;
+  return refreshManagers[normalizedRole];
+};
+
+const subscribeTokenRefresh = (role, cb) => {
+  getRefreshManager(role).subscribers.push(cb);
+};
+
+const onRefreshed = (role, accessToken) => {
+  const manager = getRefreshManager(role);
+  manager.subscribers.forEach((cb) => cb(accessToken));
+  manager.subscribers = [];
+  manager.isRefreshing = false;
+
+  // Sync to window for cross-module coordination
+  if (window.__bakala_refreshing) {
+    const r = ['admin', 'super_admin', 'moderator'].includes(role) ? 'admin' : role;
+    delete window.__bakala_refreshing[r];
+  }
+};
+
+const onRefreshFailed = (role, error) => {
+  const manager = getRefreshManager(role);
+  manager.subscribers.forEach((cb) => cb(null, error));
+  manager.subscribers = [];
+  manager.isRefreshing = false;
+
+  if (window.__bakala_refreshing) {
+    const r = ['admin', 'super_admin', 'moderator'].includes(role) ? 'admin' : role;
+    delete window.__bakala_refreshing[r];
+  }
+};
+
 /**
  * Response Interceptor
  * Handles token refresh and error responses
@@ -328,48 +401,58 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and we haven't tried to refresh yet
+    // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
+      const currentAppPath = window.location.pathname;
+      const requestUrl = originalRequest.url || '';
+
+      // Determine module and manager
+      let moduleInfo = getModuleInfo(requestUrl);
+      if (moduleInfo.expectedRole === 'user') {
+        const pageInfo = getModuleInfo(currentAppPath);
+        if (pageInfo.expectedRole !== 'user') {
+          moduleInfo = pageInfo;
+        }
+      }
+
+      const roleForRefresh = moduleInfo.expectedRole;
+      const manager = getRefreshManager(roleForRefresh);
+
+      if (manager.isRefreshing) {
+        // Queue the request until token is refreshed for THIS specific module
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh(roleForRefresh, (token, err) => {
+            if (err) {
+              return reject(err);
+            }
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            originalRequest._retry = true;
+            resolve(apiClient(originalRequest));
+          });
+        });
+      }
+
       originalRequest._retry = true;
+      manager.isRefreshing = true;
+
+      // Sync to window to prevent race conditions with proactive refresh logic
+      if (!window.__bakala_refreshing) window.__bakala_refreshing = {};
+      window.__bakala_refreshing[roleForRefresh] = true;
 
       try {
-        // Determine which module's refresh endpoint to use
-        const currentAppPath = window.location.pathname;
-        const requestUrl = originalRequest.url || '';
-
-        // Prioritize failed request URL for module detection
-        let moduleInfo;
-        if (requestUrl.includes('/restaurant/')) {
-          moduleInfo = getModuleInfo('/restaurant');
-        } else if (requestUrl.includes('/admin/')) {
-          moduleInfo = getModuleInfo('/admin');
-        } else if (requestUrl.includes('/delivery/')) {
-          moduleInfo = getModuleInfo('/delivery');
-        } else {
-          moduleInfo = getModuleInfo(currentAppPath);
-        }
-
         const { refreshEndpoint, tokenKey, expectedRole } = moduleInfo;
 
-        // Try to refresh the token
-        // Look in ALL possible keys to ensure we never get "No refresh token available"
+        // Try to find the refresh token - prioritize module-specific one
         const refreshToken = localStorage.getItem(`${expectedRole}_refreshToken`) ||
           localStorage.getItem('refreshToken') ||
           localStorage.getItem('user_refreshToken') ||
           localStorage.getItem('restaurant_refreshToken') ||
           localStorage.getItem('delivery_refreshToken');
 
-        // Only attempt refresh if we have a refresh token
         if (!refreshToken) {
-          if (import.meta.env.DEV) {
-            console.warn(`[Axios Interceptor] No refresh token found in any storage for ${expectedRole}.`);
-          }
-
-          // Before giving up, check if we can actually proceed without refresh (maybe the user session is still okay but got a false 401)
-          // But for now, if truly no token, we have to throw. 
-          // However, we'll change the error message to be more helpful.
           const noTokenError = new Error('Session expired, please log in again');
           noTokenError._isAuthError = true;
+          onRefreshFailed(expectedRole, noTokenError); // Clears manager.isRefreshing
           throw noTokenError;
         }
 
@@ -386,112 +469,84 @@ apiClient.interceptors.response.use(
 
         if (accessToken) {
           const role = getRoleFromToken(accessToken);
-
-          // Only store token if role matches expected module or valid admin alternate; otherwise treat as invalid
           const isCorrectModule = (expectedRole === 'admin' && ['admin', 'super_admin', 'moderator'].includes(role)) || (role === expectedRole);
 
           if (!role || !isCorrectModule) {
             clearModuleAuth(tokenKey.replace('_accessToken', ''));
-            const roleError = new Error('Role mismatch on refreshed token');
+            const roleError = new Error(`Role mismatch on refreshed token. Expected ${expectedRole}, got ${role}`);
             roleError._isAuthError = true;
             throw roleError;
           }
 
-          // Store new access token for the current module
           localStorage.setItem(tokenKey, accessToken);
-          // SYNC: Always update legacy key too
           localStorage.setItem('accessToken', accessToken);
 
-          // If backend returned a new refresh token, store it as well
           if (newRefreshToken) {
             localStorage.setItem(`${expectedRole}_refreshToken`, newRefreshToken);
-            // Also update the generic 'refreshToken' to keep it in sync for general requests
             localStorage.setItem('refreshToken', newRefreshToken);
           }
 
-          // Retry original request with new token
+          onRefreshed(expectedRole, accessToken); // Clears manager.isRefreshing
+
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
-        // Check if it's a network error or truly expired token
+        const expectedRole = moduleInfo.expectedRole;
+        onRefreshFailed(expectedRole, refreshError); // Clears manager.isRefreshing
+
         const isNetworkError = refreshError.code === 'ERR_NETWORK' || refreshError.message === 'Network Error';
         const isTokenExpired = refreshError._isAuthError || (refreshError.response?.status === 401 &&
           (refreshError.response?.data?.message?.includes('expired') ||
             refreshError.response?.data?.message?.includes('Invalid refresh token') ||
             refreshError.response?.data?.message?.includes('Refresh token not found') ||
-            refreshError.response?.data?.message?.includes('User not found or inactive') ||
             refreshError.response?.data?.message?.includes('Invalid token for')));
 
-        // Show error toast in development mode for refresh errors
-        if (import.meta.env.DEV && !isNetworkError) {
-          const refreshErrorMessage =
-            refreshError.response?.data?.message ||
-            refreshError.response?.data?.error ||
-            refreshError.message ||
-            'Token refresh failed';
-
-          toast.error(refreshErrorMessage, {
-            duration: 3000,
-            style: {
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              color: '#ffffff',
-              border: '1px solid #b91c1c',
-              borderRadius: '12px',
-              padding: '16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3), 0 8px 10px -6px rgba(239, 68, 68, 0.2)',
-            },
-            className: 'error-toast',
-          });
+        if (import.meta.env.DEV && !isNetworkError && !isTokenExpired) {
+          const msg = refreshError.response?.data?.message || refreshError.message || 'Token refresh failed';
+          if (msg !== 'canceled') toast.error(msg);
         }
 
-        // Only logout if token is truly expired/invalid, not on network errors
-        // Network errors should not cause logout - user might be offline temporarily
+        // Only logout if token is truly expired and it matches the current active module page
         if (isTokenExpired && !isNetworkError) {
           const currentPath = window.location.pathname;
           const isOnboardingPage = currentPath.includes('/onboarding');
-          const isLandingPageManagement = currentPath.includes('/hero-banner-management') || currentPath.includes('/landing-page');
 
-          // For landing page management and onboarding, don't auto-logout - let component handle it
-          // Only auto-logout for other pages when token is truly expired
-          if (!isOnboardingPage && !isLandingPageManagement) {
-            const currentPath = window.location.pathname;
-            const requestUrl = originalRequest.url || '';
-
-            // Get module info for the current page and the failed request
+          if (!isOnboardingPage) {
             const pageModule = getModuleInfo(currentPath);
-            const requestModule = getModuleInfo(requestUrl);
+            const requestModule = getModuleInfo(originalRequest.url || '');
 
-            // ONLY REDIRECT if the failed request's module matches the current page's module
-            // This prevents a background 'user' request from logging out someone in the 'delivery' app
-            if (requestModule.expectedRole === pageModule.expectedRole) {
+            // Strict check: Only logout if we are on a specialized app page
+            // AND we just failed to refresh THAT page's module token.
+            const isSpecializedApp = ['restaurant', 'delivery', 'admin'].includes(pageModule.expectedRole);
+            const isMatchingRequest = requestModule.expectedRole === pageModule.expectedRole;
+            const isModuleSpecificRequest = ['restaurant', 'delivery', 'admin'].includes(requestModule.expectedRole);
+
+            // CRITICAL: If the refresh failed for the page's module, we must logout.
+            // Also logout if the failed request's module matches the page module.
+            if (isMatchingRequest || (isSpecializedApp && (expectedRole === pageModule.expectedRole || isModuleSpecificRequest))) {
               const { loginPath, tokenKey } = pageModule;
-              const returnToParam = `?returnTo=${encodeURIComponent(currentPath)}`;
-
               const moduleName = tokenKey.replace('_accessToken', '');
+
               localStorage.removeItem(`${moduleName}_accessToken`);
               localStorage.removeItem(`${moduleName}_authenticated`);
               localStorage.removeItem(`${moduleName}_user`);
               localStorage.removeItem(`${moduleName}_refreshToken`);
-
-              // Also clear generic keys
               localStorage.removeItem('accessToken');
               localStorage.removeItem('refreshToken');
               localStorage.removeItem('user');
 
-              window.location.href = `${loginPath}${returnToParam}`;
+              // Ensure loginPath is correct for the module
+              window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
             } else {
               if (import.meta.env.DEV) {
-                console.warn(`[API Interceptor] Token expired for background module '${requestModule.expectedRole}', but keeping current session for '${pageModule.expectedRole}' active.`);
+                console.warn(`[API Interceptor] Token expired/refresh failed for module '${expectedRole}', but keeping current session for '${pageModule.expectedRole}' active.`);
               }
             }
           }
         }
 
         // For network errors or onboarding page, reject the promise so component can handle it
-        // Don't logout on network errors - user might reconnect
         return Promise.reject(refreshError);
       }
     }

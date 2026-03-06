@@ -335,15 +335,26 @@ export default function ProfilePage() {
       <div className="px-4 py-6 pb-24 md:pb-6">
 
         {/* Navigation Buttons */}
-        <div ref={navButtonsRef} className="grid grid-cols-1 gap-3 mb-6">
+        <div ref={navButtonsRef} className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={() => navigate("/delivery/trip-history")}
-            className="bg-white rounded-lg p-4 flex flex-col items-center gap-1 hover:bg-gray-200 transition-colors"
+            className="bg-white rounded-xl p-5 flex flex-col items-center gap-2 hover:bg-gray-50 transition-all shadow-sm border border-gray-100"
           >
-            <div className="rounded-lg p-2">
-              <Bike className="w-5 h-5" />
+            <div className="bg-blue-50 p-2.5 rounded-lg">
+              <Bike className="w-6 h-6 text-blue-600" />
             </div>
-            <span className="text-xs font-medium">Trips history</span>
+            <span className="text-sm font-bold text-gray-900">My Trips</span>
+            <span className="text-[10px] text-gray-500 font-medium">History & details</span>
+          </button>
+          <button
+            onClick={() => navigate("/delivery/earnings")}
+            className="bg-white rounded-xl p-5 flex flex-col items-center gap-2 hover:bg-gray-50 transition-all shadow-sm border border-gray-100"
+          >
+            <div className="bg-green-50 p-2.5 rounded-lg">
+              <Star className="w-6 h-6 text-green-600" />
+            </div>
+            <span className="text-sm font-bold text-gray-900">Statistics</span>
+            <span className="text-[10px] text-gray-500 font-medium">Earnings & stats</span>
           </button>
         </div>
 

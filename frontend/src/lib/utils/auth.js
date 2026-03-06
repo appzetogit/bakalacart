@@ -237,6 +237,18 @@ export async function proactiveTokenRefresh(module) {
       return false;
     }
 
+    // CRITICAL: If this module is already being refreshed by the axios interceptor, 
+    // skip proactive refresh to prevent race conditions (rotating refresh tokens).
+    const normalizedModule = ['admin', 'super_admin', 'moderator'].includes(module) ? 'admin' : module;
+    if (window.__bakala_refreshing && window.__bakala_refreshing[normalizedModule]) {
+      if (import.meta.env.DEV) console.log(`[Proactive Refresh] ${module} is already refreshing via interceptor, skipping.`);
+      return true;
+    }
+
+    // Set refreshing flag
+    if (!window.__bakala_refreshing) window.__bakala_refreshing = {};
+    window.__bakala_refreshing[normalizedModule] = true;
+
     // Import axios and API_BASE_URL dynamically
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
@@ -294,11 +306,18 @@ export async function proactiveTokenRefresh(module) {
 
     return false;
   } catch (error) {
+    // Clear refreshing flag
+    const normalizedModule = ['admin', 'super_admin', 'moderator'].includes(module) ? 'admin' : module;
+    if (window.__bakala_refreshing) delete window.__bakala_refreshing[normalizedModule];
+
     // Don't log network errors as they're expected when offline
     if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
       console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
     }
     return false;
+  } finally {
+    const normalizedModule = ['admin', 'super_admin', 'moderator'].includes(module) ? 'admin' : module;
+    if (window.__bakala_refreshing) delete window.__bakala_refreshing[normalizedModule];
   }
 }
 

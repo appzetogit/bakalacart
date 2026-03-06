@@ -1336,14 +1336,21 @@ export default function Cart() {
       // Handle network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         const backendUrl = API_BASE_URL.replace('/api', '');
-        errorMessage = `Network Error: Cannot connect to backend server.\n\n` +
-          `Expected backend URL: ${backendUrl}\n\n` +
-          `Please check:\n` +
-          `1. Backend server is running\n` +
-          `2. Backend is accessible at ${backendUrl}\n` +
-          `3. Check browser console (F12) for more details\n\n` +
-          `If backend is not running, start it with:\n` +
-          `cd bakalacart/backend && npm start`
+
+        if (import.meta.env.DEV) {
+          // Detailed message for developers in local environment
+          errorMessage = `Network Error: Cannot connect to backend server.\n\n` +
+            `Expected backend URL: ${backendUrl}\n\n` +
+            `Please check:\n` +
+            `1. Backend server is running\n` +
+            `2. Backend is accessible at ${backendUrl}\n` +
+            `3. Check browser console (F12) for more details\n\n` +
+            `If backend is not running, start it with:\n` +
+            `cd bakalacart/backend && npm start`
+        } else {
+          // Cleaner message for customers in production
+          errorMessage = "Unable to connect to our server right now. Please check your internet connection and try again in a moment.";
+        }
 
         console.error("🔴 Network Error Details:", {
           code: error.code,
@@ -1358,7 +1365,7 @@ export default function Cart() {
           apiBaseUrl: API_BASE_URL
         })
 
-        // Try to test backend connectivity
+        // Try to test backend connectivity (dev aid, harmless in prod)
         try {
           fetch(backendUrl + '/health', { method: 'GET', signal: AbortSignal.timeout(5000) })
             .then(response => {
@@ -1382,8 +1389,14 @@ export default function Cart() {
       }
       // Handle other axios errors
       else if (error.response) {
-        // Server responded with error status
-        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`
+        // Session / auth issues – this is why checkout sometimes works only after manual logout/login.
+        // Give a clear message and let the global interceptor drive the actual logout/redirect.
+        if (error.response.status === 401) {
+          errorMessage = "Your session has expired. Please log in again to place your order.";
+        } else {
+          // Generic server error
+          errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+        }
       }
       // Handle other errors
       else if (error.message) {

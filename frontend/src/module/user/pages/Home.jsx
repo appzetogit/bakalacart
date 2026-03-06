@@ -412,49 +412,34 @@ export default function Home() {
 
     const fetchHeroBanners = async () => {
       try {
-        // Check cache first
-        if (HOME_PAGE_CACHE.heroBanners && HOME_PAGE_CACHE.heroBanners.length > 0) {
-          console.log('🖼️ [Hero Banners] Using cached banners');
+        // PERMANENT FIX: Check persistent cache first for INSTANT load
+        const sessionBanners = sessionStorage.getItem('home_hero_banners_cache');
+        if (sessionBanners) {
+          const parsed = JSON.parse(sessionBanners);
+          if (parsed && parsed.length > 0) {
+            setHeroBannersData(parsed);
+            setHeroBannerImages(parsed.map(b => b.imageUrl));
+            setLoadingBanners(false);
+            if (!HOME_PAGE_CACHE.heroBanners) HOME_PAGE_CACHE.heroBanners = parsed;
+          }
+        } else if (HOME_PAGE_CACHE.heroBanners && HOME_PAGE_CACHE.heroBanners.length > 0) {
           setHeroBannersData(HOME_PAGE_CACHE.heroBanners);
-          const imageUrls = HOME_PAGE_CACHE.heroBanners.map(b => b.imageUrl);
-          setHeroBannerImages(imageUrls);
+          setHeroBannerImages(HOME_PAGE_CACHE.heroBanners.map(b => b.imageUrl));
           setLoadingBanners(false);
-          // Background refresh if needed, or just return
-          return;
         }
 
-        console.log('🖼️ [Hero Banners] Starting to fetch banners...')
-        console.log('🖼️ [Hero Banners] API Base URL:', API_BASE_URL)
-        console.log('🖼️ [Hero Banners] Full API URL:', `${API_BASE_URL}/hero-banners/public`)
-        setLoadingBanners(true)
-
         const response = await api.get('/hero-banners/public')
-        console.log('🖼️ [Hero Banners] API response received:', {
-          success: response.data?.success,
-          hasData: !!response.data?.data,
-          bannersCount: response.data?.data?.banners?.length || 0,
-          fullResponse: response.data
-        })
-
         if (response.data && response.data.success && response.data.data) {
           const banners = response.data.data.banners || []
-          console.log('🖼️ [Hero Banners] Raw banners array:', banners)
-
           if (banners.length > 0) {
-            // Filter out banners without imageUrl
-            const validBanners = banners.filter(b => {
-              const isValid = b && b.imageUrl && typeof b.imageUrl === 'string' && b.imageUrl.trim() !== ''
-              if (!isValid) {
-                console.warn('🖼️ [Hero Banners] Invalid banner found:', b)
-              }
-              return isValid
-            })
+            const validBanners = banners.filter(b => b && b.imageUrl && typeof b.imageUrl === 'string' && b.imageUrl.trim() !== '')
             console.log('🖼️ [Hero Banners] Valid banners after filtering:', validBanners.length, validBanners)
 
             if (validBanners.length > 0) {
               setHeroBannersData(validBanners)
               // Update cache
               HOME_PAGE_CACHE.heroBanners = validBanners;
+              try { sessionStorage.setItem('home_hero_banners_cache', JSON.stringify(validBanners)); } catch (e) {}
               // Extract image URLs for display
               // IMPORTANT: Extract raw imageUrl from validBanners, we'll resilient-ify in render
               const imageUrls = validBanners.map(b => b.imageUrl)
@@ -534,14 +519,20 @@ export default function Home() {
   useEffect(() => {
     const fetchRealCategories = async () => {
       try {
-        // Check cache first
-        if (HOME_PAGE_CACHE.realCategories && HOME_PAGE_CACHE.realCategories.length > 0) {
+        // PERMANENT FIX: Check persistent cache for instant loading
+        const sessionCats = sessionStorage.getItem('home_real_categories_cache');
+        if (sessionCats) {
+          const parsed = JSON.parse(sessionCats);
+          if (parsed && parsed.length > 0) {
+            setRealCategories(parsed);
+            setLoadingRealCategories(false);
+            if (!HOME_PAGE_CACHE.realCategories) HOME_PAGE_CACHE.realCategories = parsed;
+          }
+        } else if (HOME_PAGE_CACHE.realCategories && HOME_PAGE_CACHE.realCategories.length > 0) {
           setRealCategories(HOME_PAGE_CACHE.realCategories);
           setLoadingRealCategories(false);
-          return;
         }
 
-        setLoadingRealCategories(true)
         const response = await api.get('/categories/public')
         if (response.data.success && response.data.data.categories) {
           const adminCategories = response.data.data.categories.map(cat => {
@@ -560,6 +551,7 @@ export default function Home() {
           setRealCategories(adminCategories)
           // Update cache
           HOME_PAGE_CACHE.realCategories = adminCategories;
+          try { sessionStorage.setItem('home_real_categories_cache', JSON.stringify(adminCategories)); } catch (e) {}
         } else {
           setRealCategories([])
         }
@@ -578,16 +570,24 @@ export default function Home() {
   useEffect(() => {
     const fetchLandingConfig = async () => {
       try {
-        // Check cache
-        if (HOME_PAGE_CACHE.landingConfig) {
+        // PERMANENT FIX: Check persistent cache for instant loading
+        const sessionLanding = sessionStorage.getItem('home_landing_config_cache');
+        if (sessionLanding) {
+          const parsed = JSON.parse(sessionLanding);
+          if (parsed) {
+            setLandingCategories(parsed.categories);
+            setLandingExploreMore(parsed.exploreMore);
+            setExploreMoreHeading(parsed.heading);
+            setLoadingLandingConfig(false);
+            if (!HOME_PAGE_CACHE.landingConfig) HOME_PAGE_CACHE.landingConfig = parsed;
+          }
+        } else if (HOME_PAGE_CACHE.landingConfig) {
           setLandingCategories(HOME_PAGE_CACHE.landingConfig.categories);
           setLandingExploreMore(HOME_PAGE_CACHE.landingConfig.exploreMore);
           setExploreMoreHeading(HOME_PAGE_CACHE.landingConfig.heading);
           setLoadingLandingConfig(false);
-          return;
         }
 
-        setLoadingLandingConfig(true)
         const response = await api.get('/hero-banners/landing/public')
         if (response.data.success && response.data.data) {
           const apiCategories = response.data.data.categories || []
@@ -607,11 +607,13 @@ export default function Home() {
           setExploreMoreHeading(response.data.data.settings?.exploreMoreHeading || "Explore More")
 
           // Update Cache
-          HOME_PAGE_CACHE.landingConfig = {
+          const finalConfig = {
             categories: apiCategories.filter((c) => c.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
             exploreMore: apiExploreMore.filter((e) => e.isActive !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
             heading: response.data.data.settings?.exploreMoreHeading || "Explore More"
           };
+          HOME_PAGE_CACHE.landingConfig = finalConfig;
+          try { sessionStorage.setItem('home_landing_config_cache', JSON.stringify(finalConfig)); } catch (e) {}
         }
       } catch (error) {
         console.error('Error fetching landing config:', error)
@@ -943,17 +945,21 @@ export default function Home() {
       // Generate cache key based on params
       const cacheKey = JSON.stringify(params);
 
-      // Check global memory cache first (for fast back navigation)
-      // TEMPORARILY DISABLED FOR DEBUGGING STATUS ISSUES
-      /*
-      if (useCache && HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
-        console.log('Using cached restaurants data for key:', cacheKey);
+      // PERMANENT FIX: Check persistent cache for instant restaurant list
+      const sessionRestos = sessionStorage.getItem(`home_restaurants_cache_${cacheKey}`);
+      if (sessionRestos) {
+        const parsed = JSON.parse(sessionRestos);
+        if (parsed && parsed.length > 0) {
+          setRestaurantsData(parsed);
+          setLoadingRestaurants(false);
+          if (!HOME_PAGE_CACHE.restaurants.has(cacheKey)) HOME_PAGE_CACHE.restaurants.set(cacheKey, parsed);
+        }
+      } else if (useCache && HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
         setRestaurantsData(HOME_PAGE_CACHE.restaurants.get(cacheKey));
         setLoadingRestaurants(false);
-        // Optional: fetch in background to update
-        // return;
+      } else {
+        setLoadingRestaurants(true)
       }
-      */
 
       // If we have cached data, we can still fetch to update, but don't show loading spinner if we have data
       if (HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
@@ -1232,6 +1238,7 @@ export default function Home() {
 
         // Update global cache
         HOME_PAGE_CACHE.restaurants.set(cacheKey, transformedRestaurants);
+        try { sessionStorage.setItem(`home_restaurants_cache_${cacheKey}`, JSON.stringify(transformedRestaurants)); } catch (e) {}
       } else {
         console.warn('Invalid API response structure:', response.data)
         // Only clear if we don't have cache to show
@@ -1614,7 +1621,8 @@ export default function Home() {
                           onFocus={handleSearchFocus}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && heroSearch.trim()) {
-                              navigate(`/user/search?q=${encodeURIComponent(heroSearch.trim())}`)
+                              // Use canonical search route without /user prefix
+                              navigate(`/search?q=${encodeURIComponent(heroSearch.trim())}`)
                               closeSearch()
                               setHeroSearch("")
                             }
@@ -3233,7 +3241,7 @@ export default function Home() {
                         whileTap={{ scale: 0.95 }}
                       >
                         <Link
-                          to={`/user/category/${categoryData.slug || categoryData.name.toLowerCase().replace(/\s+/g, '-')}`}
+                          to={`/category/${categoryData.slug || categoryData.name.toLowerCase().replace(/\s+/g, '-')}`}
                           onClick={() => setShowAllCategoriesModal(false)}
                           className="block"
                         >
