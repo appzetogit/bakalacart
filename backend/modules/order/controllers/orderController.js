@@ -204,7 +204,8 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // CRITICAL: Validate that restaurant's location (pin) is within an active zone
+    // Validate that restaurant's location (pin) is within an active zone
+    // NOTE: Zone validation is now SOFT – orders are allowed even if no active zone matches
     const restaurantLat = restaurant.location?.latitude || restaurant.location?.coordinates?.[1];
     const restaurantLng = restaurant.location?.longitude || restaurant.location?.coordinates?.[0];
 
@@ -258,24 +259,21 @@ export const createOrder = async (req, res) => {
     }
 
     if (!restaurantInZone) {
-      logger.warn('⚠️ Restaurant location is not within any active zone:', {
+      // Soft validation: log but DO NOT block order creation
+      logger.warn('⚠️ Restaurant location is not within any active zone (soft check only, order allowed):', {
         restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
         restaurantName: restaurant.name,
         restaurantLat,
         restaurantLng
       });
-      return res.status(403).json({
-        success: false,
-        message: 'This restaurant is not available in your area. Only restaurants within active delivery zones can receive orders.'
+    } else {
+      logger.info('✅ Restaurant validated - location is within active zone:', {
+        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
+        restaurantName: restaurant.name,
+        zoneId: restaurantZone?._id?.toString(),
+        zoneName: restaurantZone?.name || restaurantZone?.zoneName
       });
     }
-
-    logger.info('✅ Restaurant validated - location is within active zone:', {
-      restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-      restaurantName: restaurant.name,
-      zoneId: restaurantZone?._id?.toString(),
-      zoneName: restaurantZone?.name || restaurantZone?.zoneName
-    });
 
     // NOTE: Cross-zone orders are now allowed
     // Users can order from restaurants in different zones

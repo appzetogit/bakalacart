@@ -15,7 +15,7 @@ export const LocationProvider = ({ children }) => {
 
     // Zone State (from useZone)
     const [zoneId, setZoneId] = useState(null)
-    const [zoneStatus, setZoneStatus] = useState('loading') // 'loading' | 'IN_SERVICE' | 'OUT_OF_SERVICE'
+    const [zoneStatus, setZoneStatus] = useState('IN_SERVICE') // Always in service
     const [zone, setZone] = useState(null)
     const [zoneLoading, setZoneLoading] = useState(false)
     const [zoneError, setZoneError] = useState(null)
@@ -72,50 +72,12 @@ export const LocationProvider = ({ children }) => {
 
     /* ===================== ZONE DETECTION ===================== */
     const detectZone = useCallback(async (lat, lng) => {
-        if (!lat || !lng) {
-            setZoneStatus('OUT_OF_SERVICE')
-            setZoneId(null)
-            setZone(null)
-            return
-        }
-
-        try {
-            setZoneLoading(true)
-            setZoneError(null)
-
-            const response = await zoneAPI.detectZone(lat, lng)
-
-            if (response.data?.success) {
-                const data = response.data.data
-                if (data.status === 'IN_SERVICE' && data.zoneId) {
-                    setZoneId(data.zoneId)
-                    setZone(data.zone)
-                    setZoneStatus('IN_SERVICE')
-                    localStorage.setItem('userZoneId', data.zoneId)
-                    localStorage.setItem('userZone', JSON.stringify(data.zone))
-                } else {
-                    setZoneId(null)
-                    setZone(null)
-                    setZoneStatus('OUT_OF_SERVICE')
-                    localStorage.removeItem('userZoneId')
-                    localStorage.removeItem('userZone')
-                }
-            }
-        } catch (err) {
-            console.error('❌ [LocationContext] Error detecting zone:', err)
-            setZoneStatus('OUT_OF_SERVICE')
-            setZoneId(null)
-
-            const cachedZoneId = localStorage.getItem('userZoneId')
-            if (cachedZoneId) {
-                const cachedZone = localStorage.getItem('userZone')
-                setZoneId(cachedZoneId)
-                setZone(cachedZone ? JSON.parse(cachedZone) : null)
-                setZoneStatus('IN_SERVICE')
-            }
-        } finally {
-            setZoneLoading(false)
-        }
+        // Zone detection disabled: always treat user as in service
+        setZoneStatus('IN_SERVICE')
+        setZoneLoading(false)
+        setZoneError(null)
+        setZoneId(null)
+        setZone(null)
     }, [])
 
     /* ===================== REVERSE GEOCODING ===================== */
@@ -334,17 +296,11 @@ export const LocationProvider = ({ children }) => {
     // Auto-detect zone when location changes
     useEffect(() => {
         if (location?.latitude && location?.longitude) {
+            // Keep coordinates in ref but do not perform remote zone checks
             const lat = location.latitude
             const lng = location.longitude
-
-            const coordThreshold = 0.0001
-            const changed = Math.abs(lat - (prevZoneCoordsRef.current.latitude || 0)) > coordThreshold ||
-                Math.abs(lng - (prevZoneCoordsRef.current.longitude || 0)) > coordThreshold
-
-            if (changed) {
-                prevZoneCoordsRef.current = { latitude: lat, longitude: lng }
-                detectZone(lat, lng)
-            }
+            prevZoneCoordsRef.current = { latitude: lat, longitude: lng }
+            detectZone(lat, lng)
         }
     }, [location?.latitude, location?.longitude, detectZone])
 
@@ -365,8 +321,8 @@ export const LocationProvider = ({ children }) => {
         zone,
         zoneStatus,
         zoneLoading,
-        isInService: zoneStatus === 'IN_SERVICE',
-        isOutOfService: zoneStatus === 'OUT_OF_SERVICE',
+        isInService: true,
+        isOutOfService: false,
         refreshZone: () => detectZone(location?.latitude, location?.longitude),
         setLocation,
         updateLocation: (newLoc) => {

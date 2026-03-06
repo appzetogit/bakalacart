@@ -70,16 +70,6 @@ export default function Navbar() {
     }
   }, [])
 
-  // Show area if available, otherwise show city
-  const areaName = location?.area && location?.area !== location?.city ? location.area : null
-  const cityName = areaName || location?.city || "Select"
-  const stateName = location?.state || "Location"
-
-  const handleLocationClick = () => {
-    // Open location selector overlay
-    openLocationSelector()
-  }
-
   // Mock points value - replace with actual points from context/store
   const userPoints = 99
 
@@ -87,33 +77,8 @@ export default function Navbar() {
     <nav className="z-50 w-full backdrop-blur-md bg-gradient-to-b from-page-bg/80 via-page-bg/50 to-page-bg/20 border-b border-gray-200/50">
       <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="flex h-16 sm:h-18 md:h-20 items-center justify-between gap-2 sm:gap-3 md:gap-4">
-          {/* Location Section */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            {/* Location - 2 Row Layout */}
-            <Button
-              variant="ghost"
-              onClick={handleLocationClick}
-              disabled={loading}
-            >
-              {loading ? (
-                <span className="text-xs sm:text-sm font-semibold text-left text-black">
-                  Loading...
-                </span>
-              ) : (
-                <div className="flex flex-col items-start w-full min-w-0">
-                  <div className="text-xs sm:text-sm flex flex-row items-center gap-1 font-semibold text-left text-foreground w-full min-w-0">
-                    <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-black flex-shrink-0" />
-                    <span className="truncate">{cityName}</span>
-                  </div>
-                  {location?.state && (
-                    <span className="text-[10px] sm:text-xs text-black pt-1 text-left truncate w-full block">
-                      {stateName}
-                    </span>
-                  )}
-                </div>
-              )}
-            </Button>
-          </div>
+          {/* Location Section removed (no location display) */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0" />
 
           {/* Company Logo or Name - Centered between sections */}
           <Link to="/user" className="flex items-center justify-center flex-shrink-0">

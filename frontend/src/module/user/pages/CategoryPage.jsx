@@ -480,51 +480,32 @@ export default function CategoryPage() {
       const selectedCategoryLower = selectedCategory.toLowerCase()
 
       filtered.forEach(r => {
+        // CRITICAL: Only show restaurants that have menu loaded AND at least one matching dish
+        // 1 restaurant = 1 card, showing a representative dish for that category
         if (r.menu) {
           const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
           if (hasCategoryItem) {
-            const categoryDishes = getAllCategoryDishesFromMenu(r.menu, selectedCategory)
-            if (categoryDishes.length > 0) {
-              categoryDishes.forEach((dish, index) => {
-                // Apply vegMode filter if enabled
-                if (vegMode && dish.foodType !== "Veg") {
-                  return
-                }
-                expandedDishes.push({
-                  ...r,
-                  id: `${r.id}-dish-${dish.itemId || index}`,
-                  dishId: dish.itemId || `${r.id}-dish-${index}`,
-                  categoryDish: dish,
-                  categoryDishName: dish.name,
-                  categoryDishPrice: dish.price,
-                  categoryDishImage: dish.image,
-                })
+            const dish = getCategoryDishFromMenu(r.menu, selectedCategory)
+            if (dish) {
+              // Apply vegMode filter if enabled
+              if (vegMode && dish.foodType !== "Veg") {
+                return
+              }
+              expandedDishes.push({
+                ...r,
+                // Keep restaurant id stable so same restaurant does not appear multiple times
+                id: r.id,
+                dishId: dish.itemId || r.id,
+                categoryDish: dish,
+                categoryDishName: dish.name,
+                categoryDishPrice: dish.price,
+                categoryDishImage: dish.image,
               })
             }
           }
-        } else {
-          // Menu still loading or no menu - filter by keywords in metadata
-          const featuredDishLower = (r.featuredDish || '').toLowerCase()
-          const cuisineLower = (r.cuisine || '').toLowerCase()
-          const nameLower = (r.name || '').toLowerCase()
-          const restaurantCategoryLower = (r.category || '').toLowerCase()
-
-          // Check for matches in keywords OR direct category match
-          const matchesCategory =
-            restaurantCategoryLower === selectedCategoryLower ||
-            restaurantCategoryLower.includes(selectedCategoryLower) ||
-            selectedCategoryLower.includes(restaurantCategoryLower) ||
-            (keywords.length > 0 && keywords.some(keyword =>
-              featuredDishLower.includes(keyword) ||
-              cuisineLower.includes(keyword) ||
-              nameLower.includes(keyword) ||
-              restaurantCategoryLower.includes(keyword)
-            ))
-
-          if (matchesCategory) {
-            expandedDishes.push(r)
-          }
         }
+        // If menu is not loaded yet, skip this restaurant (don't show it until menu loads)
+        // This ensures only restaurants with actual category items are shown
       })
       filtered = expandedDishes
     }

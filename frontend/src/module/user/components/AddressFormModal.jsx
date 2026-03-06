@@ -132,6 +132,20 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             return
         }
 
+        // City & State must be entered manually but are not restricted to any region
+        const manualCity = (formData.city || "").trim()
+        const manualState = (formData.state || "").trim()
+
+        if (!manualCity) {
+            toast.error("City is required")
+            return
+        }
+
+        if (!manualState) {
+            toast.error("State is required")
+            return
+        }
+
         try {
             // Map form fields to backend address structure
             const additionalDetails = [
@@ -141,37 +155,13 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                 formData.autoAddress ? `Location: ${formData.autoAddress}` : ""
             ].filter(Boolean).join(", ")
 
-            // Try to get city/state from location context, then localStorage fallback
-            // Priority: Manual form field -> Location hook -> Edit address -> fallback
-            let city = formData.city || location?.city || editAddress?.city || ""
-            let state = formData.state || location?.state || editAddress?.state || ""
-
-            if (!city || !state) {
-                try {
-                    const savedLocation = localStorage.getItem("userLocation")
-                    if (savedLocation) {
-                        const parsed = JSON.parse(savedLocation)
-                        city = city || parsed.city || ""
-                        state = state || parsed.state || ""
-                    }
-                } catch (e) {
-                    // ignore parse error
-                }
-            }
-
-            // Backend requires city and state - show specific error if missing
-            if (!city || !state) {
-                toast.error("City/State not detected. Please set your location first before saving an address.")
-                return
-            }
-
             const addressData = {
                 label: formData.label,
                 street: formData.buildingName,
                 additionalDetails: additionalDetails,
-                city,
-                state,
-                zipCode: formData.pinCode || location?.postalCode || editAddress?.zipCode || "",
+                city: manualCity,
+                state: manualState,
+                zipCode: formData.pinCode || editAddress?.zipCode || "",
                 latitude: location?.latitude || editAddress?.latitude || 22.7196,
                 longitude: location?.longitude || editAddress?.longitude || 75.8577,
                 phone: formData.phone,

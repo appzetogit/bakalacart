@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom"
 import { useState, useEffect } from "react"
-import { ChevronDown, ShoppingCart } from "lucide-react"
+import { ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLocation } from "../hooks/useLocation"
 import { useCart } from "../context/CartContext"
 import { useLocationSelector } from "./UserLayout"
-import { FaLocationDot } from "react-icons/fa6"
+import { FaLocationDot } from "react-icons/fa6" // kept for backward compatibility (no UI use)
 import { getCachedSettings, loadBusinessSettings } from "@/lib/utils/businessSettings"
 
 export default function PageNavbar({
@@ -901,14 +901,6 @@ export default function PageNavbar({
     }
   })()
 
-  const mainLocationName = locationDisplay.main
-  const subLocationName = locationDisplay.sub
-
-  const handleLocationClick = () => {
-    // Open location selector overlay
-    openLocationSelector()
-  }
-
   const textColorClass = textColor === "white" ? "text-white" : "text-black"
   const iconFill = textColor === "white" ? "white" : "black"
   const ringColor = textColor === "white" ? "ring-white/30" : "ring-gray-800/30"
@@ -921,44 +913,20 @@ export default function PageNavbar({
       onClick={onNavClick}
     >
       <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4 lg:gap-6 max-w-7xl mx-auto">
-        {/* Left: Location - Hidden on desktop, shown on mobile */}
-        <div className="flex md:hidden items-center gap-3 sm:gap-4 min-w-0">
-          {/* Location Button */}
-          <Button
-            variant="ghost"
-            onClick={handleLocationClick}
-            disabled={loading}
-            className="h-auto px-0 py-0 hover:bg-transparent transition-colors flex-shrink-0"
-          >
-            {loading ? (
-              <span className={`text-sm font-bold ${textColorClass} ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
-                Loading...
-              </span>
-            ) : (
-              <div className="flex flex-col items-start min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <FaLocationDot
-                    className={`h-6 w-6 sm:h-7 sm:w-7 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`}
-                    fill={iconFill}
-                    strokeWidth={2}
-                  />
-                  <span className={`text-md sm:text-lg font-bold ${textColorClass} truncate max-w-[120px] xs:max-w-[150px] sm:max-w-[280px] block ${textColor === "white" ? "drop-shadow-lg" : ""}`}>
-                    {mainLocationName}
-                  </span>
-                  <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 ${textColorClass} flex-shrink-0 ${textColor === "white" ? "drop-shadow-lg" : ""}`} strokeWidth={2.5} />
-                </div>
-                {/* Show sub location (city, state) in second line */}
-                {subLocationName && (
-                  <span className={`text-xs font-bold ${textColorClass}${textColor === "white" ? "/90" : ""} truncate max-w-[110px] xs:max-w-[140px] sm:max-w-[240px] mt-0.5 block ${textColor === "white" ? "drop-shadow-md" : ""}`}>
-                    {subLocationName}
-                  </span>
-                )}
-              </div>
-            )}
-          </Button>
+        {/* Left: Brand logo (replaces old location icon) */}
+        <div className="flex md:hidden items-center gap-2 sm:gap-3 min-w-0">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={companyName || "Logo"}
+              className="h-10 sm:h-11 object-contain ml-1 sm:ml-2"
+            />
+          ) : companyName ? (
+            <span className={`text-sm sm:text-base font-bold ${textColorClass}`}>
+              {companyName}
+            </span>
+          ) : null}
         </div>
-
-        {/* Center: Company Logo or Name - Removed */}
 
         {/* Right: Actions - Hidden on desktop, shown on mobile */}
         <div className="flex md:hidden items-center gap-2 sm:gap-3 flex-shrink-0">
