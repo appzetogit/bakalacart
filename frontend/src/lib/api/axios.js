@@ -624,44 +624,94 @@ apiClient.interceptors.response.use(
             refreshError.response?.data?.message?.includes('Invalid token for')));
         
         // Check if error is specifically about token not found in database
+        // Make check case-insensitive and more robust for live environment
+        const errorMessage = refreshError.response?.data?.message || refreshError.message || '';
+        const errorMessageLower = errorMessage.toLowerCase();
+        
+        // Check for exact backend error messages (case-insensitive)
         const isTokenNotFoundInDB = refreshError.response?.status === 401 &&
-          (refreshError.response?.data?.message?.includes('Refresh token not found') ||
-           refreshError.response?.data?.message?.includes('Refresh token not found in database'));
+          (errorMessageLower.includes('refresh token not found') ||
+           errorMessageLower.includes('refresh token not found in database') ||
+           errorMessageLower.includes('token not found') ||
+           errorMessage.includes('Refresh token not found') ||
+           errorMessage.includes('Refresh token not found in database') ||
+           errorMessage.includes('Refresh token not found. Please login again.') ||
+           errorMessage.includes('Refresh token not found in database. Please login again.'));
+
+        // Enhanced logging for debugging (works in both dev and production)
+        if (refreshError.response?.status === 401) {
+          console.warn(`[Axios Interceptor] 401 Error for ${expectedRole}:`, {
+            message: errorMessage,
+            status: refreshError.response?.status,
+            isTokenNotFoundInDB,
+            url: refreshError.config?.url
+          });
+        }
 
         if (import.meta.env.DEV && !isNetworkError && !isTokenExpired) {
-          const msg = refreshError.response?.data?.message || refreshError.message || 'Token refresh failed';
+          const msg = errorMessage || 'Token refresh failed';
           if (msg !== 'canceled') toast.error(msg);
         }
 
         // CRITICAL: If token is not found in database, ALL modules (including restaurant/delivery/admin) MUST logout
         // This ensures security - if admin deletes token from DB, user is logged out
         if (isTokenNotFoundInDB) {
-          if (import.meta.env.DEV) {
-            console.log(`[Axios Interceptor] Token not found in database for ${expectedRole} - forcing logout for security`);
-          }
-          // Force logout for all modules when token is missing from database
+          console.warn(`[Axios Interceptor] Token not found in database for ${expectedRole} - forcing logout for security`, {
+            errorMessage,
+            expectedRole,
+            status: refreshError.response?.status
+          });
+          
+          // CRITICAL: Force logout for ALL modules when token is missing from database
+          // This is a security issue - token was deleted from DB, so user MUST logout
           const currentPath = window.location.pathname;
           const pageModule = getModuleInfo(currentPath);
           
-          if (expectedRole === pageModule.expectedRole || 
-              (expectedRole === 'user' && pageModule.expectedRole === 'user')) {
-            clearModuleAuth(expectedRole);
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            
-            const loginPaths = {
-              'user': '/auth/sign-in',
-              'restaurant': '/restaurant/login',
-              'delivery': '/delivery/sign-in',
-              'admin': '/admin/login'
-            };
-            
-            const loginPath = loginPaths[expectedRole] || '/auth/sign-in';
-            
-            setTimeout(() => {
+          console.warn(`[Axios Interceptor] Executing logout for ${expectedRole} - token missing from DB`, {
+            currentPath,
+            pageModule: pageModule.expectedRole,
+            expectedRole,
+            errorMessage
+          });
+          
+          // Always logout when token is missing from database (security requirement)
+          clearModuleAuth(expectedRole);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          
+          // Also clear module-specific tokens
+          localStorage.removeItem(`${expectedRole}_accessToken`);
+          localStorage.removeItem(`${expectedRole}_refreshToken`);
+          
+          // Clear all possible token variations
+          ['user', 'restaurant', 'delivery', 'admin'].forEach(module => {
+            if (expectedRole === module) {
+              localStorage.removeItem(`${module}_accessToken`);
+              localStorage.removeItem(`${module}_refreshToken`);
+            }
+          });
+          
+          const loginPaths = {
+            'user': '/auth/sign-in',
+            'restaurant': '/restaurant/login',
+            'delivery': '/delivery/sign-in',
+            'admin': '/admin/login'
+          };
+          
+          const loginPath = loginPaths[expectedRole] || '/auth/sign-in';
+          
+          console.warn(`[Axios Interceptor] Redirecting ${expectedRole} to login: ${loginPath}`);
+          
+          // Use window.location.href for redirect (works reliably in both local and live)
+          // Using setTimeout to ensure all cleanup completes first
+          setTimeout(() => {
+            try {
               window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
-            }, 100);
-          }
+            } catch (redirectError) {
+              console.error('[Axios Interceptor] Redirect failed, forcing reload:', redirectError);
+              window.location.reload();
+            }
+          }, 100);
           throw refreshError;
         }
 
