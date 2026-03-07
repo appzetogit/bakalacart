@@ -150,6 +150,10 @@ export function ProfileProvider({ children }) {
 
   // Fetch user profile and addresses from API on mount and when authentication changes
   useEffect(() => {
+    // CRITICAL: Defer initialization to allow app to render first
+    let initTimeout = null
+    let isMounted = true
+
     const fetchUserProfile = async () => {
       // Check if user is authenticated
       const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
@@ -275,6 +279,8 @@ export function ProfileProvider({ children }) {
       }
     }
 
+    // CRITICAL: Defer fetch to allow app to render first
+    initTimeout = setTimeout(() => {
       if (isMounted) {
         fetchUserProfile()
       }

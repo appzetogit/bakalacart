@@ -56,7 +56,9 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
 })
 
 // Lazy load all route components for code splitting
-const UserRouter = lazyImport(() => import("@/module/user/components/UserRouter"))
+// CRITICAL: UserRouter is NOT lazy loaded to prevent dynamic import failures in Flutter WebView
+// Import it directly to ensure it always loads
+import UserRouter from "@/module/user/components/UserRouter"
 const HomePage = lazy(() => import("@/module/usermain/pages/HomePage"))
 const CategoriesPage = lazy(() => import("@/module/usermain/pages/CategoriesPage"))
 const CategoryFoodsPage = lazy(() => import("@/module/usermain/pages/CategoryFoodsPage"))
