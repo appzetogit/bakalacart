@@ -1019,50 +1019,152 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
   try {
     const User = (await import('../../auth/models/User.js')).default;
 
-    // Get count before logout
-    const usersWithTokenBefore = await User.countDocuments({
+    logger.info('🔄 [Logout All Users] Starting logout process', {
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'unknown'
+    });
+
+    // Get count before logout - try multiple query patterns
+    const usersWithTokenBefore1 = await User.countDocuments({
       role: 'user',
       refreshToken: { $exists: true, $ne: null }
     });
 
-    // Update all users to remove refresh tokens
-    const result = await User.updateMany(
-      { role: 'user', refreshToken: { $exists: true, $ne: null } },
-      { $unset: { refreshToken: '' } }
-    );
+    const usersWithTokenBefore2 = await User.countDocuments({
+      role: 'user',
+      refreshToken: { $ne: null, $ne: '' }
+    });
+
+    const usersWithTokenBefore = Math.max(usersWithTokenBefore1, usersWithTokenBefore2);
+
+    logger.info('📊 [Logout All Users] Before logout counts', {
+      query1: usersWithTokenBefore1,
+      query2: usersWithTokenBefore2,
+      selected: usersWithTokenBefore
+    });
+
+    // Method 1: Try updateMany with $unset
+    let result1 = { modifiedCount: 0, matchedCount: 0 };
+    try {
+      result1 = await User.updateMany(
+        { role: 'user', refreshToken: { $exists: true, $ne: null } },
+        { $unset: { refreshToken: '' } }
+      );
+      logger.info('✅ [Logout All Users] Method 1 (updateMany $unset) result', {
+        matchedCount: result1.matchedCount,
+        modifiedCount: result1.modifiedCount
+      });
+    } catch (error1) {
+      logger.error('❌ [Logout All Users] Method 1 failed', { error: error1.message });
+    }
+
+    // Method 2: Try updateMany with $set to null (alternative approach)
+    let result2 = { modifiedCount: 0, matchedCount: 0 };
+    if (result1.modifiedCount === 0) {
+      try {
+        result2 = await User.updateMany(
+          { role: 'user', refreshToken: { $exists: true, $ne: null } },
+          { $set: { refreshToken: null } }
+        );
+        logger.info('✅ [Logout All Users] Method 2 (updateMany $set null) result', {
+          matchedCount: result2.matchedCount,
+          modifiedCount: result2.modifiedCount
+        });
+      } catch (error2) {
+        logger.error('❌ [Logout All Users] Method 2 failed', { error: error2.message });
+      }
+    }
+
+    // Method 3: Try direct field update (most reliable)
+    let result3 = { modifiedCount: 0 };
+    if (result1.modifiedCount === 0 && result2.modifiedCount === 0) {
+      try {
+        // Find all users with refresh tokens
+        const usersWithTokens = await User.find({
+          role: 'user',
+          refreshToken: { $exists: true, $ne: null }
+        }).select('_id refreshToken').limit(1000); // Process in batches
+
+        logger.info('🔄 [Logout All Users] Method 3 - Processing users individually', {
+          usersFound: usersWithTokens.length
+        });
+
+        let updatedCount = 0;
+        for (const user of usersWithTokens) {
+          try {
+            user.refreshToken = undefined;
+            await user.save();
+            updatedCount++;
+          } catch (userError) {
+            logger.warn(`⚠️ [Logout All Users] Failed to update user ${user._id}`, {
+              error: userError.message
+            });
+          }
+        }
+        result3.modifiedCount = updatedCount;
+        logger.info('✅ [Logout All Users] Method 3 (individual updates) result', {
+          updatedCount
+        });
+      } catch (error3) {
+        logger.error('❌ [Logout All Users] Method 3 failed', { error: error3.message });
+      }
+    }
+
+    // Calculate total modified
+    const totalModified = result1.modifiedCount + result2.modifiedCount + result3.modifiedCount;
 
     // Get count after logout
-    const usersWithTokenAfter = await User.countDocuments({
+    const usersWithTokenAfter1 = await User.countDocuments({
       role: 'user',
       refreshToken: { $exists: true, $ne: null }
     });
+
+    const usersWithTokenAfter2 = await User.countDocuments({
+      role: 'user',
+      refreshToken: { $ne: null, $ne: '' }
+    });
+
+    const usersWithTokenAfter = Math.min(usersWithTokenAfter1, usersWithTokenAfter2);
 
     // Get total users count
     const totalUsers = await User.countDocuments({ role: 'user' });
 
-    logger.info(`All users logged out`, {
-      usersLoggedOut: result.modifiedCount,
+    logger.info('📊 [Logout All Users] Final results', {
+      usersLoggedOut: totalModified,
       usersWithTokenBefore,
       usersWithTokenAfter,
       totalUsers,
-      loggedOutBy: req.user?._id || 'public_endpoint'
+      method1Result: result1.modifiedCount,
+      method2Result: result2.modifiedCount,
+      method3Result: result3.modifiedCount,
+      loggedOutBy: req.user?._id || 'public_endpoint',
+      timestamp: new Date().toISOString()
     });
 
     return successResponse(res, 200, 'All users logged out successfully', {
-      usersLoggedOut: result.modifiedCount,
+      usersLoggedOut: totalModified,
       usersWithTokenBefore,
       usersWithTokenAfter,
       totalUsers,
+      methodsUsed: {
+        method1: result1.modifiedCount > 0,
+        method2: result2.modifiedCount > 0,
+        method3: result3.modifiedCount > 0
+      },
       verification: {
         allLoggedOut: usersWithTokenAfter === 0,
         message: usersWithTokenAfter === 0 
           ? '✅ All users successfully logged out - no refresh tokens remaining'
-          : `⚠️ ${usersWithTokenAfter} users still have refresh tokens`
+          : `⚠️ ${usersWithTokenAfter} users still have refresh tokens. Check server logs for details.`
       }
     });
   } catch (error) {
-    logger.error(`Error logging out all users: ${error.message}`, { error: error.stack });
-    return errorResponse(res, 500, 'Failed to logout all users');
+    logger.error(`❌ [Logout All Users] Critical error: ${error.message}`, { 
+      error: error.stack,
+      name: error.name,
+      timestamp: new Date().toISOString()
+    });
+    return errorResponse(res, 500, `Failed to logout all users: ${error.message}`);
   }
 });
 
