@@ -354,6 +354,13 @@ export const refreshToken = asyncHandler(async (req, res) => {
           const delivery = await Delivery.findById(decodedInfo.payload.userId).select('+refreshToken');
           
           if (delivery && delivery.isActive) {
+            // Verify refresh token matches database (if exists)
+            if (delivery.refreshToken && delivery.refreshToken !== refreshToken) {
+              logger.warn('⚠️ [Delivery Refresh Token] Signature mismatch recovery failed - database token different', {
+                deliveryId: delivery._id.toString()
+              });
+              throw verifyError; // Fall back to original error
+            }
             logger.info('✅ [Delivery Refresh Token] Signature mismatch recovery: Regenerating tokens for valid user', {
               deliveryId: delivery._id.toString(),
               deliveryName: delivery.name
@@ -417,7 +424,23 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Delivery boy not found or inactive');
     }
 
-    // For delivery partners, allow multiple devices by skipping the database token match check
+    // CRITICAL: Verify refresh token matches stored token in database
+    // If refreshToken is deleted from database, this will fail and delivery will be logged out
+    if (delivery.refreshToken && delivery.refreshToken !== refreshToken) {
+      logger.warn('❌ [Delivery Refresh Token] Token mismatch - database token different', {
+        deliveryId: delivery._id.toString()
+      });
+      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
+    }
+
+    // If refreshToken is null/undefined in database, delivery must login again
+    if (!delivery.refreshToken) {
+      logger.warn('❌ [Delivery Refresh Token] Token not found in database - user must login', {
+        deliveryId: delivery._id.toString()
+      });
+      return errorResponse(res, 401, 'Refresh token not found. Please login again.');
+    }
+
     // Generate new access and refresh tokens
     const tokens = jwtService.generateTokens({
       userId: delivery._id.toString(),

@@ -591,6 +591,10 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
 
+    // Update refresh token in database
+    restaurant.refreshToken = tokens.refreshToken;
+    await restaurant.save();
+
     // Set refresh token in httpOnly cookie with restaurant-specific name
     res.cookie('restaurant_refreshToken', tokens.refreshToken, {
       httpOnly: true,
@@ -685,6 +689,10 @@ export const register = asyncHandler(async (req, res) => {
     email: restaurant.email || restaurant.phone || restaurant.restaurantId
   });
 
+  // Update refresh token in database
+  restaurant.refreshToken = tokens.refreshToken;
+  await restaurant.save();
+
   // Set refresh token in httpOnly cookie
   res.cookie('restaurant_refreshToken', tokens.refreshToken, {
     httpOnly: true,
@@ -770,6 +778,10 @@ export const login = asyncHandler(async (req, res) => {
     role: 'restaurant',
     email: restaurant.email || restaurant.phone || restaurant.restaurantId
   });
+
+  // Update refresh token in database
+  restaurant.refreshToken = tokens.refreshToken;
+  await restaurant.save();
 
   // Set refresh token in httpOnly cookie with restaurant-specific name
   res.cookie('restaurant_refreshToken', tokens.refreshToken, {
@@ -912,10 +924,17 @@ export const refreshToken = asyncHandler(async (req, res) => {
             decodedInfo.payload.userId &&
             !decodedInfo.payload.exp || (Date.now() / 1000 < decodedInfo.payload.exp)) {
           
-          // Check if restaurant exists and is active
-          const restaurant = await Restaurant.findById(decodedInfo.payload.userId).select('-password');
+          // Check if restaurant exists and is active (include refreshToken for validation)
+          const restaurant = await Restaurant.findById(decodedInfo.payload.userId).select('+refreshToken');
           
           if (restaurant && restaurant.isActive) {
+            // Verify refresh token matches database (if exists)
+            if (restaurant.refreshToken && restaurant.refreshToken !== refreshToken) {
+              logger.warn('⚠️ [Restaurant Refresh Token] Signature mismatch recovery failed - database token different', {
+                restaurantId: restaurant._id.toString()
+              });
+              throw verifyError; // Fall back to original error
+            }
             logger.info('✅ [Restaurant Refresh Token] Signature mismatch recovery: Regenerating tokens for valid user', {
               restaurantId: restaurant._id.toString(),
               restaurantName: restaurant.name
@@ -927,6 +946,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
               role: 'restaurant',
               email: restaurant.email || restaurant.phone || restaurant.restaurantId
             });
+
+            // Update refresh token in database
+            restaurant.refreshToken = tokens.refreshToken;
+            await restaurant.save();
 
             // Set new refresh token in httpOnly cookie
             res.cookie('restaurant_refreshToken', tokens.refreshToken, {
@@ -963,8 +986,8 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Invalid token for restaurant');
     }
 
-    // Get restaurant from database
-    const restaurant = await Restaurant.findById(decoded.userId).select('-password');
+    // Get restaurant from database (include refreshToken for validation)
+    const restaurant = await Restaurant.findById(decoded.userId).select('+refreshToken');
 
     if (!restaurant) {
       logger.warn('❌ [Restaurant Refresh Token] Restaurant not found', {
@@ -973,12 +996,33 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant not found');
     }
 
+    // CRITICAL: Verify refresh token matches stored token in database
+    // If refreshToken is deleted from database, this will fail and restaurant will be logged out
+    if (restaurant.refreshToken && restaurant.refreshToken !== refreshToken) {
+      logger.warn('❌ [Restaurant Refresh Token] Token mismatch - database token different', {
+        restaurantId: restaurant._id.toString()
+      });
+      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
+    }
+
+    // If refreshToken is null/undefined in database, restaurant must login again
+    if (!restaurant.refreshToken) {
+      logger.warn('❌ [Restaurant Refresh Token] Token not found in database - user must login', {
+        restaurantId: restaurant._id.toString()
+      });
+      return errorResponse(res, 401, 'Refresh token not found. Please login again.');
+    }
+
     // Generate new access and refresh tokens
     const tokens = jwtService.generateTokens({
       userId: restaurant._id.toString(),
       role: 'restaurant',
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
+
+    // Update refresh token in database
+    restaurant.refreshToken = tokens.refreshToken;
+    await restaurant.save();
 
     // Set new refresh token in httpOnly cookie
     res.cookie('restaurant_refreshToken', tokens.refreshToken, {
@@ -1293,6 +1337,10 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       role: 'restaurant',
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
+
+    // Update refresh token in database
+    restaurant.refreshToken = tokens.refreshToken;
+    await restaurant.save();
 
     // Set refresh token in httpOnly cookie with restaurant-specific name
     res.cookie('restaurant_refreshToken', tokens.refreshToken, {

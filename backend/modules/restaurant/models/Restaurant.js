@@ -285,6 +285,11 @@ const restaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: true, // Manual override for open/close status
     },
+    // Refresh token (for JWT) - stored in database for validation
+    refreshToken: {
+      type: String,
+      select: false // Don't return refresh token by default
+    },
   },
   {
     timestamps: true,

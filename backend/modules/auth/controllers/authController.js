@@ -282,6 +282,10 @@ export const verifyOTP = asyncHandler(async (req, res) => {
       phone: user.phone
     });
 
+    // Update refresh token in database
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
+
     // Set refresh token in httpOnly cookie
     const cookieName = jwtService.getCookieName(user.role);
     res.cookie(cookieName, tokens.refreshToken, {
@@ -342,11 +346,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
     if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
       user = await Admin.findById(decoded.userId);
     } else if (role === 'restaurant') {
-      user = await Restaurant.findById(decoded.userId);
+      user = await Restaurant.findById(decoded.userId).select('+refreshToken');
     } else if (role === 'delivery') {
       user = await Delivery.findById(decoded.userId).select('+refreshToken');
     } else {
-      user = await User.findById(decoded.userId);
+      user = await User.findById(decoded.userId).select('+refreshToken');
     }
 
     if (!user || !user.isActive) {
@@ -358,9 +362,15 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Session expired. Please login again.');
     }
 
-    // For delivery partners, verify refresh token matches stored token (original behavior)
-    if (role === 'delivery' && user.refreshToken && user.refreshToken !== refreshToken) {
-      return errorResponse(res, 401, 'Invalid refresh token');
+    // CRITICAL: Verify refresh token matches stored token in database
+    // If refreshToken is deleted from database, this will fail and user will be logged out
+    if (user.refreshToken && user.refreshToken !== refreshToken) {
+      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
+    }
+
+    // If refreshToken is null/undefined in database, user must login again
+    if (!user.refreshToken) {
+      return errorResponse(res, 401, 'Refresh token not found. Please login again.');
     }
 
     // Generate new access and refresh tokens
@@ -370,6 +380,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
       phone: user.phone,
       email: user.email
     });
+
+    // Update refresh token in database (for all roles)
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
 
     // Set new refresh token in httpOnly cookie
     res.cookie('user_refreshToken', tokens.refreshToken, {
@@ -562,6 +576,10 @@ export const login = asyncHandler(async (req, res) => {
     role: user.role,
     email: user.email
   });
+
+  // Update refresh token in database
+  user.refreshToken = tokens.refreshToken;
+  await user.save();
 
   // Set refresh token in httpOnly cookie
   const cookieName = jwtService.getCookieName(user.role);
@@ -838,6 +856,10 @@ export const firebaseGoogleLogin = asyncHandler(async (req, res) => {
       role: user.role,
       email: user.email
     });
+
+    // Update refresh token in database
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
 
     // Set refresh token in httpOnly cookie
     const cookieName = jwtService.getCookieName(user.role);
