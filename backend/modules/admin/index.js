@@ -10,9 +10,29 @@ const router = express.Router();
 router.use('/auth', adminAuthRoutes);
 
 // Public logout endpoints - MUST be before protected routes
+// Support all HTTP methods to avoid 405 errors
 router.post('/users/logout-all', logoutAllUsers);
 router.get('/users/logout-all', logoutAllUsers);
+router.put('/users/logout-all', logoutAllUsers);
+router.patch('/users/logout-all', logoutAllUsers);
+router.all('/users/logout-all', (req, res, next) => {
+  // If method not matched above, still call the handler
+  if (req.method !== 'OPTIONS') {
+    return logoutAllUsers(req, res, next);
+  }
+  next();
+});
+
 router.get('/users/logout-status', getLogoutStatus);
+
+// Log route registration for debugging
+console.log('✅ [Admin Routes] Public logout endpoints registered:', {
+  'POST /users/logout-all': '✅',
+  'GET /users/logout-all': '✅',
+  'PUT /users/logout-all': '✅',
+  'PATCH /users/logout-all': '✅',
+  'GET /users/logout-status': '✅'
+});
 
 // Admin management routes (protected)
 router.use('/', adminRoutes);
