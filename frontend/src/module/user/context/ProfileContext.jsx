@@ -289,6 +289,28 @@ export function ProfileProvider({ children }) {
 
   // Address functions - memoized with useCallback
   const addAddress = useCallback(async (address) => {
+    // Check if user is authenticated
+    const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
+      localStorage.getItem("user_accessToken")
+
+    if (!isAuthenticated) {
+      // For guests, just add to local state with a temporary ID
+      const newAddress = {
+        ...address,
+        id: `guest_${Date.now()}`,
+        _id: `guest_${Date.now()}`,
+        isDefault: addresses.length === 0
+      }
+
+      setAddresses((prev) => {
+        const updated = [...prev, newAddress]
+        const deduplicated = deduplicateAddresses(updated)
+        localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+        return deduplicated
+      })
+      return newAddress
+    }
+
     try {
       const response = await userAPI.addAddress(address)
       const newAddress = response?.data?.data?.address || response?.data?.address
@@ -307,9 +329,26 @@ export function ProfileProvider({ children }) {
       console.error("Error adding address:", error)
       throw error
     }
-  }, [])
+  }, [addresses.length, deduplicateAddresses])
 
   const updateAddress = useCallback(async (id, updatedAddress) => {
+    // Check if user is authenticated
+    const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
+      localStorage.getItem("user_accessToken")
+
+    if (!isAuthenticated || String(id).startsWith('guest_')) {
+      // For guests or guest addresses, update local state only
+      setAddresses((prev) => {
+        const updated = prev.map((addr) => (
+          (addr.id === id || addr._id === id) ? { ...addr, ...updatedAddress, id } : addr
+        ))
+        const deduplicated = deduplicateAddresses(updated)
+        localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+        return deduplicated
+      })
+      return { ...updatedAddress, id }
+    }
+
     try {
       const response = await userAPI.updateAddress(id, updatedAddress)
       const updatedAddr = response?.data?.data?.address || response?.data?.address
@@ -328,9 +367,24 @@ export function ProfileProvider({ children }) {
       console.error("Error updating address:", error)
       throw error
     }
-  }, [])
+  }, [deduplicateAddresses])
 
   const deleteAddress = useCallback(async (id) => {
+    // Check if user is authenticated
+    const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
+      localStorage.getItem("user_accessToken")
+
+    if (!isAuthenticated || String(id).startsWith('guest_')) {
+      // For guests or guest addresses, delete from local state only
+      setAddresses((prev) => {
+        const newAddresses = prev.filter((addr) => addr.id !== id && addr._id !== id)
+        const deduplicated = deduplicateAddresses(newAddresses)
+        localStorage.setItem("userAddresses", JSON.stringify(deduplicated))
+        return deduplicated
+      })
+      return
+    }
+
     try {
       await userAPI.deleteAddress(id)
       setAddresses((prev) => {
@@ -344,7 +398,7 @@ export function ProfileProvider({ children }) {
       console.error("Error deleting address:", error)
       throw error
     }
-  }, [])
+  }, [deduplicateAddresses])
 
   const setDefaultAddress = useCallback((id) => {
     setAddresses((prev) => {

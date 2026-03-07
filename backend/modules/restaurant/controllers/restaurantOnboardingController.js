@@ -11,7 +11,7 @@ export const getOnboarding = async (req, res) => {
     }
 
     const restaurantId = req.restaurant._id;
-    const restaurant = await Restaurant.findById(restaurantId).select('onboarding').lean();
+    const restaurant = await Restaurant.findById(restaurantId).lean();
 
     if (!restaurant) {
       return errorResponse(res, 404, 'Restaurant not found');

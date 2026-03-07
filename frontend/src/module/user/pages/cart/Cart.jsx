@@ -1174,25 +1174,70 @@ export default function Cart() {
         return;
       }
 
+      // VALIDATE AND FORMAT ADDRESS FOR BACKEND
+      // Backend requires: street, city, zipCode
+      if (!defaultAddress) {
+        alert("Please select a delivery address before placing order.")
+        setIsPlacingOrder(false)
+        return
+      }
+
+      // Ensure required address fields are present
+      const addressStreet = defaultAddress.street || defaultAddress.buildingName || defaultAddress.address || ""
+      const addressCity = defaultAddress.city || ""
+      const addressZipCode = defaultAddress.zipCode || defaultAddress.pinCode || ""
+      const addressState = defaultAddress.state || ""
+
+      // Validate required fields
+      if (!addressStreet.trim()) {
+        alert("Address is incomplete. Please add Building/Street name in your address.")
+        setIsPlacingOrder(false)
+        return
+      }
+
+      if (!addressCity.trim()) {
+        alert("Address is incomplete. Please add City in your address.")
+        setIsPlacingOrder(false)
+        return
+      }
+
+      if (!addressZipCode.trim()) {
+        alert("Address is incomplete. Please add Pin Code in your address.")
+        setIsPlacingOrder(false)
+        return
+      }
+
       // BUILD COMPLETE ADDRESS STRING FOR BACKEND LOGS AND RIDER VIEW
       const fullAddressString = [
-        defaultAddress?.street,
+        addressStreet,
         defaultAddress?.additionalDetails
       ].filter(Boolean).join(", ").trim();
 
+      // Format address object with required fields
+      const formattedAddress = {
+        label: defaultAddress.label || "Home",
+        street: addressStreet.trim(),
+        city: addressCity.trim(),
+        state: addressState.trim(),
+        zipCode: addressZipCode.trim(),
+        additionalDetails: defaultAddress.additionalDetails || "",
+        formattedAddress: formatFullAddress(defaultAddress),
+        location: defaultAddress.location || (defaultAddress.latitude && defaultAddress.longitude ? {
+          type: 'Point',
+          coordinates: [defaultAddress.longitude, defaultAddress.latitude]
+        } : undefined)
+      }
+
       const orderPayload = {
         items: orderItems,
-        address: {
-          ...defaultAddress,
-          formattedAddress: formatFullAddress(defaultAddress)
-        },
+        address: formattedAddress,
         restaurantId: finalRestaurantId,
         restaurantName: finalRestaurantName,
         pricing: orderPricing,
         deliveryFleet: deliveryFleet || 'standard',
         note: note || "",
         sendCutlery: sendCutlery !== false,
-        deliveryAddressDetails: fullAddressString || formatFullAddress(defaultAddress) || "",
+        deliveryAddressDetails: fullAddressString || formatFullAddress(defaultAddress) || formattedAddress.street,
         paymentMethod: finalPaymentMethod,
         zoneId: zoneId // CRITICAL: Pass zoneId for strict zone validation
       };
@@ -1202,7 +1247,14 @@ export default function Cart() {
         restaurantName: finalRestaurantName,
         itemCount: orderItems.length,
         totalAmount: orderPricing.total,
-        paymentMethod: finalPaymentMethod
+        paymentMethod: finalPaymentMethod,
+        address: {
+          street: formattedAddress.street,
+          city: formattedAddress.city,
+          zipCode: formattedAddress.zipCode,
+          state: formattedAddress.state,
+          hasAllRequired: !!(formattedAddress.street && formattedAddress.city && formattedAddress.zipCode)
+        }
       });
 
 
@@ -1389,13 +1441,35 @@ export default function Cart() {
       }
       // Handle other axios errors
       else if (error.response) {
-        // Session / auth issues – this is why checkout sometimes works only after manual logout/login.
-        // Give a clear message and let the global interceptor drive the actual logout/redirect.
+        const responseData = error.response.data || {}
+        
+        // Session / auth issues
         if (error.response.status === 401) {
           errorMessage = "Your session has expired. Please log in again to place your order.";
-        } else {
-          // Generic server error
-          errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+        } 
+        // Address validation errors (400)
+        else if (error.response.status === 400) {
+          // Extract error message from backend
+          if (responseData.message) {
+            errorMessage = responseData.message
+          } else if (responseData.error) {
+            errorMessage = responseData.error
+          } else {
+            errorMessage = "Invalid order data. Please check your address and try again."
+          }
+          
+          // Show specific address errors
+          if (responseData.error === 'ADDRESS_INCOMPLETE' || responseData.message?.includes('Missing:')) {
+            errorMessage = responseData.message || "Address is incomplete. Please ensure Building/Street, City, and Pin Code are filled."
+          }
+        }
+        // Server errors (500)
+        else if (error.response.status === 500) {
+          errorMessage = responseData.message || "Server error. Please try again later."
+        }
+        // Other errors
+        else {
+          errorMessage = responseData.message || responseData.error || `Server error: ${error.response.status}`;
         }
       }
       // Handle other errors

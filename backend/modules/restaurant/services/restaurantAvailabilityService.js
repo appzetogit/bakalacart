@@ -108,7 +108,15 @@ export const processRestaurantAvailability = async () => {
             isActive: true, // Only check active accounts
             'deliveryTimings.openingTime': { $exists: true, $ne: null },
             'deliveryTimings.closingTime': { $exists: true, $ne: null }
-        }).select('_id name deliveryTimings isAcceptingOrders').lean();
+        }).lean();
+        
+        if (!restaurant) return null;
+        return {
+          _id: restaurant._id,
+          name: restaurant.name,
+          deliveryTimings: restaurant.deliveryTimings,
+          isAcceptingOrders: restaurant.isAcceptingOrders
+        };
 
         if (restaurants.length === 0) {
             return { processed: 0, message: 'No restaurants with timings found' };

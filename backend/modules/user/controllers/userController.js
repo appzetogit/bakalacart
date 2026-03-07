@@ -317,9 +317,7 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
  */
 export const getUserLocation = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('currentLocation')
-      .lean();
+    const user = await User.findById(req.user._id).lean();
 
     if (!user) {
       return errorResponse(res, 404, 'User not found');
@@ -340,22 +338,20 @@ export const getUserLocation = asyncHandler(async (req, res) => {
  */
 export const getUserAddresses = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('addresses')
-      .lean();
+    const user = await User.findById(req.user._id).lean();
 
     if (!user) {
       return errorResponse(res, 404, 'User not found');
     }
 
     // Add _id to each address for frontend compatibility
-    const addresses = (user.addresses || []).map(addr => ({
+    const addressesList = (user.addresses || []).map(addr => ({
       ...addr,
       id: addr._id ? addr._id.toString() : null
     }));
 
     return successResponse(res, 200, 'Addresses retrieved successfully', {
-      addresses
+      addresses: addressesList
     });
   } catch (error) {
     logger.error(`Error fetching user addresses: ${error.message}`);

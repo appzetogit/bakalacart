@@ -246,12 +246,13 @@ export const verifyOTP = asyncHandler(async (req, res) => {
           role: userRole
         });
       } else {
-        // Existing user login - update verification status if needed
-        if (phone && !user.phoneVerified) {
-          user.phoneVerified = true;
+        // Could add email verification status update here if needed
+        
+        // Clear force logout flag on successful login/auto-registration
+        if (user.forceLogoutAt) {
+          user.forceLogoutAt = null;
           await user.save();
         }
-        // Could add email verification status update here if needed
       }
     }
 
@@ -339,23 +340,17 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
     let user;
     if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
-      user = await Admin.findById(decoded.userId).select('-password');
+      user = await Admin.findById(decoded.userId);
     } else if (role === 'restaurant') {
-      user = await Restaurant.findById(decoded.userId).select('-password');
+      user = await Restaurant.findById(decoded.userId);
     } else if (role === 'delivery') {
-      user = await Delivery.findById(decoded.userId).select('-password +refreshToken');
+      user = await Delivery.findById(decoded.userId).select('+refreshToken');
     } else {
-      user = await User.findById(decoded.userId).select('-password +forceLogoutAt');
+      user = await User.findById(decoded.userId);
     }
 
     if (!user || !user.isActive) {
       return errorResponse(res, 401, 'User not found or inactive');
-    }
-
-    // Check if user has been force logged out
-    // If forceLogoutAt is set, always logout regardless of token issue time
-    if (role === 'user' && user.forceLogoutAt) {
-      return errorResponse(res, 401, 'Session expired. Please login again.');
     }
 
     // For delivery partners, verify refresh token matches stored token (original behavior)
@@ -548,6 +543,10 @@ export const login = asyncHandler(async (req, res) => {
         user.fcmTokenMobile.push(fcmToken);
         if (user.fcmTokenMobile.length > 10) user.fcmTokenMobile = user.fcmTokenMobile.slice(-10);
       }
+    }
+    // Reset force logout flag on successful login
+    if (user.forceLogoutAt) {
+      user.forceLogoutAt = null;
     }
     await user.save();
   }

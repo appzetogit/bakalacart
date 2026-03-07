@@ -43,7 +43,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                     landmark: landmarkMatch ? landmarkMatch[1].trim() : "",
                     name: editAddress.receiverName || editAddress.name || "",
                     phone: (editAddress.phone || "").replace(/^\+91\s?/, "").replace(/\D/g, "").slice(0, 10),
-                    pinCode: editAddress.zipCode || "",
+                    pinCode: (editAddress.zipCode || "").replace(/\D/g, '').slice(0, 6),
                     city: editAddress.city || "",
                     state: editAddress.state || "",
                     label: editAddress.label || "Home",
@@ -68,10 +68,13 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
     }, [isOpen, editAddress])
 
     useEffect(() => {
-        if (isOpen && location?.postalCode && !editAddress) {
-            setFormData(prev => ({ ...prev, pinCode: location.postalCode }))
+        // Only set pinCode from location if it's currently empty
+        if (isOpen && location?.postalCode && !editAddress && !formData.pinCode) {
+            // Validate and limit pin code from location
+            const validatedPinCode = String(location.postalCode || '').replace(/\D/g, '').slice(0, 6)
+            setFormData(prev => ({ ...prev, pinCode: validatedPinCode }))
         }
-    }, [location?.postalCode, isOpen, editAddress])
+    }, [location?.postalCode, isOpen, editAddress, formData.pinCode])
 
     const handleChange = (e) => {
         const { name, value } = e.target
@@ -84,10 +87,12 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             return
         }
 
-        // Validation for pin code
+        // Validation for pin code - only numbers, max 6 digits
         if (name === "pinCode") {
-            const cleanValue = value.replace(/\D/g, "").slice(0, 6)
-            setFormData(prev => ({ ...prev, [name]: cleanValue }))
+            // Only allow numeric input and limit to 6 digits
+            const numericValue = value.replace(/\D/g, '') // Remove non-numeric characters
+            const limitedValue = numericValue.slice(0, 6) // Strictly limit to 6 digits
+            setFormData(prev => ({ ...prev, [name]: limitedValue }))
             return
         }
 
@@ -127,9 +132,26 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             return
         }
 
-        if (!formData.pinCode || formData.pinCode.length !== 6) {
-            toast.error("A valid 6-digit Pin Code is required")
+        if (!formData.pinCode) {
+            toast.error("Pin Code is required")
             return
+        }
+
+        // Validate pin code: must be numeric and max 6 digits
+        const numericPinCode = formData.pinCode.replace(/\D/g, '')
+        if (numericPinCode.length === 0) {
+            toast.error("Pin Code is required")
+            return
+        }
+        if (numericPinCode.length > 6) {
+            toast.error("Pin Code cannot exceed 6 digits")
+            return
+        }
+        
+        // Final safety check: ensure pin code doesn't exceed 6 digits
+        const finalPinCode = numericPinCode.slice(0, 6)
+        if (finalPinCode !== formData.pinCode) {
+            setFormData(prev => ({ ...prev, pinCode: finalPinCode }))
         }
 
         // City & State must be entered manually but are not restricted to any region
@@ -155,18 +177,45 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                 formData.autoAddress ? `Location: ${formData.autoAddress}` : ""
             ].filter(Boolean).join(", ")
 
-            const addressData = {
-                label: formData.label,
-                street: formData.buildingName,
-                additionalDetails: additionalDetails,
-                city: manualCity,
-                state: manualState,
-                zipCode: formData.pinCode || editAddress?.zipCode || "",
-                latitude: location?.latitude || editAddress?.latitude || 22.7196,
-                longitude: location?.longitude || editAddress?.longitude || 75.8577,
-                phone: formData.phone,
-                receiverName: formData.name
+            // Ensure all required fields are properly trimmed and not empty
+            const trimmedStreet = formData.buildingName.trim()
+            const trimmedCity = manualCity.trim()
+            const trimmedState = manualState.trim()
+            
+            if (!trimmedStreet || !trimmedCity || !trimmedState) {
+                toast.error("Building name, City, and State are required fields")
+                return
             }
+            
+            // Ensure zipCode is present and valid
+            const finalZipCode = (formData.pinCode || editAddress?.zipCode || "").replace(/\D/g, '').slice(0, 6)
+            if (!finalZipCode) {
+                toast.error("Pin Code is required")
+                setSavingAddress(false)
+                return
+            }
+
+            const addressData = {
+                label: formData.label || "Home",
+                street: trimmedStreet,
+                additionalDetails: additionalDetails || "",
+                city: trimmedCity,
+                state: trimmedState,
+                zipCode: finalZipCode,
+                latitude: location?.latitude || editAddress?.latitude || null,
+                longitude: location?.longitude || editAddress?.longitude || null,
+                phone: formData.phone || "",
+                receiverName: formData.name || ""
+            }
+            
+            // Log the data being sent for debugging
+            console.log("💾 Saving address with data:", {
+                ...addressData,
+                hasStreet: !!addressData.street,
+                hasCity: !!addressData.city,
+                hasZipCode: !!addressData.zipCode,
+                zipCodeLength: addressData.zipCode.length
+            })
 
             if (editAddress) {
                 const addressId = editAddress.id || editAddress._id
@@ -180,9 +229,60 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
             onClose()
         } catch (error) {
             console.error("Error saving address:", error)
-            // Show backend error message if available
-            const backendMsg = error?.response?.data?.message
-            toast.error(backendMsg || "Failed to save address. Please try again.")
+            console.error("Error details:", {
+                message: error?.message,
+                response: error?.response?.data,
+                status: error?.response?.status
+            })
+            
+            // Extract error message from backend response structure
+            // Backend format: { success: false, message: "...", errors: [...] }
+            let errorMessage = "Failed to save address. Please try again."
+            
+            if (error?.response?.data) {
+                const responseData = error.response.data
+                
+                // Backend sends message in response.data.message
+                if (responseData.message) {
+                    errorMessage = responseData.message
+                } 
+                // Handle validation errors array
+                else if (responseData.errors && Array.isArray(responseData.errors)) {
+                    errorMessage = responseData.errors.join(", ")
+                }
+                // Handle errors object (from validation)
+                else if (responseData.errors && typeof responseData.errors === 'object') {
+                    const errorMessages = Object.values(responseData.errors).map(err => 
+                        typeof err === 'string' ? err : err.message || err
+                    )
+                    errorMessage = errorMessages.join(", ")
+                }
+                // Fallback to error or msg
+                else if (responseData.error) {
+                    errorMessage = responseData.error
+                } else if (responseData.msg) {
+                    errorMessage = responseData.msg
+                } else if (typeof responseData === 'string') {
+                    errorMessage = responseData
+                }
+            } else if (error?.message) {
+                errorMessage = error.message
+            }
+            
+            // Show more specific error messages based on status code
+            if (error?.response?.status === 400) {
+                if (!errorMessage || errorMessage === "Failed to save address. Please try again.") {
+                    errorMessage = "Invalid address data. Please check all required fields (Building name, City, State)."
+                }
+            } else if (error?.response?.status === 401) {
+                errorMessage = "Please login to save address."
+            } else if (error?.response?.status === 500) {
+                if (!errorMessage || errorMessage === "Failed to save address. Please try again.") {
+                    errorMessage = "Server error. Please try again later."
+                }
+            }
+            
+            toast.error(errorMessage)
         }
     }
 
@@ -308,8 +408,48 @@ export default function AddressFormModal({ isOpen, onClose, onSaveSuccess, editA
                             placeholder="Pin code *"
                             value={formData.pinCode}
                             onChange={handleChange}
+                            onKeyDown={(e) => {
+                                // Prevent typing if already 6 digits (except backspace, delete, arrow keys, etc.)
+                                const currentLength = formData.pinCode.replace(/\D/g, '').length
+                                if (currentLength >= 6 && 
+                                    !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End'].includes(e.key) &&
+                                    !e.ctrlKey && !e.metaKey &&
+                                    /[0-9]/.test(e.key)) {
+                                    e.preventDefault()
+                                    return false
+                                }
+                            }}
+                            onPaste={(e) => {
+                                e.preventDefault()
+                                const pastedText = e.clipboardData.getData('text')
+                                const numericPasted = pastedText.replace(/\D/g, '').slice(0, 6)
+                                setFormData(prev => ({ ...prev, pinCode: numericPasted }))
+                            }}
+                            onInput={(e) => {
+                                // Real-time validation on input event
+                                const inputValue = e.target.value.replace(/\D/g, '')
+                                if (inputValue.length > 6) {
+                                    const limited = inputValue.slice(0, 6)
+                                    e.target.value = limited
+                                    setFormData(prev => ({ ...prev, pinCode: limited }))
+                                }
+                            }}
+                            onBeforeInput={(e) => {
+                                // Additional layer: prevent input if already 6 digits
+                                if (e.data && /[0-9]/.test(e.data)) {
+                                    const currentLength = formData.pinCode.replace(/\D/g, '').length
+                                    if (currentLength >= 6) {
+                                        e.preventDefault()
+                                        return false
+                                    }
+                                }
+                            }}
                             required
                             className="h-12 rounded-xl bg-gray-50 border-gray-200 dark:bg-gray-900/50 dark:border-gray-700"
+                            maxLength={6}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{0,6}"
                         />
                     </div>
 

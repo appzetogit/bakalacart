@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useLocation } from "@/module/user/hooks/useLocation"
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ const getAddressIcon = (address) => {
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { location: globalLocation } = useLocation()
   const [paymentMethod, setPaymentMethod] = useState("card")
   const [userData, setUserData] = useState(null)
@@ -163,6 +164,33 @@ export default function CheckoutPage() {
     }
   }, [])
 
+  // Restore address form state from URL params on mount (for refresh persistence)
+  useEffect(() => {
+    const showForm = searchParams.get('addAddress') === 'true'
+    if (showForm) {
+      setIsAddressSelectorOpen(true)
+      setIsAddressFormOpen(true)
+      
+      // Restore form data from localStorage if available
+      try {
+        const savedFormData = localStorage.getItem('checkout_address_form_data')
+        if (savedFormData) {
+          const formData = JSON.parse(savedFormData)
+          setAddressFormData(prev => ({ ...prev, ...formData }))
+        }
+      } catch (error) {
+        console.error("Error parsing saved form data:", error)
+      }
+    }
+  }, []) // Only run on mount
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (isAddressFormOpen) {
+      localStorage.setItem('checkout_address_form_data', JSON.stringify(addressFormData))
+    }
+  }, [addressFormData, isAddressFormOpen])
+
   // Fetch saved addresses from backend
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -209,6 +237,31 @@ export default function CheckoutPage() {
 
   const [validationError, setValidationError] = useState(false)
 
+  // Helper functions to open/close address form with URL param sync
+  const openAddressForm = () => {
+    setIsAddressSelectorOpen(true)
+    setIsAddressFormOpen(true)
+    setSearchParams({ addAddress: 'true' })
+  }
+
+  const closeAddressForm = () => {
+    setIsAddressFormOpen(false)
+    setIsAddressSelectorOpen(false)
+    setSearchParams({})
+    // Clear saved form data when closing
+    localStorage.removeItem('checkout_address_form_data')
+  }
+
+  const openAddressSelector = () => {
+    setIsAddressSelectorOpen(true)
+    setSearchParams({})
+  }
+
+  const closeAddressSelector = () => {
+    setIsAddressSelectorOpen(false)
+    setSearchParams({})
+  }
+
   // Save order data to localStorage before navigating to payment
   const handleProceedToPayment = () => {
     // Validation: Check if a delivery address is available
@@ -240,10 +293,28 @@ export default function CheckoutPage() {
   }
 
   const handleAddressFieldChange = (field, value) => {
+    // Additional validation for pinCode field - ensure 6 digit limit
+    let finalValue = value
+    if (field === "pinCode") {
+      const numericValue = String(value).replace(/\D/g, '')
+      finalValue = numericValue.slice(0, 6)
+    }
+    
     setAddressFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: finalValue
     }))
+  }
+
+  // Special handler for pin code with 6 digit validation - 100% accurate
+  const handlePinCodeChange = (value) => {
+    // Only allow numeric input and limit to 6 digits
+    const numericValue = value.replace(/\D/g, '') // Remove non-numeric characters
+    // Strictly limit to 6 digits by slicing - this is the final check
+    const limitedValue = numericValue.slice(0, 6)
+    // Double check: ensure it never exceeds 6 digits
+    const finalValue = limitedValue.length > 6 ? limitedValue.substring(0, 6) : limitedValue
+    handleAddressFieldChange("pinCode", finalValue)
   }
 
   const handleSaveAddress = async (e) => {
@@ -295,13 +366,26 @@ export default function CheckoutPage() {
         return
       }
 
+      // Final validation: Ensure pin code is max 6 digits before saving
+      let pinCodeValue = (addressFormData.pinCode || "").trim()
+      if (pinCodeValue) {
+        const numericPinCode = pinCodeValue.replace(/\D/g, '')
+        if (numericPinCode.length > 6) {
+          pinCodeValue = numericPinCode.slice(0, 6)
+          // Update the form data with corrected value
+          setAddressFormData(prev => ({ ...prev, pinCode: pinCodeValue }))
+        } else {
+          pinCodeValue = numericPinCode
+        }
+      }
+
       const payload = {
         label: addressLabel || "Other",
         street: streetParts.join(", "),
         additionalDetails: additionalParts.join(", "),
         city,
         state,
-        zipCode: (addressFormData.pinCode || "").trim(),
+        zipCode: pinCodeValue,
         latitude: globalLocation?.latitude || 0,
         longitude: globalLocation?.longitude || 0,
         receiverName: addressFormData.name || userData?.name || "",
@@ -317,8 +401,9 @@ export default function CheckoutPage() {
         const id = newAddress.id || newAddress._id
         setSelectedAddressId(id)
         setAddressLabel(newAddress.label || "Other")
-        setIsAddressFormOpen(false)
-        setIsAddressSelectorOpen(false)
+        closeAddressForm()
+        // Clear saved form data after successful save
+        localStorage.removeItem('checkout_address_form_data')
       }
     } catch (error) {
       console.error("Error saving address:", error)
@@ -358,7 +443,7 @@ export default function CheckoutPage() {
               </p>
             </div>
             <button
-              onClick={() => setIsAddressSelectorOpen(true)}
+              onClick={() => openAddressForm()}
               className="text-xs font-bold text-[#ff8100] px-3 py-1.5 bg-[#fff7ed] rounded-lg border border-[#ff8100]/20"
             >
               + Add New
@@ -375,7 +460,7 @@ export default function CheckoutPage() {
             </div>
           ) : addresses.length === 0 ? (
             <button
-              onClick={() => setIsAddressSelectorOpen(true)}
+              onClick={() => openAddressForm()}
               className="w-full flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors gap-2"
             >
               <Plus className="w-6 h-6 text-gray-400" />
@@ -427,10 +512,7 @@ export default function CheckoutPage() {
               })}
 
               <button
-                onClick={() => {
-                  setIsAddressFormOpen(true);
-                  setIsAddressSelectorOpen(true);
-                }}
+                onClick={() => openAddressForm()}
                 className="flex-shrink-0 w-[100px] flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-colors gap-1.5 group"
               >
                 <div className="p-2 bg-white rounded-full shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
@@ -450,7 +532,7 @@ export default function CheckoutPage() {
                 </p>
               </div>
               <button
-                onClick={() => setIsAddressSelectorOpen(true)}
+                onClick={() => openAddressSelector()}
                 className="text-[10px] font-bold text-[#ff8100] hover:underline"
               >
                 Change
@@ -554,7 +636,7 @@ export default function CheckoutPage() {
               <span className="text-[10px] font-bold text-[#ff8100] uppercase tracking-wider">Confirm Your Address</span>
               <button
                 onClick={() => {
-                  setIsAddressSelectorOpen(true);
+                  openAddressSelector();
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className="text-xs font-bold text-[#ff8100] bg-white px-3 py-1 rounded-full border border-[#ff8100]/20 shadow-sm"
@@ -639,9 +721,9 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={() => {
                   if (isAddressFormOpen) {
-                    setIsAddressFormOpen(false)
+                    closeAddressForm()
                   } else {
-                    setIsAddressSelectorOpen(false)
+                    closeAddressSelector()
                   }
                 }}
                 className="p-2 -ml-2 rounded-full hover:bg-gray-100"
@@ -658,7 +740,7 @@ export default function CheckoutPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => setIsAddressFormOpen(true)}
+                  onClick={() => openAddressForm()}
                   className="w-full flex items-center justify-between bg-[#e9f9ee] border border-[#44c776] rounded-xl px-4 py-3 mb-4"
                 >
                   <span className="text-sm font-semibold text-[#15803d]">+ Add New Address</span>
@@ -685,7 +767,7 @@ export default function CheckoutPage() {
                           onClick={() => {
                             setSelectedAddressId(id)
                             setAddressLabel(address.label || "Other")
-                            setIsAddressSelectorOpen(false)
+                            closeAddressSelector()
                           }}
                           className={`w-full flex items-center justify-between rounded-xl border px-3 py-3 text-left ${isSelected ? "border-[#ff8100] bg-[#fff3e6]" : "border-gray-200"
                             }`}
@@ -778,11 +860,60 @@ export default function CheckoutPage() {
                   <Input
                     placeholder="Pin code"
                     value={addressFormData.pinCode}
-                    onChange={(e) => handleAddressFieldChange("pinCode", e.target.value)}
+                    onChange={(e) => {
+                      const inputValue = e.target.value
+                      handlePinCodeChange(inputValue)
+                      // Additional safety check: ensure value never exceeds 6 digits
+                      if (inputValue.replace(/\D/g, '').length > 6) {
+                        const limited = inputValue.replace(/\D/g, '').slice(0, 6)
+                        e.target.value = limited
+                        handlePinCodeChange(limited)
+                      }
+                    }}
+                    onInput={(e) => {
+                      // Real-time validation on input event
+                      const inputValue = e.target.value.replace(/\D/g, '')
+                      if (inputValue.length > 6) {
+                        const limited = inputValue.slice(0, 6)
+                        e.target.value = limited
+                        handlePinCodeChange(limited)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Prevent typing if already 6 digits (except backspace, delete, arrow keys, etc.)
+                      const currentLength = addressFormData.pinCode.replace(/\D/g, '').length
+                      if (currentLength >= 6 && 
+                          !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End'].includes(e.key) &&
+                          !e.ctrlKey && !e.metaKey &&
+                          /[0-9]/.test(e.key)) {
+                        e.preventDefault()
+                        return false
+                      }
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault()
+                      const pastedText = e.clipboardData.getData('text')
+                      const numericPasted = pastedText.replace(/\D/g, '').slice(0, 6)
+                      handlePinCodeChange(numericPasted)
+                    }}
+                    onBeforeInput={(e) => {
+                      // Additional layer: prevent input if already 6 digits
+                      if (e.data && /[0-9]/.test(e.data)) {
+                        const currentLength = addressFormData.pinCode.replace(/\D/g, '').length
+                        if (currentLength >= 6) {
+                          e.preventDefault()
+                          return false
+                        }
+                      }
+                    }}
                     onFocus={(e) => {
                       setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
                     }}
                     className="h-11 bg-gray-50 border-gray-200 text-sm"
+                    maxLength={6}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{0,6}"
                   />
                   <Input
                     placeholder="Add Location"

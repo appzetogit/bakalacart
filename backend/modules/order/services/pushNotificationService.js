@@ -25,15 +25,17 @@ export const sendOrderPushNotification = async (userId, userType, payload) => {
 
         // 1. Try finding by MongoDB _id first (standard for all models)
         if (mongoose.Types.ObjectId.isValid(userId)) {
-            record = await model.findById(userId).select('fcmTokens fcmTokenMobile');
+            record = await model.findById(userId).lean();
         }
 
         // 2. Fallback: Try finding by model-specific custom ID fields if findById failed
         if (!record) {
-            if (userType === 'restaurant') {
-                record = await model.findOne({ restaurantId: userId }).select('fcmTokens fcmTokenMobile');
+            if (userType === 'user') {
+                record = await model.findById(userId).lean();
+            } else if (userType === 'restaurant') {
+                record = await model.findOne({ restaurantId: userId }).lean();
             } else if (userType === 'delivery') {
-                record = await model.findOne({ deliveryId: userId }).select('fcmTokens fcmTokenMobile');
+                record = await model.findOne({ deliveryId: userId }).lean();
             }
         }
 
@@ -114,18 +116,15 @@ export const sendOrderPushNotification = async (userId, userType, payload) => {
  * Send push notification to all admin users
  * @param {Object} payload - { title, body, data }
  */
-/**
- * Send push notification to all admin users
- * @param {Object} payload - { title, body, data }
- */
 export const sendAdminPushNotification = async (payload) => {
     try {
         const Admin = (await import('../../admin/models/Admin.js')).default;
 
         // Fetch admins from Admin collection (the dedicated admin users)
         const admins = await Admin.find({
-            fcmTokens: { $exists: true, $not: { $size: 0 } }
-        }).select('fcmTokens');
+            fcmTokens: { $exists: true, $not: { $size: 0 } },
+            isActive: true
+        }).lean();
 
         // Also fetch Users with admin role if applicable (optional, depending on if you use dual systems)
         // For now, focusing on the dedicated Admin model as that's what the request implies
