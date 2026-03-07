@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { initializePushNotifications } from "@/services/pushNotificationService"
 import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
-import { proactiveTokenRefresh } from "@/lib/utils/auth"
+import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/utils/auth"
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (
@@ -183,6 +183,10 @@ export default function App() {
   useEffect(() => {
     initializePushNotifications();
 
+    // Check if users have refresh tokens and logout if missing
+    // This ensures users without refresh tokens are automatically logged out
+    checkAllModulesForRefreshTokens();
+
     // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
     const modules = ['user', 'restaurant', 'delivery', 'admin'];
     const refreshAllTokens = () => {
@@ -194,7 +198,7 @@ export default function App() {
       });
     };
 
-    // Run once on mount
+    // Run once on mount (after checking refresh tokens)
     refreshAllTokens();
 
     // Set interval for periodic refresh

@@ -453,6 +453,33 @@ apiClient.interceptors.response.use(
           const noTokenError = new Error('Session expired, please log in again');
           noTokenError._isAuthError = true;
           onRefreshFailed(expectedRole, noTokenError); // Clears manager.isRefreshing
+          
+          // Immediately logout user if no refresh token found
+          const currentPath = window.location.pathname;
+          const pageModule = getModuleInfo(currentPath);
+          
+          // Only logout if this is the active module
+          if (expectedRole === pageModule.expectedRole || 
+              (expectedRole === 'user' && pageModule.expectedRole === 'user')) {
+            clearModuleAuth(expectedRole);
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            
+            const loginPaths = {
+              'user': '/auth/sign-in',
+              'restaurant': '/restaurant/login',
+              'delivery': '/delivery/sign-in',
+              'admin': '/admin/login'
+            };
+            
+            const loginPath = loginPaths[expectedRole] || '/auth/sign-in';
+            
+            // Use setTimeout to avoid navigation during error handling
+            setTimeout(() => {
+              window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+            }, 100);
+          }
+          
           throw noTokenError;
         }
 

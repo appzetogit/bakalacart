@@ -322,6 +322,104 @@ export async function proactiveTokenRefresh(module) {
 }
 
 /**
+ * Check if user has a refresh token and logout if missing
+ * This ensures users without refresh tokens are automatically logged out
+ * @param {string} module - Module name (admin, restaurant, delivery, user)
+ * @returns {boolean} - True if user has refresh token, false if logged out
+ */
+export function checkAndLogoutIfNoRefreshToken(module) {
+  // Get refresh token for the module
+  const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+    localStorage.getItem('refreshToken') ||
+    localStorage.getItem('user_refreshToken') ||
+    localStorage.getItem('restaurant_refreshToken') ||
+    localStorage.getItem('delivery_refreshToken') ||
+    localStorage.getItem('admin_refreshToken');
+
+  // If no refresh token found, logout the user
+  if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
+    if (import.meta.env.DEV) {
+      console.warn(`[Auth Check] No refresh token found for module '${module}'. Logging out...`);
+    }
+
+    // Clear all auth data for this module
+    clearModuleAuth(module);
+
+    // Also clear generic tokens
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+
+    // Determine login path based on module
+    const loginPaths = {
+      'user': '/auth/sign-in',
+      'restaurant': '/restaurant/login',
+      'delivery': '/delivery/sign-in',
+      'admin': '/admin/login'
+    };
+
+    const loginPath = loginPaths[module] || '/auth/sign-in';
+    const currentPath = window.location.pathname;
+
+    // Dispatch auth change event
+    window.dispatchEvent(new Event(`${module}AuthChanged`));
+    window.dispatchEvent(new Event('userAuthChanged'));
+
+    // Redirect to login page
+    // Use setTimeout to avoid navigation during render
+    setTimeout(() => {
+      if (window.location.pathname !== loginPath && !window.location.pathname.includes('/auth/')) {
+        window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+      }
+    }, 100);
+
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Check all active modules for refresh tokens and logout if missing
+ * This is called on app initialization to ensure all users have valid refresh tokens
+ */
+export function checkAllModulesForRefreshTokens() {
+  const modules = ['user', 'restaurant', 'delivery', 'admin'];
+  const currentPath = window.location.pathname;
+
+  // Determine which module the user is currently on
+  let activeModule = 'user'; // default
+  if (currentPath.startsWith('/restaurant')) activeModule = 'restaurant';
+  else if (currentPath.startsWith('/delivery')) activeModule = 'delivery';
+  else if (currentPath.startsWith('/admin')) activeModule = 'admin';
+
+  // Check the active module first
+  const hasRefreshToken = checkAndLogoutIfNoRefreshToken(activeModule);
+
+  // If active module has no refresh token, it will redirect, so we can return early
+  if (!hasRefreshToken) {
+    return false;
+  }
+
+  // For other modules, just clear their data if they don't have refresh tokens
+  // (but don't redirect since user is not on those pages)
+  modules.forEach(module => {
+    if (module !== activeModule) {
+      const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+        localStorage.getItem('refreshToken');
+
+      if (!moduleRefreshToken || moduleRefreshToken.trim() === '' || 
+          moduleRefreshToken === 'null' || moduleRefreshToken === 'undefined') {
+        // Clear stale auth data for inactive modules
+        clearModuleAuth(module);
+      }
+    }
+  });
+
+  return true;
+}
+
+/**
  * Set authentication data for a specific module
  * @param {string} module - Module name (admin, restaurant, delivery, user)
  * @param {string} token - Access token

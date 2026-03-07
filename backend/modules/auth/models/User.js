@@ -215,6 +215,10 @@ const userSchema = new mongoose.Schema({
   forceLogoutAt: {
     type: Date,
     default: null
+  },
+  refreshToken: {
+    type: String,
+    select: false // Don't return refresh token by default
   }
 }, {
   timestamps: true

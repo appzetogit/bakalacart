@@ -445,13 +445,20 @@ adminNamespace.on('connection', (socket) => {
 app.set('io', io);
 
 // Connect to databases
-connectDB().then(async () => {
-  // Initialize Firebase Admin (Realtime Database & FCM)
-  await initializeFirebase().catch(err => console.error('❌ Failed to initialize Firebase:', err));
+connectDB()
+  .then(async () => {
+    // Initialize Firebase Admin (Realtime Database & FCM)
+    await initializeFirebase().catch(err => console.error('❌ Failed to initialize Firebase:', err));
 
-  // Initialize Cloudinary after DB connection
-  initializeCloudinary().catch(err => console.error('Failed to initialize Cloudinary:', err));
-});
+    // Initialize Cloudinary after DB connection
+    initializeCloudinary().catch(err => console.error('Failed to initialize Cloudinary:', err));
+  })
+  .catch((error) => {
+    // This catch handles any unexpected errors during connection
+    // Note: connectDB already handles retries and exits on failure
+    console.error('❌ [SERVER] Critical: MongoDB connection failed. Server cannot start without database.');
+    console.error('Error details:', error.message);
+  });
 
 // Redis connection is optional - only connects if REDIS_ENABLED=true
 connectRedis().catch(() => {
