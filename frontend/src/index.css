@@ -294,3 +294,17 @@
     opacity: 1 !important;
     transform: none !important;
   }
+  
+  /* CRITICAL: Ensure root element has proper background from start */
+  #root {
+    background-color: var(--background, #ffffff);
+    min-height: 100vh;
+    opacity: 1 !important;
+  }
+  
+  /* CRITICAL: Prevent any background color changes during initial render */
+  body:not(.loaded) #root,
+  body:not(.loaded) body,
+  body:not(.loaded) html {
+    background-color: inherit !important;
+  }

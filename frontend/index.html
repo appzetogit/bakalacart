@@ -14,6 +14,43 @@
     <!-- Preconnect to critical origins -->
     <link rel="preconnect" href="https://maps.googleapis.com" crossorigin />
     <!-- Google Maps API will be loaded dynamically from environment variable -->
+    <!-- CRITICAL: Inline styles to prevent FOUC (Flash of Unstyled Content) and blink -->
+    <style>
+      /* Prevent any blink on initial load */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow-x: hidden;
+        background-color: #ffffff;
+        color: #000000;
+      }
+      
+      /* Ensure root div matches app background immediately */
+      #root {
+        width: 100%;
+        min-height: 100vh;
+        background-color: #ffffff;
+        opacity: 1;
+        transition: none;
+        animation: none;
+      }
+      
+      /* Prevent any transitions until body.loaded class is added */
+      * {
+        transition: none !important;
+        animation: none !important;
+      }
+      
+      /* Hide any loading spinners or fallbacks */
+      [class*="loading"],
+      [class*="Loading"],
+      [class*="spinner"],
+      [class*="Spinner"] {
+        display: none !important;
+      }
+    </style>
   </head>
   <body> 
     <div id="root"></div>

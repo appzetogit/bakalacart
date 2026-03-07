@@ -94,12 +94,27 @@ const initializeNonCriticalFeatures = () => {
   });
 }
 
-// Apply theme on app initialization (synchronous, fast)
+// CRITICAL: Get root element first
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
+
+// CRITICAL: Apply theme IMMEDIATELY before any rendering to prevent blink
+// This must happen synchronously before React renders
 const savedTheme = localStorage.getItem('appTheme') || 'light'
 if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
+  // Also set body and root background immediately to prevent white flash
+  document.body.style.backgroundColor = '#0a0a0a'
+  document.body.style.color = '#ffffff'
+  rootElement.style.backgroundColor = '#0a0a0a'
 } else {
   document.documentElement.classList.remove('dark')
+  // Set body and root background immediately to prevent white flash
+  document.body.style.backgroundColor = '#ffffff'
+  document.body.style.color = '#000000'
+  rootElement.style.backgroundColor = '#ffffff'
 }
 
 // Suppress browser extension errors (defer to avoid blocking render)
@@ -258,10 +273,7 @@ if ('requestIdleCallback' in window) {
   setTimeout(setupErrorSuppression, 0)
 }
 
-const rootElement = document.getElementById('root')
-if (!rootElement) {
-  throw new Error('Root element not found')
-}
+// rootElement already defined above for theme setup
 
 // Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web
 // Improved detection for various mobile webview environments
