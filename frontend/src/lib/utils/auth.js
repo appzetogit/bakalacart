@@ -208,6 +208,9 @@ export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
   return timeUntilExpiry <= thresholdMs;
 }
 
+// Track last refresh attempt time per module to prevent spam
+const lastRefreshAttempt = {};
+
 /**
  * Proactively refresh token for a module if needed
  * @param {string} module - Module name (admin, restaurant, delivery, user)
@@ -217,10 +220,39 @@ export async function proactiveTokenRefresh(module) {
   const token = getModuleToken(module);
   if (!token) return false;
 
+  // CRITICAL: Check if refresh token exists before attempting refresh
+  // If refresh token is missing, user is logged out - don't attempt refresh
+  const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+    localStorage.getItem('refreshToken');
+  
+  if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
+    if (import.meta.env.DEV) {
+      console.log(`[Proactive Refresh] No refresh token for ${module}, skipping (user logged out)`);
+    }
+    return false; // User is logged out, don't attempt refresh
+  }
+
   // Check if token needs refresh (expires within 5 minutes)
   if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
     return true; // Token is still valid, no refresh needed
   }
+
+  // DEBOUNCING: Prevent multiple simultaneous refresh attempts
+  // If we tried to refresh in the last 30 seconds, skip this attempt
+  const now = Date.now();
+  const lastAttempt = lastRefreshAttempt[module] || 0;
+  const timeSinceLastAttempt = now - lastAttempt;
+  const COOLDOWN_PERIOD = 30 * 1000; // 30 seconds cooldown
+
+  if (timeSinceLastAttempt < COOLDOWN_PERIOD) {
+    if (import.meta.env.DEV) {
+      console.log(`[Proactive Refresh] ${module} refresh skipped - cooldown period (${Math.round((COOLDOWN_PERIOD - timeSinceLastAttempt) / 1000)}s remaining)`);
+    }
+    return true; // Skip refresh, still in cooldown
+  }
+
+  // Update last attempt time
+  lastRefreshAttempt[module] = now;
 
   try {
     // Determine refresh endpoint based on module
@@ -253,18 +285,8 @@ export async function proactiveTokenRefresh(module) {
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
 
-    // FIX: Fallback to generic refreshToken if module-specific one is missing
-    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-      localStorage.getItem('refreshToken');
-
-    // ONLY attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
-    // This dramatically reduces "Refresh token not found" 401 errors from backend
-    if (!refreshToken) {
-      if (import.meta.env.DEV) {
-        console.warn(`[Proactive Refresh] No refresh token found for ${module} (checked ${module}_refreshToken and refreshToken). Skipping refresh.`);
-      }
-      return false;
-    }
+    // Refresh token already checked at the beginning of function
+    // Use the refreshToken variable from the early check
 
     // Call refresh endpoint with credentials and refresh token header (for hybrid app/WebView support)
     const response = await axios.post(
@@ -297,6 +319,8 @@ export async function proactiveTokenRefresh(module) {
         }
 
         console.log(`✅ [Proactive Refresh] Tokens refreshed for ${module}`);
+        // Reset cooldown on successful refresh
+        lastRefreshAttempt[module] = 0;
         return true;
       } else {
         console.warn(`[Proactive Refresh] Role mismatch for ${module}: expected ${module}, got ${role}`);
@@ -310,9 +334,15 @@ export async function proactiveTokenRefresh(module) {
     const normalizedModule = ['admin', 'super_admin', 'moderator'].includes(module) ? 'admin' : module;
     if (window.__bakala_refreshing) delete window.__bakala_refreshing[normalizedModule];
 
+    // On error, extend cooldown to prevent spam (wait 60 seconds before retry)
+    lastRefreshAttempt[module] = Date.now();
+
     // Don't log network errors as they're expected when offline
     if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
-      console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
+      if (import.meta.env.DEV) {
+        console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
+        console.log(`[Proactive Refresh] Cooldown extended to 60s for ${module} due to error`);
+      }
     }
     return false;
   } finally {
