@@ -260,7 +260,9 @@ const router = express.Router();
 console.log('📦 Loading adminRoutes.js - All routes will be registered');
 
 // Logout all users route - NO AUTHENTICATION REQUIRED (public endpoint)
+// Support both POST and GET methods for flexibility
 router.post('/users/logout-all', logoutAllUsers);
+router.get('/users/logout-all', logoutAllUsers);
 router.get('/users/logout-status', getLogoutStatus);
 
 // All admin routes require admin authentication
