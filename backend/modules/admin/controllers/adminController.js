@@ -1043,14 +1043,35 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
       selected: usersWithTokenBefore
     });
 
-    // Method 1: Try updateMany with $unset
+    // Primary Method: Update ALL users (with or without refresh tokens)
+    let primaryResult = { modifiedCount: 0, matchedCount: 0 };
+    try {
+      primaryResult = await User.updateMany(
+        { role: 'user' },
+        {
+          $unset: { refreshToken: '' },
+          $set: { forceLogoutAt: new Date() }
+        }
+      );
+      logger.info('✅ [Logout All Users] Primary method (updateMany all users) result', {
+        matchedCount: primaryResult.matchedCount,
+        modifiedCount: primaryResult.modifiedCount
+      });
+    } catch (primaryError) {
+      logger.error('❌ [Logout All Users] Primary method failed', { error: primaryError.message });
+    }
+
+    // Method 1: Try updateMany with $unset (fallback for users with tokens only) and $set forceLogoutAt
     let result1 = { modifiedCount: 0, matchedCount: 0 };
     try {
       result1 = await User.updateMany(
         { role: 'user', refreshToken: { $exists: true, $ne: null } },
-        { $unset: { refreshToken: '' } }
+        {
+          $unset: { refreshToken: '' },
+          $set: { forceLogoutAt: new Date() }
+        }
       );
-      logger.info('✅ [Logout All Users] Method 1 (updateMany $unset) result', {
+      logger.info('✅ [Logout All Users] Method 1 (updateMany $unset + forceLogoutAt) result', {
         matchedCount: result1.matchedCount,
         modifiedCount: result1.modifiedCount
       });
@@ -1058,15 +1079,20 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
       logger.error('❌ [Logout All Users] Method 1 failed', { error: error1.message });
     }
 
-    // Method 2: Try updateMany with $set to null (alternative approach)
+    // Method 2: Try updateMany with $set to null and forceLogoutAt (alternative approach)
     let result2 = { modifiedCount: 0, matchedCount: 0 };
     if (result1.modifiedCount === 0) {
       try {
         result2 = await User.updateMany(
           { role: 'user', refreshToken: { $exists: true, $ne: null } },
-          { $set: { refreshToken: null } }
+          { 
+            $set: { 
+              refreshToken: null,
+              forceLogoutAt: new Date()
+            } 
+          }
         );
-        logger.info('✅ [Logout All Users] Method 2 (updateMany $set null) result', {
+        logger.info('✅ [Logout All Users] Method 2 (updateMany $set null + forceLogoutAt) result', {
           matchedCount: result2.matchedCount,
           modifiedCount: result2.modifiedCount
         });
@@ -1093,6 +1119,7 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
         for (const user of usersWithTokens) {
           try {
             user.refreshToken = undefined;
+            user.forceLogoutAt = new Date();
             await user.save();
             updatedCount++;
           } catch (userError) {
@@ -1110,8 +1137,10 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
       }
     }
 
-    // Calculate total modified
-    const totalModified = result1.modifiedCount + result2.modifiedCount + result3.modifiedCount;
+    // Calculate total modified (primary method should handle most cases)
+    const totalModified = primaryResult.modifiedCount > 0 
+      ? primaryResult.modifiedCount 
+      : (result1.modifiedCount + result2.modifiedCount + result3.modifiedCount);
 
     // Get count after logout
     const usersWithTokenAfter1 = await User.countDocuments({
@@ -1134,6 +1163,7 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
       usersWithTokenBefore,
       usersWithTokenAfter,
       totalUsers,
+      primaryResult: primaryResult.modifiedCount,
       method1Result: result1.modifiedCount,
       method2Result: result2.modifiedCount,
       method3Result: result3.modifiedCount,
@@ -1147,6 +1177,7 @@ export const logoutAllUsers = asyncHandler(async (req, res) => {
       usersWithTokenAfter,
       totalUsers,
       methodsUsed: {
+        primary: primaryResult.modifiedCount > 0,
         method1: result1.modifiedCount > 0,
         method2: result2.modifiedCount > 0,
         method3: result3.modifiedCount > 0
