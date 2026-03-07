@@ -3,6 +3,47 @@ import { toast } from 'sonner';
 import { API_BASE_URL } from './config.js';
 import { getRoleFromToken, clearModuleAuth } from '../utils/auth.js';
 
+// Helper function to clear AsyncStorage (for mobile app)
+const clearAsyncStorage = async () => {
+  try {
+    // Dynamic import for AsyncStorage (only if available in mobile app)
+    const asyncStorageModule = await import('@react-native-async-storage/async-storage');
+    const AsyncStorage = asyncStorageModule.default;
+    if (AsyncStorage) {
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      if (import.meta.env.DEV) {
+        console.log('[Axios] Cleared AsyncStorage tokens (mobile app)');
+      }
+    }
+  } catch (e) {
+    // AsyncStorage not available (web app) - that's fine, ignore
+    if (import.meta.env.DEV) {
+      console.debug('[Axios] AsyncStorage not available (web app)');
+    }
+  }
+};
+
+// Helper function to navigate to Login (for mobile app)
+const navigateToLogin = () => {
+  try {
+    // Try to get navigation from global scope (React Navigation)
+    if (typeof window !== 'undefined' && window.__NAVIGATION__) {
+      const navigation = window.__NAVIGATION__;
+      if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Login');
+        if (import.meta.env.DEV) {
+          console.log('[Axios] Navigated to Login (mobile app)');
+        }
+        return true;
+      }
+    }
+  } catch (e) {
+    // Navigation not available (web app) - that's fine, ignore
+  }
+  return false;
+};
+
 // Network error tracking to prevent spam
 const networkErrorState = {
   lastErrorTime: 0,
@@ -966,6 +1007,25 @@ apiClient.interceptors.response.use(
     }
 
     // Handle other errors
+    // MOBILE APP SUPPORT: Clear AsyncStorage and navigate to Login on 401 errors
+    if (error.response && error.response.status === 401) {
+      // Clear AsyncStorage tokens (for mobile app)
+      clearAsyncStorage().catch(() => {
+        // Ignore errors - AsyncStorage might not be available (web app)
+      });
+
+      // Navigate to Login (for mobile app)
+      const navigated = navigateToLogin();
+      
+      if (!navigated) {
+        // Web app - existing logic will handle redirect via window.location
+        // This is just for mobile app support
+        if (import.meta.env.DEV) {
+          console.log('[Axios] 401 error - web app will handle redirect');
+        }
+      }
+    }
+
     return Promise.reject(error);
   }
 );
