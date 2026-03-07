@@ -8,10 +8,53 @@ export const LocationContext = createContext(null)
  * Ensures only one instance of geolocation watchers and API calls
  */
 export const LocationProvider = ({ children }) => {
-    const [location, setLocation] = useState(null)
-    const [loading, setLoading] = useState(true)
+    // CRITICAL: Initialize from localStorage immediately to prevent loading blink
+    const [location, setLocation] = useState(() => {
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                return parsed
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return null
+    })
+    
+    // CRITICAL: Set loading to false if we have location from localStorage
+    const [loading, setLoading] = useState(() => {
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                // If we have valid location data, don't show loading
+                if (parsed && (parsed.latitude || parsed.city)) {
+                    return false
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return true
+    })
+    
     const [error, setError] = useState(null)
-    const [permissionGranted, setPermissionGranted] = useState(false)
+    const [permissionGranted, setPermissionGranted] = useState(() => {
+        // If we have location in localStorage, assume permission was granted
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                if (parsed && (parsed.latitude || parsed.city)) {
+                    return true
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return false
+    })
 
     // Zone State (from useZone)
     const [zoneId, setZoneId] = useState(null)
@@ -264,41 +307,59 @@ export const LocationProvider = ({ children }) => {
         let isMounted = true
         let initTimeout = null
         
-        // CRITICAL: Defer initialization to allow app to render first
-        // This prevents blocking the initial render in Flutter WebView
-        initTimeout = setTimeout(() => {
-            const init = async () => {
-                if (hasInitializedRef.current || !isMounted) return // Double check
-                hasInitializedRef.current = true // Mark as initialized
+        // CRITICAL: Only initialize if we don't already have location from localStorage
+        // This prevents unnecessary state updates and blinks
+        if (!location || (!location.latitude && !location.city && location.city !== "Select location")) {
+            // CRITICAL: Defer initialization to allow app to render first
+            // This prevents blocking the initial render in Flutter WebView
+            initTimeout = setTimeout(() => {
+                const init = async () => {
+                    if (hasInitializedRef.current || !isMounted) return // Double check
+                    hasInitializedRef.current = true // Mark as initialized
 
-                const stored = localStorage.getItem("userLocation")
-                if (stored) {
-                    try {
-                        const parsed = JSON.parse(stored)
-                        if (isMounted) {
-                            setLocation(parsed)
-                            isManualRef.current = !!parsed.isManual
-                            setPermissionGranted(true)
-                            setLoading(false)
+                    const stored = localStorage.getItem("userLocation")
+                    if (stored) {
+                        try {
+                            const parsed = JSON.parse(stored)
+                            if (isMounted) {
+                                // Only update if different to prevent unnecessary re-renders
+                                if (JSON.stringify(location) !== JSON.stringify(parsed)) {
+                                    setLocation(parsed)
+                                }
+                                isManualRef.current = !!parsed.isManual
+                                if (!permissionGranted) {
+                                    setPermissionGranted(true)
+                                }
+                                if (loading) {
+                                    setLoading(false)
+                                }
+                            }
+                        } catch (e) {
+                            if (isMounted && !location) {
+                                getLocation(false, true)
+                            }
                         }
-                    } catch (e) {
-                        if (isMounted) {
+                    } else {
+                        if (isMounted && !location) {
                             getLocation(false, true)
                         }
                     }
-                } else {
+
                     if (isMounted) {
-                        getLocation(false, true)
+                        startWatchingLocation()
                     }
                 }
 
-                if (isMounted) {
-                    startWatchingLocation()
-                }
+                init()
+            }, 300) // 300ms delay to ensure app renders first
+        } else {
+            // We already have location, just start watching and mark as initialized
+            hasInitializedRef.current = true
+            isManualRef.current = !!location.isManual
+            if (isMounted) {
+                startWatchingLocation()
             }
-
-            init()
-        }, 300) // 300ms delay to ensure app renders first
+        }
 
         const handleStorageChange = (e) => {
             if (e.key === "userLocation" && e.newValue && isMounted) {

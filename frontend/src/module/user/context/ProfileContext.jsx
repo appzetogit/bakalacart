@@ -41,19 +41,24 @@ export function ProfileProvider({ children }) {
     return []
   })
 
-  // If we already have addresses from localStorage, no need to show loading
-  const hasLocalAddresses = (() => {
+  // CRITICAL: Check if we have data in localStorage to prevent loading blink
+  const hasLocalData = (() => {
     try {
+      // Check if we have user profile
+      const userStr = localStorage.getItem("user_user") || localStorage.getItem("userProfile")
+      const hasUser = userStr && userStr !== 'null' && userStr !== 'undefined'
+      
+      // Check if we have addresses
       const saved = localStorage.getItem("userAddresses")
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        return Array.isArray(parsed) && parsed.length > 0
-      }
+      const hasAddresses = saved && saved !== 'null' && saved !== 'undefined'
+      
+      // If we have either user or addresses, don't show loading
+      return hasUser || hasAddresses
     } catch (e) { /* ignore */ }
     return false
   })()
 
-  const [loading, setLoading] = useState(!hasLocalAddresses)
+  const [loading, setLoading] = useState(!hasLocalData)
 
   // Helper function to deduplicate addresses by ID
   const deduplicateAddresses = useCallback((addressList) => {
@@ -153,6 +158,8 @@ export function ProfileProvider({ children }) {
     // CRITICAL: Defer initialization to allow app to render first
     let initTimeout = null
     let isMounted = true
+    // Capture hasLocalData value at effect start
+    const hasLocalDataValue = hasLocalData
 
     const fetchUserProfile = async () => {
       // Check if user is authenticated
@@ -160,13 +167,22 @@ export function ProfileProvider({ children }) {
         localStorage.getItem("user_accessToken")
 
       if (!isAuthenticated) {
-        setUserProfile(null)
-        setAddresses([])
-        setFavorites([])
-        setDishFavorites([])
+        // Only update state if different to prevent unnecessary re-renders
+        if (userProfile !== null) {
+          setUserProfile(null)
+        }
+        if (addresses.length > 0) {
+          setAddresses([])
+        }
+        if (favorites.length > 0) {
+          setFavorites([])
+        }
+        if (dishFavorites.length > 0) {
+          setDishFavorites([])
+        }
         // Reset payment methods to default dummy cards or empty
         const savedPayments = localStorage.getItem("userPaymentMethods")
-        if (!savedPayments) {
+        if (!savedPayments && paymentMethods.length === 0) {
           setPaymentMethods([
             {
               id: "1",
@@ -190,12 +206,18 @@ export function ProfileProvider({ children }) {
             },
           ])
         }
-        setLoading(false)
+        if (loading) {
+          setLoading(false)
+        }
         return
       }
 
       try {
-        setLoading(true)
+        // Only set loading to true if we don't have local data
+        // This prevents loading blink when we already have data
+        if (!hasLocalDataValue && isMounted && !loading) {
+          setLoading(true)
+        }
 
         // Fetch user profile
         try {
@@ -279,12 +301,27 @@ export function ProfileProvider({ children }) {
       }
     }
 
-    // CRITICAL: Defer fetch to allow app to render first
-    initTimeout = setTimeout(() => {
-      if (isMounted) {
-        fetchUserProfile()
+    // CRITICAL: Only fetch if we don't have local data, or defer if we do
+    // This prevents unnecessary loading states and blinks
+    if (hasLocalDataValue) {
+      // We have local data, set loading to false immediately if it's true
+      if (isMounted && loading) {
+        setLoading(false)
       }
-    }, 300) // 300ms delay to ensure app renders first
+      // Still fetch in background to update, but don't show loading
+      initTimeout = setTimeout(() => {
+        if (isMounted) {
+          fetchUserProfile()
+        }
+      }, 500) // Slightly longer delay since we have data
+    } else {
+      // No local data, fetch immediately but still defer slightly
+      initTimeout = setTimeout(() => {
+        if (isMounted) {
+          fetchUserProfile()
+        }
+      }, 100) // Shorter delay if no data
+    }
 
     // Listen for auth changes with debouncing to prevent multiple rapid calls
     let authChangeTimeout = null
