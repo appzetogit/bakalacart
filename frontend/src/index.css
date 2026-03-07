@@ -271,14 +271,26 @@
   }
   
   /* CRITICAL: Prevent initial render blinks and transitions */
-  /* Disable transitions on initial load to prevent visual blinks */
-  body:not(.loaded) * {
+  /* Disable ALL transitions and animations on initial load to prevent visual blinks */
+  body:not(.loaded) *,
+  body:not(.loaded) *::before,
+  body:not(.loaded) *::after {
     transition: none !important;
     animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
   
   /* After initial load, enable transitions */
   body.loaded * {
     transition: inherit;
     animation: inherit;
+  }
+  
+  /* CRITICAL: Ensure auth pages render immediately without any opacity changes */
+  body:not(.loaded) [class*="AnimatedPage"],
+  body:not(.loaded) [class*="animated"],
+  body:not(.loaded) [class*="fade"] {
+    opacity: 1 !important;
+    transform: none !important;
   }

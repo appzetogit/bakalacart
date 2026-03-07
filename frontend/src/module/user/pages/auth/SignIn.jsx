@@ -53,14 +53,6 @@ export default function SignIn() {
   const returnTo = searchParamsInURL.get('returnTo');
   const from = location.state?.from || returnTo || "/";
 
-  const [authMethod, setAuthMethod] = useState("phone") // "phone" or "email"
-  const [formData, setFormData] = useState({
-    phone: "",
-    countryCode: "+91",
-    email: "",
-    name: "",
-    rememberMe: false,
-  })
   const [errors, setErrors] = useState({
     phone: "",
     email: "",
@@ -70,67 +62,112 @@ export default function SignIn() {
   const [apiError, setApiError] = useState("")
   const redirectHandledRef = useRef(false)
 
-  // Prefill form data from sessionStorage if available (when coming back from OTP)
-  // Or from localStorage if "Remember Me" was previously used
-  useEffect(() => {
-    // Priority 1: sessionStorage (transient state like coming back from OTP)
-    const storedSession = sessionStorage.getItem("userAuthData")
-    if (storedSession) {
-      try {
+  // CRITICAL: Initialize form data from localStorage/sessionStorage immediately
+  // This prevents state updates after initial render that cause blinks
+  const [authMethod, setAuthMethod] = useState(() => {
+    // Check sessionStorage first
+    try {
+      const storedSession = sessionStorage.getItem("userAuthData")
+      if (storedSession) {
         const data = JSON.parse(storedSession)
         if (data.method === "phone" && data.phone) {
-          setAuthMethod("phone")
-          const phoneParts = data.phone.split(" ")
-          if (phoneParts.length >= 2) {
-            setFormData(prev => ({
-              ...prev,
-              countryCode: phoneParts[0],
-              phone: phoneParts[1],
-              name: data.name || prev.name,
-              rememberMe: data.rememberMe || false
-            }))
-          }
+          return "phone"
         } else if (data.method === "email" && data.email) {
-          setAuthMethod("email")
-          setFormData(prev => ({
-            ...prev,
-            email: data.email,
-            name: data.name || prev.name,
-            rememberMe: data.rememberMe || false
-          }))
+          return "email"
         }
-        return // Skip localStorage if we have session data
-      } catch (e) {
-        console.error("Error parsing session auth data:", e)
       }
+    } catch (e) {
+      // Ignore parse errors
     }
 
-    // Priority 2: localStorage (persistent "Remember Me" state)
-    const remembered = localStorage.getItem("rememberedUser")
-    if (remembered) {
-      try {
+    // Check localStorage
+    try {
+      const remembered = localStorage.getItem("rememberedUser")
+      if (remembered) {
         const data = JSON.parse(remembered)
         if (data.method === "phone" && data.phone) {
-          setAuthMethod("phone")
-          setFormData(prev => ({
-            ...prev,
-            countryCode: data.countryCode || "+91",
-            phone: data.phone,
-            rememberMe: true
-          }))
+          return "phone"
         } else if (data.method === "email" && data.email) {
-          setAuthMethod("email")
-          setFormData(prev => ({
-            ...prev,
-            email: data.email,
-            rememberMe: true
-          }))
+          return "email"
         }
-      } catch (e) {
-        console.error("Error parsing remembered auth data:", e)
       }
+    } catch (e) {
+      // Ignore parse errors
     }
-  }, [])
+
+    return "phone" // Default
+  })
+
+  const [formData, setFormData] = useState(() => {
+    // Initialize from sessionStorage or localStorage immediately
+    try {
+      const storedSession = sessionStorage.getItem("userAuthData")
+      if (storedSession) {
+        const data = JSON.parse(storedSession)
+        if (data.method === "phone" && data.phone) {
+          const phoneParts = data.phone.split(" ")
+          if (phoneParts.length >= 2) {
+            return {
+              phone: phoneParts[1],
+              countryCode: phoneParts[0],
+              email: "",
+              name: data.name || "",
+              rememberMe: data.rememberMe || false,
+            }
+          }
+        } else if (data.method === "email" && data.email) {
+          return {
+            phone: "",
+            countryCode: "+91",
+            email: data.email,
+            name: data.name || "",
+            rememberMe: data.rememberMe || false,
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    // Check localStorage
+    try {
+      const remembered = localStorage.getItem("rememberedUser")
+      if (remembered) {
+        const data = JSON.parse(remembered)
+        if (data.method === "phone" && data.phone) {
+          return {
+            phone: data.phone,
+            countryCode: data.countryCode || "+91",
+            email: "",
+            name: "",
+            rememberMe: true,
+          }
+        } else if (data.method === "email" && data.email) {
+          return {
+            phone: "",
+            countryCode: "+91",
+            email: data.email,
+            name: "",
+            rememberMe: true,
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    // Default values
+    return {
+      phone: "",
+      countryCode: "+91",
+      email: "",
+      name: "",
+      rememberMe: false,
+    }
+  })
+
+  // Note: Form data is now initialized immediately in useState above
+  // No need for useEffect to set initial values - this prevents blink
 
   // Helper function to process signed-in user
   const processSignedInUser = async (user, source = "unknown") => {

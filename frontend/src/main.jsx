@@ -332,9 +332,13 @@ createRoot(rootElement).render(AppWrapper)
 
 // CRITICAL: Mark body as loaded after first render to enable transitions
 // This prevents initial render blinks while allowing smooth transitions later
+// Use multiple requestAnimationFrame calls to ensure it happens after all renders
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    document.body.classList.add('loaded')
+    requestAnimationFrame(() => {
+      // Only add loaded class after all initial renders are complete
+      document.body.classList.add('loaded')
+    })
   })
 })
 
