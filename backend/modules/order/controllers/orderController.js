@@ -346,9 +346,9 @@ export const createOrder = async (req, res) => {
       },
       assignmentInfo: {
         restaurantId: assignedRestaurantId,
-        zoneId: restaurantZone?._id?.toString(),
-        zoneName: restaurantZone?.name || restaurantZone?.zoneName,
-        assignedBy: 'zone_match',
+        zoneId: restaurantZone?._id?.toString() || null,
+        zoneName: restaurantZone?.name || restaurantZone?.zoneName || null,
+        assignedBy: restaurantZone ? 'zone_match' : 'manual',
         assignedAt: new Date()
       }
     });
@@ -400,9 +400,25 @@ export const createOrder = async (req, res) => {
           userLocation
         }, maxPreparationTime);
 
-        // ETA already includes preparation time, so use it directly
-        const finalMinETA = etaResult.minETA;
-        const finalMaxETA = etaResult.maxETA;
+        // Validate ETA values - ensure they are valid numbers, not NaN or undefined
+        let finalMinETA = etaResult?.minETA;
+        let finalMaxETA = etaResult?.maxETA;
+        
+        // Check if values are valid numbers
+        if (typeof finalMinETA !== 'number' || isNaN(finalMinETA) || finalMinETA <= 0) {
+          logger.warn('⚠️ Invalid minETA from ETA service, using default:', { minETA: finalMinETA });
+          finalMinETA = 25; // Default minimum ETA
+        }
+        if (typeof finalMaxETA !== 'number' || isNaN(finalMaxETA) || finalMaxETA <= 0) {
+          logger.warn('⚠️ Invalid maxETA from ETA service, using default:', { maxETA: finalMaxETA });
+          finalMaxETA = 30; // Default maximum ETA
+        }
+        
+        // Ensure minETA <= maxETA
+        if (finalMinETA > finalMaxETA) {
+          logger.warn('⚠️ minETA > maxETA, swapping values:', { minETA: finalMinETA, maxETA: finalMaxETA });
+          [finalMinETA, finalMaxETA] = [finalMaxETA, finalMinETA];
+        }
 
         // Update order with ETA (including preparation time)
         order.eta = {
@@ -411,7 +427,12 @@ export const createOrder = async (req, res) => {
           lastUpdated: new Date(),
           additionalTime: 0 // Will be updated when restaurant adds time
         };
-        order.estimatedDeliveryTime = Math.ceil((finalMinETA + finalMaxETA) / 2);
+        
+        // Calculate estimated delivery time - ensure it's a valid number
+        const calculatedETA = Math.ceil((finalMinETA + finalMaxETA) / 2);
+        order.estimatedDeliveryTime = (typeof calculatedETA === 'number' && !isNaN(calculatedETA) && calculatedETA > 0) 
+          ? calculatedETA 
+          : 30; // Default if calculation fails
 
         // Create order created event
         await OrderEvent.create({
@@ -434,14 +455,63 @@ export const createOrder = async (req, res) => {
           baseETA: `${etaResult.minETA}-${etaResult.maxETA} mins`
         });
       } else {
-        logger.warn('⚠️ Could not calculate ETA - missing location data');
+        logger.warn('⚠️ Could not calculate ETA - missing location data, using default values');
+        // Set default ETA values when location data is missing
+        order.eta = {
+          min: 25,
+          max: 30,
+          lastUpdated: new Date(),
+          additionalTime: 0
+        };
+        order.estimatedDeliveryTime = 30;
       }
     } catch (etaError) {
       logger.error('❌ Error calculating ETA:', etaError);
+      // Set default ETA values when ETA calculation fails
+      order.eta = {
+        min: 25,
+        max: 30,
+        lastUpdated: new Date(),
+        additionalTime: 0
+      };
+      order.estimatedDeliveryTime = 30;
       // Continue with order creation even if ETA calculation fails
     }
+    
+    // Final validation: Ensure ETA values are always valid numbers before saving
+    if (!order.eta || typeof order.eta.min !== 'number' || isNaN(order.eta.min) || order.eta.min <= 0) {
+      logger.warn('⚠️ Final validation: Invalid eta.min, setting default:', { eta: order.eta });
+      order.eta = order.eta || {};
+      order.eta.min = 25;
+    }
+    if (!order.eta || typeof order.eta.max !== 'number' || isNaN(order.eta.max) || order.eta.max <= 0) {
+      logger.warn('⚠️ Final validation: Invalid eta.max, setting default:', { eta: order.eta });
+      order.eta = order.eta || {};
+      order.eta.max = 30;
+    }
+    if (order.eta.min > order.eta.max) {
+      logger.warn('⚠️ Final validation: min > max, fixing:', { min: order.eta.min, max: order.eta.max });
+      [order.eta.min, order.eta.max] = [order.eta.max, order.eta.min];
+    }
+    if (typeof order.estimatedDeliveryTime !== 'number' || isNaN(order.estimatedDeliveryTime) || order.estimatedDeliveryTime <= 0) {
+      logger.warn('⚠️ Final validation: Invalid estimatedDeliveryTime, setting default:', { estimatedDeliveryTime: order.estimatedDeliveryTime });
+      order.estimatedDeliveryTime = Math.ceil((order.eta.min + order.eta.max) / 2) || 30;
+    }
 
-    await order.save();
+    // Save order - this must succeed for order creation
+    try {
+      await order.save();
+    } catch (saveError) {
+      logger.error('❌ Error saving order to database:', {
+        error: saveError.message,
+        stack: saveError.stack,
+        orderId: order.orderId,
+        restaurantId: assignedRestaurantId,
+        hasZone: !!restaurantZone
+      });
+      // Re-throw to be caught by main catch block
+      throw new Error(`Failed to save order: ${saveError.message}`);
+    }
 
     // Log order creation for debugging
     logger.info('Order created successfully:', {
