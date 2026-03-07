@@ -102,20 +102,35 @@ if (!rootElement) {
 
 // CRITICAL: Apply theme IMMEDIATELY before any rendering to prevent blink
 // This must happen synchronously before React renders
+// CRITICAL: Flutter WebView optimization - set everything immediately
 const savedTheme = localStorage.getItem('appTheme') || 'light'
 if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
   // Also set body and root background immediately to prevent white flash
   document.body.style.backgroundColor = '#0a0a0a'
   document.body.style.color = '#ffffff'
+  document.body.style.opacity = '1'
+  document.body.style.visibility = 'visible'
   rootElement.style.backgroundColor = '#0a0a0a'
+  rootElement.style.opacity = '1'
+  rootElement.style.visibility = 'visible'
+  rootElement.style.display = 'block'
 } else {
   document.documentElement.classList.remove('dark')
   // Set body and root background immediately to prevent white flash
   document.body.style.backgroundColor = '#ffffff'
   document.body.style.color = '#000000'
+  document.body.style.opacity = '1'
+  document.body.style.visibility = 'visible'
   rootElement.style.backgroundColor = '#ffffff'
+  rootElement.style.opacity = '1'
+  rootElement.style.visibility = 'visible'
+  rootElement.style.display = 'block'
 }
+
+// CRITICAL: Ensure document is visible immediately for Flutter WebView
+document.documentElement.style.opacity = '1'
+document.documentElement.style.visibility = 'visible'
 
 // Suppress browser extension errors (defer to avoid blocking render)
 // Use requestIdleCallback or setTimeout to defer this setup
@@ -340,6 +355,23 @@ const AppWrapper = import.meta.env.PROD ? (
   </StrictMode>
 )
 
+// CRITICAL: Set root element visibility immediately before React renders
+// This prevents Flutter WebView loading blink
+// CRITICAL: Remove any placeholder content before React renders (if exists)
+const placeholder = rootElement.querySelector('div[style*="placeholder"], div[style*="Placeholder"]')
+if (placeholder) {
+  placeholder.remove()
+}
+
+rootElement.style.opacity = '1'
+rootElement.style.visibility = 'visible'
+rootElement.style.display = 'block'
+rootElement.style.backgroundColor = savedTheme === 'dark' ? '#0a0a0a' : '#ffffff'
+document.body.style.opacity = '1'
+document.body.style.visibility = 'visible'
+document.documentElement.style.opacity = '1'
+document.documentElement.style.visibility = 'visible'
+
 createRoot(rootElement).render(AppWrapper)
 
 // CRITICAL: Mark body as loaded after first render to enable transitions
@@ -350,6 +382,11 @@ requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       // Only add loaded class after all initial renders are complete
       document.body.classList.add('loaded')
+      // Ensure visibility is maintained
+      document.body.style.opacity = '1'
+      document.body.style.visibility = 'visible'
+      rootElement.style.opacity = '1'
+      rootElement.style.visibility = 'visible'
     })
   })
 })

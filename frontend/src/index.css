@@ -272,6 +272,22 @@
   
   /* CRITICAL: Prevent initial render blinks and transitions */
   /* Disable ALL transitions and animations on initial load to prevent visual blinks */
+  /* CRITICAL: Flutter WebView optimization - ensure everything is visible immediately */
+  html,
+  body,
+  #root {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  html:not(.loaded),
+  body:not(.loaded),
+  #root:not(.loaded) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+  
   body:not(.loaded) *,
   body:not(.loaded) *::before,
   body:not(.loaded) *::after {
@@ -279,6 +295,7 @@
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    visibility: visible !important;
   }
   
   /* After initial load, enable transitions */

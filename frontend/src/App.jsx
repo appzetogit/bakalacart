@@ -9,7 +9,11 @@ import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/ut
 // Loading component for lazy-loaded routes
 // CRITICAL: Return null to prevent any loading blink/flash
 // Components will render immediately without showing loading state
-const LoadingFallback = () => null
+// CRITICAL: For Flutter WebView - ensure no visual element is shown
+const LoadingFallback = () => {
+  // Return absolutely nothing - not even a fragment
+  return null
+}
 
 // Helper to ensure dynamic imports work with Vite aliases
 const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
