@@ -82,21 +82,87 @@ class JWTService {
    */
   verifyToken(token, type = 'access') {
     try {
-      const decoded = jwt.verify(token, this.secret);
+      // Validate token format before verification
+      if (!token || typeof token !== 'string' || token.trim() === '') {
+        throw new Error('Token is empty or invalid format');
+      }
+
+      // Trim whitespace from token
+      const cleanToken = token.trim();
+
+      // Check if token has the correct JWT structure (3 parts separated by dots)
+      const parts = cleanToken.split('.');
+      if (parts.length !== 3) {
+        throw new Error(`Invalid token format: JWT must have 3 parts, got ${parts.length}`);
+      }
+
+      // Try to decode without verification first to get more info
+      let decodedWithoutVerify = null;
+      try {
+        decodedWithoutVerify = jwt.decode(cleanToken, { complete: true });
+      } catch (decodeError) {
+        // If decode fails, token is completely malformed
+        throw new Error(`Token decode failed: ${decodeError.message}`);
+      }
+
+      // If decode succeeded but no payload, token is invalid
+      if (!decodedWithoutVerify || !decodedWithoutVerify.payload) {
+        throw new Error('Token payload is missing or invalid');
+      }
+
+      // Now verify with secret
+      const decoded = jwt.verify(cleanToken, this.secret);
 
       if (decoded.type !== type) {
-        throw new Error(`Invalid token type. Expected ${type}, got ${decoded.type}`);
+        throw new Error(`Invalid token type. Expected ${type}, got ${decoded.type || 'unknown'}`);
       }
 
       return decoded;
     } catch (error) {
+      // Handle specific JWT errors
       if (error.name === 'TokenExpiredError') {
         throw new Error('Token expired');
       }
+      
       if (error.name === 'JsonWebTokenError') {
-        throw new Error('Invalid token');
+        // Provide more specific error message based on error details
+        const errorMsg = error.message || 'Invalid token';
+        
+        // Check decoded token info if available
+        let decodedInfo = '';
+        try {
+          const decoded = jwt.decode(token?.trim(), { complete: true });
+          if (decoded) {
+            decodedInfo = ` (decoded: role=${decoded.payload?.role || 'unknown'}, type=${decoded.payload?.type || 'unknown'})`;
+          }
+        } catch (e) {
+          // Ignore decode errors here
+        }
+        
+        if (errorMsg.toLowerCase().includes('signature') || errorMsg.toLowerCase().includes('invalid signature')) {
+          throw new Error(`Invalid token signature - token may be corrupted or signed with different secret${decodedInfo}`);
+        }
+        if (errorMsg.toLowerCase().includes('malformed') || errorMsg.toLowerCase().includes('jwt malformed')) {
+          throw new Error(`Malformed token - token format is invalid${decodedInfo}`);
+        }
+        if (errorMsg.toLowerCase().includes('jwt secret') || errorMsg.toLowerCase().includes('secret')) {
+          throw new Error(`Token verification failed - secret mismatch${decodedInfo}`);
+        }
+        
+        // Generic JsonWebTokenError with decoded info
+        throw new Error(`Invalid token: ${errorMsg}${decodedInfo}`);
       }
-      throw error;
+      
+      // Re-throw if it's already our custom error
+      if (error.message && (error.message.includes('Token is empty') || 
+          error.message.includes('Invalid token format') || 
+          error.message.includes('Token decode failed') ||
+          error.message.includes('Token payload'))) {
+        throw error;
+      }
+      
+      // For any other errors, wrap them
+      throw new Error(`Token verification failed: ${error.message || error.name || 'Unknown error'}`);
     }
   }
 

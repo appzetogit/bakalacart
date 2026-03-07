@@ -6,6 +6,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import { asyncHandler } from '../../../shared/middleware/asyncHandler.js';
 import { normalizePhoneNumber } from '../../../shared/utils/phoneUtils.js';
 import winston from 'winston';
+import jwt from 'jsonwebtoken';
 
 /**
  * Build phone query that searches in multiple formats (with/without country code)
@@ -848,12 +849,48 @@ export const refreshToken = asyncHandler(async (req, res) => {
     logger.warn('❌ [Restaurant Refresh Token] No refresh token found', {
       hasCookie: !!req.cookies?.restaurant_refreshToken,
       hasGenericCookie: !!req.cookies?.refreshToken,
-      hasHeader: !!(req.headers['x-refresh-token'] || req.headers['X-Refresh-Token'])
+      hasHeader: !!(req.headers['x-refresh-token'] || req.headers['X-Refresh-Token']),
+      cookieNames: Object.keys(req.cookies || {}),
+      headerNames: Object.keys(req.headers || {}).filter(h => h.toLowerCase().includes('refresh'))
     });
     return errorResponse(res, 401, 'Refresh token not found');
   }
 
+  // Log token info for debugging (first 10 and last 10 chars only for security)
+  const tokenPreview = refreshToken.length > 20 
+    ? `${refreshToken.substring(0, 10)}...${refreshToken.substring(refreshToken.length - 10)}`
+    : '***';
+  const tokenParts = refreshToken.split('.');
+  
+  logger.info('🔍 [Restaurant Refresh Token] Attempting to refresh', {
+    tokenLength: refreshToken.length,
+    tokenParts: tokenParts.length,
+    tokenPreview,
+    hasValidFormat: tokenParts.length === 3
+  });
+
   try {
+    // Try to decode token without verification first to get diagnostic info
+    let decodedInfo = null;
+    try {
+      decodedInfo = jwt.decode(refreshToken, { complete: true });
+      if (decodedInfo) {
+        logger.info('🔍 [Restaurant Refresh Token] Token decoded (without verification)', {
+          hasPayload: !!decodedInfo.payload,
+          role: decodedInfo.payload?.role,
+          type: decodedInfo.payload?.type,
+          userId: decodedInfo.payload?.userId,
+          exp: decodedInfo.payload?.exp,
+          iat: decodedInfo.payload?.iat,
+          isExpired: decodedInfo.payload?.exp ? (Date.now() / 1000 > decodedInfo.payload.exp) : null
+        });
+      }
+    } catch (decodeError) {
+      logger.warn('⚠️ [Restaurant Refresh Token] Failed to decode token (diagnostic)', {
+        error: decodeError.message
+      });
+    }
+
     // Verify refresh token
     const decoded = jwtService.verifyRefreshToken(refreshToken);
 
@@ -862,7 +899,8 @@ export const refreshToken = asyncHandler(async (req, res) => {
       logger.warn('❌ [Restaurant Refresh Token] Invalid role in token', {
         expectedRole: 'restaurant',
         actualRole: decoded.role,
-        userId: decoded.userId
+        userId: decoded.userId,
+        decodedInfo: decodedInfo?.payload
       });
       return errorResponse(res, 401, 'Invalid token for restaurant');
     }
@@ -902,11 +940,50 @@ export const refreshToken = asyncHandler(async (req, res) => {
       refreshToken: tokens.refreshToken
     });
   } catch (error) {
-    logger.error('❌ [Restaurant Refresh Token] Error refreshing token', {
+    // Try to decode token to get more diagnostic info
+    let decodedDiagnostic = null;
+    try {
+      decodedDiagnostic = jwt.decode(refreshToken, { complete: true });
+    } catch (e) {
+      // Ignore decode errors
+    }
+
+    // Enhanced error logging with more context
+    const errorDetails = {
       error: error.message,
-      stack: error.stack
-    });
-    return errorResponse(res, 401, error.message || 'Invalid refresh token');
+      errorName: error.name,
+      tokenLength: refreshToken?.length,
+      tokenParts: refreshToken?.split('.').length,
+      tokenPreview: tokenPreview,
+      hasSecret: !!process.env.JWT_SECRET,
+      secretLength: process.env.JWT_SECRET?.length || 0,
+      decodedRole: decodedDiagnostic?.payload?.role,
+      decodedType: decodedDiagnostic?.payload?.type,
+      decodedUserId: decodedDiagnostic?.payload?.userId,
+      decodedExp: decodedDiagnostic?.payload?.exp,
+      isExpired: decodedDiagnostic?.payload?.exp ? (Date.now() / 1000 > decodedDiagnostic.payload.exp) : null
+    };
+
+    // Don't log full stack in production to avoid exposing sensitive info
+    if (process.env.NODE_ENV === 'development') {
+      errorDetails.stack = error.stack;
+    }
+
+    logger.error('❌ [Restaurant Refresh Token] Error refreshing token', errorDetails);
+
+    // Return user-friendly error message
+    let errorMessage = 'Invalid refresh token';
+    if (error.message && error.message.toLowerCase().includes('expired')) {
+      errorMessage = 'Refresh token expired. Please login again.';
+    } else if (error.message && (error.message.toLowerCase().includes('signature') || error.message.toLowerCase().includes('secret'))) {
+      errorMessage = 'Token signature invalid. Token may be from different server. Please login again.';
+    } else if (error.message && error.message.toLowerCase().includes('format')) {
+      errorMessage = 'Invalid token format. Please login again.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    return errorResponse(res, 401, errorMessage);
   }
 });
 
