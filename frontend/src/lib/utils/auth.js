@@ -202,7 +202,38 @@ export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
   if (!token) return false;
 
   const timeUntilExpiry = getTokenExpirationTime(token);
-  if (timeUntilExpiry === null) return true; // Invalid token, should refresh
+  
+  // If token is invalid or expired, check if refresh token exists before returning true
+  // This prevents continuous refresh attempts when user is logged out
+  if (timeUntilExpiry === null) {
+    // Token is invalid - but only refresh if we have a refresh token
+    // Check current module from path or use a generic check
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    let module = 'user';
+    if (currentPath.includes('/restaurant')) module = 'restaurant';
+    else if (currentPath.includes('/delivery')) module = 'delivery';
+    else if (currentPath.includes('/admin')) module = 'admin';
+    
+    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+      localStorage.getItem('refreshToken');
+    
+    // Only return true if refresh token exists (user might still be logged in)
+    return !!(refreshToken && refreshToken.trim() !== '' && refreshToken !== 'null' && refreshToken !== 'undefined');
+  }
+
+  // If token is already expired (negative time), check refresh token before refreshing
+  if (timeUntilExpiry < 0) {
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    let module = 'user';
+    if (currentPath.includes('/restaurant')) module = 'restaurant';
+    else if (currentPath.includes('/delivery')) module = 'delivery';
+    else if (currentPath.includes('/admin')) module = 'admin';
+    
+    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+      localStorage.getItem('refreshToken');
+    
+    return !!(refreshToken && refreshToken.trim() !== '' && refreshToken !== 'null' && refreshToken !== 'undefined');
+  }
 
   // Refresh if token expires within threshold
   return timeUntilExpiry <= thresholdMs;
@@ -217,10 +248,7 @@ const lastRefreshAttempt = {};
  * @returns {Promise<boolean>} - True if refresh was successful or not needed
  */
 export async function proactiveTokenRefresh(module) {
-  const token = getModuleToken(module);
-  if (!token) return false;
-
-  // CRITICAL: Check if refresh token exists before attempting refresh
+  // CRITICAL: Check if refresh token exists FIRST before checking access token
   // If refresh token is missing, user is logged out - don't attempt refresh
   const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
     localStorage.getItem('refreshToken');
@@ -232,9 +260,24 @@ export async function proactiveTokenRefresh(module) {
     return false; // User is logged out, don't attempt refresh
   }
 
-  // Check if token needs refresh (expires within 5 minutes)
-  if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
-    return true; // Token is still valid, no refresh needed
+  const token = getModuleToken(module);
+  if (!token) {
+    // If no access token but refresh token exists, might need to refresh
+    // But check cooldown first
+    const now = Date.now();
+    const lastAttempt = lastRefreshAttempt[module] || 0;
+    const timeSinceLastAttempt = now - lastAttempt;
+    const COOLDOWN_PERIOD = 30 * 1000;
+    
+    if (timeSinceLastAttempt < COOLDOWN_PERIOD) {
+      return true; // Still in cooldown
+    }
+    // Continue to refresh attempt below
+  } else {
+    // Check if token needs refresh (expires within 5 minutes)
+    if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
+      return true; // Token is still valid, no refresh needed
+    }
   }
 
   // DEBOUNCING: Prevent multiple simultaneous refresh attempts

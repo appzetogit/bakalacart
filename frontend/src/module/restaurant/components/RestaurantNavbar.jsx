@@ -196,6 +196,18 @@ export default function RestaurantNavbar({
       const isAuthenticated = localStorage.getItem("restaurant_authenticated") === "true"
       if (!isAuthenticated) return
 
+      // CRITICAL: Check if refresh token exists before attempting refresh
+      // This prevents continuous refresh attempts after logout
+      const refreshToken = localStorage.getItem('restaurant_refreshToken') ||
+        localStorage.getItem('refreshToken');
+      
+      if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
+        if (import.meta.env.DEV) {
+          console.debug('[Restaurant Navbar] Skipping refresh - no refresh token (user logged out)');
+        }
+        return; // User is logged out, don't attempt refresh
+      }
+
       // Try to refresh token if needed
       try {
         await proactiveTokenRefresh('restaurant')

@@ -191,6 +191,19 @@ export default function App() {
     const modules = ['user', 'restaurant', 'delivery', 'admin'];
     const refreshAllTokens = () => {
       modules.forEach(module => {
+        // CRITICAL: Check if refresh token exists before attempting refresh
+        // This prevents continuous refresh attempts after logout
+        const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+          localStorage.getItem('refreshToken');
+        
+        // Skip if no refresh token (user is logged out)
+        if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
+          if (import.meta.env.DEV) {
+            console.debug(`[Background Refresh] Skipping ${module} - no refresh token (user logged out)`);
+          }
+          return; // Skip this module
+        }
+
         proactiveTokenRefresh(module).catch(err => {
           // Silent catch for network errors
           if (import.meta.env.DEV) console.debug(`[Background Refresh] Skipping ${module}:`, err.message);
