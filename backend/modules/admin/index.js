@@ -25,13 +25,29 @@ router.all('/users/logout-all', (req, res, next) => {
 
 router.get('/users/logout-status', getLogoutStatus);
 
-// Log route registration for debugging
+// Log route registration for debugging - CRITICAL for live debugging
 console.log('✅ [Admin Routes] Public logout endpoints registered:', {
   'POST /users/logout-all': '✅',
   'GET /users/logout-all': '✅',
   'PUT /users/logout-all': '✅',
   'PATCH /users/logout-all': '✅',
-  'GET /users/logout-status': '✅'
+  'GET /users/logout-status': '✅',
+  'Full URL': '/api/admin/users/logout-all',
+  'Environment': process.env.NODE_ENV || 'unknown',
+  'Timestamp': new Date().toISOString()
+});
+
+// Add route debugging middleware for logout-all
+router.use('/users/logout-all', (req, res, next) => {
+  console.log('🔍 [Route Debug] Logout-all route hit:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    timestamp: new Date().toISOString()
+  });
+  next();
 });
 
 // Admin management routes (protected)

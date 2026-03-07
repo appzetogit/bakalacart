@@ -582,7 +582,7 @@ app.use((req, res, next) => {
   }
 
   // Log 404 errors for debugging (especially for admin routes)
-  if (req.path.includes('/admin') || req.path.includes('refund')) {
+  if (req.path.includes('/admin') || req.path.includes('refund') || req.path.includes('logout-all')) {
     console.error('❌ [404 HANDLER] Route not found:', {
       method: req.method,
       path: req.path,
@@ -590,13 +590,26 @@ app.use((req, res, next) => {
       originalUrl: req.originalUrl,
       baseUrl: req.baseUrl,
       route: req.route?.path,
-      registeredRoutes: 'Check server startup logs for route registration'
+      registeredRoutes: 'Check server startup logs for route registration',
+      environment: process.env.NODE_ENV || 'unknown'
     });
-    console.error('💡 [404 HANDLER] Expected route: POST /api/admin/refund-requests/:orderId/process');
-    console.error('💡 [404 HANDLER] Make sure:');
+    
+    if (req.path.includes('logout-all')) {
+      console.error('💡 [404 HANDLER] Logout-all route not found!');
+      console.error('💡 [404 HANDLER] Expected route: POST /api/admin/users/logout-all');
+      console.error('💡 [404 HANDLER] Make sure:');
+      console.error('   1. Code is deployed to live server');
+      console.error('   2. Backend server has been RESTARTED after deployment');
+      console.error('   3. Check server startup logs for: "✅ [Admin Routes] Public logout endpoints registered"');
+      console.error('   4. Route is registered BEFORE protected routes in admin/index.js');
+    } else if (req.path.includes('refund')) {
+      console.error('💡 [404 HANDLER] Expected route: POST /api/admin/refund-requests/:orderId/process');
+    }
+    
+    console.error('💡 [404 HANDLER] General checks:');
     console.error('   1. Backend server has been restarted');
     console.error('   2. Route is registered (check startup logs)');
-    console.error('   3. Authentication token is valid');
+    console.error('   3. Authentication token is valid (if required)');
   }
 
   res.status(404).json({

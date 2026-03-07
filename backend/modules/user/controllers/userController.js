@@ -18,10 +18,26 @@ const logger = winston.createLogger({
 /**
  * Get user profile
  * GET /api/user/profile
+ * Supports both authenticated (req.user) and unauthenticated (userId query param) requests
  */
 export const getUserProfile = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
+    let userId;
+    
+    // Check if user is authenticated (from middleware)
+    if (req.user && req.user._id) {
+      userId = req.user._id;
+    } 
+    // If not authenticated, check for userId in query params
+    else if (req.query.userId) {
+      userId = req.query.userId;
+    } 
+    // If neither, return error
+    else {
+      return errorResponse(res, 400, 'User ID is required. Either authenticate or provide userId in query params.');
+    }
+
+    const user = await User.findById(userId)
       .select('-password')
       .lean();
 

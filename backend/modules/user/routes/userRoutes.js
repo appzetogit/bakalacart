@@ -21,11 +21,13 @@ const router = express.Router();
 // Check maintenance mode for user app
 router.use(checkMaintenanceMode('user'));
 
+// Public profile route - NO AUTHENTICATION REQUIRED
+router.get('/profile', getUserProfile);
+
 // All routes require user authentication
 router.use(authenticate);
 
-// Profile routes
-router.get('/profile', getUserProfile);
+// Protected profile routes
 router.put('/profile', updateUserProfile);
 
 // Profile image upload
