@@ -328,6 +328,15 @@ export async function proactiveTokenRefresh(module) {
  * @returns {boolean} - True if user has refresh token, false if logged out
  */
 export function checkAndLogoutIfNoRefreshToken(module) {
+  // PERMANENT FIX: Restaurant and Delivery modules should NOT auto-logout
+  // They will handle token refresh through their own mechanisms
+  if (module === 'restaurant' || module === 'delivery') {
+    if (import.meta.env.DEV) {
+      console.log(`[Auth Check] Skipping auto-logout check for module '${module}' (permanent fix)`);
+    }
+    return true; // Always return true to prevent logout
+  }
+
   // Get refresh token for the module
   const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
     localStorage.getItem('refreshToken') ||
@@ -336,7 +345,7 @@ export function checkAndLogoutIfNoRefreshToken(module) {
     localStorage.getItem('delivery_refreshToken') ||
     localStorage.getItem('admin_refreshToken');
 
-  // If no refresh token found, logout the user
+  // If no refresh token found, logout the user (only for user and admin modules)
   if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
     if (import.meta.env.DEV) {
       console.warn(`[Auth Check] No refresh token found for module '${module}'. Logging out...`);

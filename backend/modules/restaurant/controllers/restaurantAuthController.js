@@ -842,9 +842,14 @@ export const resetPassword = asyncHandler(async (req, res) => {
  */
 export const refreshToken = asyncHandler(async (req, res) => {
   // Try to find the refresh token in restaurant-specific cookie or generic cookie
-  const refreshToken = req.cookies?.restaurant_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  const refreshToken = req.cookies?.restaurant_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'] || req.headers['X-Refresh-Token'];
 
   if (!refreshToken) {
+    logger.warn('❌ [Restaurant Refresh Token] No refresh token found', {
+      hasCookie: !!req.cookies?.restaurant_refreshToken,
+      hasGenericCookie: !!req.cookies?.refreshToken,
+      hasHeader: !!(req.headers['x-refresh-token'] || req.headers['X-Refresh-Token'])
+    });
     return errorResponse(res, 401, 'Refresh token not found');
   }
 
@@ -854,6 +859,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
     // Ensure it's a restaurant token
     if (decoded.role !== 'restaurant') {
+      logger.warn('❌ [Restaurant Refresh Token] Invalid role in token', {
+        expectedRole: 'restaurant',
+        actualRole: decoded.role,
+        userId: decoded.userId
+      });
       return errorResponse(res, 401, 'Invalid token for restaurant');
     }
 
@@ -861,6 +871,9 @@ export const refreshToken = asyncHandler(async (req, res) => {
     const restaurant = await Restaurant.findById(decoded.userId).select('-password');
 
     if (!restaurant) {
+      logger.warn('❌ [Restaurant Refresh Token] Restaurant not found', {
+        userId: decoded.userId
+      });
       return errorResponse(res, 401, 'Restaurant not found');
     }
 
@@ -879,11 +892,20 @@ export const refreshToken = asyncHandler(async (req, res) => {
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
+    logger.info('✅ [Restaurant Refresh Token] Token refreshed successfully', {
+      restaurantId: restaurant._id.toString(),
+      restaurantName: restaurant.name
+    });
+
     return successResponse(res, 200, 'Token refreshed successfully', {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken
     });
   } catch (error) {
+    logger.error('❌ [Restaurant Refresh Token] Error refreshing token', {
+      error: error.message,
+      stack: error.stack
+    });
     return errorResponse(res, 401, error.message || 'Invalid refresh token');
   }
 });

@@ -280,9 +280,14 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  */
 export const refreshToken = asyncHandler(async (req, res) => {
   // Try to find the refresh token in delivery-specific cookie or generic cookie
-  const refreshToken = req.cookies?.delivery_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  const refreshToken = req.cookies?.delivery_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'] || req.headers['X-Refresh-Token'];
 
   if (!refreshToken) {
+    logger.warn('❌ [Delivery Refresh Token] No refresh token found', {
+      hasCookie: !!req.cookies?.delivery_refreshToken,
+      hasGenericCookie: !!req.cookies?.refreshToken,
+      hasHeader: !!(req.headers['x-refresh-token'] || req.headers['X-Refresh-Token'])
+    });
     return errorResponse(res, 401, 'Refresh token not found');
   }
 
@@ -292,6 +297,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
     // Ensure it's a delivery token
     if (decoded.role !== 'delivery') {
+      logger.warn('❌ [Delivery Refresh Token] Invalid role in token', {
+        expectedRole: 'delivery',
+        actualRole: decoded.role,
+        userId: decoded.userId
+      });
       return errorResponse(res, 401, 'Invalid token for delivery');
     }
 
@@ -299,6 +309,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
     const delivery = await Delivery.findById(decoded.userId).select('+refreshToken');
 
     if (!delivery || !delivery.isActive) {
+      logger.warn('❌ [Delivery Refresh Token] Delivery boy not found or inactive', {
+        userId: decoded.userId,
+        found: !!delivery,
+        isActive: delivery?.isActive
+      });
       return errorResponse(res, 401, 'Delivery boy not found or inactive');
     }
 
@@ -322,11 +337,20 @@ export const refreshToken = asyncHandler(async (req, res) => {
       maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
     });
 
+    logger.info('✅ [Delivery Refresh Token] Token refreshed successfully', {
+      deliveryId: delivery._id.toString(),
+      deliveryName: delivery.name
+    });
+
     return successResponse(res, 200, 'Token refreshed successfully', {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken
     });
   } catch (error) {
+    logger.error('❌ [Delivery Refresh Token] Error refreshing token', {
+      error: error.message,
+      stack: error.stack
+    });
     return errorResponse(res, 401, error.message || 'Invalid refresh token');
   }
 });

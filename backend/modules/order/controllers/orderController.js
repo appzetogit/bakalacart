@@ -209,77 +209,77 @@ export const createOrder = async (req, res) => {
     const restaurantLat = restaurant.location?.latitude || restaurant.location?.coordinates?.[1];
     const restaurantLng = restaurant.location?.longitude || restaurant.location?.coordinates?.[0];
 
-    if (!restaurantLat || !restaurantLng) {
-      logger.error('❌ Restaurant location not found:', {
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-        restaurantName: restaurant.name
-      });
-      return res.status(400).json({
-        success: false,
-        message: 'Restaurant location is not set. Please contact support.'
-      });
-    }
-
-    // Check if restaurant is within any active zone
-    const activeZones = await Zone.find({ isActive: true }).lean();
+    // Check if restaurant location is available
+    // If not available, allow order but skip zone validation and ETA calculation
     let restaurantInZone = false;
     let restaurantZone = null;
 
-    for (const zone of activeZones) {
-      if (!zone.coordinates || zone.coordinates.length < 3) continue;
-
-      let isInZone = false;
-      if (typeof zone.containsPoint === 'function') {
-        isInZone = zone.containsPoint(restaurantLat, restaurantLng);
-      } else {
-        // Ray casting algorithm
-        let inside = false;
-        for (let i = 0, j = zone.coordinates.length - 1; i < zone.coordinates.length; j = i++) {
-          const coordI = zone.coordinates[i];
-          const coordJ = zone.coordinates[j];
-          const xi = typeof coordI === 'object' ? (coordI.latitude || coordI.lat) : null;
-          const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
-          const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
-          const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
-
-          if (xi === null || yi === null || xj === null || yj === null) continue;
-
-          const intersect = ((yi > restaurantLng) !== (yj > restaurantLng)) &&
-            (restaurantLat < (xj - xi) * (restaurantLng - yi) / (yj - yi) + xi);
-          if (intersect) inside = !inside;
-        }
-        isInZone = inside;
-      }
-
-      if (isInZone) {
-        restaurantInZone = true;
-        restaurantZone = zone;
-        break;
-      }
-    }
-
-    if (!restaurantInZone) {
-      // Soft validation: log but DO NOT block order creation
-      logger.warn('⚠️ Restaurant location is not within any active zone (soft check only, order allowed):', {
+    if (!restaurantLat || !restaurantLng) {
+      logger.warn('⚠️ Restaurant location not found - allowing order but skipping zone validation and ETA calculation:', {
         restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-        restaurantName: restaurant.name,
-        restaurantLat,
-        restaurantLng
+        restaurantName: restaurant.name
       });
+      // Continue with order creation - zone validation and ETA will be skipped
     } else {
-      logger.info('✅ Restaurant validated - location is within active zone:', {
-        restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
-        restaurantName: restaurant.name,
-        zoneId: restaurantZone?._id?.toString(),
-        zoneName: restaurantZone?.name || restaurantZone?.zoneName
-      });
+      // Check if restaurant is within any active zone (only if location is available)
+      const activeZones = await Zone.find({ isActive: true }).lean();
+
+      for (const zone of activeZones) {
+        if (!zone.coordinates || zone.coordinates.length < 3) continue;
+
+        let isInZone = false;
+        if (typeof zone.containsPoint === 'function') {
+          isInZone = zone.containsPoint(restaurantLat, restaurantLng);
+        } else {
+          // Ray casting algorithm
+          let inside = false;
+          for (let i = 0, j = zone.coordinates.length - 1; i < zone.coordinates.length; j = i++) {
+            const coordI = zone.coordinates[i];
+            const coordJ = zone.coordinates[j];
+            const xi = typeof coordI === 'object' ? (coordI.latitude || coordI.lat) : null;
+            const yi = typeof coordI === 'object' ? (coordI.longitude || coordI.lng) : null;
+            const xj = typeof coordJ === 'object' ? (coordJ.latitude || coordJ.lat) : null;
+            const yj = typeof coordJ === 'object' ? (coordJ.longitude || coordJ.lng) : null;
+
+            if (xi === null || yi === null || xj === null || yj === null) continue;
+
+            const intersect = ((yi > restaurantLng) !== (yj > restaurantLng)) &&
+              (restaurantLat < (xj - xi) * (restaurantLng - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+          }
+          isInZone = inside;
+        }
+
+        if (isInZone) {
+          restaurantInZone = true;
+          restaurantZone = zone;
+          break;
+        }
+      }
+
+      if (!restaurantInZone) {
+        // Soft validation: log but DO NOT block order creation
+        logger.warn('⚠️ Restaurant location is not within any active zone (soft check only, order allowed):', {
+          restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
+          restaurantName: restaurant.name,
+          restaurantLat,
+          restaurantLng
+        });
+      } else {
+        logger.info('✅ Restaurant validated - location is within active zone:', {
+          restaurantId: restaurant._id?.toString() || restaurant.restaurantId,
+          restaurantName: restaurant.name,
+          zoneId: restaurantZone?._id?.toString(),
+          zoneName: restaurantZone?.name || restaurantZone?.zoneName
+        });
+      }
     }
 
     // NOTE: Cross-zone orders are now allowed
     // Users can order from restaurants in different zones
     const { zoneId: userZoneId } = req.body; // User's zone ID from frontend
 
-    if (userZoneId) {
+    if (userZoneId && restaurantZone) {
       const restaurantZoneId = restaurantZone._id.toString();
 
       if (restaurantZoneId !== userZoneId) {

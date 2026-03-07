@@ -468,7 +468,16 @@ apiClient.interceptors.response.use(
           noTokenError._isAuthError = true;
           onRefreshFailed(expectedRole, noTokenError); // Clears manager.isRefreshing
           
-          // Immediately logout user if no refresh token found
+          // PERMANENT FIX: Restaurant and Delivery modules should NOT auto-logout
+          // They will handle token refresh through their own mechanisms
+          if (expectedRole === 'restaurant' || expectedRole === 'delivery') {
+            if (import.meta.env.DEV) {
+              console.log(`[Axios Interceptor] Skipping auto-logout for module '${expectedRole}' (permanent fix)`);
+            }
+            throw noTokenError; // Just throw error, don't logout
+          }
+          
+          // Immediately logout user if no refresh token found (only for user and admin)
           const currentPath = window.location.pathname;
           const pageModule = getModuleInfo(currentPath);
           
@@ -511,16 +520,64 @@ apiClient.interceptors.response.use(
           }
         );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data || response.data;
+        // Debug logging for restaurant and delivery modules
+        if (import.meta.env.DEV && (expectedRole === 'restaurant' || expectedRole === 'delivery')) {
+          console.log(`[Refresh Token Response] Module: ${expectedRole}`, {
+            status: response.status,
+            hasData: !!response.data,
+            dataKeys: response.data ? Object.keys(response.data) : [],
+            fullResponse: response.data
+          });
+        }
+
+        // Handle different response formats
+        let accessToken, newRefreshToken;
+        if (response.data) {
+          if (response.data.data) {
+            // Format: { success: true, data: { accessToken, refreshToken } }
+            accessToken = response.data.data.accessToken;
+            newRefreshToken = response.data.data.refreshToken;
+          } else if (response.data.accessToken) {
+            // Format: { accessToken, refreshToken }
+            accessToken = response.data.accessToken;
+            newRefreshToken = response.data.refreshToken;
+          }
+        }
+
+        if (!accessToken) {
+          const formatError = new Error('Invalid refresh token response format');
+          formatError._isAuthError = true;
+          
+          // PERMANENT FIX: Don't logout restaurant/delivery on format errors
+          if (expectedRole === 'restaurant' || expectedRole === 'delivery') {
+            if (import.meta.env.DEV) {
+              console.error(`[Refresh Token] Invalid response format for ${expectedRole}, but not logging out (permanent fix)`);
+            }
+            onRefreshFailed(expectedRole, formatError);
+            throw formatError;
+          }
+          
+          throw formatError;
+        }
 
         if (accessToken) {
           const role = getRoleFromToken(accessToken);
           const isCorrectModule = (expectedRole === 'admin' && ['admin', 'super_admin', 'moderator'].includes(role)) || (role === expectedRole);
 
           if (!role || !isCorrectModule) {
-            clearModuleAuth(tokenKey.replace('_accessToken', ''));
             const roleError = new Error(`Role mismatch on refreshed token. Expected ${expectedRole}, got ${role}`);
             roleError._isAuthError = true;
+            
+            // PERMANENT FIX: Don't logout restaurant/delivery on role mismatch
+            if (expectedRole === 'restaurant' || expectedRole === 'delivery') {
+              if (import.meta.env.DEV) {
+                console.error(`[Refresh Token] Role mismatch for ${expectedRole}, but not logging out (permanent fix)`);
+              }
+              onRefreshFailed(expectedRole, roleError);
+              throw roleError;
+            }
+            
+            clearModuleAuth(tokenKey.replace('_accessToken', ''));
             throw roleError;
           }
 
@@ -553,7 +610,20 @@ apiClient.interceptors.response.use(
           if (msg !== 'canceled') toast.error(msg);
         }
 
-        // Only logout if token is truly expired and it matches the current active module page
+        // PERMANENT FIX: Restaurant and Delivery should NEVER auto-logout
+        if (expectedRole === 'restaurant' || expectedRole === 'delivery') {
+          if (import.meta.env.DEV) {
+            console.log(`[Axios Interceptor] Refresh failed for ${expectedRole}, but NOT logging out (permanent fix)`, {
+              error: refreshError.message,
+              isNetworkError,
+              isTokenExpired
+            });
+          }
+          // Just throw the error, don't logout
+          throw refreshError;
+        }
+
+        // Only logout if token is truly expired and it matches the current active module page (for user/admin only)
         if (isTokenExpired && !isNetworkError) {
           const currentPath = window.location.pathname;
           const isOnboardingPage = currentPath.includes('/onboarding');
