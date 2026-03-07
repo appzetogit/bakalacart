@@ -109,14 +109,6 @@ export const processRestaurantAvailability = async () => {
             'deliveryTimings.openingTime': { $exists: true, $ne: null },
             'deliveryTimings.closingTime': { $exists: true, $ne: null }
         }).lean();
-        
-        if (!restaurant) return null;
-        return {
-          _id: restaurant._id,
-          name: restaurant.name,
-          deliveryTimings: restaurant.deliveryTimings,
-          isAcceptingOrders: restaurant.isAcceptingOrders
-        };
 
         if (restaurants.length === 0) {
             return { processed: 0, message: 'No restaurants with timings found' };
