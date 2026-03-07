@@ -474,7 +474,7 @@ export default function HomePage() {
               <p className="text-white text-xs font-medium mb-0.5">Your Location</p>
               <div className="flex items-center gap-1">
                 <div className="flex-1 min-w-0">
-                  {locationLoading && !location ? (
+                  {locationLoading && !location && !storedLocation ? (
                     <p className="text-white text-sm font-bold truncate">
                       Loading...
                     </p>

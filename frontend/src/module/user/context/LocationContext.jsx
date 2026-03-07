@@ -164,42 +164,97 @@ export const LocationProvider = ({ children }) => {
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
                 setError("Geolocation not supported")
-                resolve(null)
+                setLoading(false)
+                const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                setLocation(fallback)
+                resolve(fallback)
                 return
             }
 
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    const { latitude, longitude, accuracy } = pos.coords
-                    const addr = await reverseGeocodeWithGoogleMaps(latitude, longitude)
-                    const finalLoc = { ...addr, latitude, longitude, accuracy, isManual: false }
-
-                    // Only update if not currently a manual selection, OR if we are explicitly ignoring manual (e.g. user clicked "Use current location")
-                    if (!isManualRef.current || ignoreManual) {
-                        isManualRef.current = false // Reset manual status as we are using GPS
-                        setLocation(finalLoc)
-                        localStorage.setItem("userLocation", JSON.stringify(finalLoc))
-                        if (updateDB) updateLocationInDB(finalLoc)
-                    }
-
-                    setPermissionGranted(true)
-                    setLoading(false)
-                    resolve(finalLoc)
-                },
-                async (err) => {
-                    console.warn("⚠️ [LocationContext] Geolocation error:", err.message)
-                    const stored = localStorage.getItem("userLocation")
-                    if (stored) {
+            // Add a safety timeout to ensure loading is always set to false
+            const safetyTimeout = setTimeout(() => {
+                setLoading(false)
+                const stored = localStorage.getItem("userLocation")
+                if (stored) {
+                    try {
                         const parsed = JSON.parse(stored)
                         setLocation(parsed)
                         setPermissionGranted(true)
-                        setLoading(false)
                         resolve(parsed)
+                    } catch (e) {
+                        const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                        setLocation(fallback)
+                        resolve(fallback)
+                    }
+                } else {
+                    const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                    setLocation(fallback)
+                    resolve(fallback)
+                }
+            }, 20000) // 20 seconds max (longer than geolocation timeout)
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    clearTimeout(safetyTimeout)
+                    try {
+                        const { latitude, longitude, accuracy } = pos.coords
+                        const addr = await reverseGeocodeWithGoogleMaps(latitude, longitude)
+                        const finalLoc = { ...addr, latitude, longitude, accuracy, isManual: false }
+
+                        // Only update if not currently a manual selection, OR if we are explicitly ignoring manual (e.g. user clicked "Use current location")
+                        if (!isManualRef.current || ignoreManual) {
+                            isManualRef.current = false // Reset manual status as we are using GPS
+                            setLocation(finalLoc)
+                            localStorage.setItem("userLocation", JSON.stringify(finalLoc))
+                            if (updateDB) updateLocationInDB(finalLoc)
+                        }
+
+                        setPermissionGranted(true)
+                        setLoading(false)
+                        resolve(finalLoc)
+                    } catch (error) {
+                        clearTimeout(safetyTimeout)
+                        console.error("❌ [LocationContext] Error processing location:", error)
+                        setLoading(false)
+                        const stored = localStorage.getItem("userLocation")
+                        if (stored) {
+                            try {
+                                const parsed = JSON.parse(stored)
+                                setLocation(parsed)
+                                resolve(parsed)
+                            } catch (e) {
+                                const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                                setLocation(fallback)
+                                resolve(fallback)
+                            }
+                        } else {
+                            const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                            setLocation(fallback)
+                            resolve(fallback)
+                        }
+                    }
+                },
+                async (err) => {
+                    clearTimeout(safetyTimeout)
+                    console.warn("⚠️ [LocationContext] Geolocation error:", err.message)
+                    setLoading(false)
+                    const stored = localStorage.getItem("userLocation")
+                    if (stored) {
+                        try {
+                            const parsed = JSON.parse(stored)
+                            setLocation(parsed)
+                            setPermissionGranted(true)
+                            resolve(parsed)
+                        } catch (e) {
+                            const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                            setLocation(fallback)
+                            setPermissionGranted(false)
+                            resolve(fallback)
+                        }
                     } else {
                         const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
                         setLocation(fallback)
                         setPermissionGranted(false)
-                        setLoading(false)
                         resolve(fallback)
                     }
                 },
@@ -255,26 +310,66 @@ export const LocationProvider = ({ children }) => {
 
     /* ===================== INITIALIZATION ===================== */
     useEffect(() => {
+        let initTimeout = null
+        let isMounted = true
+
         const init = async () => {
             const stored = localStorage.getItem("userLocation")
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored)
-                    setLocation(parsed)
-                    isManualRef.current = !!parsed.isManual
-                    setPermissionGranted(true)
-                    setLoading(false)
+                    if (isMounted) {
+                        setLocation(parsed)
+                        isManualRef.current = !!parsed.isManual
+                        setPermissionGranted(true)
+                        setLoading(false)
+                    }
                 } catch (e) {
-                    getLocation(false, true)
+                    // Set loading to false immediately if stored location is invalid
+                    if (isMounted) {
+                        setLoading(false)
+                    }
+                    // Try to get location but don't block on it
+                    getLocation(false, true).catch(() => {
+                        // Ensure loading is false even if getLocation fails
+                        if (isMounted) {
+                            setLoading(false)
+                        }
+                    })
                 }
             } else {
-                getLocation(false, true)
+                // Set a timeout to ensure loading doesn't stay true forever
+                initTimeout = setTimeout(() => {
+                    if (isMounted) {
+                        setLoading(false)
+                        // Set fallback location if geolocation takes too long
+                        const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+                        setLocation(fallback)
+                    }
+                }, 10000) // 10 seconds max wait
+
+                // Try to get location but don't block
+                getLocation(false, true).finally(() => {
+                    if (initTimeout) clearTimeout(initTimeout)
+                    if (isMounted) {
+                        setLoading(false)
+                    }
+                }).catch(() => {
+                    if (isMounted) {
+                        setLoading(false)
+                    }
+                })
             }
 
             startWatchingLocation()
         }
 
         init()
+
+        return () => {
+            isMounted = false
+            if (initTimeout) clearTimeout(initTimeout)
+        }
 
         const handleStorageChange = (e) => {
             if (e.key === "userLocation" && e.newValue) {
