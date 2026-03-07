@@ -32,6 +32,12 @@ export const authenticate = async (req, res, next) => {
       return errorResponse(res, 401, 'User account is inactive');
     }
 
+    // Check if user was force logged out (forceLogoutAt check)
+    // If token was issued before forceLogoutAt timestamp, reject it
+    if (user.forceLogoutAt && decoded.iat * 1000 < user.forceLogoutAt.getTime()) {
+      return errorResponse(res, 401, 'Session expired. Please login again.');
+    }
+
     // Attach user to request
     req.user = user;
     req.token = decoded;
