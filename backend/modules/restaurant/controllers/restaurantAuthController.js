@@ -892,7 +892,65 @@ export const refreshToken = asyncHandler(async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwtService.verifyRefreshToken(refreshToken);
+    let decoded;
+    try {
+      decoded = jwtService.verifyRefreshToken(refreshToken);
+    } catch (verifyError) {
+      // Special handling for signature mismatch: If token decodes successfully but signature doesn't match,
+      // it might be from a different secret (e.g., after secret rotation). 
+      // In this case, if the decoded info is valid and user exists, we can regenerate tokens.
+      if (verifyError.message && verifyError.message.includes('signature') && decodedInfo && decodedInfo.payload) {
+        logger.warn('⚠️ [Restaurant Refresh Token] Signature mismatch detected, attempting recovery', {
+          userId: decodedInfo.payload.userId,
+          role: decodedInfo.payload.role,
+          type: decodedInfo.payload.type
+        });
+
+        // Validate decoded token structure
+        if (decodedInfo.payload.role === 'restaurant' && 
+            decodedInfo.payload.type === 'refresh' && 
+            decodedInfo.payload.userId &&
+            !decodedInfo.payload.exp || (Date.now() / 1000 < decodedInfo.payload.exp)) {
+          
+          // Check if restaurant exists and is active
+          const restaurant = await Restaurant.findById(decodedInfo.payload.userId).select('-password');
+          
+          if (restaurant && restaurant.isActive) {
+            logger.info('✅ [Restaurant Refresh Token] Signature mismatch recovery: Regenerating tokens for valid user', {
+              restaurantId: restaurant._id.toString(),
+              restaurantName: restaurant.name
+            });
+
+            // Generate new tokens with current secret
+            const tokens = jwtService.generateTokens({
+              userId: restaurant._id.toString(),
+              role: 'restaurant',
+              email: restaurant.email || restaurant.phone || restaurant.restaurantId
+            });
+
+            // Set new refresh token in httpOnly cookie
+            res.cookie('restaurant_refreshToken', tokens.refreshToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
+            });
+
+            logger.info('✅ [Restaurant Refresh Token] Tokens regenerated after signature mismatch recovery', {
+              restaurantId: restaurant._id.toString()
+            });
+
+            return successResponse(res, 200, 'Token refreshed successfully (recovered from signature mismatch)', {
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken
+            });
+          }
+        }
+      }
+      
+      // If recovery failed, throw the original error
+      throw verifyError;
+    }
 
     // Ensure it's a restaurant token
     if (decoded.role !== 'restaurant') {

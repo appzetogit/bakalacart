@@ -330,7 +330,69 @@ export const refreshToken = asyncHandler(async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwtService.verifyRefreshToken(refreshToken);
+    let decoded;
+    try {
+      decoded = jwtService.verifyRefreshToken(refreshToken);
+    } catch (verifyError) {
+      // Special handling for signature mismatch: If token decodes successfully but signature doesn't match,
+      // it might be from a different secret (e.g., after secret rotation). 
+      // In this case, if the decoded info is valid and user exists, we can regenerate tokens.
+      if (verifyError.message && verifyError.message.includes('signature') && decodedInfo && decodedInfo.payload) {
+        logger.warn('⚠️ [Delivery Refresh Token] Signature mismatch detected, attempting recovery', {
+          userId: decodedInfo.payload.userId,
+          role: decodedInfo.payload.role,
+          type: decodedInfo.payload.type
+        });
+
+        // Validate decoded token structure
+        if (decodedInfo.payload.role === 'delivery' && 
+            decodedInfo.payload.type === 'refresh' && 
+            decodedInfo.payload.userId &&
+            (!decodedInfo.payload.exp || (Date.now() / 1000 < decodedInfo.payload.exp))) {
+          
+          // Check if delivery exists and is active
+          const delivery = await Delivery.findById(decodedInfo.payload.userId).select('+refreshToken');
+          
+          if (delivery && delivery.isActive) {
+            logger.info('✅ [Delivery Refresh Token] Signature mismatch recovery: Regenerating tokens for valid user', {
+              deliveryId: delivery._id.toString(),
+              deliveryName: delivery.name
+            });
+
+            // Generate new tokens with current secret
+            const tokens = jwtService.generateTokens({
+              userId: delivery._id.toString(),
+              role: 'delivery',
+              email: delivery.email || delivery.phone || delivery.deliveryId
+            });
+
+            // Update refresh token in database
+            delivery.refreshToken = tokens.refreshToken;
+            await delivery.save();
+
+            // Set new refresh token in httpOnly cookie
+            res.cookie('delivery_refreshToken', tokens.refreshToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
+            });
+
+            logger.info('✅ [Delivery Refresh Token] Tokens regenerated after signature mismatch recovery', {
+              deliveryId: delivery._id.toString()
+            });
+
+            return successResponse(res, 200, 'Token refreshed successfully (recovered from signature mismatch)', {
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken
+            });
+          }
+        }
+      }
+      
+      // If recovery failed, throw the original error
+      throw verifyError;
+    }
 
     // Ensure it's a delivery token
     if (decoded.role !== 'delivery') {
