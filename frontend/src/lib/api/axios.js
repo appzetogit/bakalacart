@@ -447,9 +447,23 @@ apiClient.interceptors.response.use(
           localStorage.getItem('refreshToken') ||
           localStorage.getItem('user_refreshToken') ||
           localStorage.getItem('restaurant_refreshToken') ||
-          localStorage.getItem('delivery_refreshToken');
+          localStorage.getItem('delivery_refreshToken') ||
+          localStorage.getItem('admin_refreshToken');
 
-        if (!refreshToken) {
+        // Debug logging for restaurant and delivery modules
+        if (import.meta.env.DEV && (expectedRole === 'restaurant' || expectedRole === 'delivery')) {
+          console.log(`[Refresh Token Debug] Module: ${expectedRole}`, {
+            hasModuleToken: !!localStorage.getItem(`${expectedRole}_refreshToken`),
+            hasGenericToken: !!localStorage.getItem('refreshToken'),
+            hasToken: !!refreshToken,
+            allTokens: {
+              module: localStorage.getItem(`${expectedRole}_refreshToken`)?.substring(0, 20) + '...',
+              generic: localStorage.getItem('refreshToken')?.substring(0, 20) + '...',
+            }
+          });
+        }
+
+        if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
           const noTokenError = new Error('Session expired, please log in again');
           noTokenError._isAuthError = true;
           onRefreshFailed(expectedRole, noTokenError); // Clears manager.isRefreshing
@@ -483,12 +497,17 @@ apiClient.interceptors.response.use(
           throw noTokenError;
         }
 
+        // Ensure header name matches exactly what backend expects
+        // Send both uppercase and lowercase versions for maximum compatibility
         const response = await axios.post(
           `${API_BASE_URL}${refreshEndpoint}`,
           {},
           {
             withCredentials: true,
-            headers: { 'X-Refresh-Token': refreshToken }
+            headers: { 
+              'X-Refresh-Token': refreshToken,
+              'x-refresh-token': refreshToken // Also send lowercase for compatibility
+            }
           }
         );
 
