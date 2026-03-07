@@ -259,38 +259,54 @@ export const updateUserLocation = asyncHandler(async (req, res) => {
     // Save to database
     await user.save();
 
-    // --- FIREBASE SYNC WITH TIMEOUT ---
-    try {
-      const { getFirebaseDb } = await import('../../../shared/services/firebaseAdmin.js');
-      const db = getFirebaseDb();
-      if (db) {
-        const syncPromise = db.ref(`users/${user._id}`).update({
-          lat: latNum,
-          lng: lngNum,
-          accuracy: locationUpdate.accuracy || 0,
-          address: locationUpdate.address || '',
-          area: locationUpdate.area || '',
-          city: locationUpdate.city || '',
-          state: locationUpdate.state || '',
-          formatted_address: locationUpdate.formattedAddress || '',
-          last_updated: Date.now()
-        });
+    // --- FIREBASE SYNC WITH TIMEOUT (Non-blocking) ---
+    // Only sync to Firebase if we have valid coordinates (either new or existing)
+    const finalLat = locationUpdate.latitude;
+    const finalLng = locationUpdate.longitude;
+    const hasFinalValidCoords = finalLat !== undefined && finalLat !== null && 
+                                 finalLng !== undefined && finalLng !== null &&
+                                 !isNaN(finalLat) && !isNaN(finalLng);
 
-        // 3 second timeout for Firebase sync so it doesn't block the API response
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Firebase sync timeout')), 3000)
-        );
+    if (hasFinalValidCoords) {
+      // Fire and forget - don't block API response
+      (async () => {
+        try {
+          const { getFirebaseDb } = await import('../../../shared/services/firebaseAdmin.js');
+          const db = getFirebaseDb();
+          if (db) {
+            const syncPromise = db.ref(`users/${user._id}`).update({
+              lat: finalLat,
+              lng: finalLng,
+              accuracy: locationUpdate.accuracy || 0,
+              address: locationUpdate.address || '',
+              area: locationUpdate.area || '',
+              city: locationUpdate.city || '',
+              state: locationUpdate.state || '',
+              formatted_address: locationUpdate.formattedAddress || '',
+              last_updated: Date.now()
+            });
 
-        await Promise.race([syncPromise, timeoutPromise]);
-        console.log(`✅ User ${user._id} location synced to Firebase`);
-      }
-    } catch (fbError) {
-      console.warn('⚠️ Firebase User Sync failed or timed out:', fbError.message);
+            // 5 second timeout for Firebase sync (increased from 3 seconds)
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Firebase sync timeout')), 5000)
+            );
+
+            await Promise.race([syncPromise, timeoutPromise]);
+            console.log(`✅ User ${user._id} location synced to Firebase`);
+          }
+        } catch (fbError) {
+          // Silently handle Firebase sync errors - don't spam logs
+          // Only log if it's not a timeout (timeouts are expected and handled gracefully)
+          if (!fbError.message?.includes('timeout')) {
+            console.warn('⚠️ Firebase User Sync failed:', fbError.message);
+          }
+        }
+      })();
     }
 
     logger.info(`User live location updated: ${user._id}`, {
-      latitude: latNum,
-      longitude: lngNum,
+      latitude: finalLat,
+      longitude: finalLng,
       city: user.currentLocation.city,
       area: user.currentLocation.area,
       formattedAddress: user.currentLocation.formattedAddress,
