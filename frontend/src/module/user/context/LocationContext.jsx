@@ -322,17 +322,21 @@ export const LocationProvider = ({ children }) => {
                         try {
                             const parsed = JSON.parse(stored)
                             if (isMounted) {
-                                // Only update if different to prevent unnecessary re-renders
-                                if (JSON.stringify(location) !== JSON.stringify(parsed)) {
-                                    setLocation(parsed)
-                                }
-                                isManualRef.current = !!parsed.isManual
-                                if (!permissionGranted) {
-                                    setPermissionGranted(true)
-                                }
-                                if (loading) {
-                                    setLoading(false)
-                                }
+                                // Use requestAnimationFrame to batch state updates and prevent blink
+                                requestAnimationFrame(() => {
+                                    if (!isMounted) return
+                                    // Only update if different to prevent unnecessary re-renders
+                                    if (JSON.stringify(location) !== JSON.stringify(parsed)) {
+                                        setLocation(parsed)
+                                    }
+                                    isManualRef.current = !!parsed.isManual
+                                    if (!permissionGranted) {
+                                        setPermissionGranted(true)
+                                    }
+                                    if (loading) {
+                                        setLoading(false)
+                                    }
+                                })
                             }
                         } catch (e) {
                             if (isMounted && !location) {
@@ -351,14 +355,17 @@ export const LocationProvider = ({ children }) => {
                 }
 
                 init()
-            }, 300) // 300ms delay to ensure app renders first
+            }, 500) // Longer delay to ensure app renders first
         } else {
             // We already have location, just start watching and mark as initialized
             hasInitializedRef.current = true
             isManualRef.current = !!location.isManual
-            if (isMounted) {
-                startWatchingLocation()
-            }
+            // Use requestAnimationFrame to ensure this happens after render
+            requestAnimationFrame(() => {
+                if (isMounted) {
+                    startWatchingLocation()
+                }
+            })
         }
 
         const handleStorageChange = (e) => {

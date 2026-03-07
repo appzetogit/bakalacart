@@ -7,11 +7,9 @@ import AuthRedirect from "@/components/AuthRedirect"
 import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/utils/auth"
 
 // Loading component for lazy-loaded routes
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-  </div>
-)
+// CRITICAL: Return null to prevent any loading blink/flash
+// Components will render immediately without showing loading state
+const LoadingFallback = () => null
 
 // Helper to ensure dynamic imports work with Vite aliases
 const lazyImport = (importFn, fallbackPath = null) => lazy(() => {

@@ -179,7 +179,7 @@ export default function UserLayout() {
     location.pathname.startsWith("/user/profile")
 
   return (
-    <div className={`min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200 ${isMaintenanceMode ? 'overflow-x-hidden' : ''}`}>
+    <div className={`min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] ${isMaintenanceMode ? 'overflow-x-hidden' : ''}`}>
       <MaintenanceBanner mode="user" />
       <div className={isMaintenanceMode ? 'grayscale-[0.5] opacity-90 pointer-events-none' : ''}>
         <CartProvider>

@@ -269,3 +269,16 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  
+  /* CRITICAL: Prevent initial render blinks and transitions */
+  /* Disable transitions on initial load to prevent visual blinks */
+  body:not(.loaded) * {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  /* After initial load, enable transitions */
+  body.loaded * {
+    transition: inherit;
+    animation: inherit;
+  }

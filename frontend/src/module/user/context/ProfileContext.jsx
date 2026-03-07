@@ -304,23 +304,26 @@ export function ProfileProvider({ children }) {
     // CRITICAL: Only fetch if we don't have local data, or defer if we do
     // This prevents unnecessary loading states and blinks
     if (hasLocalDataValue) {
-      // We have local data, set loading to false immediately if it's true
-      if (isMounted && loading) {
-        setLoading(false)
-      }
+      // We have local data, ensure loading is false immediately
+      // Use requestAnimationFrame to ensure this happens after render
+      requestAnimationFrame(() => {
+        if (isMounted && loading) {
+          setLoading(false)
+        }
+      })
       // Still fetch in background to update, but don't show loading
       initTimeout = setTimeout(() => {
         if (isMounted) {
           fetchUserProfile()
         }
-      }, 500) // Slightly longer delay since we have data
+      }, 1000) // Longer delay since we have data - no rush
     } else {
       // No local data, fetch immediately but still defer slightly
       initTimeout = setTimeout(() => {
         if (isMounted) {
           fetchUserProfile()
         }
-      }, 100) // Shorter delay if no data
+      }, 200) // Slightly longer delay to allow render to complete
     }
 
     // Listen for auth changes with debouncing to prevent multiple rapid calls

@@ -330,6 +330,14 @@ const AppWrapper = import.meta.env.PROD ? (
 
 createRoot(rootElement).render(AppWrapper)
 
+// CRITICAL: Mark body as loaded after first render to enable transitions
+// This prevents initial render blinks while allowing smooth transitions later
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.body.classList.add('loaded')
+  })
+})
+
 // Initialize non-critical features after React has rendered
 // This ensures FCP and LCP are not blocked
 initializeNonCriticalFeatures()
