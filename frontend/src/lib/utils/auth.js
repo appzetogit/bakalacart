@@ -328,9 +328,9 @@ export async function proactiveTokenRefresh(module) {
  * @returns {boolean} - True if user has refresh token, false if logged out
  */
 export function checkAndLogoutIfNoRefreshToken(module) {
-  // PERMANENT FIX: Restaurant and Delivery modules should NOT auto-logout
+  // PERMANENT FIX: Restaurant, Delivery, and Admin modules should NOT auto-logout
   // They will handle token refresh through their own mechanisms
-  if (module === 'restaurant' || module === 'delivery') {
+  if (module === 'restaurant' || module === 'delivery' || module === 'admin') {
     if (import.meta.env.DEV) {
       console.log(`[Auth Check] Skipping auto-logout check for module '${module}' (permanent fix)`);
     }

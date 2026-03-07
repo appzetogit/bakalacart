@@ -335,13 +335,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
     // Get user based on role from token
     const role = decoded.role;
 
-    // Ensure this generic refresh endpoint is only used for user role
-    // or properly identifies the user from the token. 
-    // Mismatch here causes frontend logouts.
-    if (role !== 'user') {
-      return errorResponse(res, 401, 'Invalid token role for user module');
-    }
-
     let user;
     if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
       user = await Admin.findById(decoded.userId);
@@ -362,15 +355,21 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Session expired. Please login again.');
     }
 
-    // CRITICAL: Verify refresh token matches stored token in database
+    // CRITICAL: Verify refresh token matches stored token in database FIRST
     // If refreshToken is deleted from database, this will fail and user will be logged out
+    // This check happens BEFORE role validation to give better error message
+    if (!user.refreshToken) {
+      return errorResponse(res, 401, 'Refresh token not found in database. Please login again.');
+    }
+
     if (user.refreshToken && user.refreshToken !== refreshToken) {
       return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
     }
 
-    // If refreshToken is null/undefined in database, user must login again
-    if (!user.refreshToken) {
-      return errorResponse(res, 401, 'Refresh token not found. Please login again.');
+    // Ensure this generic refresh endpoint is only used for user role
+    // Check role AFTER database validation to provide better error messages
+    if (role !== 'user') {
+      return errorResponse(res, 401, 'Invalid token role for user module. Please use the correct module endpoint.');
     }
 
     // Generate new access and refresh tokens

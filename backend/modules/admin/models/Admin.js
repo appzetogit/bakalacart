@@ -73,6 +73,11 @@ const adminSchema = new mongoose.Schema({
   fcmTokens: {
     type: [String],
     default: []
+  },
+  // Refresh token (for JWT) - stored in database for validation
+  refreshToken: {
+    type: String,
+    select: false // Don't return refresh token by default
   }
 }, {
   timestamps: true

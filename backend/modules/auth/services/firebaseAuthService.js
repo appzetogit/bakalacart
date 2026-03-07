@@ -75,7 +75,18 @@ class FirebaseAuthService {
 
       try {
         if (!admin.apps.length) {
-          const databaseURL = process.env.FIREBASE_DATABASE_URL || `https://${projectId}-default-rtdb.firebaseio.com/`;
+          // Use regional URL for asia-southeast1 region
+          let databaseURL = process.env.FIREBASE_DATABASE_URL;
+          
+          // If no URL provided or using old firebaseio.com format, use regional URL
+          if (!databaseURL || databaseURL.includes('firebaseio.com')) {
+            if (projectId === 'bakalaa-8f5c2') {
+              databaseURL = `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+            } else {
+              databaseURL = `https://${projectId}-default-rtdb.firebaseio.com/`;
+            }
+          }
+          
           admin.initializeApp({
             credential: admin.credential.cert({
               projectId,

@@ -11,7 +11,9 @@ const firebaseConfig = {
   appId: "1:411950794141:web:16997299bfa32af55a1b74",
   messagingSenderId: "411950794141",
   storageBucket: "bakalaa-8f5c2.firebasestorage.app",
-  measurementId: "G-TQVDSX2Z02"
+  measurementId: "G-TQVDSX2Z02",
+  // Use regional database URL for asia-southeast1 region
+  databaseURL: "https://bakalaa-8f5c2-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 // Initialize Firebase app only once

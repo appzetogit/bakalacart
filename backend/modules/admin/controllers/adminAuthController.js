@@ -66,6 +66,10 @@ export const adminSignup = asyncHandler(async (req, res) => {
       adminRole: admin.role
     });
 
+    // Update refresh token in database
+    admin.refreshToken = tokens.refreshToken;
+    await admin.save();
+
     // Set refresh token in httpOnly cookie with admin-specific name
     res.cookie('admin_refreshToken', tokens.refreshToken, {
       httpOnly: true,
@@ -134,6 +138,10 @@ export const adminLogin = asyncHandler(async (req, res) => {
     email: admin.email,
     adminRole: admin.role
   });
+
+  // Update refresh token in database
+  admin.refreshToken = tokens.refreshToken;
+  await admin.save();
 
   // Set refresh token in httpOnly cookie with admin-specific name
   res.cookie('admin_refreshToken', tokens.refreshToken, {
@@ -216,6 +224,10 @@ export const adminSignupWithOTP = asyncHandler(async (req, res) => {
       email: admin.email,
       adminRole: admin.role
     });
+
+    // Update refresh token in database
+    admin.refreshToken = tokens.refreshToken;
+    await admin.save();
 
     // Set refresh token in httpOnly cookie
     res.cookie('admin_refreshToken', tokens.refreshToken, {
@@ -313,11 +325,28 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Invalid token for admin');
     }
 
-    // Get admin from database
-    const admin = await Admin.findById(decoded.userId);
+    // Get admin from database (include refreshToken for validation)
+    const admin = await Admin.findById(decoded.userId).select('+refreshToken');
 
     if (!admin || !admin.isActive) {
       return errorResponse(res, 401, 'Admin not found or inactive');
+    }
+
+    // CRITICAL: Verify refresh token matches stored token in database
+    // If refreshToken is deleted from database, this will fail and admin will be logged out
+    if (admin.refreshToken && admin.refreshToken !== refreshToken) {
+      logger.warn('❌ [Admin Refresh Token] Token mismatch - database token different', {
+        adminId: admin._id.toString()
+      });
+      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
+    }
+
+    // If refreshToken is null/undefined in database, admin must login again
+    if (!admin.refreshToken) {
+      logger.warn('❌ [Admin Refresh Token] Token not found in database - admin must login', {
+        adminId: admin._id.toString()
+      });
+      return errorResponse(res, 401, 'Refresh token not found. Please login again.');
     }
 
     // Generate new access and refresh tokens
@@ -327,6 +356,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
       email: admin.email,
       adminRole: admin.role
     });
+
+    // Update refresh token in database
+    admin.refreshToken = tokens.refreshToken;
+    await admin.save();
 
     // Set new refresh token in httpOnly cookie
     res.cookie('admin_refreshToken', tokens.refreshToken, {
