@@ -269,20 +269,42 @@ export function ProfileProvider({ children }) {
           }
         }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchUserProfile()
+      if (isMounted) {
+        fetchUserProfile()
+      }
+    }, 300) // 300ms delay to ensure app renders first
 
-    // Listen for auth changes
+    // Listen for auth changes with debouncing to prevent multiple rapid calls
+    let authChangeTimeout = null
     const handleAuthChange = () => {
-      fetchUserProfile()
+      // Clear any pending calls
+      if (authChangeTimeout) {
+        clearTimeout(authChangeTimeout)
+      }
+      // Debounce by 300ms to prevent multiple rapid calls
+      authChangeTimeout = setTimeout(() => {
+        if (isMounted && !isAuthPage()) {
+          fetchUserProfile()
+        }
+      }, 300)
     }
 
     window.addEventListener("userAuthChanged", handleAuthChange)
 
     return () => {
+      isMounted = false
+      if (initTimeout) {
+        clearTimeout(initTimeout)
+      }
+      if (authChangeTimeout) {
+        clearTimeout(authChangeTimeout)
+      }
       window.removeEventListener("userAuthChanged", handleAuthChange)
     }
   }, [])

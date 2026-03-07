@@ -181,30 +181,42 @@ function UserPathRedirect() {
 
 export default function App() {
   useEffect(() => {
-    initializePushNotifications();
+    let interval = null;
+    
+    // CRITICAL: Defer all auth checks to allow app to render first
+    // This prevents blocking the initial render in Flutter WebView
+    const initTimer = setTimeout(() => {
+      initializePushNotifications();
 
-    // Check if users have refresh tokens and logout if missing
-    // This ensures users without refresh tokens are automatically logged out
-    checkAllModulesForRefreshTokens();
+      // Check if users have refresh tokens and logout if missing
+      // This ensures users without refresh tokens are automatically logged out
+      // Deferred to allow app to render first
+      checkAllModulesForRefreshTokens();
 
-    // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
-    const modules = ['user', 'restaurant', 'delivery', 'admin'];
-    const refreshAllTokens = () => {
-      modules.forEach(module => {
-        proactiveTokenRefresh(module).catch(err => {
-          // Silent catch for network errors
-          if (import.meta.env.DEV) console.debug(`[Background Refresh] Skipping ${module}:`, err.message);
+      // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
+      const modules = ['user', 'restaurant', 'delivery', 'admin'];
+      const refreshAllTokens = () => {
+        modules.forEach(module => {
+          proactiveTokenRefresh(module).catch(err => {
+            // Silent catch for network errors
+            if (import.meta.env.DEV) console.debug(`[Background Refresh] Skipping ${module}:`, err.message);
+          });
         });
-      });
+      };
+
+      // Run once after initial delay
+      refreshAllTokens();
+
+      // Set interval for periodic refresh
+      interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
+    }, 500); // 500ms delay to ensure app renders first
+
+    return () => {
+      clearTimeout(initTimer);
+      if (interval) {
+        clearInterval(interval);
+      }
     };
-
-    // Run once on mount (after checking refresh tokens)
-    refreshAllTokens();
-
-    // Set interval for periodic refresh
-    const interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
-
-    return () => clearInterval(interval);
   }, []);
 
   return (
