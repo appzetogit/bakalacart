@@ -977,6 +977,137 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Logout a specific user by deleting their refresh token
+ * POST /api/admin/users/:id/logout
+ */
+export const logoutUser = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const User = (await import('../../auth/models/User.js')).default;
+
+    const user = await User.findById(id).select('+refreshToken');
+
+    if (!user) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    // Delete refresh token from database
+    user.refreshToken = undefined;
+    await user.save();
+
+    logger.info(`User logged out by admin: ${id}`, {
+      userId: id,
+      userName: user.name,
+      loggedOutBy: req.user._id
+    });
+
+    return successResponse(res, 200, 'User logged out successfully', {
+      userId: user._id.toString(),
+      userName: user.name
+    });
+  } catch (error) {
+    logger.error(`Error logging out user: ${error.message}`, { error: error.stack });
+    return errorResponse(res, 500, 'Failed to logout user');
+  }
+});
+
+/**
+ * Logout all users by clearing all refresh tokens
+ * POST /api/admin/users/logout-all
+ */
+export const logoutAllUsers = asyncHandler(async (req, res) => {
+  try {
+    const User = (await import('../../auth/models/User.js')).default;
+
+    // Get count before logout
+    const usersWithTokenBefore = await User.countDocuments({
+      role: 'user',
+      refreshToken: { $exists: true, $ne: null }
+    });
+
+    // Update all users to remove refresh tokens
+    const result = await User.updateMany(
+      { role: 'user', refreshToken: { $exists: true, $ne: null } },
+      { $unset: { refreshToken: '' } }
+    );
+
+    // Get count after logout
+    const usersWithTokenAfter = await User.countDocuments({
+      role: 'user',
+      refreshToken: { $exists: true, $ne: null }
+    });
+
+    // Get total users count
+    const totalUsers = await User.countDocuments({ role: 'user' });
+
+    logger.info(`All users logged out`, {
+      usersLoggedOut: result.modifiedCount,
+      usersWithTokenBefore,
+      usersWithTokenAfter,
+      totalUsers,
+      loggedOutBy: req.user?._id || 'public_endpoint'
+    });
+
+    return successResponse(res, 200, 'All users logged out successfully', {
+      usersLoggedOut: result.modifiedCount,
+      usersWithTokenBefore,
+      usersWithTokenAfter,
+      totalUsers,
+      verification: {
+        allLoggedOut: usersWithTokenAfter === 0,
+        message: usersWithTokenAfter === 0 
+          ? '✅ All users successfully logged out - no refresh tokens remaining'
+          : `⚠️ ${usersWithTokenAfter} users still have refresh tokens`
+      }
+    });
+  } catch (error) {
+    logger.error(`Error logging out all users: ${error.message}`, { error: error.stack });
+    return errorResponse(res, 500, 'Failed to logout all users');
+  }
+});
+
+/**
+ * Verify logout status - check how many users have refresh tokens
+ * GET /api/admin/users/logout-status
+ */
+export const getLogoutStatus = asyncHandler(async (req, res) => {
+  try {
+    const User = (await import('../../auth/models/User.js')).default;
+
+    // Count users with refresh tokens
+    const usersWithToken = await User.countDocuments({
+      role: 'user',
+      refreshToken: { $exists: true, $ne: null }
+    });
+
+    // Count users without refresh tokens
+    const usersWithoutToken = await User.countDocuments({
+      role: 'user',
+      $or: [
+        { refreshToken: { $exists: false } },
+        { refreshToken: null }
+      ]
+    });
+
+    // Total users
+    const totalUsers = await User.countDocuments({ role: 'user' });
+
+    return successResponse(res, 200, 'Logout status retrieved successfully', {
+      totalUsers,
+      usersWithToken,
+      usersWithoutToken,
+      allLoggedOut: usersWithToken === 0,
+      status: usersWithToken === 0 
+        ? '✅ All users are logged out'
+        : `⚠️ ${usersWithToken} users are still logged in`
+    });
+  } catch (error) {
+    logger.error(`Error getting logout status: ${error.message}`, { error: error.stack });
+    return errorResponse(res, 500, 'Failed to get logout status');
+  }
+});
+
+/**
  * Get All Restaurants
  * GET /api/admin/restaurants
  * Query params: page, limit, search, status, cuisine, zone

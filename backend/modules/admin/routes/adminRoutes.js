@@ -13,6 +13,9 @@ import {
   getUsers,
   getUserById,
   updateUserStatus,
+  logoutUser,
+  logoutAllUsers,
+  getLogoutStatus,
   getRestaurants,
   createRestaurant,
   updateRestaurantStatus,
@@ -256,6 +259,10 @@ const router = express.Router();
 // Debug: Log route file loading
 console.log('📦 Loading adminRoutes.js - All routes will be registered');
 
+// Logout all users route - NO AUTHENTICATION REQUIRED (public endpoint)
+router.post('/users/logout-all', logoutAllUsers);
+router.get('/users/logout-status', getLogoutStatus);
+
 // All admin routes require admin authentication
 router.use(authenticateAdmin);
 
@@ -311,6 +318,7 @@ router.put('/settings/change-password', changeAdminPassword);
 router.get('/users', getUsers);
 router.get('/users/:id', getUserById);
 router.put('/users/:id/status', updateUserStatus);
+router.post('/users/:id/logout', logoutUser);
 router.get('/customer-wallet-report', getCustomerWalletReport);
 
 // Restaurant Management
