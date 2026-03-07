@@ -353,6 +353,11 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'User not found or inactive');
     }
 
+    // Check if user has been forced to logout
+    if (user.forceLogoutAt) {
+      return errorResponse(res, 401, 'Session expired. Please login again.');
+    }
+
     // For delivery partners, verify refresh token matches stored token (original behavior)
     if (role === 'delivery' && user.refreshToken && user.refreshToken !== refreshToken) {
       return errorResponse(res, 401, 'Invalid refresh token');

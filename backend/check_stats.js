@@ -13,6 +13,7 @@ async function check() {
 
     const orderCount = await mongoose.connection.db.collection('orders').countDocuments();
     const userCount = await mongoose.connection.db.collection('users').countDocuments();
+    const customerCount = await mongoose.connection.db.collection('users').countDocuments({ role: 'user' });
     const restaurantCount = await mongoose.connection.db.collection('restaurants').countDocuments();
     const deliveryCount = await mongoose.connection.db.collection('deliveries').countDocuments();
     const settlementCount = await mongoose.connection.db.collection('ordersettlements').countDocuments();
@@ -20,7 +21,8 @@ async function check() {
 
     console.log('Stats:');
     console.log('Orders:', orderCount);
-    console.log('Users:', userCount);
+    console.log('Total Users (all roles):', userCount);
+    console.log('Customers (role: user):', customerCount);
     console.log('Restaurants:', restaurantCount);
     console.log('Deliveries:', deliveryCount);
     console.log('Settlements:', settlementCount);
