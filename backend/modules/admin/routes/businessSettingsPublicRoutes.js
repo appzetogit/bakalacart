@@ -7,5 +7,8 @@ const router = express.Router();
 // GET /api/business-settings/public
 router.get('/business-settings/public', getBusinessSettingsPublic);
 
+// Alias for app startup / login screen: GET /api/settings (same as business-settings/public)
+router.get('/settings', getBusinessSettingsPublic);
+
 export default router;
 

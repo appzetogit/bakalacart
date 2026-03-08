@@ -29,8 +29,19 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       return errorResponse(res, 404, 'User profile not found');
     }
 
+    // Ensure no undefined in response (Flutter/login screen parsing)
+    const safeUser = {
+      ...user,
+      email: user.email ?? null,
+      phone: user.phone ?? null,
+      profileImage: user.profileImage ?? null,
+      dateOfBirth: user.dateOfBirth ?? null,
+      anniversary: user.anniversary ?? null,
+      gender: user.gender ?? null
+    };
+
     return successResponse(res, 200, 'User profile retrieved successfully', {
-      user
+      user: safeUser
     });
   } catch (error) {
     logger.error(`Error fetching user profile: ${error.message}`);

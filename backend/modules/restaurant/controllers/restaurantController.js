@@ -341,16 +341,16 @@ export const getRestaurants = async (req, res) => {
     });
 
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
-      restaurants,
+      restaurants: restaurants || [],
       total: restaurants.length,
       filters: {
-        sortBy,
-        cuisine,
-        minRating,
-        maxDeliveryTime,
-        maxDistance,
-        maxPrice,
-        hasOffers
+        sortBy: sortBy ?? null,
+        cuisine: cuisine ?? null,
+        minRating: minRating ?? null,
+        maxDeliveryTime: maxDeliveryTime ?? null,
+        maxDistance: maxDistance ?? null,
+        maxPrice: maxPrice ?? null,
+        hasOffers: hasOffers ?? null
       }
     });
   } catch (error) {

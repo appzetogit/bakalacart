@@ -254,8 +254,13 @@ export async function proactiveTokenRefresh(module) {
     const { API_BASE_URL } = await import('../api/config.js');
 
     // FIX: Fallback to generic refreshToken if module-specific one is missing
+    // Check multiple possible keys to ensure we find the refresh token
     const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-      localStorage.getItem('refreshToken');
+      localStorage.getItem('refreshToken') ||
+      (module === 'user' ? localStorage.getItem('user_refreshToken') : null) ||
+      localStorage.getItem('restaurant_refreshToken') ||
+      localStorage.getItem('delivery_refreshToken') ||
+      localStorage.getItem('admin_refreshToken');
 
     // ONLY attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
     // This dramatically reduces "Refresh token not found" 401 errors from backend
@@ -335,6 +340,29 @@ export function checkAndLogoutIfNoRefreshToken(module) {
       console.log(`[Auth Check] Skipping auto-logout check for module '${module}' (permanent fix)`);
     }
     return true; // Always return true to prevent logout
+  }
+
+  // Skip check if user is on an auth page (they're already logging in)
+  const pathname = window.location.pathname;
+  const authPaths = [
+    '/auth/sign-in',
+    '/auth/otp',
+    '/auth/callback',
+    '/restaurant/login',
+    '/restaurant/signup',
+    '/restaurant/auth/sign-in',
+    '/restaurant/forgot-password',
+    '/restaurant/otp',
+    '/delivery/sign-in',
+    '/delivery/signup',
+    '/delivery/otp',
+    '/admin/login'
+  ];
+  if (authPaths.some(path => pathname.startsWith(path))) {
+    if (import.meta.env.DEV) {
+      console.log(`[Auth Check] Skipping check on auth page: ${pathname}`);
+    }
+    return true; // Don't logout on auth pages
   }
 
   // Get refresh token for the module

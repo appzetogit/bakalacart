@@ -1,5 +1,6 @@
 // Restaurant module
 import express from 'express';
+import asyncHandler from '../../shared/middleware/asyncHandler.js';
 import { authenticate } from './middleware/restaurantAuth.js';
 import { uploadMiddleware } from '../../shared/utils/cloudinaryService.js';
 import restaurantAuthRoutes from './routes/restaurantAuthRoutes.js';
@@ -63,7 +64,7 @@ router.post('/offers', authenticate, createOffer);
 router.get('/offers', authenticate, getOffers);
 router.get('/offers/item/:itemId/coupons', authenticate, getCouponsByItemId);
 // Public offers route - must come before /offers/:id to avoid route conflict
-router.get('/offers/public', getPublicOffers);
+router.get('/offers/public', asyncHandler(getPublicOffers));
 router.get('/offers/:id', authenticate, getOfferById);
 router.put('/offers/:id/status', authenticate, updateOfferStatus);
 router.delete('/offers/:id', authenticate, deleteOffer);
@@ -97,16 +98,16 @@ router.get('/wallet/stats', authenticate, getWalletStats);
 router.post('/withdrawal/request', authenticate, createWithdrawalRequest);
 router.get('/withdrawal/requests', authenticate, getRestaurantWithdrawalRequests);
 
-// Restaurant routes (public - for user module)
-router.get('/list', getRestaurants);
-router.get('/under-250', getRestaurantsWithDishesUnder250);
+// Restaurant routes (public - for user module / app startup)
+router.get('/list', asyncHandler(getRestaurants));
+router.get('/under-250', asyncHandler(getRestaurantsWithDishesUnder250));
 // Menu and inventory routes must come before /:id to avoid route conflicts
-router.get('/:restaurantId/offers/item/:itemId/coupons', getCouponsByItemIdPublic);
-router.get('/:restaurantId/outlet-timings', getOutletTimingsByRestaurantId);
-router.get('/:id/menu', getMenuByRestaurantId);
-router.get('/:id/addons', getAddonsByRestaurantId);
-router.get('/:id/inventory', getInventoryByRestaurantId);
-router.get('/:id', getRestaurantById);
+router.get('/:restaurantId/offers/item/:itemId/coupons', asyncHandler(getCouponsByItemIdPublic));
+router.get('/:restaurantId/outlet-timings', asyncHandler(getOutletTimingsByRestaurantId));
+router.get('/:id/menu', asyncHandler(getMenuByRestaurantId));
+router.get('/:id/addons', asyncHandler(getAddonsByRestaurantId));
+router.get('/:id/inventory', asyncHandler(getInventoryByRestaurantId));
+router.get('/:id', asyncHandler(getRestaurantById));
 
 // Restaurant routes (authenticated - for restaurant module)
 router.get('/owner/me', authenticate, getRestaurantByOwner);

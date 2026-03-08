@@ -3,6 +3,31 @@ import { authAPI, userAPI } from "@/lib/api"
 
 const ProfileContext = createContext(null)
 
+// Helper function to check if current page is an auth page
+const isAuthPage = () => {
+  const pathname = window.location.pathname;
+  const authPaths = [
+    '/auth/sign-in',
+    '/auth/otp',
+    '/auth/callback',
+    '/restaurant/login',
+    '/restaurant/signup',
+    '/restaurant/signup-email',
+    '/restaurant/auth/sign-in',
+    '/restaurant/forgot-password',
+    '/restaurant/otp',
+    '/restaurant/auth/google-callback',
+    '/restaurant/welcome',
+    '/delivery/sign-in',
+    '/delivery/signup',
+    '/delivery/otp',
+    '/delivery/welcome',
+    '/delivery/terms',
+    '/admin/login'
+  ];
+  return authPaths.some(path => pathname.startsWith(path));
+};
+
 export function ProfileProvider({ children }) {
   const [userProfile, setUserProfile] = useState(() => {
     // First, try to get from localStorage (user_user from auth)

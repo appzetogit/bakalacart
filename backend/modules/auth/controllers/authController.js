@@ -321,8 +321,11 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  * POST /api/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Prioritize user-specific refresh token cookie or generic refreshToken cookie
-  const refreshToken = req.cookies?.user_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  // Prioritize user-specific refresh token cookie or generic refreshToken cookie; then header (any casing)
+  const refreshToken = req.cookies?.user_refreshToken
+    || req.cookies?.refreshToken
+    || req.headers['x-refresh-token']
+    || req.headers['X-Refresh-Token'];
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');

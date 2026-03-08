@@ -346,10 +346,10 @@ export const getLandingConfig = async (req, res) => {
     ]);
 
     return successResponse(res, 200, 'Landing config retrieved successfully', {
-      categories,
-      exploreMore,
+      categories: categories || [],
+      exploreMore: exploreMore || [],
       settings: {
-        exploreMoreHeading: settings.exploreMoreHeading,
+        exploreMoreHeading: settings?.exploreMoreHeading ?? '',
       },
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import express from 'express';
+import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import { uploadMiddleware } from '../../../shared/utils/cloudinaryService.js';
 import { authenticateAdmin } from '../../../modules/admin/middleware/adminAuth.js';
 import {
@@ -47,13 +48,12 @@ import {
 
 const router = express.Router();
 
-// Public routes
-router.get('/public', getHeroBanners);
-router.get('/landing/public', getLandingConfig);
-
-router.get('/under-250/public', getUnder250Banners);
-router.get('/top-10/public', getTop10Restaurants);
-router.get('/gourmet/public', getGourmetRestaurants);
+// Public routes (app startup - wrapped so no request hangs on unhandled rejection)
+router.get('/public', asyncHandler(getHeroBanners));
+router.get('/landing/public', asyncHandler(getLandingConfig));
+router.get('/under-250/public', asyncHandler(getUnder250Banners));
+router.get('/top-10/public', asyncHandler(getTop10Restaurants));
+router.get('/gourmet/public', asyncHandler(getGourmetRestaurants));
 
 // Admin routes - Hero Banners
 router.get('/', authenticateAdmin, getAllHeroBanners);
