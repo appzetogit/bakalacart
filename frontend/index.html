@@ -14,9 +14,133 @@
     <!-- Preconnect to critical origins -->
     <link rel="preconnect" href="https://maps.googleapis.com" crossorigin />
     <!-- Google Maps API will be loaded dynamically from environment variable -->
+    <!-- CRITICAL: Inline styles to prevent FOUC (Flash of Unstyled Content) and blink -->
+    <!-- CRITICAL: Flutter WebView optimization - prevent any loading blink -->
+    <style>
+      /* CRITICAL: Prevent any blink on initial load - especially for Flutter WebView */
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      
+      /* CRITICAL: Ensure root div matches app background immediately - Flutter WebView fix */
+      #root {
+        width: 100% !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+        background-color: #ffffff !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        transition: none !important;
+        animation: none !important;
+        display: block !important;
+      }
+      
+      /* CRITICAL: Prevent any transitions until body.loaded class is added */
+      *,
+      *::before,
+      *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+      
+      /* CRITICAL: Hide any loading spinners or fallbacks - Flutter WebView */
+      [class*="loading"],
+      [class*="Loading"],
+      [class*="spinner"],
+      [class*="Spinner"],
+      [class*="loader"],
+      [class*="Loader"],
+      [class*="animate-spin"],
+      [class*="animate-pulse"] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+      
+      /* CRITICAL: Ensure all elements are visible immediately */
+      body > *,
+      #root > * {
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      
+      /* CRITICAL: Prevent Flutter WebView loading overlay blink */
+      body::before,
+      body::after,
+      html::before,
+      html::after {
+        display: none !important;
+        content: none !important;
+      }
+    </style>
+    <!-- CRITICAL: Prevent Flutter WebView from showing loading state -->
+    <script>
+      // CRITICAL: Run immediately when DOM is ready to prevent any blink
+      (function() {
+        // Set styles immediately - even before root element exists
+        if (document.documentElement) {
+          document.documentElement.style.opacity = '1';
+          document.documentElement.style.visibility = 'visible';
+        }
+        if (document.body) {
+          document.body.style.opacity = '1';
+          document.body.style.visibility = 'visible';
+          document.body.style.backgroundColor = '#ffffff';
+        }
+        
+        // Wait for root element and set styles
+        function setRootStyles() {
+          const root = document.getElementById('root');
+          if (root) {
+            root.style.opacity = '1';
+            root.style.visibility = 'visible';
+            root.style.backgroundColor = '#ffffff';
+            root.style.display = 'block';
+          } else {
+            // Retry if root doesn't exist yet
+            setTimeout(setRootStyles, 0);
+          }
+        }
+        setRootStyles();
+        
+        // Prevent any default loading behavior
+        if (window.flutter_inappwebview) {
+          try {
+            window.flutter_inappwebview.callHandler('hideLoading', {});
+          } catch(e) {}
+        }
+      })();
+      
+      // CRITICAL: Also run on DOMContentLoaded to ensure styles are set
+      document.addEventListener('DOMContentLoaded', function() {
+        document.documentElement.style.opacity = '1';
+        document.documentElement.style.visibility = 'visible';
+        document.body.style.opacity = '1';
+        document.body.style.visibility = 'visible';
+        const root = document.getElementById('root');
+        if (root) {
+          root.style.opacity = '1';
+          root.style.visibility = 'visible';
+          root.style.backgroundColor = '#ffffff';
+          root.style.display = 'block';
+        }
+      });
+    </script>
   </head>
   <body> 
-    <div id="root"></div>
+    <!-- CRITICAL: Add placeholder content immediately to prevent Flutter WebView blink -->
+    <div id="root" style="opacity: 1 !important; visibility: visible !important; background-color: #ffffff !important; min-height: 100vh !important; width: 100% !important; display: block !important;">
+      <!-- Placeholder content to prevent empty flash -->
+      <div style="opacity: 1 !important; visibility: visible !important; width: 100% !important; height: 100vh !important; background-color: #ffffff !important;"></div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

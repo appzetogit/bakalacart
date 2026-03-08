@@ -456,10 +456,10 @@ export const detectUserZone = asyncHandler(async (req, res) => {
       zoneId: userZone._id.toString(),
       zone: {
         _id: userZone._id.toString(),
-        name: userZone.name || userZone.zoneName,
-        zoneName: userZone.zoneName || userZone.name,
-        country: userZone.country,
-        unit: userZone.unit
+        name: userZone.name || userZone.zoneName || '',
+        zoneName: userZone.zoneName || userZone.name || '',
+        country: userZone.country ?? null,
+        unit: userZone.unit ?? null
       },
       message: 'Service available in your area'
     });

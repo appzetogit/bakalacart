@@ -94,13 +94,43 @@ const initializeNonCriticalFeatures = () => {
   });
 }
 
-// Apply theme on app initialization (synchronous, fast)
+// CRITICAL: Get root element first
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
+
+// CRITICAL: Apply theme IMMEDIATELY before any rendering to prevent blink
+// This must happen synchronously before React renders
+// CRITICAL: Flutter WebView optimization - set everything immediately
 const savedTheme = localStorage.getItem('appTheme') || 'light'
 if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
+  // Also set body and root background immediately to prevent white flash
+  document.body.style.backgroundColor = '#0a0a0a'
+  document.body.style.color = '#ffffff'
+  document.body.style.opacity = '1'
+  document.body.style.visibility = 'visible'
+  rootElement.style.backgroundColor = '#0a0a0a'
+  rootElement.style.opacity = '1'
+  rootElement.style.visibility = 'visible'
+  rootElement.style.display = 'block'
 } else {
   document.documentElement.classList.remove('dark')
+  // Set body and root background immediately to prevent white flash
+  document.body.style.backgroundColor = '#ffffff'
+  document.body.style.color = '#000000'
+  document.body.style.opacity = '1'
+  document.body.style.visibility = 'visible'
+  rootElement.style.backgroundColor = '#ffffff'
+  rootElement.style.opacity = '1'
+  rootElement.style.visibility = 'visible'
+  rootElement.style.display = 'block'
 }
+
+// CRITICAL: Ensure document is visible immediately for Flutter WebView
+document.documentElement.style.opacity = '1'
+document.documentElement.style.visibility = 'visible'
 
 // Suppress browser extension errors (defer to avoid blocking render)
 // Use requestIdleCallback or setTimeout to defer this setup
@@ -258,10 +288,7 @@ if ('requestIdleCallback' in window) {
   setTimeout(setupErrorSuppression, 0)
 }
 
-const rootElement = document.getElementById('root')
-if (!rootElement) {
-  throw new Error('Root element not found')
-}
+// rootElement already defined above for theme setup
 
 // Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web
 // Improved detection for various mobile webview environments
@@ -328,7 +355,45 @@ const AppWrapper = import.meta.env.PROD ? (
   </StrictMode>
 )
 
+// CRITICAL: Set root element visibility immediately before React renders
+// This prevents Flutter WebView loading blink
+// CRITICAL: Remove any placeholder content before React renders (if exists)
+const placeholder = rootElement.querySelector('div[style*="placeholder"], div[style*="Placeholder"]')
+if (placeholder) {
+  placeholder.remove()
+}
+
+rootElement.style.opacity = '1'
+rootElement.style.visibility = 'visible'
+rootElement.style.display = 'block'
+rootElement.style.backgroundColor = savedTheme === 'dark' ? '#0a0a0a' : '#ffffff'
+document.body.style.opacity = '1'
+document.body.style.visibility = 'visible'
+document.documentElement.style.opacity = '1'
+document.documentElement.style.visibility = 'visible'
+
 createRoot(rootElement).render(AppWrapper)
+
+// CRITICAL: Mark body as loaded after first render to enable transitions
+// This prevents initial render blinks while allowing smooth transitions later
+// CRITICAL: Increased delay for Flutter WebView to ensure no blink
+// Use multiple requestAnimationFrame calls + setTimeout to ensure it happens after all renders
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // Additional delay for Flutter WebView to ensure smooth rendering
+      setTimeout(() => {
+        // Only add loaded class after all initial renders are complete
+        document.body.classList.add('loaded')
+        // Ensure visibility is maintained
+        document.body.style.opacity = '1'
+        document.body.style.visibility = 'visible'
+        rootElement.style.opacity = '1'
+        rootElement.style.visibility = 'visible'
+      }, 500) // Additional 500ms delay for Flutter WebView
+    })
+  })
+})
 
 // Initialize non-critical features after React has rendered
 // This ensures FCP and LCP are not blocked

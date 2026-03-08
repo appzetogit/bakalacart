@@ -3,6 +3,31 @@ import { authAPI, userAPI } from "@/lib/api"
 
 const ProfileContext = createContext(null)
 
+// Helper function to check if current page is an auth page
+const isAuthPage = () => {
+  const pathname = window.location.pathname;
+  const authPaths = [
+    '/auth/sign-in',
+    '/auth/otp',
+    '/auth/callback',
+    '/restaurant/login',
+    '/restaurant/signup',
+    '/restaurant/signup-email',
+    '/restaurant/auth/sign-in',
+    '/restaurant/forgot-password',
+    '/restaurant/otp',
+    '/restaurant/auth/google-callback',
+    '/restaurant/welcome',
+    '/delivery/sign-in',
+    '/delivery/signup',
+    '/delivery/otp',
+    '/delivery/welcome',
+    '/delivery/terms',
+    '/admin/login'
+  ];
+  return authPaths.some(path => pathname.startsWith(path));
+};
+
 export function ProfileProvider({ children }) {
   const [userProfile, setUserProfile] = useState(() => {
     // First, try to get from localStorage (user_user from auth)
@@ -41,19 +66,36 @@ export function ProfileProvider({ children }) {
     return []
   })
 
-  // If we already have addresses from localStorage, no need to show loading
-  const hasLocalAddresses = (() => {
+  // CRITICAL: Check if we have data in localStorage to prevent loading blink
+  // Also check if we're on an auth page - never show loading on auth pages
+  const hasLocalData = (() => {
     try {
-      const saved = localStorage.getItem("userAddresses")
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        return Array.isArray(parsed) && parsed.length > 0
+      // If we're on an auth page, never show loading
+      if (isAuthPage()) {
+        return true // Pretend we have data to prevent loading
       }
+      
+      // Check if we have user profile
+      const userStr = localStorage.getItem("user_user") || localStorage.getItem("userProfile")
+      const hasUser = userStr && userStr !== 'null' && userStr !== 'undefined'
+      
+      // Check if we have addresses
+      const saved = localStorage.getItem("userAddresses")
+      const hasAddresses = saved && saved !== 'null' && saved !== 'undefined'
+      
+      // If we have either user or addresses, don't show loading
+      return hasUser || hasAddresses
     } catch (e) { /* ignore */ }
     return false
   })()
 
-  const [loading, setLoading] = useState(!hasLocalAddresses)
+  // CRITICAL: Never show loading on initial mount if we have local data or are on auth page
+  // This prevents blink in Flutter WebView
+  const [loading, setLoading] = useState(() => {
+    // Always return false on initial mount to prevent any blink
+    // We'll handle loading state more carefully in useEffect
+    return false
+  })
 
   // Helper function to deduplicate addresses by ID
   const deduplicateAddresses = useCallback((addressList) => {
@@ -150,19 +192,34 @@ export function ProfileProvider({ children }) {
 
   // Fetch user profile and addresses from API on mount and when authentication changes
   useEffect(() => {
+    // CRITICAL: Defer initialization to allow app to render first
+    let initTimeout = null
+    let isMounted = true
+    // Capture hasLocalData value at effect start
+    const hasLocalDataValue = hasLocalData
+
     const fetchUserProfile = async () => {
       // Check if user is authenticated
       const isAuthenticated = localStorage.getItem("user_authenticated") === "true" ||
         localStorage.getItem("user_accessToken")
 
       if (!isAuthenticated) {
-        setUserProfile(null)
-        setAddresses([])
-        setFavorites([])
-        setDishFavorites([])
+        // Only update state if different to prevent unnecessary re-renders
+        if (userProfile !== null) {
+          setUserProfile(null)
+        }
+        if (addresses.length > 0) {
+          setAddresses([])
+        }
+        if (favorites.length > 0) {
+          setFavorites([])
+        }
+        if (dishFavorites.length > 0) {
+          setDishFavorites([])
+        }
         // Reset payment methods to default dummy cards or empty
         const savedPayments = localStorage.getItem("userPaymentMethods")
-        if (!savedPayments) {
+        if (!savedPayments && paymentMethods.length === 0) {
           setPaymentMethods([
             {
               id: "1",
@@ -186,12 +243,18 @@ export function ProfileProvider({ children }) {
             },
           ])
         }
-        setLoading(false)
+        if (loading) {
+          setLoading(false)
+        }
         return
       }
 
       try {
-        setLoading(true)
+        // CRITICAL: Never set loading to true on auth pages or if we have local data
+        // This prevents blink in Flutter WebView
+        if (!hasLocalDataValue && isMounted && !loading && !isAuthPage()) {
+          setLoading(true)
+        }
 
         // Fetch user profile
         try {
@@ -269,20 +332,68 @@ export function ProfileProvider({ children }) {
           }
         }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchUserProfile()
+    // CRITICAL: Only fetch if we don't have local data, or defer if we do
+    // This prevents unnecessary loading states and blinks
+    // CRITICAL: For Flutter WebView - never show loading on initial mount
+    if (hasLocalDataValue || isAuthPage()) {
+      // We have local data or are on auth page, ensure loading is false immediately
+      // Don't set loading to true at all - prevent any blink
+      if (isMounted && loading) {
+        setLoading(false)
+      }
+      // Still fetch in background to update, but don't show loading
+      // Use longer delay for Flutter WebView to ensure smooth rendering
+      initTimeout = setTimeout(() => {
+        if (isMounted && !isAuthPage()) {
+          fetchUserProfile()
+        }
+      }, 1500) // Longer delay for Flutter WebView - no rush since we have data
+    } else {
+      // No local data, fetch immediately but still defer to prevent blink
+      // CRITICAL: Don't set loading to true immediately - defer it
+      initTimeout = setTimeout(() => {
+        if (isMounted && !isAuthPage()) {
+          // Only set loading if we still don't have data after delay
+          const stillNoData = !localStorage.getItem("user_user") && !localStorage.getItem("userProfile")
+          if (stillNoData && isMounted) {
+            setLoading(true)
+          }
+          fetchUserProfile()
+        }
+      }, 500) // Delay to allow Flutter WebView to render first
+    }
 
-    // Listen for auth changes
+    // Listen for auth changes with debouncing to prevent multiple rapid calls
+    let authChangeTimeout = null
     const handleAuthChange = () => {
-      fetchUserProfile()
+      // Clear any pending calls
+      if (authChangeTimeout) {
+        clearTimeout(authChangeTimeout)
+      }
+      // Debounce by 300ms to prevent multiple rapid calls
+      authChangeTimeout = setTimeout(() => {
+        if (isMounted && !isAuthPage()) {
+          fetchUserProfile()
+        }
+      }, 300)
     }
 
     window.addEventListener("userAuthChanged", handleAuthChange)
 
     return () => {
+      isMounted = false
+      if (initTimeout) {
+        clearTimeout(initTimeout)
+      }
+      if (authChangeTimeout) {
+        clearTimeout(authChangeTimeout)
+      }
       window.removeEventListener("userAuthChanged", handleAuthChange)
     }
   }, [])

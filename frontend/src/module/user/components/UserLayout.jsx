@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, useState, createContext, useContext } from "react"
+import { useEffect, useState, createContext, useContext, useRef } from "react"
 import { ProfileProvider } from "../context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
 import { CartProvider } from "../context/CartContext"
@@ -109,10 +109,37 @@ export default function UserLayout() {
   const { isMaintenanceMode, loading } = useMaintenanceMode("user")
 
   // CRITICAL: All hooks must be called before any conditional returns
+  // Track previous pathname to prevent unnecessary scrolls
+  const prevPathnameRef = useRef(location.pathname)
+  const scrollTimeoutRef = useRef(null)
+
   useEffect(() => {
-    // Reset scroll to top whenever location changes (pathname, search, or hash)
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-  }, [location.pathname, location.search, location.hash])
+    // Only scroll if pathname actually changed (not just search params or hash)
+    const pathnameChanged = location.pathname !== prevPathnameRef.current
+    
+    if (pathnameChanged) {
+      prevPathnameRef.current = location.pathname
+      
+      // Clear any existing scroll timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+      
+      // Debounce scroll to prevent rapid scrolling in Flutter WebView
+      scrollTimeoutRef.current = setTimeout(() => {
+        // Only scroll if we're not at the top already
+        if (window.scrollY > 0 || window.pageYOffset > 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+        }
+      }, 100)
+    }
+
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [location.pathname]) // Only depend on pathname, not search or hash
 
   // Register FCM Token on mount if user is logged in
   useEffect(() => {
@@ -152,7 +179,7 @@ export default function UserLayout() {
     location.pathname.startsWith("/user/profile")
 
   return (
-    <div className={`min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200 ${isMaintenanceMode ? 'overflow-x-hidden' : ''}`}>
+    <div className={`min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] ${isMaintenanceMode ? 'overflow-x-hidden' : ''}`}>
       <MaintenanceBanner mode="user" />
       <div className={isMaintenanceMode ? 'grayscale-[0.5] opacity-90 pointer-events-none' : ''}>
         <CartProvider>

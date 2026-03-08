@@ -269,3 +269,73 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  
+  /* CRITICAL: Prevent initial render blinks and transitions */
+  /* Disable ALL transitions and animations on initial load to prevent visual blinks */
+  /* CRITICAL: Flutter WebView optimization - ensure everything is visible immediately */
+  html,
+  body,
+  #root {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  html:not(.loaded),
+  body:not(.loaded),
+  #root:not(.loaded) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+  
+  body:not(.loaded) *,
+  body:not(.loaded) *::before,
+  body:not(.loaded) *::after {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+  }
+  
+  /* CRITICAL: Hide all loading indicators until body.loaded */
+  body:not(.loaded) [class*="loading"],
+  body:not(.loaded) [class*="Loading"],
+  body:not(.loaded) [class*="spinner"],
+  body:not(.loaded) [class*="Spinner"],
+  body:not(.loaded) [class*="loader"],
+  body:not(.loaded) [class*="Loader"],
+  body:not(.loaded) [class*="animate-spin"],
+  body:not(.loaded) [class*="animate-pulse"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+  
+  /* After initial load, enable transitions */
+  body.loaded * {
+    transition: inherit;
+    animation: inherit;
+  }
+  
+  /* CRITICAL: Ensure auth pages render immediately without any opacity changes */
+  body:not(.loaded) [class*="AnimatedPage"],
+  body:not(.loaded) [class*="animated"],
+  body:not(.loaded) [class*="fade"] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  /* CRITICAL: Ensure root element has proper background from start */
+  #root {
+    background-color: var(--background, #ffffff);
+    min-height: 100vh;
+    opacity: 1 !important;
+  }
+  
+  /* CRITICAL: Prevent any background color changes during initial render */
+  body:not(.loaded) #root,
+  body:not(.loaded) body,
+  body:not(.loaded) html {
+    background-color: inherit !important;
+  }

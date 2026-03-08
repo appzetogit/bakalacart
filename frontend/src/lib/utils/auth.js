@@ -410,6 +410,29 @@ export function checkAndLogoutIfNoRefreshToken(module) {
     return true; // Always return true to prevent logout
   }
 
+  // Skip check if user is on an auth page (they're already logging in)
+  const pathname = window.location.pathname;
+  const authPaths = [
+    '/auth/sign-in',
+    '/auth/otp',
+    '/auth/callback',
+    '/restaurant/login',
+    '/restaurant/signup',
+    '/restaurant/auth/sign-in',
+    '/restaurant/forgot-password',
+    '/restaurant/otp',
+    '/delivery/sign-in',
+    '/delivery/signup',
+    '/delivery/otp',
+    '/admin/login'
+  ];
+  if (authPaths.some(path => pathname.startsWith(path))) {
+    if (import.meta.env.DEV) {
+      console.log(`[Auth Check] Skipping check on auth page: ${pathname}`);
+    }
+    return true; // Don't logout on auth pages
+  }
+
   // Get refresh token for the module
   const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
     localStorage.getItem('refreshToken') ||
@@ -443,9 +466,13 @@ export function checkAndLogoutIfNoRefreshToken(module) {
     const loginPath = loginPaths[module] || '/auth/sign-in';
     const currentPath = window.location.pathname;
 
-    // Dispatch auth change event
+    // Dispatch auth change event (only once to prevent multiple re-renders)
+    // Only dispatch module-specific event, not generic userAuthChanged to reduce event spam
     window.dispatchEvent(new Event(`${module}AuthChanged`));
-    window.dispatchEvent(new Event('userAuthChanged'));
+    // Only dispatch userAuthChanged if it's the user module to prevent unnecessary events
+    if (module === 'user') {
+      window.dispatchEvent(new Event('userAuthChanged'));
+    }
 
     // Redirect to login page
     // Use setTimeout to avoid navigation during render
@@ -465,40 +492,64 @@ export function checkAndLogoutIfNoRefreshToken(module) {
  * Check all active modules for refresh tokens and logout if missing
  * This is called on app initialization to ensure all users have valid refresh tokens
  */
+// Global flag to prevent multiple simultaneous checks
+let isCheckingTokens = false;
+let lastCheckTime = 0;
+const CHECK_COOLDOWN = 2000; // 2 seconds cooldown between checks
+
 export function checkAllModulesForRefreshTokens() {
-  const modules = ['user', 'restaurant', 'delivery', 'admin'];
-  const currentPath = window.location.pathname;
-
-  // Determine which module the user is currently on
-  let activeModule = 'user'; // default
-  if (currentPath.startsWith('/restaurant')) activeModule = 'restaurant';
-  else if (currentPath.startsWith('/delivery')) activeModule = 'delivery';
-  else if (currentPath.startsWith('/admin')) activeModule = 'admin';
-
-  // Check the active module first
-  const hasRefreshToken = checkAndLogoutIfNoRefreshToken(activeModule);
-
-  // If active module has no refresh token, it will redirect, so we can return early
-  if (!hasRefreshToken) {
-    return false;
+  // CRITICAL: Prevent multiple simultaneous checks
+  const now = Date.now();
+  if (isCheckingTokens || (now - lastCheckTime) < CHECK_COOLDOWN) {
+    if (import.meta.env.DEV) {
+      console.debug('[Auth Check] Skipping checkAllModulesForRefreshTokens - already checking or cooldown active');
+    }
+    return true; // Return true to prevent blocking
   }
 
-  // For other modules, just clear their data if they don't have refresh tokens
-  // (but don't redirect since user is not on those pages)
-  modules.forEach(module => {
-    if (module !== activeModule) {
-      const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-        localStorage.getItem('refreshToken');
+  isCheckingTokens = true;
+  lastCheckTime = now;
 
-      if (!moduleRefreshToken || moduleRefreshToken.trim() === '' || 
-          moduleRefreshToken === 'null' || moduleRefreshToken === 'undefined') {
-        // Clear stale auth data for inactive modules
-        clearModuleAuth(module);
-      }
+  try {
+    const modules = ['user', 'restaurant', 'delivery', 'admin'];
+    const currentPath = window.location.pathname;
+
+    // Determine which module the user is currently on
+    let activeModule = 'user'; // default
+    if (currentPath.startsWith('/restaurant')) activeModule = 'restaurant';
+    else if (currentPath.startsWith('/delivery')) activeModule = 'delivery';
+    else if (currentPath.startsWith('/admin')) activeModule = 'admin';
+
+    // Check the active module first
+    const hasRefreshToken = checkAndLogoutIfNoRefreshToken(activeModule);
+
+    // If active module has no refresh token, it will redirect, so we can return early
+    if (!hasRefreshToken) {
+      return false;
     }
-  });
 
-  return true;
+    // For other modules, just clear their data if they don't have refresh tokens
+    // (but don't redirect since user is not on those pages)
+    modules.forEach(module => {
+      if (module !== activeModule) {
+        const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+          localStorage.getItem('refreshToken');
+
+        if (!moduleRefreshToken || moduleRefreshToken.trim() === '' || 
+            moduleRefreshToken === 'null' || moduleRefreshToken === 'undefined') {
+          // Clear stale auth data for inactive modules
+          clearModuleAuth(module);
+        }
+      }
+    });
+
+    return true;
+  } finally {
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isCheckingTokens = false;
+    }, 1000);
+  }
 }
 
 /**

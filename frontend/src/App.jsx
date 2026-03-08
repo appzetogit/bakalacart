@@ -7,11 +7,13 @@ import AuthRedirect from "@/components/AuthRedirect"
 import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/utils/auth"
 
 // Loading component for lazy-loaded routes
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-  </div>
-)
+// CRITICAL: Return null to prevent any loading blink/flash
+// Components will render immediately without showing loading state
+// CRITICAL: For Flutter WebView - ensure no visual element is shown
+const LoadingFallback = () => {
+  // Return absolutely nothing - not even a fragment
+  return null
+}
 
 // Helper to ensure dynamic imports work with Vite aliases
 const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
@@ -56,7 +58,9 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
 })
 
 // Lazy load all route components for code splitting
-const UserRouter = lazyImport(() => import("@/module/user/components/UserRouter"))
+// CRITICAL: UserRouter is NOT lazy loaded to prevent dynamic import failures in Flutter WebView
+// Import it directly to ensure it always loads
+import UserRouter from "@/module/user/components/UserRouter"
 const HomePage = lazy(() => import("@/module/usermain/pages/HomePage"))
 const CategoriesPage = lazy(() => import("@/module/usermain/pages/CategoriesPage"))
 const CategoryFoodsPage = lazy(() => import("@/module/usermain/pages/CategoryFoodsPage"))
@@ -181,29 +185,23 @@ function UserPathRedirect() {
 
 export default function App() {
   useEffect(() => {
-    initializePushNotifications();
+    let interval = null;
+    
+    // CRITICAL: Defer all auth checks to allow app to render first
+    // This prevents blocking the initial render in Flutter WebView
+    // CRITICAL: Increased delay for Flutter WebView to prevent loading blink
+    const initTimer = setTimeout(() => {
+      initializePushNotifications();
 
-    // Check if users have refresh tokens and logout if missing
-    // This ensures users without refresh tokens are automatically logged out
-    checkAllModulesForRefreshTokens();
+      // Check if users have refresh tokens and logout if missing
+      // This ensures users without refresh tokens are automatically logged out
+      // Deferred to allow app to render first
+      checkAllModulesForRefreshTokens();
 
     // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
     const modules = ['user', 'restaurant', 'delivery', 'admin'];
     const refreshAllTokens = () => {
       modules.forEach(module => {
-        // CRITICAL: Check if refresh token exists before attempting refresh
-        // This prevents continuous refresh attempts after logout
-        const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-          localStorage.getItem('refreshToken');
-        
-        // Skip if no refresh token (user is logged out)
-        if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
-          if (import.meta.env.DEV) {
-            console.debug(`[Background Refresh] Skipping ${module} - no refresh token (user logged out)`);
-          }
-          return; // Skip this module
-        }
-
         proactiveTokenRefresh(module).catch(err => {
           // Silent catch for network errors
           if (import.meta.env.DEV) console.debug(`[Background Refresh] Skipping ${module}:`, err.message);
@@ -211,13 +209,19 @@ export default function App() {
       });
     };
 
-    // Run once on mount (after checking refresh tokens)
-    refreshAllTokens();
+      // Run once after initial delay
+      refreshAllTokens();
 
-    // Set interval for periodic refresh
-    const interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
+      // Set interval for periodic refresh
+      interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
+    }, 1000); // Increased to 1000ms delay for Flutter WebView to ensure smooth rendering without blink
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initTimer);
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, []);
 
   return (

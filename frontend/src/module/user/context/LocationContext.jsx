@@ -8,10 +8,53 @@ export const LocationContext = createContext(null)
  * Ensures only one instance of geolocation watchers and API calls
  */
 export const LocationProvider = ({ children }) => {
-    const [location, setLocation] = useState(null)
-    const [loading, setLoading] = useState(true)
+    // CRITICAL: Initialize from localStorage immediately to prevent loading blink
+    const [location, setLocation] = useState(() => {
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                return parsed
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return null
+    })
+    
+    // CRITICAL: Set loading to false if we have location from localStorage
+    const [loading, setLoading] = useState(() => {
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                // If we have valid location data, don't show loading
+                if (parsed && (parsed.latitude || parsed.city)) {
+                    return false
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return true
+    })
+    
     const [error, setError] = useState(null)
-    const [permissionGranted, setPermissionGranted] = useState(false)
+    const [permissionGranted, setPermissionGranted] = useState(() => {
+        // If we have location in localStorage, assume permission was granted
+        try {
+            const stored = localStorage.getItem("userLocation")
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                if (parsed && (parsed.latitude || parsed.city)) {
+                    return true
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+        return false
+    })
 
     // Zone State (from useZone)
     const [zoneId, setZoneId] = useState(null)
@@ -25,6 +68,7 @@ export const LocationProvider = ({ children }) => {
     const prevLocationCoordsRef = useRef({ latitude: null, longitude: null })
     const prevZoneCoordsRef = useRef({ latitude: null, longitude: null })
     const isManualRef = useRef(false)
+    const hasInitializedRef = useRef(false) // Prevent multiple initializations
 
     /* ===================== DB UPDATE ===================== */
     const updateLocationInDB = useCallback(async (locationData) => {
@@ -372,7 +416,7 @@ export const LocationProvider = ({ children }) => {
         }
 
         const handleStorageChange = (e) => {
-            if (e.key === "userLocation" && e.newValue) {
+            if (e.key === "userLocation" && e.newValue && isMounted) {
                 try {
                     const parsed = JSON.parse(e.newValue)
                     setLocation(parsed)
@@ -383,19 +427,50 @@ export const LocationProvider = ({ children }) => {
         window.addEventListener("storage", handleStorageChange)
 
         return () => {
+            isMounted = false
+            if (initTimeout) {
+                clearTimeout(initTimeout)
+            }
             stopWatchingLocation()
             window.removeEventListener("storage", handleStorageChange)
+            // Reset on unmount to allow re-initialization if component remounts
+            hasInitializedRef.current = false
         }
-    }, [getLocation, startWatchingLocation, stopWatchingLocation])
+    }, []) // CRITICAL: Empty dependency array - only run once on mount
 
-    // Auto-detect zone when location changes
+    // Auto-detect zone when location changes (with debouncing and change detection)
+    const detectZoneTimeoutRef = useRef(null)
     useEffect(() => {
-        if (location?.latitude && location?.longitude) {
-            // Keep coordinates in ref but do not perform remote zone checks
-            const lat = location.latitude
-            const lng = location.longitude
+        if (!location?.latitude || !location?.longitude) return
+
+        const lat = location.latitude
+        const lng = location.longitude
+        const prevCoords = prevZoneCoordsRef.current
+        
+        // Check if coordinates have changed significantly (threshold: ~22 meters)
+        const latDiff = Math.abs(lat - (prevCoords.latitude || 0))
+        const lngDiff = Math.abs(lng - (prevCoords.longitude || 0))
+        const threshold = 0.0002 // Roughly 22 meters
+        
+        // Only detect zone if coordinates changed significantly
+        if (latDiff > threshold || lngDiff > threshold || !prevCoords.latitude) {
             prevZoneCoordsRef.current = { latitude: lat, longitude: lng }
-            detectZone(lat, lng)
+            
+            // Clear any existing timeout
+            if (detectZoneTimeoutRef.current) {
+                clearTimeout(detectZoneTimeoutRef.current)
+            }
+            
+            // Debounce zone detection to prevent excessive calls
+            detectZoneTimeoutRef.current = setTimeout(() => {
+                detectZone(lat, lng)
+            }, 500) // 500ms debounce
+        }
+        
+        return () => {
+            if (detectZoneTimeoutRef.current) {
+                clearTimeout(detectZoneTimeoutRef.current)
+            }
         }
     }, [location?.latitude, location?.longitude, detectZone])
 

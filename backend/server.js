@@ -34,6 +34,8 @@ import { initializeCloudinary } from './config/cloudinary.js';
 
 // Import middleware
 import { errorHandler } from './shared/middleware/errorHandler.js';
+import { requestLogger } from './shared/middleware/requestLogger.js';
+import { getAppInit } from './shared/controllers/appInitController.js';
 
 // Import routes
 import authRoutes from './modules/auth/index.js';
@@ -515,15 +517,26 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Request/response logging (for debugging Flutter and mobile clients)
+app.use(requestLogger);
+
 // Data sanitization
 app.use(mongoSanitize());
 
 // Rate limiting (disabled in development mode)
+// Always return JSON so mobile/Flutter clients can parse errors (no HTML)
 if (process.env.NODE_ENV === 'production') {
   const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.'
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      res.status(429).set('Content-Type', 'application/json').json({
+        success: false,
+        message: 'Too many requests from this IP, please try again later.'
+      });
+    }
   });
 
   app.use('/api/', limiter);
@@ -532,13 +545,32 @@ if (process.env.NODE_ENV === 'production') {
   console.log('Rate limiting disabled (development mode)');
 }
 
-// Health check route
+// Health check route (startup API: always { success, message, data } for Flutter)
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+  res.set('Content-Type', 'application/json').json({
+    success: true,
+    message: 'OK',
+    data: {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    }
   });
+});
+
+// Startup connectivity check – no DB, instant JSON. Use this in Flutter to verify base URL.
+// GET /api/startup-check – if you get this, the app can reach the backend.
+app.get('/api/startup-check', (req, res) => {
+  res.set('Content-Type', 'application/json').json({
+    success: true,
+    message: 'Backend reachable',
+    data: { ok: true, ts: new Date().toISOString() }
+  });
+});
+
+// Single-call app init: env + settings in one response. Reduces risk of one of many parallel calls hanging.
+app.get('/api/app-init', (req, res, next) => {
+  Promise.resolve(getAppInit(req, res)).catch(next);
 });
 
 // API routes
@@ -612,13 +644,15 @@ app.use((req, res, next) => {
     console.error('   3. Authentication token is valid (if required)');
   }
 
-  res.status(404).json({
+  const payload = {
     success: false,
     message: 'Route not found',
+    data: null,
     path: req.path,
-    method: req.method,
-    expectedRoute: req.path.includes('refund') ? 'POST /api/admin/refund-requests/:orderId/process' : undefined
-  });
+    method: req.method
+  };
+  if (req.path.includes('refund')) payload.expectedRoute = 'POST /api/admin/refund-requests/:orderId/process';
+  res.status(404).set('Content-Type', 'application/json').json(payload);
 });
 
 // Error handler (must be last)
