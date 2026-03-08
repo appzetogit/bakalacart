@@ -67,8 +67,14 @@ export function ProfileProvider({ children }) {
   })
 
   // CRITICAL: Check if we have data in localStorage to prevent loading blink
+  // Also check if we're on an auth page - never show loading on auth pages
   const hasLocalData = (() => {
     try {
+      // If we're on an auth page, never show loading
+      if (isAuthPage()) {
+        return true // Pretend we have data to prevent loading
+      }
+      
       // Check if we have user profile
       const userStr = localStorage.getItem("user_user") || localStorage.getItem("userProfile")
       const hasUser = userStr && userStr !== 'null' && userStr !== 'undefined'
@@ -83,7 +89,13 @@ export function ProfileProvider({ children }) {
     return false
   })()
 
-  const [loading, setLoading] = useState(!hasLocalData)
+  // CRITICAL: Never show loading on initial mount if we have local data or are on auth page
+  // This prevents blink in Flutter WebView
+  const [loading, setLoading] = useState(() => {
+    // Always return false on initial mount to prevent any blink
+    // We'll handle loading state more carefully in useEffect
+    return false
+  })
 
   // Helper function to deduplicate addresses by ID
   const deduplicateAddresses = useCallback((addressList) => {
@@ -238,9 +250,9 @@ export function ProfileProvider({ children }) {
       }
 
       try {
-        // Only set loading to true if we don't have local data
-        // This prevents loading blink when we already have data
-        if (!hasLocalDataValue && isMounted && !loading) {
+        // CRITICAL: Never set loading to true on auth pages or if we have local data
+        // This prevents blink in Flutter WebView
+        if (!hasLocalDataValue && isMounted && !loading && !isAuthPage()) {
           setLoading(true)
         }
 
@@ -328,27 +340,33 @@ export function ProfileProvider({ children }) {
 
     // CRITICAL: Only fetch if we don't have local data, or defer if we do
     // This prevents unnecessary loading states and blinks
-    if (hasLocalDataValue) {
-      // We have local data, ensure loading is false immediately
-      // Use requestAnimationFrame to ensure this happens after render
-      requestAnimationFrame(() => {
-        if (isMounted && loading) {
-          setLoading(false)
-        }
-      })
+    // CRITICAL: For Flutter WebView - never show loading on initial mount
+    if (hasLocalDataValue || isAuthPage()) {
+      // We have local data or are on auth page, ensure loading is false immediately
+      // Don't set loading to true at all - prevent any blink
+      if (isMounted && loading) {
+        setLoading(false)
+      }
       // Still fetch in background to update, but don't show loading
+      // Use longer delay for Flutter WebView to ensure smooth rendering
       initTimeout = setTimeout(() => {
-        if (isMounted) {
+        if (isMounted && !isAuthPage()) {
           fetchUserProfile()
         }
-      }, 1000) // Longer delay since we have data - no rush
+      }, 1500) // Longer delay for Flutter WebView - no rush since we have data
     } else {
-      // No local data, fetch immediately but still defer slightly
+      // No local data, fetch immediately but still defer to prevent blink
+      // CRITICAL: Don't set loading to true immediately - defer it
       initTimeout = setTimeout(() => {
-        if (isMounted) {
+        if (isMounted && !isAuthPage()) {
+          // Only set loading if we still don't have data after delay
+          const stillNoData = !localStorage.getItem("user_user") && !localStorage.getItem("userProfile")
+          if (stillNoData && isMounted) {
+            setLoading(true)
+          }
           fetchUserProfile()
         }
-      }, 200) // Slightly longer delay to allow render to complete
+      }, 500) // Delay to allow Flutter WebView to render first
     }
 
     // Listen for auth changes with debouncing to prevent multiple rapid calls

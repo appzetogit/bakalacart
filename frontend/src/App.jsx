@@ -189,6 +189,7 @@ export default function App() {
     
     // CRITICAL: Defer all auth checks to allow app to render first
     // This prevents blocking the initial render in Flutter WebView
+    // CRITICAL: Increased delay for Flutter WebView to prevent loading blink
     const initTimer = setTimeout(() => {
       initializePushNotifications();
 
@@ -213,7 +214,7 @@ export default function App() {
 
       // Set interval for periodic refresh
       interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
-    }, 500); // 500ms delay to ensure app renders first
+    }, 1000); // Increased to 1000ms delay for Flutter WebView to ensure smooth rendering without blink
 
     return () => {
       clearTimeout(initTimer);
