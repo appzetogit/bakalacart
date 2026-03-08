@@ -298,6 +298,20 @@
     visibility: visible !important;
   }
   
+  /* CRITICAL: Hide all loading indicators until body.loaded */
+  body:not(.loaded) [class*="loading"],
+  body:not(.loaded) [class*="Loading"],
+  body:not(.loaded) [class*="spinner"],
+  body:not(.loaded) [class*="Spinner"],
+  body:not(.loaded) [class*="loader"],
+  body:not(.loaded) [class*="Loader"],
+  body:not(.loaded) [class*="animate-spin"],
+  body:not(.loaded) [class*="animate-pulse"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+  
   /* After initial load, enable transitions */
   body.loaded * {
     transition: inherit;

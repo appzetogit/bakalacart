@@ -44,7 +44,9 @@
       }
       
       /* CRITICAL: Prevent any transitions until body.loaded class is added */
-      * {
+      *,
+      *::before,
+      *::after {
         transition: none !important;
         animation: none !important;
       }
@@ -55,10 +57,19 @@
       [class*="spinner"],
       [class*="Spinner"],
       [class*="loader"],
-      [class*="Loader"] {
+      [class*="Loader"],
+      [class*="animate-spin"],
+      [class*="animate-pulse"] {
         display: none !important;
         opacity: 0 !important;
         visibility: hidden !important;
+      }
+      
+      /* CRITICAL: Ensure all elements are visible immediately */
+      body > *,
+      #root > * {
+        opacity: 1 !important;
+        visibility: visible !important;
       }
       
       /* CRITICAL: Prevent Flutter WebView loading overlay blink */

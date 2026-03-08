@@ -376,17 +376,21 @@ createRoot(rootElement).render(AppWrapper)
 
 // CRITICAL: Mark body as loaded after first render to enable transitions
 // This prevents initial render blinks while allowing smooth transitions later
-// Use multiple requestAnimationFrame calls to ensure it happens after all renders
+// CRITICAL: Increased delay for Flutter WebView to ensure no blink
+// Use multiple requestAnimationFrame calls + setTimeout to ensure it happens after all renders
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      // Only add loaded class after all initial renders are complete
-      document.body.classList.add('loaded')
-      // Ensure visibility is maintained
-      document.body.style.opacity = '1'
-      document.body.style.visibility = 'visible'
-      rootElement.style.opacity = '1'
-      rootElement.style.visibility = 'visible'
+      // Additional delay for Flutter WebView to ensure smooth rendering
+      setTimeout(() => {
+        // Only add loaded class after all initial renders are complete
+        document.body.classList.add('loaded')
+        // Ensure visibility is maintained
+        document.body.style.opacity = '1'
+        document.body.style.visibility = 'visible'
+        rootElement.style.opacity = '1'
+        rootElement.style.visibility = 'visible'
+      }, 500) // Additional 500ms delay for Flutter WebView
     })
   })
 })
