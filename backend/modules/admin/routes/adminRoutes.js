@@ -14,8 +14,9 @@ import {
   getUserById,
   updateUserStatus,
   logoutUser,
-  logoutAllUsers,
-  getLogoutStatus,
+  // COMMENTED OUT: logoutAllUsers API removed
+  // logoutAllUsers,
+  // getLogoutStatus,
   getRestaurants,
   createRestaurant,
   updateRestaurantStatus,

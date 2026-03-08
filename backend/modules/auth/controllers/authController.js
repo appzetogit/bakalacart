@@ -321,11 +321,8 @@ export const verifyOTP = asyncHandler(async (req, res) => {
  * POST /api/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (req, res) => {
-  // Prioritize user-specific refresh token cookie or generic refreshToken cookie; then header (any casing)
-  const refreshToken = req.cookies?.user_refreshToken
-    || req.cookies?.refreshToken
-    || req.headers['x-refresh-token']
-    || req.headers['X-Refresh-Token'];
+  // Prioritize user-specific refresh token cookie or generic refreshToken cookie
+  const refreshToken = req.cookies?.user_refreshToken || req.cookies?.refreshToken || req.headers['x-refresh-token'];
 
   if (!refreshToken) {
     return errorResponse(res, 401, 'Refresh token not found');
@@ -337,48 +334,20 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
     // Get user based on role from token
     const role = decoded.role;
-    const userId = decoded.userId;
-
-    logger.info('🔍 [Refresh Token] Attempting refresh', {
-      role,
-      userId,
-      tokenPreview: refreshToken.substring(0, 20) + '...'
-    });
 
     let user;
     if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
-      user = await Admin.findById(userId).select('+refreshToken');
+      user = await Admin.findById(decoded.userId);
     } else if (role === 'restaurant') {
-      user = await Restaurant.findById(userId).select('+refreshToken');
+      user = await Restaurant.findById(decoded.userId).select('+refreshToken');
     } else if (role === 'delivery') {
-      user = await Delivery.findById(userId).select('+refreshToken');
+      user = await Delivery.findById(decoded.userId).select('+refreshToken');
     } else {
-      user = await User.findById(userId).select('+refreshToken');
+      user = await User.findById(decoded.userId).select('+refreshToken');
     }
 
-    // Better error messages for debugging
-    if (!user) {
-      logger.warn('❌ [Refresh Token] User not found', { role, userId });
-      return errorResponse(res, 401, 'User not found');
-    }
-
-    // Log user details for debugging
-    logger.info('✅ [Refresh Token] User found', {
-      role,
-      userId,
-      userIsActive: user.isActive,
-      hasRefreshToken: !!user.refreshToken,
-      userModel: user.constructor.modelName || 'Unknown'
-    });
-
-    // Check isActive - explicitly check for false (undefined/null treated as active since default is true)
-    if (user.isActive === false) {
-      logger.warn('❌ [Refresh Token] User inactive', { 
-        role, 
-        userId, 
-        isActive: user.isActive
-      });
-      return errorResponse(res, 401, 'User account is inactive');
+    if (!user || !user.isActive) {
+      return errorResponse(res, 401, 'User not found or inactive');
     }
 
     // Check if user has been forced to logout

@@ -7,13 +7,11 @@ import AuthRedirect from "@/components/AuthRedirect"
 import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/utils/auth"
 
 // Loading component for lazy-loaded routes
-// CRITICAL: Return null to prevent any loading blink/flash
-// Components will render immediately without showing loading state
-// CRITICAL: For Flutter WebView - ensure no visual element is shown
-const LoadingFallback = () => {
-  // Return absolutely nothing - not even a fragment
-  return null
-}
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+  </div>
+)
 
 // Helper to ensure dynamic imports work with Vite aliases
 const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
@@ -58,9 +56,7 @@ const lazyImport = (importFn, fallbackPath = null) => lazy(() => {
 })
 
 // Lazy load all route components for code splitting
-// CRITICAL: UserRouter is NOT lazy loaded to prevent dynamic import failures in Flutter WebView
-// Import it directly to ensure it always loads
-import UserRouter from "@/module/user/components/UserRouter"
+const UserRouter = lazyImport(() => import("@/module/user/components/UserRouter"))
 const HomePage = lazy(() => import("@/module/usermain/pages/HomePage"))
 const CategoriesPage = lazy(() => import("@/module/usermain/pages/CategoriesPage"))
 const CategoryFoodsPage = lazy(() => import("@/module/usermain/pages/CategoryFoodsPage"))
@@ -185,18 +181,11 @@ function UserPathRedirect() {
 
 export default function App() {
   useEffect(() => {
-    let interval = null;
-    
-    // CRITICAL: Defer all auth checks to allow app to render first
-    // This prevents blocking the initial render in Flutter WebView
-    // CRITICAL: Increased delay for Flutter WebView to prevent loading blink
-    const initTimer = setTimeout(() => {
-      initializePushNotifications();
+    initializePushNotifications();
 
-      // Check if users have refresh tokens and logout if missing
-      // This ensures users without refresh tokens are automatically logged out
-      // Deferred to allow app to render first
-      checkAllModulesForRefreshTokens();
+    // Check if users have refresh tokens and logout if missing
+    // This ensures users without refresh tokens are automatically logged out
+    checkAllModulesForRefreshTokens();
 
     // Proactively refresh tokens for all modules every 4 minutes to prevent auto-logout
     const modules = ['user', 'restaurant', 'delivery', 'admin'];
@@ -209,19 +198,13 @@ export default function App() {
       });
     };
 
-      // Run once after initial delay
-      refreshAllTokens();
+    // Run once on mount (after checking refresh tokens)
+    refreshAllTokens();
 
-      // Set interval for periodic refresh
-      interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
-    }, 1000); // Increased to 1000ms delay for Flutter WebView to ensure smooth rendering without blink
+    // Set interval for periodic refresh
+    const interval = setInterval(refreshAllTokens, 4 * 60 * 1000); // 4 minutes
 
-    return () => {
-      clearTimeout(initTimer);
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
+    return () => clearInterval(interval);
   }, []);
 
   return (

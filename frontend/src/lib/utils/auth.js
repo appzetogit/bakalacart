@@ -202,45 +202,11 @@ export function shouldRefreshToken(token, thresholdMs = 5 * 60 * 1000) {
   if (!token) return false;
 
   const timeUntilExpiry = getTokenExpirationTime(token);
-  
-  // If token is invalid or expired, check if refresh token exists before returning true
-  // This prevents continuous refresh attempts when user is logged out
-  if (timeUntilExpiry === null) {
-    // Token is invalid - but only refresh if we have a refresh token
-    // Check current module from path or use a generic check
-    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-    let module = 'user';
-    if (currentPath.includes('/restaurant')) module = 'restaurant';
-    else if (currentPath.includes('/delivery')) module = 'delivery';
-    else if (currentPath.includes('/admin')) module = 'admin';
-    
-    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-      localStorage.getItem('refreshToken');
-    
-    // Only return true if refresh token exists (user might still be logged in)
-    return !!(refreshToken && refreshToken.trim() !== '' && refreshToken !== 'null' && refreshToken !== 'undefined');
-  }
-
-  // If token is already expired (negative time), check refresh token before refreshing
-  if (timeUntilExpiry < 0) {
-    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-    let module = 'user';
-    if (currentPath.includes('/restaurant')) module = 'restaurant';
-    else if (currentPath.includes('/delivery')) module = 'delivery';
-    else if (currentPath.includes('/admin')) module = 'admin';
-    
-    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-      localStorage.getItem('refreshToken');
-    
-    return !!(refreshToken && refreshToken.trim() !== '' && refreshToken !== 'null' && refreshToken !== 'undefined');
-  }
+  if (timeUntilExpiry === null) return true; // Invalid token, should refresh
 
   // Refresh if token expires within threshold
   return timeUntilExpiry <= thresholdMs;
 }
-
-// Track last refresh attempt time per module to prevent spam
-const lastRefreshAttempt = {};
 
 /**
  * Proactively refresh token for a module if needed
@@ -248,54 +214,13 @@ const lastRefreshAttempt = {};
  * @returns {Promise<boolean>} - True if refresh was successful or not needed
  */
 export async function proactiveTokenRefresh(module) {
-  // CRITICAL: Check if refresh token exists FIRST before checking access token
-  // If refresh token is missing, user is logged out - don't attempt refresh
-  const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-    localStorage.getItem('refreshToken');
-  
-  if (!refreshToken || refreshToken.trim() === '' || refreshToken === 'null' || refreshToken === 'undefined') {
-    if (import.meta.env.DEV) {
-      console.log(`[Proactive Refresh] No refresh token for ${module}, skipping (user logged out)`);
-    }
-    return false; // User is logged out, don't attempt refresh
-  }
-
   const token = getModuleToken(module);
-  if (!token) {
-    // If no access token but refresh token exists, might need to refresh
-    // But check cooldown first
-    const now = Date.now();
-    const lastAttempt = lastRefreshAttempt[module] || 0;
-    const timeSinceLastAttempt = now - lastAttempt;
-    const COOLDOWN_PERIOD = 30 * 1000;
-    
-    if (timeSinceLastAttempt < COOLDOWN_PERIOD) {
-      return true; // Still in cooldown
-    }
-    // Continue to refresh attempt below
-  } else {
-    // Check if token needs refresh (expires within 5 minutes)
-    if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
-      return true; // Token is still valid, no refresh needed
-    }
+  if (!token) return false;
+
+  // Check if token needs refresh (expires within 5 minutes)
+  if (!shouldRefreshToken(token, 5 * 60 * 1000)) {
+    return true; // Token is still valid, no refresh needed
   }
-
-  // DEBOUNCING: Prevent multiple simultaneous refresh attempts
-  // If we tried to refresh in the last 30 seconds, skip this attempt
-  const now = Date.now();
-  const lastAttempt = lastRefreshAttempt[module] || 0;
-  const timeSinceLastAttempt = now - lastAttempt;
-  const COOLDOWN_PERIOD = 30 * 1000; // 30 seconds cooldown
-
-  if (timeSinceLastAttempt < COOLDOWN_PERIOD) {
-    if (import.meta.env.DEV) {
-      console.log(`[Proactive Refresh] ${module} refresh skipped - cooldown period (${Math.round((COOLDOWN_PERIOD - timeSinceLastAttempt) / 1000)}s remaining)`);
-    }
-    return true; // Skip refresh, still in cooldown
-  }
-
-  // Update last attempt time
-  lastRefreshAttempt[module] = now;
 
   try {
     // Determine refresh endpoint based on module
@@ -328,8 +253,18 @@ export async function proactiveTokenRefresh(module) {
     const { default: axios } = await import('axios');
     const { API_BASE_URL } = await import('../api/config.js');
 
-    // Refresh token already checked at the beginning of function
-    // Use the refreshToken variable from the early check
+    // FIX: Fallback to generic refreshToken if module-specific one is missing
+    const refreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+      localStorage.getItem('refreshToken');
+
+    // ONLY attempt refresh if we have a refresh token (header fallback or withCredentials cookie fallback)
+    // This dramatically reduces "Refresh token not found" 401 errors from backend
+    if (!refreshToken) {
+      if (import.meta.env.DEV) {
+        console.warn(`[Proactive Refresh] No refresh token found for ${module} (checked ${module}_refreshToken and refreshToken). Skipping refresh.`);
+      }
+      return false;
+    }
 
     // Call refresh endpoint with credentials and refresh token header (for hybrid app/WebView support)
     const response = await axios.post(
@@ -362,8 +297,6 @@ export async function proactiveTokenRefresh(module) {
         }
 
         console.log(`✅ [Proactive Refresh] Tokens refreshed for ${module}`);
-        // Reset cooldown on successful refresh
-        lastRefreshAttempt[module] = 0;
         return true;
       } else {
         console.warn(`[Proactive Refresh] Role mismatch for ${module}: expected ${module}, got ${role}`);
@@ -377,15 +310,9 @@ export async function proactiveTokenRefresh(module) {
     const normalizedModule = ['admin', 'super_admin', 'moderator'].includes(module) ? 'admin' : module;
     if (window.__bakala_refreshing) delete window.__bakala_refreshing[normalizedModule];
 
-    // On error, extend cooldown to prevent spam (wait 60 seconds before retry)
-    lastRefreshAttempt[module] = Date.now();
-
     // Don't log network errors as they're expected when offline
     if (error.code !== 'ERR_NETWORK' && error.message !== 'Network Error') {
-      if (import.meta.env.DEV) {
-        console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
-        console.log(`[Proactive Refresh] Cooldown extended to 60s for ${module} due to error`);
-      }
+      console.warn(`[Proactive Refresh] Failed to refresh token for ${module}:`, error.message);
     }
     return false;
   } finally {
@@ -408,29 +335,6 @@ export function checkAndLogoutIfNoRefreshToken(module) {
       console.log(`[Auth Check] Skipping auto-logout check for module '${module}' (permanent fix)`);
     }
     return true; // Always return true to prevent logout
-  }
-
-  // Skip check if user is on an auth page (they're already logging in)
-  const pathname = window.location.pathname;
-  const authPaths = [
-    '/auth/sign-in',
-    '/auth/otp',
-    '/auth/callback',
-    '/restaurant/login',
-    '/restaurant/signup',
-    '/restaurant/auth/sign-in',
-    '/restaurant/forgot-password',
-    '/restaurant/otp',
-    '/delivery/sign-in',
-    '/delivery/signup',
-    '/delivery/otp',
-    '/admin/login'
-  ];
-  if (authPaths.some(path => pathname.startsWith(path))) {
-    if (import.meta.env.DEV) {
-      console.log(`[Auth Check] Skipping check on auth page: ${pathname}`);
-    }
-    return true; // Don't logout on auth pages
   }
 
   // Get refresh token for the module
@@ -466,13 +370,9 @@ export function checkAndLogoutIfNoRefreshToken(module) {
     const loginPath = loginPaths[module] || '/auth/sign-in';
     const currentPath = window.location.pathname;
 
-    // Dispatch auth change event (only once to prevent multiple re-renders)
-    // Only dispatch module-specific event, not generic userAuthChanged to reduce event spam
+    // Dispatch auth change event
     window.dispatchEvent(new Event(`${module}AuthChanged`));
-    // Only dispatch userAuthChanged if it's the user module to prevent unnecessary events
-    if (module === 'user') {
-      window.dispatchEvent(new Event('userAuthChanged'));
-    }
+    window.dispatchEvent(new Event('userAuthChanged'));
 
     // Redirect to login page
     // Use setTimeout to avoid navigation during render
@@ -492,64 +392,40 @@ export function checkAndLogoutIfNoRefreshToken(module) {
  * Check all active modules for refresh tokens and logout if missing
  * This is called on app initialization to ensure all users have valid refresh tokens
  */
-// Global flag to prevent multiple simultaneous checks
-let isCheckingTokens = false;
-let lastCheckTime = 0;
-const CHECK_COOLDOWN = 2000; // 2 seconds cooldown between checks
-
 export function checkAllModulesForRefreshTokens() {
-  // CRITICAL: Prevent multiple simultaneous checks
-  const now = Date.now();
-  if (isCheckingTokens || (now - lastCheckTime) < CHECK_COOLDOWN) {
-    if (import.meta.env.DEV) {
-      console.debug('[Auth Check] Skipping checkAllModulesForRefreshTokens - already checking or cooldown active');
-    }
-    return true; // Return true to prevent blocking
+  const modules = ['user', 'restaurant', 'delivery', 'admin'];
+  const currentPath = window.location.pathname;
+
+  // Determine which module the user is currently on
+  let activeModule = 'user'; // default
+  if (currentPath.startsWith('/restaurant')) activeModule = 'restaurant';
+  else if (currentPath.startsWith('/delivery')) activeModule = 'delivery';
+  else if (currentPath.startsWith('/admin')) activeModule = 'admin';
+
+  // Check the active module first
+  const hasRefreshToken = checkAndLogoutIfNoRefreshToken(activeModule);
+
+  // If active module has no refresh token, it will redirect, so we can return early
+  if (!hasRefreshToken) {
+    return false;
   }
 
-  isCheckingTokens = true;
-  lastCheckTime = now;
+  // For other modules, just clear their data if they don't have refresh tokens
+  // (but don't redirect since user is not on those pages)
+  modules.forEach(module => {
+    if (module !== activeModule) {
+      const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`) ||
+        localStorage.getItem('refreshToken');
 
-  try {
-    const modules = ['user', 'restaurant', 'delivery', 'admin'];
-    const currentPath = window.location.pathname;
-
-    // Determine which module the user is currently on
-    let activeModule = 'user'; // default
-    if (currentPath.startsWith('/restaurant')) activeModule = 'restaurant';
-    else if (currentPath.startsWith('/delivery')) activeModule = 'delivery';
-    else if (currentPath.startsWith('/admin')) activeModule = 'admin';
-
-    // Check the active module first
-    const hasRefreshToken = checkAndLogoutIfNoRefreshToken(activeModule);
-
-    // If active module has no refresh token, it will redirect, so we can return early
-    if (!hasRefreshToken) {
-      return false;
-    }
-
-    // For other modules, just clear their data if they don't have refresh tokens
-    // (but don't redirect since user is not on those pages)
-    modules.forEach(module => {
-      if (module !== activeModule) {
-        const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`) ||
-          localStorage.getItem('refreshToken');
-
-        if (!moduleRefreshToken || moduleRefreshToken.trim() === '' || 
-            moduleRefreshToken === 'null' || moduleRefreshToken === 'undefined') {
-          // Clear stale auth data for inactive modules
-          clearModuleAuth(module);
-        }
+      if (!moduleRefreshToken || moduleRefreshToken.trim() === '' || 
+          moduleRefreshToken === 'null' || moduleRefreshToken === 'undefined') {
+        // Clear stale auth data for inactive modules
+        clearModuleAuth(module);
       }
-    });
+    }
+  });
 
-    return true;
-  } finally {
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isCheckingTokens = false;
-    }, 1000);
-  }
+  return true;
 }
 
 /**
