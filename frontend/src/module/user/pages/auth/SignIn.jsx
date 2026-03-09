@@ -53,6 +53,17 @@ export default function SignIn() {
   const returnTo = searchParamsInURL.get('returnTo');
   const from = location.state?.from || returnTo || "/";
 
+  // Remove returnTo query parameter from URL if present (clean URL bar)
+  useEffect(() => {
+    if (returnTo && location.search.includes('returnTo=')) {
+      const newSearchParams = new URLSearchParams(location.search);
+      newSearchParams.delete('returnTo');
+      const newSearch = newSearchParams.toString();
+      const newUrl = newSearch ? `${location.pathname}?${newSearch}` : location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [returnTo, location.search, location.pathname]);
+
   const [errors, setErrors] = useState({
     phone: "",
     email: "",

@@ -517,7 +517,7 @@ apiClient.interceptors.response.use(
             
             // Use setTimeout to avoid navigation during error handling
             setTimeout(() => {
-              window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+              window.location.href = loginPath;
             }, 100);
           }
           
@@ -706,7 +706,7 @@ apiClient.interceptors.response.use(
           // Using setTimeout to ensure all cleanup completes first
           setTimeout(() => {
             try {
-              window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+              window.location.href = loginPath;
             } catch (redirectError) {
               console.error('[Axios Interceptor] Redirect failed, forcing reload:', redirectError);
               window.location.reload();
@@ -760,7 +760,7 @@ apiClient.interceptors.response.use(
               localStorage.removeItem('user');
 
               // Ensure loginPath is correct for the module
-              window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+              window.location.href = loginPath;
             } else {
               if (import.meta.env.DEV) {
                 console.warn(`[API Interceptor] Token expired/refresh failed for module '${expectedRole}', but keeping current session for '${pageModule.expectedRole}' active.`);

@@ -10,7 +10,7 @@ export default function ProtectedRoute({ children }) {
   if (!isAuthenticated) {
     // Pass the current location so user can be redirected back after login
     const currentPath = location.pathname + location.search;
-    return <Navigate to={`/delivery/sign-in?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />
+    return <Navigate to="/delivery/sign-in" state={{ from: currentPath }} replace />
   }
 
   return children

@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     const currentPath = location.pathname + location.search;
-    return <Navigate to={`/admin/login?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />
+    return <Navigate to="/admin/login" state={{ from: currentPath }} replace />
   }
 
   return children

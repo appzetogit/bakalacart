@@ -378,7 +378,7 @@ export function checkAndLogoutIfNoRefreshToken(module) {
     // Use setTimeout to avoid navigation during render
     setTimeout(() => {
       if (window.location.pathname !== loginPath && !window.location.pathname.includes('/auth/')) {
-        window.location.href = `${loginPath}?returnTo=${encodeURIComponent(currentPath)}`;
+        window.location.href = loginPath;
       }
     }, 100);
 

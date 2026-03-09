@@ -42,7 +42,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
   if (!isAuthenticated) {
     const currentPath = location.pathname + location.search;
     if (loginPath) {
-      return <Navigate to={`${loginPath}?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />;
+      return <Navigate to={loginPath} state={{ from: currentPath }} replace />;
     }
 
     // Fallback: redirect to appropriate login page
@@ -54,7 +54,7 @@ export default function ProtectedRoute({ children, requiredRole, loginPath }) {
     };
 
     const redirectPath = roleLoginPaths[requiredRole] || '/';
-    return <Navigate to={`${redirectPath}?returnTo=${encodeURIComponent(currentPath)}`} state={{ from: currentPath }} replace />;
+    return <Navigate to={redirectPath} state={{ from: currentPath }} replace />;
   }
 
   if (maintenanceCheck && !maintenanceCheck.loading && maintenanceCheck.isMaintenanceMode) {
