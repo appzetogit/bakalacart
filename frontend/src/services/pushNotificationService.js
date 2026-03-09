@@ -120,9 +120,11 @@ function getPlatform() {
 async function registerFCMToken(authType = 'user', authToken = null) {
     try {
         // Determine Endpoint based on authType
-        // authType: 'user' | 'restaurant' | 'delivery'
+        // authType: 'user' | 'restaurant' | 'delivery' | 'admin'
         const endpointMap = {
-            'user': '/api/auth/fcm-token',
+            // NOTE: Backend mounts `authRoutes` at `/api`, and inside those routes
+            // FCM is registered as `POST /fcm-token`, so the full path is `/api/fcm-token`
+            'user': '/api/fcm-token',
             'restaurant': '/api/restaurant/auth/fcm-token',
             'delivery': '/api/delivery/auth/fcm-token',
             'admin': '/api/admin/auth/fcm-token'

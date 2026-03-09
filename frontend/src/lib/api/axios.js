@@ -629,14 +629,23 @@ apiClient.interceptors.response.use(
         const errorMessageLower = errorMessage.toLowerCase();
         
         // Check for exact backend error messages (case-insensitive)
+        // IMPORTANT:
+        // - "Refresh token not found..." and "token not found..." => refresh token missing in DB
+        // - "Invalid refresh token. Please login again."          => refresh token mismatch with DB (also requires full re-login)
         const isTokenNotFoundInDB = refreshError.response?.status === 401 &&
-          (errorMessageLower.includes('refresh token not found') ||
-           errorMessageLower.includes('refresh token not found in database') ||
-           errorMessageLower.includes('token not found') ||
-           errorMessage.includes('Refresh token not found') ||
-           errorMessage.includes('Refresh token not found in database') ||
-           errorMessage.includes('Refresh token not found. Please login again.') ||
-           errorMessage.includes('Refresh token not found in database. Please login again.'));
+          (
+            // Generic "not found" messages
+            errorMessageLower.includes('refresh token not found') ||
+            errorMessageLower.includes('refresh token not found in database') ||
+            errorMessageLower.includes('token not found') ||
+            errorMessage.includes('Refresh token not found') ||
+            errorMessage.includes('Refresh token not found in database') ||
+            errorMessage.includes('Refresh token not found. Please login again.') ||
+            errorMessage.includes('Refresh token not found in database. Please login again.') ||
+            // NEW: Treat DB mismatch message as "token not found in DB" for logout logic
+            // This exact message is returned when the stored DB token doesn't match the provided one
+            errorMessageLower.includes('invalid refresh token. please login again')
+          );
 
         // Enhanced logging for debugging (works in both dev and production)
         if (refreshError.response?.status === 401) {
