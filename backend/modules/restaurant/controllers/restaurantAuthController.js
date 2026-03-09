@@ -996,16 +996,9 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Restaurant not found');
     }
 
-    // CRITICAL: Verify refresh token matches stored token in database
-    // If refreshToken is deleted from database, this will fail and restaurant will be logged out
-    if (restaurant.refreshToken && restaurant.refreshToken !== refreshToken) {
-      logger.warn('❌ [Restaurant Refresh Token] Token mismatch - database token different', {
-        restaurantId: restaurant._id.toString()
-      });
-      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
-    }
-
-    // If refreshToken is null/undefined in database, restaurant must login again
+    // CRITICAL: Verify refresh token exists and matches database
+    // Since we're NOT rotating refresh tokens on refresh (only on login), tokens should match
+    // This prevents race conditions that occurred when tokens were rotated on every refresh
     if (!restaurant.refreshToken) {
       logger.warn('❌ [Restaurant Refresh Token] Token not found in database - user must login', {
         restaurantId: restaurant._id.toString()
@@ -1013,24 +1006,27 @@ export const refreshToken = asyncHandler(async (req, res) => {
       return errorResponse(res, 401, 'Refresh token not found. Please login again.');
     }
 
-    // Generate new access and refresh tokens
-    const tokens = jwtService.generateTokens({
+    // Verify token matches database (should match since we're not rotating on refresh)
+    // If it doesn't match, it means user logged in elsewhere and got a new token
+    if (restaurant.refreshToken !== refreshToken) {
+      logger.warn('❌ [Restaurant Refresh Token] Token mismatch - user may have logged in from another device', {
+        restaurantId: restaurant._id.toString(),
+        hasDbToken: !!restaurant.refreshToken
+      });
+      return errorResponse(res, 401, 'Invalid refresh token. Please login again.');
+    }
+
+    // Generate ONLY new access token (don't rotate refresh token to prevent race conditions)
+    // Refresh tokens are only rotated on login, not on every refresh
+    const newAccessToken = jwtService.generateAccessToken({
       userId: restaurant._id.toString(),
       role: 'restaurant',
       email: restaurant.email || restaurant.phone || restaurant.restaurantId
     });
 
-    // Update refresh token in database
-    restaurant.refreshToken = tokens.refreshToken;
-    await restaurant.save();
-
-    // Set new refresh token in httpOnly cookie
-    res.cookie('restaurant_refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days
-    });
+    // DO NOT update refresh token in database - keep the same one
+    // This prevents race conditions when multiple requests refresh simultaneously
+    // Refresh tokens are only rotated on login/logout, not on every refresh
 
     logger.info('✅ [Restaurant Refresh Token] Token refreshed successfully', {
       restaurantId: restaurant._id.toString(),
@@ -1038,8 +1034,8 @@ export const refreshToken = asyncHandler(async (req, res) => {
     });
 
     return successResponse(res, 200, 'Token refreshed successfully', {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken
+      accessToken: newAccessToken,
+      refreshToken: refreshToken // Return the same refresh token (not rotated)
     });
   } catch (error) {
     // Try to decode token to get more diagnostic info
