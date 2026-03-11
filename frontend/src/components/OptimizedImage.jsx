@@ -182,7 +182,9 @@ const OptimizedImage = ({
         return optimizeCloudinaryUrl(imageSrc, 200, 'auto')
       }
 
-      const width = 800
+      // Hero banner / LCP: use 1280 for better quality on large screens
+      const isHeroBanner = priority && sizes && (sizes.includes('1280px') || sizes.includes('100vw'))
+      const width = isHeroBanner ? 1280 : 800
       return optimizeCloudinaryUrl(imageSrc, width, 'auto')
     }
     return imageSrc

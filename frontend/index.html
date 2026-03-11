@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
     <meta name="description" content="Bakalaa - Order food from your favorite restaurants. Fast delivery, great prices, and a wide selection of cuisines. Discover local restaurants and enjoy delicious meals delivered to your door." />
     <title>Bakalaa - Food Delivery & Restaurant Ordering</title>
     <!-- Performance optimizations -->
@@ -11,8 +11,12 @@
     <!-- DNS prefetch for external resources -->
     <link rel="dns-prefetch" href="https://maps.googleapis.com" />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-    <!-- Preconnect to critical origins -->
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+    <link rel="dns-prefetch" href="https://api.bakalaa.com" />
+    <!-- Preconnect to critical origins (LCP images, API) -->
     <link rel="preconnect" href="https://maps.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+    <link rel="preconnect" href="https://api.bakalaa.com" crossorigin />
     <!-- Google Maps API will be loaded dynamically from environment variable -->
     <!-- CRITICAL: Inline styles to prevent FOUC (Flash of Unstyled Content) and blink -->
     <!-- CRITICAL: Flutter WebView optimization - prevent any loading blink -->

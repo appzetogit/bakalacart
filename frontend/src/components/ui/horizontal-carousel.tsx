@@ -111,18 +111,20 @@ export function HorizontalCarousel({
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Scroll left"
                 className="h-10 w-10 bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white rounded-full border border-gray-200"
                 onClick={() => scroll("left")}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-5 w-5" aria-hidden />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Scroll right"
                 className="h-10 w-10 bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white rounded-full border border-gray-200"
                 onClick={() => scroll("right")}
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-5 w-5" aria-hidden />
               </Button>
             </div>
           )}

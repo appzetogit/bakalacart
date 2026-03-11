@@ -1556,6 +1556,7 @@ export default function Home() {
                 <Switch
                   checked={vegMode}
                   onCheckedChange={handleVegModeChange}
+                  aria-label="Toggle vegetarian mode to show only vegetarian items"
                   className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-200 w-8 h-4 sm:w-10 sm:h-5 [&_[data-slot=switch-thumb]]:bg-white [&_[data-slot=switch-thumb]]:h-3 [&_[data-slot=switch-thumb]]:w-3 sm:[&_[data-slot=switch-thumb]]:h-4 sm:[&_[data-slot=switch-thumb]]:w-4"
                 />
               </motion.div>
@@ -1615,21 +1616,13 @@ export default function Home() {
                         }
                       }}
                     >
-                      <img
+                      <OptimizedImage
                         src={getResilientImageUrl(image, API_BASE_URL)}
                         alt={`Hero Banner ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        loading={index === 0 ? 'eager' : 'lazy'}
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                          const parent = e.target.parentElement
-                          if (parent && !parent.querySelector('.banner-fallback')) {
-                            const fallback = document.createElement('div')
-                            fallback.className = 'banner-fallback absolute inset-0 flex items-center justify-center bg-gray-100'
-                            fallback.innerHTML = '<span class="text-4xl">🍽️</span>'
-                            parent.appendChild(fallback)
-                          }
-                        }}
+                        className="w-full h-full"
+                        objectFit="cover"
+                        priority={index === 0}
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1280px"
                       />
                     </div>
                   )
@@ -1638,15 +1631,22 @@ export default function Home() {
 
               {/* Pagination Dots */}
               {heroBannerImages.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10" role="tablist" aria-label="Hero banner slides">
                   {heroBannerImages.map((_, index) => (
-                    <div
+                    <button
                       key={index}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${index === currentBannerIndex
-                        ? "w-4 bg-white"
-                        : "w-1.5 bg-white/50"
-                        }`}
-                    />
+                      type="button"
+                      role="tab"
+                      aria-label={`Go to slide ${index + 1}`}
+                      aria-selected={index === currentBannerIndex}
+                      onClick={() => setCurrentBannerIndex(index)}
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-full"
+                    >
+                      <span className={`block rounded-full transition-all duration-300 ${index === currentBannerIndex
+                        ? "w-4 h-1.5 bg-white"
+                        : "w-1.5 h-1.5 bg-white/50"
+                        }`} />
+                    </button>
                   ))}
                 </div>
               )}
@@ -2306,6 +2306,7 @@ export default function Home() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleToggleFavorite}
+                                aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
                                 className={`h-9 w-9 md:h-11 md:w-11 rounded-full border flex items-center justify-center transition-all duration-300 ${favorite
                                   ? "border-red-500 bg-red-50 text-red-500"
                                   : "border-white bg-white/90 text-gray-600 hover:bg-white"
