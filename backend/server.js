@@ -5,8 +5,16 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
-import compression from 'compression';
 import { createServer } from 'http';
+
+// Optional compression - app works without it if package is missing
+let compression;
+try {
+  compression = (await import('compression')).default;
+} catch {
+  compression = null;
+  console.warn('⚠️ Compression package not found - API responses will not be compressed. Run: npm install compression');
+}
 import { Server } from 'socket.io';
 import cron from 'node-cron';
 import mongoose from 'mongoose';
@@ -470,7 +478,7 @@ connectRedis().catch(() => {
 // Security middleware
 app.use(helmet());
 // Gzip compression for API responses (reduces payload size)
-app.use(compression());
+if (compression) app.use(compression());
 // CORS configuration - allow multiple origins
 const allowedOrigins = [
   process.env.CORS_ORIGIN,

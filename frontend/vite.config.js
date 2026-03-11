@@ -22,11 +22,11 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // Keep React, framer-motion, and @radix-ui in same chunk so UI libs
+            // always have React in scope (avoids "createContext of undefined")
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') ||
+                id.includes('framer-motion') || id.includes('@radix-ui')) {
               return 'react-vendor';
-            }
-            if (id.includes('framer-motion') || id.includes('@radix-ui')) {
-              return 'ui-vendor';
             }
           }
         },
