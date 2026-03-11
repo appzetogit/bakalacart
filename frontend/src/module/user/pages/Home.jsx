@@ -1,5 +1,5 @@
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
-import { useRef, useEffect, useState, useMemo, useCallback } from "react"
+import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react"
 import { cn, getResilientImageUrl, normalizeImages } from "@/lib/utils"
 import { createPortal } from "react-dom"
 // Lenis will be lazy loaded
@@ -66,8 +66,8 @@ const placeholders = [
   "Search \"dosa\""
 ]
 
-// Restaurant Image Carousel Component
-function RestaurantImageCarousel({ images, restaurantName, restaurantId, priority = false }) {
+// Restaurant Image Carousel Component - memoized to reduce re-renders
+const RestaurantImageCarousel = memo(function RestaurantImageCarousel({ images, restaurantName, restaurantId, priority = false }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true) // Track image loading state for fast scroll
   const imageRef = useRef(null)
@@ -86,19 +86,6 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
       setImageLoading(false)
     }
   }, [currentIndex, displayImages[currentIndex]])
-
-  // Debug log for all restaurants (only first 3 to avoid spam)
-  if (restaurantId && (restaurantName === "Sagar restaurant" || restaurantName?.includes("Sagar"))) {
-    console.log(`🔍🔍🔍 RestaurantImageCarousel Debug for "${restaurantName}":`, {
-      restaurantName,
-      restaurantId,
-      rawImages: images,
-      displayImagesLength: displayImages.length,
-      displayFirstImage: displayImages[0],
-      currentIndex: currentIndex,
-      currentImageSrc: displayImages[currentIndex]
-    })
-  }
 
   if (displayImages.length === 0 || !displayImages[0]) {
     const fallbackImageRef = useRef(null)
@@ -212,7 +199,6 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                   style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                   loading={priority && currentIndex === 0 ? 'eager' : 'lazy'}
                   onError={(e) => {
-                    console.error(`❌ Image failed to load for "${restaurantName}":`, displayImages[currentIndex])
                     setImageLoading(false)
                     e.target.style.display = 'none'
                     const placeholder = e.target.parentElement?.querySelector('.image-placeholder')
@@ -220,12 +206,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
                       placeholder.style.display = 'flex'
                     }
                   }}
-                  onLoad={() => {
-                    setImageLoading(false)
-                    if (restaurantName === "Sagar Restaurant" || restaurantName?.includes("Sagar")) {
-                      console.log(`✅ Image loaded successfully for "${restaurantName}":`, displayImages[currentIndex])
-                    }
-                  }}
+                  onLoad={() => setImageLoading(false)}
                 />
                 {/* Placeholder if image fails */}
                 <div className="image-placeholder absolute inset-0 hidden items-center justify-center bg-gray-200 dark:bg-gray-800">
@@ -289,7 +270,7 @@ function RestaurantImageCarousel({ images, restaurantName, restaurantId, priorit
       />
     </div>
   )
-}
+})
 
 // Haversine distance formula - module level so all hooks can access it
 function calculateDistance(lat1, lng1, lat2, lng2) {
@@ -408,8 +389,6 @@ export default function Home() {
 
   // Fetch hero banners from API
   useEffect(() => {
-    console.log('🖼️ [Hero Banners] useEffect triggered - Component mounted or updated')
-
     const fetchHeroBanners = async () => {
       try {
         // PERMANENT FIX: Check persistent cache first for INSTANT load
@@ -433,7 +412,6 @@ export default function Home() {
           const banners = response.data.data.banners || []
           if (banners.length > 0) {
             const validBanners = banners.filter(b => b && b.imageUrl && typeof b.imageUrl === 'string' && b.imageUrl.trim() !== '')
-            console.log('🖼️ [Hero Banners] Valid banners after filtering:', validBanners.length, validBanners)
 
             if (validBanners.length > 0) {
               setHeroBannersData(validBanners)
@@ -443,75 +421,39 @@ export default function Home() {
               // Extract image URLs for display
               // IMPORTANT: Extract raw imageUrl from validBanners, we'll resilient-ify in render
               const imageUrls = validBanners.map(b => b.imageUrl)
-              console.log('🖼️ [Hero Banners] Setting banner images:', imageUrls)
               setHeroBannerImages(imageUrls)
             } else {
-              console.warn('🖼️ [Hero Banners] No valid banners found after filtering')
               setHeroBannerImages([])
               setHeroBannersData([])
             }
           } else {
-            console.warn('🖼️ [Hero Banners] No banners found in API response. Banners array is empty.')
             setHeroBannerImages([])
             setHeroBannersData([])
           }
         } else {
-          console.warn('🖼️ [Hero Banners] Invalid API response structure:', {
-            hasResponse: !!response.data,
-            hasSuccess: !!response.data?.success,
-            hasData: !!response.data?.data,
-            response: response.data
-          })
           setHeroBannerImages([])
           setHeroBannersData([])
         }
 
         // Fetch Under-250 Banners too
         try {
-          console.log('🖼️ [Under 250 Banners] Fetching...')
           const under250Response = await api.get('/hero-banners/under-250/public')
           if (under250Response.data?.success && under250Response.data?.data?.banners) {
             setUnder250Banners(under250Response.data.data.banners)
-            console.log('🖼️ [Under 250 Banners] Loaded:', under250Response.data.data.banners.length)
           }
-        } catch (uErr) {
-          console.warn('🖼️ [Under 250 Banners] Optional fetch failed:', uErr)
+        } catch {
         } finally {
           setLoadingUnder250Banners(false)
         }
-      } catch (error) {
-        console.error('🖼️ [Hero Banners] ❌ Error fetching hero banners:', error)
-        console.error('🖼️ [Hero Banners] Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          url: error.config?.url,
-          baseURL: error.config?.baseURL,
-          fullError: error
-        })
-
-        // Check if it's a network error
-        if (!error.response) {
-          console.error('🖼️ [Hero Banners] Network error - Backend might be down or CORS issue')
-        }
-
+      } catch {
         // Fallback to empty array if API fails
         setHeroBannerImages([])
         setHeroBannersData([])
       } finally {
         setLoadingBanners(false)
-        console.log('🖼️ [Hero Banners] Fetch completed. Loading state set to false.')
-        console.log('🖼️ [Hero Banners] Final state:', {
-          bannerImagesCount: heroBannerImages.length,
-          bannersDataCount: heroBannersData.length,
-          loadingBanners
-        })
       }
     }
 
-    // Immediate log to verify useEffect is running
-    console.log('🖼️ [Hero Banners] useEffect callback executing...')
     fetchHeroBanners()
   }, [])
 
@@ -547,7 +489,6 @@ export default function Home() {
               label: cat.name // For compatibility with existing code
             }
           })
-          console.log('📸 Categories with images:', adminCategories.map(c => ({ name: c.name, image: c.image })))
           setRealCategories(adminCategories)
           // Update cache
           HOME_PAGE_CACHE.realCategories = adminCategories;
@@ -555,8 +496,7 @@ export default function Home() {
         } else {
           setRealCategories([])
         }
-      } catch (error) {
-        console.error('Error fetching real categories:', error)
+      } catch {
         setRealCategories([])
       } finally {
         setLoadingRealCategories(false)
@@ -615,8 +555,7 @@ export default function Home() {
           HOME_PAGE_CACHE.landingConfig = finalConfig;
           try { sessionStorage.setItem('home_landing_config_cache', JSON.stringify(finalConfig)); } catch (e) {}
         }
-      } catch (error) {
-        console.error('Error fetching landing config:', error)
+      } catch {
         // Fallback to empty arrays and default heading
         setLandingCategories([])
         setLandingExploreMore([])
@@ -797,11 +736,10 @@ export default function Home() {
   try {
     profileContext = useProfile()
   } catch (error) {
-    console.warn("ProfileProvider not available, using fallback:", error.message)
     // Fallback values when ProfileProvider is not available
     profileContext = {
-      addFavorite: () => console.warn("ProfileProvider not available"),
-      removeFavorite: () => console.warn("ProfileProvider not available"),
+      addFavorite: () => {},
+      removeFavorite: () => {},
       isFavorite: () => false,
       getFavorites: () => []
     }
@@ -974,31 +912,7 @@ export default function Home() {
 
       if (response.data?.success) {
 
-        // Debug: Check first restaurant's image data
-        if (restaurantsArray.length > 0) {
-          const firstRestaurant = restaurantsArray[0]
-          console.log('🔍 First restaurant from API (RAW):', {
-            name: firstRestaurant.name,
-            coverImages: firstRestaurant.coverImages,
-            coverImagesType: typeof firstRestaurant.coverImages,
-            coverImagesIsArray: Array.isArray(firstRestaurant.coverImages),
-            menuImages: firstRestaurant.menuImages,
-            menuImagesType: typeof firstRestaurant.menuImages,
-            menuImagesIsArray: Array.isArray(firstRestaurant.menuImages),
-            profileImage: firstRestaurant.profileImage,
-            image: firstRestaurant.image,
-            hasCoverImages: !!firstRestaurant.coverImages,
-            coverImagesLength: firstRestaurant.coverImages?.length || 0,
-            hasMenuImages: !!firstRestaurant.menuImages,
-            menuImagesLength: firstRestaurant.menuImages?.length || 0,
-            // Show first menuImage structure if it exists
-            firstMenuImage: firstRestaurant.menuImages?.[0],
-            firstMenuImageType: typeof firstRestaurant.menuImages?.[0]
-          })
-        }
-
         if (restaurantsArray.length === 0) {
-          console.warn('No restaurants found in API response')
           setRestaurantsData([])
           setLoadingRestaurants(false)
           return
@@ -1017,10 +931,7 @@ export default function Home() {
             filters: params
           }
           localStorage.setItem(cacheKey, JSON.stringify(cacheData))
-          console.log('✅ Restaurant data cached successfully')
-        } catch (cacheError) {
-          console.warn('⚠️ Failed to cache restaurant data:', cacheError)
-        }
+        } catch {}
 
         // Transform API data to match expected format
         // Only show active restaurants
@@ -1163,17 +1074,6 @@ export default function Home() {
 
           const allImages = imageUrls
 
-          // Debug logging for Sagar Restaurant
-          if (restaurant.name === "Sagar Restaurant" || restaurant.name?.includes("Sagar")) {
-            console.log(`🔍🔍🔍 SAGAR RESTAURANT FINAL:`, {
-              name: restaurant.name,
-              menuImages: restaurant.menuImages,
-              extractedUrls: imageUrls,
-              allImages: allImages,
-              firstUrl: allImages[0]
-            })
-          }
-
           // Keep single image for backward compatibility - ensure it's always a valid URL
           const image = allImages && allImages.length > 0 && allImages[0]
             ? allImages[0]
@@ -1210,11 +1110,6 @@ export default function Home() {
           }
         })
 
-        if (transformedRestaurants.some(r => r.name?.includes("Sagar"))) {
-          const sagar = transformedRestaurants.find(r => r.name?.includes("Sagar"));
-          console.log(`[FRONTEND STATUS] ${sagar.name}: isAcceptingOrders=${sagar.isAcceptingOrders}`);
-        }
-
         // Sort restaurants by distance (nearby first) - only if user location is available
         if (userLat && userLng) {
           transformedRestaurants.sort((a, b) => {
@@ -1233,28 +1128,23 @@ export default function Home() {
           })
         }
 
-        console.log('Transformed and sorted restaurants:', transformedRestaurants)
         setRestaurantsData(transformedRestaurants)
 
         // Update global cache
         HOME_PAGE_CACHE.restaurants.set(cacheKey, transformedRestaurants);
         try { sessionStorage.setItem(`home_restaurants_cache_${cacheKey}`, JSON.stringify(transformedRestaurants)); } catch (e) {}
       } else {
-        console.warn('Invalid API response structure:', response.data)
         // Only clear if we don't have cache to show
         if (!HOME_PAGE_CACHE.restaurants.has(cacheKey)) {
           setRestaurantsData([])
         }
       }
-    } catch (error) {
-      console.error('Error fetching restaurants:', error)
-      console.error('Error details:', error.response?.data || error.message)
+    } catch {
       // Don't set hardcoded data here - let the useMemo fallback handle it
       // This way, if API succeeds later, it will show the real data
       setRestaurantsData([])
     } finally {
       setLoadingRestaurants(false)
-      console.log('Restaurant loading completed. restaurantsData length:', restaurantsData.length)
     }
   }, [zoneId])
 
@@ -1303,7 +1193,6 @@ export default function Home() {
       })
 
       setRestaurantsData(updatedRestaurants)
-      console.log('🔄 Recalculated distances for all restaurants (debounced)')
     }, 2000)
 
     return () => clearTimeout(timer)
@@ -1732,8 +1621,6 @@ export default function Home() {
                         className="w-full h-full object-cover"
                         loading={index === 0 ? 'eager' : 'lazy'}
                         onError={(e) => {
-                          console.error(`❌ Hero Banner image failed for index ${index}:`, image)
-                          // fallback to placeholder emoji instead of hiding
                           e.target.style.display = 'none'
                           const parent = e.target.parentElement
                           if (parent && !parent.querySelector('.banner-fallback')) {
@@ -1848,13 +1735,7 @@ export default function Home() {
                               alt={category.name}
                               className="w-full h-full object-cover rounded-full"
                               loading="lazy"
-                              onLoad={() => {
-                                console.log(`✅ Image loaded successfully for category "${category.name}":`, category.image)
-                              }}
                               onError={(e) => {
-                                console.error(`❌ Image failed to load for category "${category.name}":`, category.image)
-                                console.error('Error details:', e)
-                                // If image fails, show emoji
                                 e.target.style.display = 'none'
                                 if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                   const fallback = document.createElement('div')
@@ -1932,9 +1813,6 @@ export default function Home() {
                               loading="lazy"
                               referrerPolicy="no-referrer"
                               onError={(e) => {
-                                console.error(`❌ Image failed to load for category "${category.label}":`, category.imageUrl)
-                                // Try fallback image
-                                // If image fails, show emoji
                                 e.target.style.display = 'none'
                                 if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                   const fallback = document.createElement('div')
@@ -2390,18 +2268,6 @@ export default function Home() {
                                 : (restaurant.image
                                   ? [restaurant.image]
                                   : ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"])
-
-                              // Debug logging for Sagar Restaurant
-                              if (restaurant.name === "Sagar Restaurant" || restaurant.name?.includes("Sagar")) {
-                                console.log(`🔍🔍🔍 Passing to Carousel for "${restaurant.name}":`, {
-                                  restaurantImages: restaurant.images,
-                                  restaurantImage: restaurant.image,
-                                  imagesToPass,
-                                  imagesToPassLength: imagesToPass.length,
-                                  firstImage: imagesToPass[0],
-                                  firstImageType: typeof imagesToPass[0]
-                                })
-                              }
 
                               return (
                                 <RestaurantImageCarousel
@@ -2933,8 +2799,7 @@ export default function Home() {
                         sortBy,
                         selectedCuisine
                       })
-                    } catch (error) {
-                      console.error('Error applying filters:', error)
+                    } catch {
                     } finally {
                       setIsLoadingFilterResults(false)
                     }
@@ -3254,8 +3119,6 @@ export default function Home() {
                                   className="w-full h-full object-cover rounded-full"
                                   loading="lazy"
                                   onError={(e) => {
-                                    console.error(`❌ Image failed to load for category "${categoryData.name}":`, categoryData.image)
-                                    // If image fails, show emoji
                                     e.target.style.display = 'none'
                                     if (!e.target.parentElement.querySelector('.fallback-emoji')) {
                                       const fallback = document.createElement('div')

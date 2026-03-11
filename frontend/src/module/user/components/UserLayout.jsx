@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, useState, createContext, useContext, useRef } from "react"
+import { useEffect, useState, createContext, useContext, useRef, useCallback, useMemo } from "react"
 import { ProfileProvider } from "../context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
 import { CartProvider } from "../context/CartContext"
@@ -37,17 +37,21 @@ function SearchOverlayProvider({ children }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState("")
 
-  const openSearch = () => {
+  const openSearch = useCallback(() => {
     setIsSearchOpen(true)
-  }
-
-  const closeSearch = () => {
+  }, [])
+  const closeSearch = useCallback(() => {
     setIsSearchOpen(false)
     setSearchValue("")
-  }
+  }, [])
+
+  const searchOverlayValue = useMemo(
+    () => ({ isSearchOpen, searchValue, setSearchValue, openSearch, closeSearch }),
+    [isSearchOpen, searchValue, openSearch, closeSearch]
+  )
 
   return (
-    <SearchOverlayContext.Provider value={{ isSearchOpen, searchValue, setSearchValue, openSearch, closeSearch }}>
+    <SearchOverlayContext.Provider value={searchOverlayValue}>
       {children}
       <SearchOverlay
         isOpen={isSearchOpen}
@@ -79,19 +83,13 @@ export function useLocationSelector() {
 function LocationSelectorProvider({ children }) {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
 
-  const openLocationSelector = () => {
-    setIsLocationSelectorOpen(true)
-  }
+  const openLocationSelector = useCallback(() => setIsLocationSelectorOpen(true), [])
+  const closeLocationSelector = useCallback(() => setIsLocationSelectorOpen(false), [])
 
-  const closeLocationSelector = () => {
-    setIsLocationSelectorOpen(false)
-  }
-
-  const value = {
-    isLocationSelectorOpen,
-    openLocationSelector,
-    closeLocationSelector
-  }
+  const value = useMemo(
+    () => ({ isLocationSelectorOpen, openLocationSelector, closeLocationSelector }),
+    [isLocationSelectorOpen, openLocationSelector, closeLocationSelector]
+  )
 
   return (
     <LocationSelectorContext.Provider value={value}>

@@ -207,6 +207,8 @@ export const API_ENDPOINTS = {
     ANALYTICS: '/restaurant/analytics',
     LIST: '/restaurant/list',
     UNDER_250: '/restaurant/under-250',
+    SEARCH_SUGGESTIONS: '/restaurant/search-suggestions',
+    SEARCH: '/restaurant/search',
     BY_ID: '/restaurant/:id',
     BY_OWNER: '/restaurant/owner/me',
   },

@@ -48,6 +48,7 @@ adminCategoryManagementSchema.index({ name: 1 });
 adminCategoryManagementSchema.index({ status: 1 });
 adminCategoryManagementSchema.index({ priority: 1 });
 adminCategoryManagementSchema.index({ createdAt: -1 });
+adminCategoryManagementSchema.index({ status: 1, createdAt: -1 }); // Compound for getPublicCategories
 
 // Virtual for serial number (for display purposes)
 adminCategoryManagementSchema.virtual('sl').get(function() {

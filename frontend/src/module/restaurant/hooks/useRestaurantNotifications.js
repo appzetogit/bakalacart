@@ -5,6 +5,9 @@ import { restaurantAPI } from '@/lib/api';
 import alertSound from '@/assets/audio/restaurant aacept ringtone.mp3';
 import { addRestaurantNotification } from '../utils/notifications';
 
+const isDev = import.meta.env.DEV;
+const devLog = (...a) => { if (isDev) devLog(...a); };
+
 /**
  * Hook for restaurant to receive real-time order notifications with sound
  * @returns {object} - { newOrder, playSound, isConnected }
@@ -33,7 +36,7 @@ export const useRestaurantNotifications = () => {
       } catch (error) {
         // Handle 503 (maintenance mode) gracefully - don't log as error
         if (error?.response?.status === 503) {
-          console.log("Maintenance mode active - skipping restaurant ID fetch")
+          devLog("Maintenance mode active - skipping restaurant ID fetch")
         } else {
           console.error('Error fetching restaurant:', error);
         }
@@ -44,7 +47,7 @@ export const useRestaurantNotifications = () => {
 
   useEffect(() => {
     if (!restaurantId) {
-      console.log('⏳ Waiting for restaurantId...');
+      devLog('⏳ Waiting for restaurantId...');
       return;
     }
 
@@ -139,7 +142,7 @@ export const useRestaurantNotifications = () => {
 
       // Clean up any existing socket connection
       if (socketRef.current) {
-        console.log('🧹 Cleaning up existing socket connection...');
+        devLog('🧹 Cleaning up existing socket connection...');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -181,13 +184,13 @@ export const useRestaurantNotifications = () => {
       return; // Don't try to connect with invalid URL
     }
 
-    console.log('🔌 Attempting to connect to Socket.IO:', socketUrl);
-    console.log('🔌 Backend URL:', backendUrl);
-    console.log('🔌 API_BASE_URL:', API_BASE_URL);
-    console.log('🔌 Restaurant ID:', restaurantId);
-    console.log('🔌 Environment:', import.meta.env.MODE);
-    console.log('🔌 Is Production Build:', isProductionBuild);
-    console.log('🔌 Is Production Deployment:', isProductionDeployment);
+    devLog('🔌 Attempting to connect to Socket.IO:', socketUrl);
+    devLog('🔌 Backend URL:', backendUrl);
+    devLog('🔌 API_BASE_URL:', API_BASE_URL);
+    devLog('🔌 Restaurant ID:', restaurantId);
+    devLog('🔌 Environment:', import.meta.env.MODE);
+    devLog('🔌 Is Production Build:', isProductionBuild);
+    devLog('🔌 Is Production Deployment:', isProductionDeployment);
 
     // Initialize socket connection to restaurant namespace
     // Use polling only to avoid repeated "WebSocket connection failed" when backend is down
@@ -208,8 +211,8 @@ export const useRestaurantNotifications = () => {
 
     // Listen for connection
     socketRef.current.on('connect', () => {
-      console.log('✅ Restaurant Socket connected, restaurantId:', restaurantId);
-      console.log('✅ Socket ID:', socketRef.current.id);
+      devLog('✅ Restaurant Socket connected, restaurantId:', restaurantId);
+      devLog('✅ Socket ID:', socketRef.current.id);
       setIsConnected(true);
 
       // Join restaurant room immediately after connection
@@ -230,9 +233,9 @@ export const useRestaurantNotifications = () => {
 
     // Listen for room join confirmation
     socketRef.current.on('restaurant-room-joined', (data) => {
-      console.log('✅ Restaurant room joined successfully:', data);
-      console.log('✅ Room:', data?.room);
-      console.log('✅ Restaurant ID in room:', data?.restaurantId);
+      devLog('✅ Restaurant room joined successfully:', data);
+      devLog('✅ Room:', data?.room);
+      devLog('✅ Restaurant ID in room:', data?.restaurantId);
     });
 
     // Listen for connection errors (throttle logs to avoid console spam on reconnect loops)
@@ -260,7 +263,7 @@ export const useRestaurantNotifications = () => {
 
     // Listen for disconnection
     socketRef.current.on('disconnect', (reason) => {
-      console.log('❌ Restaurant Socket disconnected:', reason);
+      devLog('❌ Restaurant Socket disconnected:', reason);
       setIsConnected(false);
 
       if (reason === 'io server disconnect') {
@@ -271,12 +274,12 @@ export const useRestaurantNotifications = () => {
 
     // Listen for reconnection attempts
     socketRef.current.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`🔄 Reconnection attempt ${attemptNumber}...`);
+      devLog(`🔄 Reconnection attempt ${attemptNumber}...`);
     });
 
     // Listen for successful reconnection
     socketRef.current.on('reconnect', (attemptNumber) => {
-      console.log(`✅ Reconnected after ${attemptNumber} attempts`);
+      devLog(`✅ Reconnected after ${attemptNumber} attempts`);
       setIsConnected(true);
 
       // Rejoin restaurant room after reconnection
@@ -287,7 +290,7 @@ export const useRestaurantNotifications = () => {
 
     // Listen for new order notifications
     socketRef.current.on('new_order', (orderData) => {
-      console.log('📦 New order received:', orderData);
+      devLog('📦 New order received:', orderData);
       setNewOrder(orderData);
 
       // Save notification to localStorage
@@ -305,13 +308,13 @@ export const useRestaurantNotifications = () => {
 
     // Listen for sound notification event
     socketRef.current.on('play_notification_sound', (data) => {
-      console.log('🔔 Sound notification:', data);
+      devLog('🔔 Sound notification:', data);
       playNotificationSound();
     });
 
     // Listen for order status updates (e.g., when admin accepts order on behalf of restaurant)
     socketRef.current.on('order_status_update', (data) => {
-      console.log('📊 Order status update received via Socket.IO:', data);
+      devLog('📊 Order status update received via Socket.IO:', data);
       setOrderStatusUpdate(data);
 
       // Save notification to localStorage

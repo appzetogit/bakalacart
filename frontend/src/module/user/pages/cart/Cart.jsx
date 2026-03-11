@@ -2015,24 +2015,6 @@ export default function Cart() {
 
 
               </div>
-              {/* Personal Details */}
-              <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl">
-                <Link to="/profile/edit" className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">Deliver to</p>
-                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium">
-                        {userProfile?.name || "Guest"}, {userProfile?.phone || "+91-XXXXXXXXXX"}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </Link>
-              </div>
-
               {/* Bill Details */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl lg:hidden">
                 <button

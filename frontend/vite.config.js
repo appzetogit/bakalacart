@@ -14,13 +14,33 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@emotion/react', '@emotion/styled', '@mui/material', '@mui/x-date-pickers', 'mapbox-gl', 'react-map-gl'],
-    // Force pre-bundling of DeliveryRouter to avoid dynamic import issues
-    entries: [
-      'src/module/delivery/components/DeliveryRouter.jsx'
-    ],
+    entries: ['src/module/delivery/components/DeliveryRouter.jsx'],
+  },
+  build: {
+    minify: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            if (id.includes('framer-motion') || id.includes('@radix-ui')) {
+              return 'ui-vendor';
+            }
+          }
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
+    chunkSizeWarningLimit: 600,
+    cssCodeSplit: true,
+    sourcemap: false,
   },
   server: {
-    host: '0.0.0.0', // Allow access from network
-    port: 5173, // Default Vite port
+    host: '0.0.0.0',
+    port: 5173,
   },
 })

@@ -5,6 +5,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cron from 'node-cron';
@@ -468,6 +469,8 @@ connectRedis().catch(() => {
 
 // Security middleware
 app.use(helmet());
+// Gzip compression for API responses (reduces payload size)
+app.use(compression());
 // CORS configuration - allow multiple origins
 const allowedOrigins = [
   process.env.CORS_ORIGIN,

@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '../../../shared/utils/response.j
 import Delivery from '../../delivery/models/Delivery.js';
 import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import Order from '../../order/models/Order.js';
+import BusinessSettings from '../../admin/models/BusinessSettings.js';
 import mongoose from 'mongoose';
 import winston from 'winston';
 
@@ -211,7 +212,7 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
           orders = await Order.find({
             _id: { $in: orderIds }
           })
-            .select('orderId status createdAt deliveredAt pricing.total pricing.deliveryFee restaurantName address')
+            .select('orderId status createdAt deliveredAt pricing.total pricing.deliveryFee restaurantName address payment.method')
             .lean();
           
           console.log(`📦 Found ${orders.length} orders for ${orderIds.length} order IDs`);
@@ -236,6 +237,11 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
         // Get transaction date
         const transactionDate = transaction.createdAt || transaction.processedAt || new Date();
 
+        const paymentMethod = order?.payment?.method || '';
+        const paymentType = ['cash', 'cod'].includes(String(paymentMethod).toLowerCase())
+          ? 'Cash'
+          : (paymentMethod ? 'Online' : 'N/A');
+
         allEarnings.push({
           deliveryPartnerId: delivery._id.toString(),
           deliveryPartnerName: delivery.name || 'Unknown',
@@ -253,7 +259,8 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
           restaurantName: order?.restaurantName || 'N/A',
           orderTotal: order?.pricing?.total || 0,
           deliveryFee: order?.pricing?.deliveryFee || 0,
-          customerAddress: order?.address?.formattedAddress || 'N/A'
+          customerAddress: order?.address?.formattedAddress || 'N/A',
+          paymentType
         });
       }
 
@@ -281,7 +288,7 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
 
     try {
       const missingOrders = await Order.find(missingOrderQuery)
-        .select('orderId status createdAt deliveredAt updatedAt pricing.total pricing.deliveryFee restaurantName address deliveryPartnerId')
+        .select('orderId status createdAt deliveredAt updatedAt pricing.total pricing.deliveryFee restaurantName address deliveryPartnerId payment.method')
         .lean();
 
       console.log(`📦 Found ${missingOrders.length} missing delivered orders without wallet transactions`);
@@ -293,6 +300,10 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
         // Fallback to deliveryFee if no transaction amount exists
         const amount = order.pricing?.deliveryFee || 0;
         const transactionDate = order.deliveredAt || order.updatedAt || new Date();
+        const paymentMethod = order?.payment?.method || '';
+        const paymentType = ['cash', 'cod'].includes(String(paymentMethod).toLowerCase())
+          ? 'Cash'
+          : (paymentMethod ? 'Online' : 'N/A');
 
         allEarnings.push({
           deliveryPartnerId: delivery._id.toString(),
@@ -311,7 +322,8 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
           restaurantName: order.restaurantName || 'N/A',
           orderTotal: order.pricing?.total || 0,
           deliveryFee: order.pricing?.deliveryFee || 0,
-          customerAddress: order.address?.formattedAddress || 'N/A'
+          customerAddress: order.address?.formattedAddress || 'N/A',
+          paymentType
         });
       }
     } catch (missingOrdersError) {
@@ -330,6 +342,25 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
     const totalOrders = allEarnings.length;
     const uniqueDeliveryPartners = new Set(allEarnings.map(e => e.deliveryPartnerId?.toString()).filter(Boolean)).size;
 
+    /**
+     * Remaining cash limit:
+     * - MUST NOT depend on period / date filters
+     * - MUST match the Delivery Boy Wallet page
+     * - Use the same formula as deliveryBoyWalletController:
+     *   remainingCashLimit = max(0, deliveryCashLimitSetting - wallet.cashInHand)
+     */
+    let remainingCashLimit = null;
+    if (deliveryPartnerId && deliveryIds.length === 1) {
+      const [wallet, settings] = await Promise.all([
+        DeliveryWallet.findOne({ deliveryId: deliveryIds[0] }),
+        BusinessSettings.getSettings().catch(() => null)
+      ]);
+
+      const totalCashLimit = Number(settings?.deliveryCashLimit) || 0;
+      const cashInHand = wallet ? Number(wallet.cashInHand) || 0 : 0;
+      remainingCashLimit = Math.max(0, totalCashLimit - cashInHand);
+    }
+
     console.log(`✅ Summary: Total earnings: ₹${totalEarnings}, Total orders: ${totalOrders}, Unique delivery partners: ${uniqueDeliveryPartners}`);
 
     // Pagination
@@ -347,7 +378,10 @@ export const getDeliveryEarnings = asyncHandler(async (req, res) => {
         totalDeliveryPartners: uniqueDeliveryPartners,
         totalEarnings,
         totalOrders,
-        todayOrders: todayTotalOrdersCount
+        todayOrders: todayTotalOrdersCount,
+        // settlementAmount kept for backward compatibility (if any old clients use it)
+        settlementAmount: remainingCashLimit ?? totalEarnings,
+        remainingCashLimit
       },
       pagination: {
         page: parseInt(page),

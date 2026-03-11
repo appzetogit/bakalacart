@@ -160,6 +160,7 @@ export default function RestaurantDetails() {
 
   const [searchParams] = useSearchParams()
   const showOnlyUnder250 = searchParams.get('under250') === 'true'
+  const itemFromUrl = searchParams.get('item') || ''
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
   const { vegMode, addDishFavorite, removeDishFavorite, isDishFavorite, getDishFavorites, getFavorites, addFavorite, removeFavorite, isFavorite } = useProfile()
   const { location: userLocation } = useLocation() // Get user's current location
@@ -178,8 +179,8 @@ export default function RestaurantDetails() {
   const [expandedCoupons, setExpandedCoupons] = useState(new Set())
   const [showMenuSheet, setShowMenuSheet] = useState(false)
   const [showLargeOrderMenu, setShowLargeOrderMenu] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [showSearch, setShowSearch] = useState(!!itemFromUrl)
+  const [searchQuery, setSearchQuery] = useState(itemFromUrl)
   const [showMenuOptionsSheet, setShowMenuOptionsSheet] = useState(false)
   const [expandedAddButtons, setExpandedAddButtons] = useState(new Set())
   const [expandedSections, setExpandedSections] = useState(new Set([0])) // Default: Recommended section is expanded
@@ -198,6 +199,14 @@ export default function RestaurantDetails() {
   const [restaurantError, setRestaurantError] = useState(null)
   const fetchedRestaurantRef = useRef(false) // Track if restaurant has been fetched for current slug
   const [menuFetched, setMenuFetched] = useState(false) // Track if menu fetch is complete (to prevent premature empty state)
+
+  // Sync search from ?item= URL param (e.g. from SearchResults when user clicked a restaurant serving a food)
+  useEffect(() => {
+    if (itemFromUrl) {
+      setSearchQuery(itemFromUrl)
+      setShowSearch(true)
+    }
+  }, [itemFromUrl])
 
   // Fetch restaurant data from API
   useEffect(() => {

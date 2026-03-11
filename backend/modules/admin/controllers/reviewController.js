@@ -318,11 +318,8 @@ export const getDeliverymanReviews = asyncHandler(async (req, res) => {
     } else {
       sortOptions['review.submittedAt'] = -1; // Default: newest first
     }
-    
-    console.log('🔍 Sort options:', sortOptions);
-    
+
     // Fetch reviews with pagination
-    console.log('🔍 Executing Order.find()...');
     const reviews = await Order.find(query)
       .populate('deliveryPartnerId', 'name phone')
       .populate('userId', 'name phone email')
@@ -331,15 +328,11 @@ export const getDeliverymanReviews = asyncHandler(async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .lean();
-    
-    console.log(`✅ Found ${reviews.length} reviews`);
-    
+
     // Get total count
     const totalReviews = await Order.countDocuments(query);
-    console.log(`✅ Total reviews count: ${totalReviews}`);
-    
+
     // Transform data for frontend
-    console.log('🔄 Transforming reviews data...');
     const transformedReviews = reviews.map((review, index) => {
       try {
         const deliveryPartner = review.deliveryPartnerId;

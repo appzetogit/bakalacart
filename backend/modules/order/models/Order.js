@@ -335,6 +335,7 @@ orderSchema.index({ restaurantId: 1, status: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ deliveredAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
+orderSchema.index({ deliveryPartnerId: 1, status: 1 }); // Delivery dashboard & assignment
 
 // Generate order ID before saving (fallback if not provided)
 orderSchema.pre('save', async function (next) {

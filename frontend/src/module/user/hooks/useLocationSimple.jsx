@@ -171,69 +171,18 @@ export function useLocationSimple() {
    * @param {boolean} forceFresh - Force fresh location (ignore cache)
    * @returns {Promise<Object>} Location object
    */
-  const getCurrentLocation = async (forceFresh = false) => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by your browser"))
-        return
-      }
-
-      const options = {
-        enableHighAccuracy: true, // Use GPS for accurate location
-        timeout: 10000, // 10 seconds timeout
-        maximumAge: forceFresh ? 0 : 300000, // Allow 5-minute cache if not forcing fresh
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords
-            
-            // Reverse geocode to get area name
-            const locationData = await reverseGeocode(latitude, longitude)
-            
-            // Save to localStorage for quick access
-            localStorage.setItem("userLocation", JSON.stringify(locationData))
-            
-            resolve(locationData)
-          } catch (err) {
-            // If reverse geocoding fails, still return coordinates
-            const fallbackLocation = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              area: "",
-              city: "",
-              state: "",
-              formattedAddress: "",
-            }
-            localStorage.setItem("userLocation", JSON.stringify(fallbackLocation))
-            reject(err)
-          }
-        },
-        (err) => {
-          // Handle geolocation errors
-          let errorMessage = "Unable to retrieve your location"
-          
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              errorMessage = "Location permission denied. Please enable location access in your browser settings."
-              break
-            case err.POSITION_UNAVAILABLE:
-              errorMessage = "Location information is unavailable."
-              break
-            case err.TIMEOUT:
-              errorMessage = "Location request timed out. Please try again."
-              break
-            default:
-              errorMessage = "An unknown error occurred while retrieving location."
-              break
-          }
-          
-          reject(new Error(errorMessage))
-        },
-        options
-      )
-    })
+  const getCurrentLocation = async () => {
+    // Geolocation disabled: always use fallback manual/select location.
+    const fallbackLocation = {
+      latitude: null,
+      longitude: null,
+      area: "",
+      city: "",
+      state: "",
+      formattedAddress: "",
+    }
+    localStorage.setItem("userLocation", JSON.stringify(fallbackLocation))
+    return fallbackLocation
   }
 
   /**

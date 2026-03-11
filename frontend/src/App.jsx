@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, memo } from "react"
 import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { useEffect } from "react"
 import { initializePushNotifications } from "@/services/pushNotificationService"
@@ -6,12 +6,14 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 import AuthRedirect from "@/components/AuthRedirect"
 import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/utils/auth"
 
-// Loading component for lazy-loaded routes
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-  </div>
-)
+// Memoized loading fallback to avoid re-renders
+const LoadingFallback = memo(function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>
+  )
+})
 
 // Helper to ensure dynamic imports work with Vite aliases
 const lazyImport = (importFn, fallbackPath = null) => lazy(() => {

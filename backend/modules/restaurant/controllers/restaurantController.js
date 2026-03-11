@@ -330,16 +330,6 @@ export const getRestaurants = async (req, res) => {
     delete totalQuery.$or; // Remove $or for count
     const total = await Restaurant.countDocuments(totalQuery);
 
-    console.log(`Fetched ${restaurants.length} restaurants from database with filters:`, {
-      sortBy,
-      cuisine,
-      minRating,
-      maxDeliveryTime,
-      maxDistance,
-      maxPrice,
-      hasOffers
-    });
-
     return successResponse(res, 200, 'Restaurants retrieved successfully', {
       restaurants: restaurants || [],
       total: restaurants.length,
@@ -1144,6 +1134,238 @@ export const getRestaurantsWithDishesUnder250 = async (req, res) => {
   } catch (error) {
     console.error('Error fetching restaurants with dishes under ₹250:', error);
     return errorResponse(res, 500, 'Failed to fetch restaurants with dishes under ₹250');
+  }
+};
+
+/**
+ * Search suggestions for live search dropdown (restaurants + menu items)
+ * GET /api/restaurant/search-suggestions?q=burger&limit=4
+ */
+export const searchSuggestions = async (req, res) => {
+  try {
+    const { q = '', limit = 4 } = req.query;
+    const query = String(q).trim();
+
+    if (!query || query.length < 2) {
+      return successResponse(res, 200, 'Search suggestions', { suggestions: [] });
+    }
+
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const maxResults = Math.min(parseInt(limit, 10) || 4, 8);
+    const results = [];
+    const seenRestaurantIds = new Set();
+    const seenDishKey = (name, rid) => `${(name || '').toLowerCase()}|${String(rid)}`;
+
+    // 1. Find restaurants by name (case-insensitive, partial)
+    const restaurants = await Restaurant.find({
+      isActive: true,
+      name: { $regex: regex },
+    })
+      .select('name slug restaurantId _id')
+      .limit(maxResults)
+      .lean();
+
+    for (const r of restaurants) {
+      const rid = r.restaurantId || r._id;
+      const slug = r.slug || (r.name || '').toLowerCase().replace(/\s+/g, '-');
+      if (!seenRestaurantIds.has(String(rid))) {
+        seenRestaurantIds.add(String(rid));
+        results.push({
+          type: 'restaurant',
+          name: r.name,
+          slug,
+          restaurantId: rid,
+        });
+        if (results.length >= maxResults) {
+          return successResponse(res, 200, 'OK', { suggestions: results });
+        }
+      }
+    }
+
+    // 2. Find menu items by name - use aggregation
+    const menuItems = await Menu.aggregate([
+      { $match: { isActive: { $ne: false } } },
+      {
+        $lookup: {
+          from: 'restaurants',
+          localField: 'restaurant',
+          foreignField: '_id',
+          as: 'restaurantDoc',
+        },
+      },
+      { $unwind: '$restaurantDoc' },
+      { $match: { 'restaurantDoc.isActive': true } },
+      { $unwind: '$sections' },
+      {
+        $addFields: {
+          allItems: {
+            $concatArrays: [
+              { $ifNull: ['$sections.items', []] },
+              {
+                $reduce: {
+                  input: { $ifNull: ['$sections.subsections', []] },
+                  initialValue: [],
+                  in: { $concatArrays: ['$$value', { $ifNull: ['$$this.items', []] }] },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { $unwind: '$allItems' },
+      { $match: { 'allItems.name': { $regex: regex } } },
+      {
+        $project: {
+          itemName: '$allItems.name',
+          restaurantDoc: 1,
+        },
+      },
+      { $limit: maxResults * 3 },
+    ]);
+
+    for (const m of menuItems) {
+      if (results.length >= maxResults) break;
+      const rid = m.restaurantDoc?.restaurantId || m.restaurantDoc?._id;
+      const slug = m.restaurantDoc?.slug || (m.restaurantDoc?.name || '').toLowerCase().replace(/\s+/g, '-');
+      const itemName = m.itemName;
+      if (!itemName) continue;
+      const key = seenDishKey(itemName, rid);
+      if (results.some((x) => x.type === 'dish' && seenDishKey(x.dishName, x.restaurantId) === key)) continue;
+      results.push({
+        type: 'dish',
+        dishName: itemName,
+        restaurantId: rid,
+        restaurantName: m.restaurantDoc?.name,
+        slug,
+      });
+    }
+
+    return successResponse(res, 200, 'OK', { suggestions: results.slice(0, maxResults) });
+  } catch (error) {
+    console.error('Error in searchSuggestions:', error);
+    return errorResponse(res, 500, 'Failed to fetch search suggestions');
+  }
+};
+
+/**
+ * Full search for SearchResults page - returns restaurants matching query (by name OR menu item)
+ * GET /api/restaurant/search?q=chipotle+cheese+fries
+ * Single API call, no per-restaurant menu fetching needed
+ */
+export const searchRestaurants = async (req, res) => {
+  try {
+    const { q = '', limit = 100, offset = 0 } = req.query;
+    const query = String(q).trim();
+
+    if (!query || query.length < 2) {
+      return successResponse(res, 200, 'Search results', { restaurants: [], total: 0 });
+    }
+
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const restaurantIds = new Set();
+
+    // 1. Restaurants by name
+    const byName = await Restaurant.find({
+      isActive: true,
+      name: { $regex: regex },
+    })
+      .select('_id restaurantId')
+      .lean();
+    byName.forEach((r) => restaurantIds.add(String(r.restaurantId || r._id)));
+
+    // 2. Restaurants by menu item (aggregation)
+    const byMenu = await Menu.aggregate([
+      { $match: { isActive: { $ne: false } } },
+      { $unwind: '$sections' },
+      {
+        $addFields: {
+          allItems: {
+            $concatArrays: [
+              { $ifNull: ['$sections.items', []] },
+              {
+                $reduce: {
+                  input: { $ifNull: ['$sections.subsections', []] },
+                  initialValue: [],
+                  in: { $concatArrays: ['$$value', { $ifNull: ['$$this.items', []] }] },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { $unwind: '$allItems' },
+      { $match: { 'allItems.name': { $regex: regex } } },
+      { $group: { _id: '$restaurant' } },
+    ]);
+    const restoIdsFromMenu = await Restaurant.find({
+      _id: { $in: byMenu.map((m) => m._id) },
+      isActive: true,
+    })
+      .select('_id restaurantId')
+      .lean();
+    restoIdsFromMenu.forEach((r) => restaurantIds.add(String(r.restaurantId || r._id)));
+
+    if (restaurantIds.size === 0) {
+      return successResponse(res, 200, 'Search results', { restaurants: [], total: 0 });
+    }
+
+    // 3. Fetch full restaurant data
+    const ids = Array.from(restaurantIds);
+    const objectIds = ids
+      .filter((id) => mongoose.Types.ObjectId.isValid(id) && String(id).length === 24)
+      .map((id) => new mongoose.Types.ObjectId(id));
+    const orConditions = [];
+    if (objectIds.length > 0) orConditions.push({ _id: { $in: objectIds } });
+    if (ids.length > 0) orConditions.push({ restaurantId: { $in: ids } });
+    const findQuery = { isActive: true };
+    if (orConditions.length > 0) findQuery.$or = orConditions;
+
+    const restaurants = await Restaurant.find(findQuery)
+      .select('-owner -createdAt -updatedAt -password')
+      .sort({ rating: -1, totalRatings: -1 })
+      .skip(parseInt(offset, 10))
+      .limit(Math.min(parseInt(limit, 10) || 100, 100))
+      .lean();
+
+    // Transform to same format as getRestaurants
+    const transformed = restaurants.map((restaurant) => {
+      const hasCoverImages = restaurant.coverImages && Array.isArray(restaurant.coverImages) && restaurant.coverImages.length > 0;
+      const hasMenuImages = restaurant.menuImages && Array.isArray(restaurant.menuImages) && restaurant.menuImages.length > 0;
+      const coverImages = hasCoverImages ? restaurant.coverImages : (hasMenuImages ? restaurant.menuImages : []);
+      const isAcceptingOrders = calculateAcceptingOrders(restaurant);
+      const restaurantId = restaurant.restaurantId || restaurant._id;
+      const coverUrls = coverImages.map((img) => img?.url || img).filter(Boolean);
+      const menuUrls = (restaurant.menuImages || []).map((img) => img?.url || img).filter(Boolean);
+      const image = coverUrls[0] || menuUrls[0] || restaurant.profileImage?.url || null;
+
+      return {
+        id: restaurantId,
+        restaurantId,
+        name: restaurant.name,
+        cuisine: restaurant.cuisines && restaurant.cuisines.length > 0 ? restaurant.cuisines.join(', ') : null,
+        rating: restaurant.rating ?? null,
+        deliveryTime: restaurant.estimatedDeliveryTime || null,
+        distance: restaurant.distance || null,
+        image,
+        images: coverUrls.length > 0 ? coverUrls : menuUrls,
+        priceRange: restaurant.priceRange || null,
+        featuredDish: restaurant.featuredDish || null,
+        featuredPrice: restaurant.featuredPrice ?? null,
+        offer: restaurant.offer && !['Na', 'NA', 'N/A', 'na', 'n/a'].includes(String(restaurant.offer).trim()) ? restaurant.offer : '',
+        slug: restaurant.slug || (restaurant.name || '').toLowerCase().replace(/\s+/g, '-'),
+        isAcceptingOrders,
+      };
+    });
+
+    return successResponse(res, 200, 'Search results', {
+      restaurants: transformed,
+      total: transformed.length,
+    });
+  } catch (error) {
+    console.error('Error in searchRestaurants:', error);
+    return errorResponse(res, 500, 'Failed to search restaurants');
   }
 };
 

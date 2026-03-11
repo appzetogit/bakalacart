@@ -1,5 +1,6 @@
 import etaCalculationService from './etaCalculationService.js';
 import Order from '../models/Order.js';
+import { logger } from '../../../shared/utils/logger.js';
 
 /**
  * ETA WebSocket Service
@@ -29,7 +30,7 @@ class ETAWebSocketService {
     try {
       const io = await this.getIOInstance();
       if (!io) {
-        console.warn('Socket.IO not initialized, skipping ETA update');
+        logger.warn('Socket.IO not initialized, skipping ETA update');
         return;
       }
 
@@ -108,7 +109,7 @@ class ETAWebSocketService {
         io.to(`user:${order.userId}`).emit('RIDER_ASSIGNED', eventData);
       }
 
-      console.log(`📡 Rider assigned event emitted for order ${order.orderId}`);
+      logger.log(`📡 Rider assigned event emitted for order ${order.orderId}`);
     } catch (error) {
       console.error('Error emitting rider assigned event:', error);
     }
@@ -138,7 +139,7 @@ class ETAWebSocketService {
         io.to(`user:${order.userId}`).emit('PICKED_UP', eventData);
       }
 
-      console.log(`📡 Picked up event emitted for order ${order.orderId}`);
+      logger.log(`📡 Picked up event emitted for order ${order.orderId}`);
     } catch (error) {
       console.error('Error emitting picked up event:', error);
     }
@@ -170,7 +171,7 @@ class ETAWebSocketService {
         io.to(`user:${order.userId}`).emit('NEARBY', eventData);
       }
 
-      console.log(`📡 Nearby event emitted for order ${order.orderId}, distance: ${distanceToDrop}km`);
+      logger.log(`📡 Nearby event emitted for order ${order.orderId}, distance: ${distanceToDrop}km`);
     } catch (error) {
       console.error('Error emitting nearby event:', error);
     }

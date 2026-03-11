@@ -9,22 +9,22 @@ import UserLayout from "./UserLayout"
 // Components will render immediately without showing loading state
 const LoadingFallback = () => null
 
-// Home & Discovery
-import Home from "../pages/Home"
-import Coffee from "../pages/Coffee"
+// Home & Discovery - lazy for code splitting
+const Home = lazy(() => import("../pages/Home"))
+const Coffee = lazy(() => import("../pages/Coffee"))
 const Under250 = lazy(() => import("../pages/Under250"))
-import CategoryPage from "../pages/CategoryPage"
-import Restaurants from "../pages/restaurants/Restaurants"
+const CategoryPage = lazy(() => import("../pages/CategoryPage"))
+const Restaurants = lazy(() => import("../pages/restaurants/Restaurants"))
 const RestaurantDetails = lazy(() => import("../pages/restaurants/RestaurantDetails"))
 const SearchResults = lazy(() => import("../pages/SearchResults"))
-import ProductDetail from "../pages/ProductDetail"
+const ProductDetail = lazy(() => import("../pages/ProductDetail"))
 
 // Cart
-import Cart from "../pages/cart/Cart"
-import Checkout from "../pages/cart/Checkout"
+const Cart = lazy(() => import("../pages/cart/Cart"))
+const Checkout = lazy(() => import("../pages/cart/Checkout"))
 
 // Orders
-import Orders from "../pages/orders/Orders"
+const Orders = lazy(() => import("../pages/orders/Orders"))
 import OrderTracking from "../pages/orders/OrderTracking"
 import OrderInvoice from "../pages/orders/OrderInvoice"
 import UserOrderDetails from "../pages/orders/UserOrderDetails"
@@ -98,7 +98,9 @@ export default function UserRouter() {
             path="/"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Home />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Home />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -110,8 +112,8 @@ export default function UserRouter() {
               </Suspense>
             }
           />
-          <Route path="/category/:category" element={<CategoryPage />} />
-          <Route path="/restaurants" element={<Restaurants />} />
+          <Route path="/category/:category" element={<Suspense fallback={<LoadingFallback />}><CategoryPage /></Suspense>} />
+          <Route path="/restaurants" element={<Suspense fallback={<LoadingFallback />}><Restaurants /></Suspense>} />
           <Route
             path="/restaurants/:slug"
             element={
@@ -136,14 +138,16 @@ export default function UserRouter() {
               </Suspense>
             }
           />
-          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/product/:id" element={<Suspense fallback={<LoadingFallback />}><ProductDetail /></Suspense>} />
 
           {/* Cart - Protected */}
           <Route
             path="/cart"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Cart />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Cart />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -151,7 +155,9 @@ export default function UserRouter() {
             path="/user/cart"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Cart />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Cart />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -159,7 +165,9 @@ export default function UserRouter() {
             path="/cart/checkout"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Checkout />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Checkout />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -167,7 +175,9 @@ export default function UserRouter() {
             path="/user/cart/checkout"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Checkout />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Checkout />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -177,7 +187,9 @@ export default function UserRouter() {
             path="/orders"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/auth/sign-in">
-                <Orders />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Orders />
+                </Suspense>
               </ProtectedRoute>
             }
           />

@@ -33,7 +33,7 @@ const notifyUserSafely = async (userId, title, body, data) => {
       body,
       data: { ...data, icon: '/bakalalogo.png' }
     });
-    console.log(`✅ [Push Notification] Sent to user: ${title}`);
+    if (process.env.NODE_ENV === 'development') logger.info(`[Push Notification] Sent to user: ${title}`);
   } catch (error) {
     console.error('❌ [Push Notification] Error sending to user:', error);
   }
@@ -335,6 +335,59 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     if (!order) {
       console.error(`❌ Order ${orderId} not found in database`);
       return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Enforce COD cash-limit rule BEFORE allowing acceptance
+    // If payment method is COD/cash and available cash limit is less than order total,
+    // prevent delivery boy from accepting this order.
+    try {
+      const paymentMethod = (order.payment?.method || '').toString().toLowerCase();
+      const isCODOrder = paymentMethod === 'cash' || paymentMethod === 'cod' || paymentMethod === 'cash on delivery';
+
+      if (isCODOrder) {
+        // Get global delivery cash limit
+        const { default: BusinessSettings } = await import('../../admin/models/BusinessSettings.js');
+        let totalCashLimit = 750; // default fallback
+        try {
+          const settings = await BusinessSettings.getSettings();
+          if (settings?.deliveryCashLimit !== undefined && settings?.deliveryCashLimit !== null) {
+            const configured = Number(settings.deliveryCashLimit);
+            if (Number.isFinite(configured) && configured >= 0) {
+              totalCashLimit = configured;
+            }
+          }
+        } catch (e) {
+          logger.warn('⚠️ [acceptOrder] Failed to read deliveryCashLimit from settings, using default 750:', e?.message || e);
+        }
+
+        // Get current wallet and available cash limit for this delivery partner
+        let wallet = await DeliveryWallet.findOne({ deliveryId: delivery._id }).lean();
+        const cashInHand = Math.max(0, Number(wallet?.cashInHand) || 0);
+        const availableCashLimit = Math.max(0, totalCashLimit - cashInHand);
+
+        const orderTotal = Number(order.pricing?.total) || 0;
+
+        if (orderTotal > availableCashLimit) {
+          logger.warn('⚠️ [acceptOrder] COD order rejected due to insufficient available cash limit', {
+            deliveryId: delivery._id?.toString(),
+            orderId: order.orderId,
+            orderTotal,
+            totalCashLimit,
+            cashInHand,
+            availableCashLimit
+          });
+          return errorResponse(
+            res,
+            400,
+            `You cannot accept this COD order because your available cash limit (₹${availableCashLimit.toFixed(
+              2
+            )}) is less than the order amount (₹${orderTotal.toFixed(2)}). Please settle cash or complete a deposit.`
+          );
+        }
+      }
+    } catch (cashLimitCheckError) {
+      logger.error('❌ [acceptOrder] Error while enforcing COD cash-limit rule:', cashLimitCheckError);
+      // Do not block acceptance purely due to check failure; fallback to old behavior
     }
 
     // Check if order is assigned to this delivery partner

@@ -185,19 +185,6 @@ export const getWallet = asyncHandler(async (req, res) => {
       totalTransactions: wallet.transactions.length
     };
 
-    // Log wallet data for debugging
-    console.log('💰 Wallet API Response:', {
-      deliveryId: delivery._id,
-      totalBalance: walletData.totalBalance,
-      pocketBalance: walletData.pocketBalance,
-      cashInHand: walletData.cashInHand,
-      availableCashLimit: walletData.availableCashLimit,
-      codCollectedTotal,
-      totalBonus: totalBonus,
-      bonusTransactionsCount: bonusTransactions.length,
-      totalTransactions: walletData.totalTransactions
-    });
-
     return successResponse(res, 200, 'Wallet balance retrieved successfully', {
       wallet: walletData
     });

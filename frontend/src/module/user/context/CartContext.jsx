@@ -62,7 +62,7 @@ export function CartProvider({ children }) {
   // Listen for auth changes to sync cart (especially on logout)
   useEffect(() => {
     const handleAuthChange = () => {
-      console.log('🔄 Auth changed, syncing cart data...')
+      if (import.meta.env.DEV) console.log('🔄 Auth changed, syncing cart data...')
       try {
         const saved = localStorage.getItem("cart")
         setCart(saved ? JSON.parse(saved) : [])

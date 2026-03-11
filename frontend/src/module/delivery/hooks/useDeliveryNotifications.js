@@ -5,6 +5,19 @@ import { deliveryAPI } from '@/lib/api';
 import alertSound from '@/assets/audio/delivery aacept ringtone.mp3';
 import originalSound from '@/assets/audio/delivery aacept ringtone.mp3';
 
+const isDev = import.meta.env.DEV;
+const devLog = (...args) => {
+  if (!isDev) return;
+  // Use console.log to avoid recursive self-calls
+  // eslint-disable-next-line no-console
+  console.log('[DeliveryNotifications]', ...args);
+};
+const devWarn = (...args) => {
+  if (!isDev) return;
+  // eslint-disable-next-line no-console
+  console.warn('[DeliveryNotifications]', ...args);
+};
+
 export const useDeliveryNotifications = () => {
   // CRITICAL: All hooks must be called unconditionally and in the same order every render
   // Order: useRef -> useState -> useEffect -> useCallback
@@ -33,7 +46,7 @@ export const useDeliveryNotifications = () => {
       const selectedSound = localStorage.getItem('delivery_alert_sound') || 'zomato_tone';
       const soundFile = selectedSound === 'original' ? originalSound : alertSound;
 
-      console.log('🔊 Playing notification sound:', {
+      devLog('🔊 Playing notification sound:', {
         selectedSound,
         soundType: selectedSound === 'original' ? 'Original' : 'Zomato Tone',
         soundFile,
@@ -60,10 +73,10 @@ export const useDeliveryNotifications = () => {
         // Use absolute URL for mobile APK to ensure it resolves correctly
         const baseUrl = window.location.origin;
         audioSrc = `${baseUrl}${publicPath}`;
-        console.log('📱 Mobile APK - using absolute URL:', audioSrc);
+        devLog('📱 Mobile APK - using absolute URL:', audioSrc);
       }
 
-      console.log('🔊 Creating audio with source:', {
+      devLog('🔊 Creating audio with source:', {
         audioSrc,
         isFlutterWebView,
         selectedSound,
@@ -88,14 +101,14 @@ export const useDeliveryNotifications = () => {
 
         // Try fallback public path if import path failed (for browser)
         if (!isFlutterWebView && audioSrc === soundFile) {
-          console.log('🔄 Trying fallback public path:', publicPath);
+          devLog('🔄 Trying fallback public path:', publicPath);
           const fallbackAudio = new Audio(publicPath);
           fallbackAudio.volume = 1.0;
           fallbackAudio.loop = true;
           fallbackAudio.preload = 'auto';
 
           fallbackAudio.addEventListener('canplaythrough', () => {
-            console.log('✅ Fallback audio ready, playing...');
+            devLog('✅ Fallback audio ready, playing...');
             fallbackAudio.currentTime = 0;
             fallbackAudio.play().catch(err => {
               console.error('❌ Fallback audio play failed:', err);
@@ -113,49 +126,49 @@ export const useDeliveryNotifications = () => {
 
       // Add success handlers
       audioRef.current.addEventListener('loadeddata', () => {
-        console.log('✅ Audio file loaded successfully');
+        devLog('✅ Audio file loaded successfully');
       });
 
       audioRef.current.addEventListener('canplay', () => {
-        console.log('✅ Audio can play');
+        devLog('✅ Audio can play');
       });
 
       // In mobile APK, always allow sound (Flutter handles permissions)
       // In browser, require user interaction due to autoplay policy
       if (!isFlutterWebView && !userInteractedRef.current) {
-        console.log('🔇 Audio playback skipped - user has not interacted with page yet');
+        devLog('🔇 Audio playback skipped - user has not interacted with page yet');
         return;
       }
 
       // For mobile APK, mark as interacted to allow sound playback
       if (isFlutterWebView) {
         userInteractedRef.current = true;
-        console.log('📱 Mobile APK detected - allowing sound playback without user interaction');
+        devLog('📱 Mobile APK detected - allowing sound playback without user interaction');
       }
 
       // Try Flutter sound handler first (if available)
       if (isFlutterWebView && window.flutter_inappwebview?.callHandler) {
         try {
-          console.log('📱 Attempting to play sound via Flutter handler');
+          devLog('📱 Attempting to play sound via Flutter handler');
           window.flutter_inappwebview.callHandler('playNotificationSound', {
             soundType: selectedSound === 'original' ? 'original' : 'alert',
             loop: true
           }).catch(err => {
-            console.warn('⚠️ Flutter sound handler failed, using fallback:', err);
+            devWarn('⚠️ Flutter sound handler failed, using fallback:', err);
           });
         } catch (flutterError) {
-          console.warn('⚠️ Flutter sound handler error, using fallback:', flutterError);
+          devWarn('⚠️ Flutter sound handler error, using fallback:', flutterError);
         }
       }
 
       // Function to play audio
       const playAudio = () => {
         if (!audioRef.current) {
-          console.warn('⚠️ Audio ref is null, cannot play');
+          devWarn('⚠️ Audio ref is null, cannot play');
           return;
         }
 
-        console.log('🎵 Attempting to play audio...', {
+        devLog('🎵 Attempting to play audio...', {
           readyState: audioRef.current.readyState,
           src: audioRef.current.src,
           volume: audioRef.current.volume,
@@ -169,11 +182,11 @@ export const useDeliveryNotifications = () => {
 
           if (playPromise !== undefined) {
             playPromise.then(() => {
-              console.log('✅ Notification sound started playing successfully');
+              devLog('✅ Notification sound started playing successfully');
               // Verify it's actually playing
               setTimeout(() => {
                 if (audioRef.current) {
-                  console.log('🔊 Audio playback status:', {
+                  devLog('🔊 Audio playback status:', {
                     paused: audioRef.current.paused,
                     currentTime: audioRef.current.currentTime,
                     duration: audioRef.current.duration,
@@ -186,7 +199,7 @@ export const useDeliveryNotifications = () => {
               if (!error.message?.includes('user didn\'t interact') &&
                 !error.name?.includes('NotAllowedError') &&
                 !isFlutterWebView) {
-                console.warn('Error playing notification sound:', error);
+                devWarn('Error playing notification sound:', error);
               } else if (isFlutterWebView) {
                 // In mobile APK, this shouldn't fail, but log if it does
                 console.error('❌ Sound playback failed in mobile APK:', error);
@@ -206,21 +219,21 @@ export const useDeliveryNotifications = () => {
       // Try to play when audio is ready
       if (audioRef.current.readyState >= 2) {
         // Audio already loaded
-        console.log('✅ Audio already loaded, playing immediately');
+        devLog('✅ Audio already loaded, playing immediately');
         playAudio();
       } else {
         // Wait for audio to load
-        console.log('⏳ Waiting for audio to load...');
+        devLog('⏳ Waiting for audio to load...');
 
         const onCanPlay = () => {
-          console.log('✅ Audio can play, starting playback');
+          devLog('✅ Audio can play, starting playback');
           playAudio();
         };
 
         audioRef.current.addEventListener('canplaythrough', onCanPlay, { once: true });
         audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
         audioRef.current.addEventListener('loadeddata', () => {
-          console.log('✅ Audio data loaded');
+          devLog('✅ Audio data loaded');
           // Try to play if ready
           if (audioRef.current.readyState >= 2) {
             playAudio();
@@ -233,10 +246,10 @@ export const useDeliveryNotifications = () => {
         // Fallback: try to play after delays (for mobile APK)
         setTimeout(() => {
           if (audioRef.current && audioRef.current.readyState >= 2) {
-            console.log('🔄 Fallback: Audio ready after delay, playing...');
+            devLog('🔄 Fallback: Audio ready after delay, playing...');
             playAudio();
           } else if (audioRef.current) {
-            console.warn('⚠️ Audio not ready after 500ms, readyState:', audioRef.current.readyState);
+            devWarn('⚠️ Audio not ready after 500ms, readyState:', audioRef.current.readyState);
           }
         }, 500);
 
@@ -244,7 +257,7 @@ export const useDeliveryNotifications = () => {
         if (isFlutterWebView) {
           setTimeout(() => {
             if (audioRef.current && !audioRef.current.paused === false) {
-              console.log('🔄 Mobile APK fallback: Force playing audio...');
+              devLog('🔄 Mobile APK fallback: Force playing audio...');
               playAudio();
             }
           }, 1000);
@@ -258,7 +271,7 @@ export const useDeliveryNotifications = () => {
       if (!error.message?.includes('user didn\'t interact') &&
         !error.name?.includes('NotAllowedError') &&
         !isFlutterWebView) {
-        console.warn('Error playing sound:', error);
+        devWarn('Error playing sound:', error);
       } else if (isFlutterWebView) {
         console.error('❌ Sound playback error in mobile APK:', error);
       }
@@ -276,13 +289,13 @@ export const useDeliveryNotifications = () => {
     // This allows sound to play even when app is in foreground
     if (isFlutterWebView) {
       userInteractedRef.current = true;
-      console.log('📱 Mobile APK detected - sound playback enabled without user interaction');
+      devLog('📱 Mobile APK detected - sound playback enabled without user interaction');
       return; // No need to listen for user interaction in mobile APK
     }
 
     const handleUserInteraction = () => {
       userInteractedRef.current = true;
-      console.log('👆 User interaction detected - sound playback enabled');
+      devLog('👆 User interaction detected - sound playback enabled');
       // Remove listeners after first interaction
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
@@ -310,7 +323,7 @@ export const useDeliveryNotifications = () => {
     if (!audioRef.current) {
       audioRef.current = new Audio(soundFile);
       audioRef.current.volume = 0.7;
-      console.log('🔊 Audio initialized with:', selectedSound === 'original' ? 'Original' : 'Zomato Tone');
+      devLog('🔊 Audio initialized with:', selectedSound === 'original' ? 'Original' : 'Zomato Tone');
     } else {
       // Update audio source if preference changed
       const currentSrc = audioRef.current.src;
@@ -319,7 +332,7 @@ export const useDeliveryNotifications = () => {
         audioRef.current.pause();
         audioRef.current.src = newSrc;
         audioRef.current.load();
-        console.log('🔊 Audio updated to:', selectedSound === 'original' ? 'Original' : 'Zomato Tone');
+        devLog('🔊 Audio updated to:', selectedSound === 'original' ? 'Original' : 'Zomato Tone');
       }
     }
 
@@ -344,15 +357,15 @@ export const useDeliveryNotifications = () => {
               deliveryPartner.deliveryId;
             if (id) {
               setDeliveryPartnerId(id);
-              console.log('✅ Delivery Partner ID fetched:', id);
+              devLog('✅ Delivery Partner ID fetched:', id);
             } else {
-              console.warn('⚠️ Could not extract delivery partner ID from response');
+              devWarn('⚠️ Could not extract delivery partner ID from response');
             }
           } else {
-            console.warn('⚠️ No delivery partner data in API response');
+            devWarn('⚠️ No delivery partner data in API response');
           }
         } else {
-          console.warn('⚠️ Could not fetch delivery partner ID from API');
+          devWarn('⚠️ Could not fetch delivery partner ID from API');
         }
       } catch (error) {
         console.error('Error fetching delivery partner:', error);
@@ -364,7 +377,7 @@ export const useDeliveryNotifications = () => {
   // Socket connection effect
   useEffect(() => {
     if (!deliveryPartnerId) {
-      console.log('⏳ Waiting for deliveryPartnerId...');
+      devLog('⏳ Waiting for deliveryPartnerId...');
       return;
     }
 
@@ -407,11 +420,11 @@ export const useDeliveryNotifications = () => {
 
     const socketUrl = `${backendUrl}/delivery`;
 
-    console.log('🔌 Attempting to connect to Delivery Socket.IO:', socketUrl);
-    console.log('🔌 Backend URL:', backendUrl);
-    console.log('🔌 API_BASE_URL:', API_BASE_URL);
-    console.log('🔌 Delivery Partner ID:', deliveryPartnerId);
-    console.log('🔌 Environment:', import.meta.env.MODE);
+    devLog('🔌 Attempting to connect to Delivery Socket.IO:', socketUrl);
+    devLog('🔌 Backend URL:', backendUrl);
+    devLog('🔌 API_BASE_URL:', API_BASE_URL);
+    devLog('🔌 Delivery Partner ID:', deliveryPartnerId);
+    devLog('🔌 Environment:', import.meta.env.MODE);
 
     // Warn if trying to connect to localhost in production
     if (import.meta.env.MODE === 'production' && backendUrl.includes('localhost')) {
@@ -464,17 +477,17 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('connect', () => {
-      console.log('✅ Delivery Socket connected, deliveryPartnerId:', deliveryPartnerId);
+      devLog('✅ Delivery Socket connected, deliveryPartnerId:', deliveryPartnerId);
       setIsConnected(true);
 
       if (deliveryPartnerId) {
-        console.log('📢 Joining delivery room with ID:', deliveryPartnerId);
+        devLog('📢 Joining delivery room with ID:', deliveryPartnerId);
         socketRef.current.emit('join-delivery', deliveryPartnerId);
       }
     });
 
     socketRef.current.on('delivery-room-joined', (data) => {
-      console.log('✅ Delivery room joined successfully:', data);
+      devLog('✅ Delivery room joined successfully:', data);
     });
 
     socketRef.current.on('connect_error', (error) => {
@@ -493,14 +506,14 @@ export const useDeliveryNotifications = () => {
         // Socket.IO will automatically retry with exponential backoff and fall back to polling
         // Only log in development for debugging
         if (process.env.NODE_ENV === 'development') {
-          console.log('⏳ Delivery Socket: WebSocket upgrade failed, using polling fallback');
+          devLog('⏳ Delivery Socket: WebSocket upgrade failed, using polling fallback');
         }
       }
       setIsConnected(false);
     });
 
     socketRef.current.on('disconnect', (reason) => {
-      console.log('❌ Delivery Socket disconnected:', reason);
+      devLog('❌ Delivery Socket disconnected:', reason);
       setIsConnected(false);
 
       if (reason === 'io server disconnect') {
@@ -509,11 +522,11 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`🔄 Reconnection attempt ${attemptNumber}...`);
+      devLog(`🔄 Reconnection attempt ${attemptNumber}...`);
     });
 
     socketRef.current.on('reconnect', (attemptNumber) => {
-      console.log(`✅ Reconnected after ${attemptNumber} attempts`);
+      devLog(`✅ Reconnected after ${attemptNumber} attempts`);
       setIsConnected(true);
 
       if (deliveryPartnerId) {
@@ -522,8 +535,8 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('new_order', (orderData) => {
-      console.log('📦 New order received via socket:', orderData);
-      console.log('🔊 Triggering sound notification for new order');
+      devLog('📦 New order received via socket:', orderData);
+      devLog('🔊 Triggering sound notification for new order');
       setNewOrder(orderData);
       // Play sound immediately when order is assigned (even in foreground)
       // For mobile APK, this will work without user interaction
@@ -534,9 +547,9 @@ export const useDeliveryNotifications = () => {
 
     // Listen for priority-based order notifications (new_order_available)
     socketRef.current.on('new_order_available', (orderData) => {
-      console.log('📦 New order available (priority notification):', orderData);
-      console.log('📦 Notification phase:', orderData.phase || 'unknown');
-      console.log('🔊 Triggering sound notification for new order available');
+      devLog('📦 New order available (priority notification):', orderData);
+      devLog('📦 Notification phase:', orderData.phase || 'unknown');
+      devLog('🔊 Triggering sound notification for new order available');
       // Treat it the same as new_order for now - delivery boy can accept it
       setNewOrder(orderData);
       // Play sound immediately when order is assigned (even in foreground)
@@ -546,12 +559,12 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('play_notification_sound', (data) => {
-      console.log('🔔 Sound notification:', data);
+      devLog('🔔 Sound notification:', data);
       playNotificationSound();
     });
 
     socketRef.current.on('order_ready', (orderData) => {
-      console.log('✅ Order ready notification received via socket:', orderData);
+      devLog('✅ Order ready notification received via socket:', orderData);
       setOrderReady(orderData);
       playNotificationSound();
     });

@@ -3,6 +3,7 @@ import Order from '../models/Order.js';
 import Zone from '../../admin/models/Zone.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
+import { logger } from '../../../shared/utils/logger.js';
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -60,7 +61,7 @@ export async function findNearestDeliveryBoys(restaurantLat, restaurantLng, rest
           console.log(`✅ Found zone: ${zone.name} for restaurant ${restaurantId}`);
         }
       } catch (zoneError) {
-        console.warn(`⚠️ Error finding zone:`, zoneError.message);
+        logger.warn(`⚠️ Error finding zone:`, zoneError.message);
       }
     }
 
@@ -170,7 +171,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
         };
       }
     } catch (fbError) {
-      console.warn('⚠️ Firebase nearest boy search failed, falling back to MongoDB:', fbError.message);
+      logger.warn('⚠️ Firebase nearest boy search failed, falling back to MongoDB:', fbError.message);
     }
 
     // --- STEP 2: FALLBACK TO MONGODB ---
@@ -213,7 +214,7 @@ export async function findNearestDeliveryBoy(restaurantLat, restaurantLng, resta
           console.log(`⚠️ No zone found for restaurant ${restaurantId}, using distance-based assignment`);
         }
       } catch (zoneError) {
-        console.warn(`⚠️ Error finding zone for restaurant ${restaurantId}:`, zoneError.message);
+        logger.warn(`⚠️ Error finding zone for restaurant ${restaurantId}:`, zoneError.message);
         // Continue with distance-based assignment
       }
     }

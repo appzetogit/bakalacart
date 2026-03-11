@@ -5,6 +5,10 @@
 
 import { deliveryAPI } from '@/lib/api'
 
+const isDev = import.meta.env.DEV;
+const devLog = (...a) => { if (isDev) console.log(...a); };
+const devWarn = (...a) => { if (isDev) devWarn(...a); };
+
 // Empty wallet state structure (no default data)
 const EMPTY_WALLET_STATE = {
   totalBalance: 0,
@@ -22,37 +26,30 @@ const EMPTY_WALLET_STATE = {
  */
 export const fetchDeliveryWallet = async () => {
   try {
-    console.log('🚀 Starting wallet fetch...')
+    devLog('🚀 Starting wallet fetch...')
     const response = await deliveryAPI.getWallet()
-    console.log('🔍 Full API Response:', JSON.stringify(response, null, 2))
-    console.log('🔍 Response Status:', response?.status)
-    console.log('🔍 Response Data:', response?.data)
-    console.log('🔍 Response Data Type:', typeof response?.data)
+    devLog('🔍 Full API Response:', response?.data)
+    devLog('🔍 Response Status:', response?.status)
     
     // Check multiple possible response structures
     let walletData = null
     
     if (response?.data?.success && response?.data?.data?.wallet) {
       walletData = response.data.data.wallet
-      console.log('✅ Found wallet in: response.data.data.wallet')
+      devLog('✅ Found wallet in: response.data.data.wallet')
     } else if (response?.data?.wallet) {
       walletData = response.data.wallet
-      console.log('✅ Found wallet in: response.data.wallet')
+      devLog('✅ Found wallet in: response.data.wallet')
     } else if (response?.data?.data) {
       walletData = response.data.data
-      console.log('✅ Found wallet in: response.data.data')
+      devLog('✅ Found wallet in: response.data.data')
     } else if (response?.data) {
       walletData = response.data
-      console.log('✅ Found wallet in: response.data')
+      devLog('✅ Found wallet in: response.data')
     }
     
     if (walletData) {
-      console.log('💰 Wallet Data from API:', JSON.stringify(walletData, null, 2))
-      console.log('💰 Total Balance:', walletData.totalBalance)
-      console.log('💰 Cash In Hand:', walletData.cashInHand)
-      console.log('💰 Total Earned:', walletData.totalEarned)
-      console.log('💰 Transactions Count:', walletData.transactions?.length || walletData.recentTransactions?.length || 0)
-      console.log('💰 Transactions:', walletData.transactions || walletData.recentTransactions || [])
+      devLog('💰 Wallet Data:', { totalBalance: walletData.totalBalance, cashInHand: walletData.cashInHand, transactionsCount: walletData.transactions?.length || walletData.recentTransactions?.length || 0 })
       
       // Transform API response to match expected format (support both camelCase and snake_case)
       const transformedData = {
@@ -73,15 +70,14 @@ export const fetchDeliveryWallet = async () => {
         totalTransactions: walletData.totalTransactions || 0
       }
       
-      console.log('✅ Transformed Wallet Data:', JSON.stringify(transformedData, null, 2))
+      devLog('✅ Transformed Wallet Data:', transformedData)
       return transformedData
     } else {
-      console.warn('⚠️ No wallet data found in response')
-      console.warn('⚠️ Response structure:', Object.keys(response?.data || {}))
-      console.warn('⚠️ Full response:', response)
+      devWarn('⚠️ No wallet data found in response', Object.keys(response?.data || {}))
+      devWarn('⚠️ Full response:', response)
     }
     
-    console.log('⚠️ Returning empty wallet state')
+    devLog('⚠️ Returning empty wallet state')
     return EMPTY_WALLET_STATE
   } catch (error) {
     // Skip logging network errors - they're handled by axios interceptor
@@ -103,7 +99,7 @@ export const fetchDeliveryWallet = async () => {
  */
 export const getDeliveryWalletState = () => {
   // Return empty state - should use fetchDeliveryWallet() instead
-  console.warn('getDeliveryWalletState is deprecated. Use fetchDeliveryWallet() instead.')
+  devWarn('getDeliveryWalletState is deprecated. Use fetchDeliveryWallet() instead.')
   return EMPTY_WALLET_STATE
 }
 
@@ -113,7 +109,7 @@ export const getDeliveryWalletState = () => {
  */
 export const setDeliveryWalletState = (state) => {
   // No-op - data is managed by backend
-  console.warn('setDeliveryWalletState is deprecated. Wallet data is managed by backend.')
+  devWarn('setDeliveryWalletState is deprecated. Wallet data is managed by backend.')
 }
 
 /**
@@ -122,10 +118,10 @@ export const setDeliveryWalletState = (state) => {
  * @returns {Object} - Calculated balances
  */
 export const calculateDeliveryBalances = (state) => {
-  console.log('📊 calculateDeliveryBalances called with state:', state)
+  devLog('📊 calculateDeliveryBalances called with state:', state)
   
   if (!state) {
-    console.warn('⚠️ No state provided to calculateDeliveryBalances')
+    devWarn('⚠️ No state provided to calculateDeliveryBalances')
     return {
       totalBalance: 0,
       cashInHand: 0,
@@ -174,7 +170,7 @@ export const calculateDeliveryBalances = (state) => {
     totalEarnings: totalEarningsFromTransactions || totalEarned || totalBalance || 0
   }
   
-  console.log('📊 Calculated balances:', balances)
+  devLog('📊 Calculated balances:', balances)
   return balances
 }
 
@@ -292,7 +288,7 @@ export const collectPayment = async (orderId, amount = null) => {
  * @returns {Array} - Filtered transactions
  */
 export const getDeliveryTransactionsByType = (type = 'all') => {
-  console.warn('getDeliveryTransactionsByType is deprecated. Use fetchWalletTransactions() instead.')
+  devWarn('getDeliveryTransactionsByType is deprecated. Use fetchWalletTransactions() instead.')
   return []
 }
 
@@ -302,7 +298,7 @@ export const getDeliveryTransactionsByType = (type = 'all') => {
  * @returns {Array} - Filtered transactions
  */
 export const getDeliveryTransactionsByStatus = (status) => {
-  console.warn('getDeliveryTransactionsByStatus is deprecated. Use fetchWalletTransactions() instead.')
+  devWarn('getDeliveryTransactionsByStatus is deprecated. Use fetchWalletTransactions() instead.')
   return []
 }
 
@@ -312,7 +308,7 @@ export const getDeliveryTransactionsByStatus = (status) => {
  * @returns {number|null} - Payment amount if found, null otherwise
  */
 export const getDeliveryOrderPaymentAmount = (orderId) => {
-  console.warn('getDeliveryOrderPaymentAmount is deprecated. Use API to fetch transactions instead.')
+  devWarn('getDeliveryOrderPaymentAmount is deprecated. Use API to fetch transactions instead.')
   return null
 }
 
@@ -322,7 +318,7 @@ export const getDeliveryOrderPaymentAmount = (orderId) => {
  * @returns {string} - Payment status ("Paid" or "Unpaid")
  */
 export const getDeliveryOrderPaymentStatus = (orderId) => {
-  console.warn('getDeliveryOrderPaymentStatus is deprecated. Use API to fetch transactions instead.')
+  devWarn('getDeliveryOrderPaymentStatus is deprecated. Use API to fetch transactions instead.')
   return "Unpaid"
 }
 
@@ -332,7 +328,7 @@ export const getDeliveryOrderPaymentStatus = (orderId) => {
  * @returns {boolean} - Whether payment is collected
  */
 export const isPaymentCollected = (orderId) => {
-  console.warn('isPaymentCollected is deprecated. Use API to fetch transactions instead.')
+  devWarn('isPaymentCollected is deprecated. Use API to fetch transactions instead.')
   return false
 }
 
@@ -341,7 +337,7 @@ export const isPaymentCollected = (orderId) => {
  * @param {Object} transaction - Transaction object
  */
 export const addDeliveryTransaction = (transaction) => {
-  console.warn('addDeliveryTransaction is deprecated. Use API endpoints instead.')
+  devWarn('addDeliveryTransaction is deprecated. Use API endpoints instead.')
   return null
 }
 
@@ -352,7 +348,7 @@ export const addDeliveryTransaction = (transaction) => {
  * @returns {Object} - Created transaction
  */
 export const createDeliveryWithdrawRequest = (amount, paymentMethod) => {
-  console.warn('createDeliveryWithdrawRequest is deprecated. Use createWithdrawalRequest() instead.')
+  devWarn('createDeliveryWithdrawRequest is deprecated. Use createWithdrawalRequest() instead.')
   return createWithdrawalRequest(amount, paymentMethod)
 }
 
@@ -364,7 +360,7 @@ export const createDeliveryWithdrawRequest = (amount, paymentMethod) => {
  * @param {boolean} paymentCollected - Whether payment is collected (for COD)
  */
 export const addDeliveryEarnings = (amount, orderId, description, paymentCollected = false) => {
-  console.warn('addDeliveryEarnings is deprecated. Use deliveryAPI.addEarning() instead.')
+  devWarn('addDeliveryEarnings is deprecated. Use deliveryAPI.addEarning() instead.')
   return deliveryAPI.addEarning({
     amount,
     orderId,
