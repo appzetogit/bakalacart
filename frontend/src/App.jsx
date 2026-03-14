@@ -8,8 +8,11 @@ import { proactiveTokenRefresh, checkAllModulesForRefreshTokens } from "@/lib/ut
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+  <div className="flex items-center justify-center min-h-screen bg-white fixed inset-0 z-50">
+    <div className="flex flex-col items-center justify-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-gray-900"></div>
+      <p className="mt-4 text-gray-600 text-sm">Loading...</p>
+    </div>
   </div>
 )
 
