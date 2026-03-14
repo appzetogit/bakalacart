@@ -153,31 +153,7 @@ export default function FeedNavbar({ className = "" }) {
         console.warn('Error reading location from localStorage:', err);
       }
       
-      // If no saved location, try to get current location
-      if ((!latitude || !longitude) && navigator.geolocation) {
-        try {
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              maximumAge: 0,
-              enableHighAccuracy: true
-            });
-          });
-          latitude = position.coords.latitude;
-          longitude = position.coords.longitude;
-          
-          // Validate coordinates
-          if (typeof latitude !== 'number' || typeof longitude !== 'number' ||
-              latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-            console.warn('⚠️ Invalid coordinates from geolocation:', { latitude, longitude });
-            latitude = null;
-            longitude = null;
-          }
-        } catch (geoError) {
-          console.warn('Could not get current location:', geoError);
-        }
-      }
-      
+      // Geolocation disabled: do not trigger browser location permission prompt.
       // Update backend with location if available, otherwise just online status
       if (latitude && longitude && 
           latitude >= -90 && latitude <= 90 && 

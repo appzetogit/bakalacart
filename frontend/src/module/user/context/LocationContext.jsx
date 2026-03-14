@@ -202,147 +202,26 @@ export const LocationProvider = ({ children }) => {
     }, [])
 
     /* ===================== CORE LOCATION GETTER ===================== */
-    const getLocation = useCallback(async (updateDB = true, forceFresh = false, showLoading = false, ignoreManual = false) => {
-        if (showLoading) setLoading(true)
-
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                setError("Geolocation not supported")
-                setLoading(false)
-                const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                setLocation(fallback)
-                resolve(fallback)
-                return
-            }
-
-            // Add a safety timeout to ensure loading is always set to false
-            const safetyTimeout = setTimeout(() => {
-                setLoading(false)
-                const stored = localStorage.getItem("userLocation")
-                if (stored) {
-                    try {
-                        const parsed = JSON.parse(stored)
-                        setLocation(parsed)
-                        setPermissionGranted(true)
-                        resolve(parsed)
-                    } catch (e) {
-                        const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                        setLocation(fallback)
-                        resolve(fallback)
-                    }
-                } else {
-                    const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                    setLocation(fallback)
-                    resolve(fallback)
-                }
-            }, 20000) // 20 seconds max (longer than geolocation timeout)
-
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    clearTimeout(safetyTimeout)
-                    try {
-                        const { latitude, longitude, accuracy } = pos.coords
-                        const addr = await reverseGeocodeWithGoogleMaps(latitude, longitude)
-                        const finalLoc = { ...addr, latitude, longitude, accuracy, isManual: false }
-
-                        // Only update if not currently a manual selection, OR if we are explicitly ignoring manual (e.g. user clicked "Use current location")
-                        if (!isManualRef.current || ignoreManual) {
-                            isManualRef.current = false // Reset manual status as we are using GPS
-                            setLocation(finalLoc)
-                            localStorage.setItem("userLocation", JSON.stringify(finalLoc))
-                            if (updateDB) updateLocationInDB(finalLoc)
-                        }
-
-                        setPermissionGranted(true)
-                        setLoading(false)
-                        resolve(finalLoc)
-                    } catch (error) {
-                        clearTimeout(safetyTimeout)
-                        console.error("❌ [LocationContext] Error processing location:", error)
-                        setLoading(false)
-                        const stored = localStorage.getItem("userLocation")
-                        if (stored) {
-                            try {
-                                const parsed = JSON.parse(stored)
-                                setLocation(parsed)
-                                resolve(parsed)
-                            } catch (e) {
-                                const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                                setLocation(fallback)
-                                resolve(fallback)
-                            }
-                        } else {
-                            const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                            setLocation(fallback)
-                            resolve(fallback)
-                        }
-                    }
-                },
-                async (err) => {
-                    clearTimeout(safetyTimeout)
-                    console.warn("⚠️ [LocationContext] Geolocation error:", err.message)
-                    setLoading(false)
-                    const stored = localStorage.getItem("userLocation")
-                    if (stored) {
-                        try {
-                            const parsed = JSON.parse(stored)
-                            setLocation(parsed)
-                            setPermissionGranted(true)
-                            resolve(parsed)
-                        } catch (e) {
-                            const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                            setLocation(fallback)
-                            setPermissionGranted(false)
-                            resolve(fallback)
-                        }
-                    } else {
-                        const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
-                        setLocation(fallback)
-                        setPermissionGranted(false)
-                        resolve(fallback)
-                    }
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: forceFresh ? 0 : 60000 }
-            )
-        })
-    }, [reverseGeocodeWithGoogleMaps, updateLocationInDB])
+    const getLocation = useCallback(async (_updateDB = true, _forceFresh = false, showLoading = false, _ignoreManual = false) => {
+        // Geolocation disabled: always use a neutral manual-select location.
+        if (showLoading) setLoading(false)
+        const fallback = { city: "Select location", address: "Select location", formattedAddress: "Select location" }
+        isManualRef.current = true
+        setPermissionGranted(false)
+        setLocation(fallback)
+        try {
+            localStorage.setItem("userLocation", JSON.stringify(fallback))
+        } catch {
+            // ignore storage failures
+        }
+        return fallback
+    }, [])
 
     /* ===================== LIVE TRACKING ===================== */
     const startWatchingLocation = useCallback(() => {
-        if (!navigator.geolocation) return
-        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current)
-
-        watchIdRef.current = navigator.geolocation.watchPosition(
-            async (pos) => {
-                const { latitude, longitude, accuracy } = pos.coords
-
-                // Threshold check to avoid excessive updates (roughly 22 meters)
-                const latDiff = Math.abs(latitude - (prevLocationCoordsRef.current.latitude || 0))
-                const lngDiff = Math.abs(longitude - (prevLocationCoordsRef.current.longitude || 0))
-
-                if (latDiff < 0.0002 && lngDiff < 0.0002) return
-
-                prevLocationCoordsRef.current = { latitude, longitude }
-
-                const addr = await reverseGeocodeWithGoogleMaps(latitude, longitude)
-                const loc = { ...addr, latitude, longitude, accuracy, isManual: false }
-
-                // Only update if not currently a manual selection
-                if (!isManualRef.current) {
-                    setLocation(loc)
-                    localStorage.setItem("userLocation", JSON.stringify(loc))
-
-                    // Debounced DB update (10 seconds to avoid spamming server)
-                    clearTimeout(updateTimerRef.current)
-                    updateTimerRef.current = setTimeout(() => updateLocationInDB(loc), 10000)
-                }
-            },
-            (err) => {
-                if (err.code !== 3) console.warn("⚠️ [LocationContext] Watch error:", err.message)
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-        )
-    }, [reverseGeocodeWithGoogleMaps, updateLocationInDB])
+        // Geolocation-based live tracking disabled.
+        return
+    }, [])
 
     const stopWatchingLocation = useCallback(() => {
         if (watchIdRef.current) {

@@ -239,16 +239,16 @@ export default function RestaurantOTP() {
           // Onboarding is complete, navigate to restaurant home
           console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
           const finalPath = (from && from !== "/restaurant/otp" && from !== "/restaurant/login") ? from : "/restaurant";
-          navigate(finalPath, { replace: true })
+          window.location.replace(finalPath)
         } else {
           // Onboarding not complete, navigate to onboarding with appropriate step
           console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
-          navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
+          window.location.replace(`/restaurant/onboarding?step=${onboardingStep}`)
         }
       } catch (error) {
         console.error("❌ [Restaurant OTP] Error checking onboarding status:", error)
         // Default to onboarding if check fails (for new registrations)
-        navigate("/restaurant/onboarding", { replace: true })
+        window.location.replace("/restaurant/onboarding")
       }
     } catch (err) {
       const message =
@@ -384,16 +384,16 @@ export default function RestaurantOTP() {
           // Onboarding is complete, navigate to restaurant home
           console.log("✅ [Restaurant OTP] Onboarding already complete, redirecting to restaurant home...")
           const finalPath = (from && from !== "/restaurant/otp" && from !== "/restaurant/login") ? from : "/restaurant";
-          navigate(finalPath, { replace: true })
+          window.location.replace(finalPath)
         } else {
           // Onboarding not complete, navigate to onboarding with appropriate step
           console.log(`✅ [Restaurant OTP] Onboarding incomplete (step ${onboardingStep}), redirecting to onboarding...`)
-          navigate(`/restaurant/onboarding?step=${onboardingStep}`, { replace: true })
+          window.location.replace(`/restaurant/onboarding?step=${onboardingStep}`)
         }
       } catch (error) {
         console.error("❌ [Restaurant OTP] Error checking onboarding status:", error)
         // Default to onboarding if check fails (for new registrations)
-        navigate("/restaurant/onboarding", { replace: true })
+        window.location.replace("/restaurant/onboarding")
       }
     } catch (err) {
       const message =

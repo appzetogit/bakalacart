@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Search, Download, ChevronDown, DollarSign, Calendar, Filter, Loader2, FileText, FileSpreadsheet, Code } from "lucide-react"
+import { Search, Download, ChevronDown, DollarSign, Calendar, Filter, Loader2, FileText, FileSpreadsheet, Code, Wallet } from "lucide-react"
 import { adminAPI } from "@/lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
@@ -163,6 +163,7 @@ export default function DeliveryEarnings() {
       { key: "restaurantName", label: "Restaurant" },
       { key: "amount", label: "Earning" },
       { key: "orderTotal", label: "Order Total" },
+      { key: "paymentType", label: "Payment Type" },
       { key: "deliveryFee", label: "Delivery Fee" },
       { key: "orderStatus", label: "Status" },
       { key: "createdAt", label: "Date" },
@@ -176,6 +177,7 @@ export default function DeliveryEarnings() {
       restaurantName: earning.restaurantName || 'N/A',
       amount: formatCurrency(earning.amount),
       orderTotal: formatCurrency(earning.orderTotal),
+      paymentType: earning.paymentType || 'N/A',
       deliveryFee: formatCurrency(earning.deliveryFee),
       orderStatus: earning.orderStatus || 'N/A',
       createdAt: formatDate(earning.createdAt)
@@ -244,7 +246,7 @@ export default function DeliveryEarnings() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -289,6 +291,19 @@ export default function DeliveryEarnings() {
               </div>
             </div>
           </div>
+          {filters.deliveryPartnerId && (
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600 mb-1">Remaining Cash Limit</p>
+                  <p className="text-2xl font-bold text-indigo-600">{formatCurrency(summary.remainingCashLimit ?? 0)}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center">
+                  <Wallet className="w-6 h-6 text-indigo-600" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filters */}
@@ -404,6 +419,7 @@ export default function DeliveryEarnings() {
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Restaurant</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Earning</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Order Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Payment Type</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Date</th>
                 </tr>
@@ -411,7 +427,7 @@ export default function DeliveryEarnings() {
               <tbody className="divide-y divide-slate-100">
                 {filteredEarnings.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center">
+                    <td colSpan={10} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Earnings Found</p>
                         <p className="text-sm text-slate-500">No earnings match your filters</p>
@@ -441,6 +457,15 @@ export default function DeliveryEarnings() {
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {formatCurrency(earning.orderTotal)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          (earning.paymentType || '').toLowerCase() === 'cash'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {earning.paymentType || 'N/A'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

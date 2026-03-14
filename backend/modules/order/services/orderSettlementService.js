@@ -6,6 +6,7 @@ import FeeSettings from '../../admin/models/FeeSettings.js';
 import Restaurant from '../../restaurant/models/Restaurant.js';
 import mongoose from 'mongoose';
 import { calculateDistance } from './orderCalculationService.js';
+import { logger } from '../../../shared/utils/logger.js';
 
 /**
  * Calculate comprehensive order settlement breakdown
@@ -218,7 +219,7 @@ export const calculateOrderSettlement = async (orderId) => {
       // Always update deliveryPartnerId if it exists in order (even if it was null before)
       if (deliveryPartnerIdValue) {
         settlement.deliveryPartnerId = deliveryPartnerIdValue;
-        console.log(`✅ Updated deliveryPartnerId in settlement: ${deliveryPartnerIdValue.toString()}`);
+        logger.log(`✅ Updated deliveryPartnerId in settlement: ${deliveryPartnerIdValue.toString()}`);
       }
       
       // Check if settlement was calculated with old formula (entire distance instead of extra distance)
@@ -240,7 +241,7 @@ export const calculateOrderSettlement = async (orderId) => {
           const expectedNewFormula = deliveryCommission.breakdown.distanceCommission;
           if (Math.abs(oldDistanceCommission - expectedNewFormula) > tolerance) {
             needsRecalculation = true;
-            console.log(`🔄 Detected old formula settlement. Old: ₹${oldDistanceCommission.toFixed(2)}, New: ₹${expectedNewFormula.toFixed(2)}. Recalculating...`);
+            logger.log(`🔄 Detected old formula settlement. Old: ₹${oldDistanceCommission.toFixed(2)}, New: ₹${expectedNewFormula.toFixed(2)}. Recalculating...`);
           }
         }
       }
@@ -248,11 +249,11 @@ export const calculateOrderSettlement = async (orderId) => {
       // Always update earnings if delivery partner exists and we have earnings (or if recalculation needed)
       if (deliveryPartnerIdValue && (deliveryPartnerEarning.totalEarning > 0 || needsRecalculation)) {
         settlement.deliveryPartnerEarning = deliveryPartnerEarning;
-        console.log(`✅ Updated deliveryPartnerEarning: ₹${deliveryPartnerEarning.totalEarning}`);
+        logger.log(`✅ Updated deliveryPartnerEarning: ₹${deliveryPartnerEarning.totalEarning}`);
       } else if (deliveryPartnerIdValue && deliveryPartnerEarning.totalEarning === 0) {
         // Even if earnings is 0, update it to ensure distance and other fields are set
         settlement.deliveryPartnerEarning = deliveryPartnerEarning;
-        console.log(`⚠️ Updated deliveryPartnerEarning with 0 (distance might be missing)`);
+        logger.log(`⚠️ Updated deliveryPartnerEarning with 0 (distance might be missing)`);
       }
       
       // Update other fields (but don't overwrite deliveryPartnerId if we just set it)
@@ -263,22 +264,22 @@ export const calculateOrderSettlement = async (orderId) => {
       Object.assign(settlement, fieldsToUpdate);
       
       await settlement.save();
-      console.log(`✅ Settlement updated for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
+      logger.log(`✅ Settlement updated for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
     } else {
       settlement = await OrderSettlement.create({
         orderId,
         ...settlementData
       });
-      console.log(`✅ Settlement created for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
+      logger.log(`✅ Settlement created for order ${order.orderId}. Delivery earnings: ₹${settlement.deliveryPartnerEarning?.totalEarning || 0}`);
     }
 
     // Verify settlement was saved correctly
     const verifySettlement = await OrderSettlement.findOne({ orderId }).lean();
     if (verifySettlement) {
-      console.log(`✅ Verified settlement exists for order ${order.orderId}`);
-      console.log(`   DeliveryPartnerId: ${verifySettlement.deliveryPartnerId?.toString() || 'null'}`);
-      console.log(`   Earnings: ₹${verifySettlement.deliveryPartnerEarning?.totalEarning || 0}`);
-      console.log(`   Distance: ${verifySettlement.deliveryPartnerEarning?.distance || 0} km`);
+      logger.log(`✅ Verified settlement exists for order ${order.orderId}`);
+      logger.log(`   DeliveryPartnerId: ${verifySettlement.deliveryPartnerId?.toString() || 'null'}`);
+      logger.log(`   Earnings: ₹${verifySettlement.deliveryPartnerEarning?.totalEarning || 0}`);
+      logger.log(`   Distance: ${verifySettlement.deliveryPartnerEarning?.distance || 0} km`);
     } else {
       console.error(`❌ Settlement verification failed for order ${order.orderId}`);
     }

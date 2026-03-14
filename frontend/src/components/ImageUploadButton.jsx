@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { Camera, Image as ImageIcon, Upload, X } from "lucide-react"
-import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
+import { openCameraWithFallback, openGalleryWithFallback, isFlutterAvailable } from "@/lib/utils/flutterCamera"
 import { toast } from "sonner"
 
 /**
@@ -97,19 +97,22 @@ export default function ImageUploadButton({
   const handleCameraClick = async () => {
     setShowSourceMenu(false)
 
+    // CRITICAL: When Flutter is not available, trigger file input synchronously
+    // to preserve the user gesture (browsers block programmatic file input after async)
+    if (!isFlutterAvailable()) {
+      cameraInputRef.current?.click()
+      return
+    }
+
     try {
       setIsProcessing(true)
 
-      // Try Flutter camera first
       const file = await openCameraWithFallback(
         { source: 'camera', accept, multiple, quality: 0.8 },
         () => {
-          // Fallback: use file input
           if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            // On mobile, show menu if Flutter not available
             setShowSourceMenu(true)
           } else {
-            // On desktop, directly open camera input
             cameraInputRef.current?.click()
           }
         }
@@ -121,7 +124,6 @@ export default function ImageUploadButton({
           onFileSelect(processed)
         }
       } else if (cameraInputRef.current) {
-        // If Flutter returned null and we have input, trigger it
         cameraInputRef.current.click()
       }
     } catch (error) {
@@ -136,21 +138,23 @@ export default function ImageUploadButton({
   const handleGalleryClick = async () => {
     setShowSourceMenu(false)
 
+    // CRITICAL: When Flutter is not available, trigger file input synchronously
+    // to preserve the user gesture (browsers block programmatic file input after async)
+    if (!isFlutterAvailable()) {
+      galleryInputRef.current?.click()
+      return
+    }
+
     try {
       setIsProcessing(true)
 
-      // Try Flutter gallery first
       const files = await openGalleryWithFallback(
         { accept, multiple, quality: 1.0 },
-        () => {
-          // Fallback: use file input
-          galleryInputRef.current?.click()
-        }
+        () => galleryInputRef.current?.click()
       )
 
       if (files) {
         if (multiple && Array.isArray(files)) {
-          // Process multiple files
           const validFiles = []
           for (const file of files) {
             const processed = await processFile(file)
@@ -162,14 +166,12 @@ export default function ImageUploadButton({
             onFileSelect(validFiles)
           }
         } else {
-          // Process single file
           const processed = await processFile(files)
           if (processed) {
             onFileSelect(processed)
           }
         }
       } else if (galleryInputRef.current) {
-        // If Flutter returned null and we have input, trigger it
         galleryInputRef.current.click()
       }
     } catch (error) {

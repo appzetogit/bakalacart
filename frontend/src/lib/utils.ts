@@ -47,6 +47,30 @@ export function getResilientImageUrl(url: string | null | undefined, apiBaseUrl?
 }
 
 /**
+ * Optimize Cloudinary URL for responsive delivery (WebP/AVIF, proper dimensions)
+ * Use for hero banners, restaurant images, etc. to reduce payload and improve LCP
+ */
+export function optimizeCloudinaryUrl(url: string | null | undefined, width: number, quality: string = 'auto'): string {
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url || ''
+  try {
+    if (url.includes('/w_') || url.includes('/h_') || url.includes('/c_') || url.includes('/q_')) return url
+    const urlParts = url.split('/image/upload/')
+    if (urlParts.length !== 2) return url
+    const baseUrl = urlParts[0] + '/image/upload/'
+    const afterUpload = urlParts[1]
+    const pathWithVersion = afterUpload.split('?')[0]
+    const pathSegments = pathWithVersion.split('/')
+    const hasVersion = pathSegments[0]?.startsWith('v')
+    const version = hasVersion ? pathSegments[0] : null
+    const imagePath = hasVersion ? pathSegments.slice(1).join('/') : pathWithVersion
+    const transformations = [`w_${width}`, `q_${quality}`, 'f_auto', 'c_limit', 'fl_progressive'].join(',')
+    return version ? `${baseUrl}${transformations}/${version}/${imagePath}` : `${baseUrl}${transformations}/${imagePath}`
+  } catch {
+    return url
+  }
+}
+
+/**
  * Filter and normalize images array
  */
 export function normalizeImages(imgArray: any[] | any, apiBaseUrl?: string): string[] {

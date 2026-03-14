@@ -14,12 +14,29 @@ const logger = winston.createLogger({
   ]
 });
 
+// In-memory cache for public categories (5 min TTL) - reduces DB load
+let _publicCategoriesCache = null;
+let _publicCategoriesCacheTime = 0;
+const PUBLIC_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const invalidatePublicCategoriesCache = () => {
+  _publicCategoriesCache = null;
+  _publicCategoriesCacheTime = 0;
+};
+
 /**
  * Get All Categories (Public - for user frontend)
  * GET /api/categories/public
  */
 export const getPublicCategories = asyncHandler(async (req, res) => {
   try {
+    const now = Date.now();
+    if (_publicCategoriesCache && (now - _publicCategoriesCacheTime) < PUBLIC_CATEGORIES_CACHE_TTL_MS) {
+      return successResponse(res, 200, 'Categories retrieved successfully', {
+        categories: _publicCategoriesCache
+      });
+    }
+
     // Only get active categories for public access
     const categories = await AdminCategoryManagement.find({ status: true })
       .select('name image _id type')
@@ -33,6 +50,9 @@ export const getPublicCategories = asyncHandler(async (req, res) => {
       type: category.type || null,
       slug: category.name.toLowerCase().replace(/\s+/g, '-')
     }));
+
+    _publicCategoriesCache = formattedCategories;
+    _publicCategoriesCacheTime = now;
 
     return successResponse(res, 200, 'Categories retrieved successfully', {
       categories: formattedCategories
@@ -187,6 +207,7 @@ export const createCategory = asyncHandler(async (req, res) => {
     };
 
     const category = await AdminCategoryManagement.create(categoryData);
+    invalidatePublicCategoriesCache();
 
     logger.info(`Category created: ${category._id}`, {
       name: category.name,
@@ -270,6 +291,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
     category.updatedBy = req.user._id;
 
     await category.save();
+    invalidatePublicCategoriesCache();
 
     logger.info(`Category updated: ${id}`, {
       updatedBy: req.user._id
@@ -336,6 +358,7 @@ export const toggleCategoryStatus = asyncHandler(async (req, res) => {
     category.status = !category.status;
     category.updatedBy = req.user._id;
     await category.save();
+    invalidatePublicCategoriesCache();
 
     logger.info(`Category status toggled: ${id}`, {
       status: category.status,
@@ -376,6 +399,7 @@ export const updateCategoryPriority = asyncHandler(async (req, res) => {
     category.priority = priority;
     category.updatedBy = req.user._id;
     await category.save();
+    invalidatePublicCategoriesCache();
 
     logger.info(`Category priority updated: ${id}`, {
       priority,

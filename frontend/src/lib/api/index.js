@@ -501,6 +501,18 @@ export const restaurantAPI = {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.UNDER_250, { params });
   },
 
+  // Search suggestions (restaurants + menu items) for live search dropdown
+  searchSuggestions: (query, limit = 4) => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.SEARCH_SUGGESTIONS, {
+      params: { q: query, limit },
+    });
+  },
+
+  // Full search for SearchResults page - returns restaurants matching query (name or menu item)
+  searchRestaurants: (params = {}) => {
+    return apiClient.get(API_ENDPOINTS.RESTAURANT.SEARCH, { params });
+  },
+
   // Get restaurant by ID or slug
   getRestaurantById: (id) => {
     return apiClient.get(API_ENDPOINTS.RESTAURANT.BY_ID.replace(':id', id));

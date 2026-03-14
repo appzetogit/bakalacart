@@ -64,6 +64,7 @@ export default function SearchResults() {
   ])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [categoryKeywords, setCategoryKeywords] = useState({})
+  const [searchResultsFromAPI, setSearchResultsFromAPI] = useState(false) // true when results came from search API (already filtered)
 
   // Fetch categories from admin API
   useEffect(() => {
@@ -283,16 +284,40 @@ export default function SearchResults() {
 
 
   
-  // Fetch restaurants from API
+  // Fetch restaurants from API – use search API when query exists for instant results
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        // PERMANENT FIX: Start hydration for cached data IMMEDIATELY
+        const hasSearchQuery = (query || '').trim().length >= 2
+
+        if (hasSearchQuery) {
+          // INSTANT: Use search API – single call, no menu hydration needed
+          setLoadingRestaurants(true)
+          setMenusLoading(false) // Skip hydration – backend already filtered by menu
+          setSearchResultsFromAPI(true)
+          const response = await restaurantAPI.searchRestaurants({ q: query.trim(), limit: 100 })
+          if (response.data?.success && Array.isArray(response.data?.data?.restaurants)) {
+            const list = response.data.data.restaurants.map((r) => ({
+              ...r,
+              id: r.restaurantId || r.id,
+              slug: r.slug || (r.name || '').toLowerCase().replace(/\s+/g, '-'),
+              categoryMatches: {},
+            }))
+            setRestaurantsData(list)
+            setLoadingRestaurants(false)
+          } else {
+            setRestaurantsData([])
+            setLoadingRestaurants(false)
+          }
+          return
+        }
+
+        setSearchResultsFromAPI(false)
+
+        // No search query: use full list + hydrate menus
         if (cachedData && cachedData.length > 0) {
           hydrateMenus(cachedData)
         }
-
-        // Only show loading spinner if no data at all
         if (restaurantsData.length === 0) setLoadingRestaurants(true)
 
         const params = {}
@@ -303,7 +328,6 @@ export default function SearchResults() {
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
 
-          // Helper function to check if value is a default/mock value
           const isDefaultValue = (value, fieldName) => {
             if (!value) return false
             const defaultOffers = [
@@ -377,11 +401,8 @@ export default function SearchResults() {
           })
 
           setLoadingRestaurants(false)
-
-          // Hydrate menus for the list
           hydrateMenus(restaurantsWithIds)
 
-          // Save to sessionStorage for instant load next time
           try {
             sessionStorage.setItem('search_restaurants_cache', JSON.stringify({
               data: restaurantsWithIds,
@@ -395,14 +416,14 @@ export default function SearchResults() {
       } catch (error) {
         console.error('❌ Error fetching restaurants:', error)
         if (restaurantsData.length === 0) setRestaurantsData([])
+        setMenusLoading(false)
       } finally {
-        setLoadingRestaurants(false) // fallback in case of early error
+        setLoadingRestaurants(false)
       }
-
     }
 
     fetchRestaurants()
-  }, [zoneId, isOutOfService, hydrateMenus])
+  }, [zoneId, isOutOfService, hydrateMenus, query])
 
   // Update search query when URL changes
   useEffect(() => {
@@ -507,8 +528,8 @@ export default function SearchResults() {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
 
-    // Filter by search query
-    if (query.trim()) {
+        // Filter by search query (skip when results came from search API – already filtered)
+    if (query.trim() && !searchResultsFromAPI) {
       const lowerQuery = query.toLowerCase()
       const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 0)
       filtered = filtered.filter(r => isMatch(r, lowerQuery, queryWords))
@@ -583,15 +604,15 @@ export default function SearchResults() {
     }
 
     return filtered
-  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories])
+  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, searchResultsFromAPI])
 
   const filteredAllRestaurants = useMemo(() => {
     // Use ONLY backend data - no hardcoded fallback
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
 
-    // Filter by search query - Smart Multi-word Match
-    if (query.trim()) {
+    // Filter by search query - skip when results came from search API (already filtered)
+    if (query.trim() && !searchResultsFromAPI) {
       const lowerQuery = query.toLowerCase()
       const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 0)
       filtered = filtered.filter(r => isMatch(r, lowerQuery, queryWords))
@@ -669,7 +690,7 @@ export default function SearchResults() {
     }
 
     return filtered
-  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories])
+  }, [query, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, searchResultsFromAPI])
 
   // Check if should show grayscale (user out of service)
   const shouldShowGrayscale = isOutOfService
@@ -809,7 +830,7 @@ export default function SearchResults() {
                 return (
                   <Link
                     key={restaurant.id}
-                    to={`/user/restaurants/${restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    to={`/user/restaurants/${restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, '-')}${query ? `?item=${encodeURIComponent(query)}` : ''}`}
                     className="block"
                   >
                     <div className={`group ${shouldShowGrayscale || !restaurant.isAcceptingOrders ? 'grayscale opacity-75' : ''}`}>
@@ -887,7 +908,7 @@ export default function SearchResults() {
               const isFavorite = favorites.has(restaurant.id)
 
               return (
-                <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="h-full flex">
+                <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}${query ? `?item=${encodeURIComponent(query)}` : ''}`} className="h-full flex">
                   <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${shouldShowGrayscale || !restaurant.isAcceptingOrders ? 'grayscale opacity-75' : ''
                     }`}>
                     {/* Image Section */}
