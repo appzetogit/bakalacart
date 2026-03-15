@@ -30,6 +30,18 @@ const shortenOrderId = (id) => {
   return id
 }
 
+const getCustomerVisibleNote = (note) => {
+  if (!note || typeof note !== "string") return ""
+
+  return note
+    .replace(/\[System:[^\]]*\]/gi, " ")
+    .replace(/System:\s*Recovery verified payment/gi, " ")
+    .replace(/\[\s*\]/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+,/g, ",")
+    .trim()
+}
+
 export default function OrderAssign() {
   const [orders, setOrders] = useState([])
   const [deliveryBoys, setDeliveryBoys] = useState([])
@@ -541,6 +553,7 @@ export default function OrderAssign() {
                   {orders.map((order) => {
                     const orderId = order.id || order._id
                     const isSelected = selectedOrders.has(orderId)
+                    const customerNote = getCustomerVisibleNote(order.note)
                     return (
                       <tr key={orderId} className={`group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}>
                         <td className="p-4 align-top">
@@ -653,10 +666,10 @@ export default function OrderAssign() {
                                     return String(addr).replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '') || "No customer address";
                                   })()}
                                 </span>
-                                {order.note && order.note.trim() && (
+                                {customerNote && (
                                   <div className="mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
                                     <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                                      Note: {order.note}
+                                      Note: {customerNote}
                                     </p>
                                   </div>
                                 )}
@@ -814,6 +827,7 @@ export default function OrderAssign() {
               {orders.map((order) => {
                 const orderId = order.id || order._id
                 const isSelected = selectedOrders.has(orderId)
+                const customerNote = getCustomerVisibleNote(order.note)
                 return (
                   <Card key={orderId} className={`border-none shadow-sm transition-all ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : 'bg-white dark:bg-gray-800'}`}>
                     <CardContent className="p-4 space-y-4">
@@ -1012,9 +1026,9 @@ export default function OrderAssign() {
                                 return String(addr).replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '') || "No address provided";
                               })()}
                             </p>
-                            {order.note && order.note.trim() && (
+                            {customerNote && (
                               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
-                                "{order.note}"
+                                "{customerNote}"
                               </p>
                             )}
                             {order.items && order.items.length > 0 && (
