@@ -35,7 +35,7 @@ try {
     host === 'www.bakalaa.com';
 
   if (import.meta.env.MODE === 'production' && isHostedWebDomain) {
-    rawApiBaseUrl = 'https://bakalaa.com/api';
+    rawApiBaseUrl = 'https://api.bakalaa.com/api';
   }
 } catch {
   // Ignore host detection errors and keep existing base URL fallback.
