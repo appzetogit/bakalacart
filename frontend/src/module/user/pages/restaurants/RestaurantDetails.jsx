@@ -1323,9 +1323,8 @@ export default function RestaurantDetails() {
     return (
       <AnimatedPage>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center justify-center">
             <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
-            <span className="text-sm text-gray-600">Loading restaurant...</span>
           </div>
         </div>
       </AnimatedPage>
@@ -2112,8 +2111,10 @@ export default function RestaurantDetails() {
               </Button>
             </div>
           ) : (
-            // menuSections is empty — menu still loading, show nothing
-            <div className="min-h-[200px]" />
+            // menuSections is empty — menu still loading, show spinner preloader
+            <div className="min-h-[200px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+            </div>
           )}
         </div>
       </div>
