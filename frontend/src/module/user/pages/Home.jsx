@@ -2125,9 +2125,8 @@ export default function Home() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center justify-center">
                     <Loader2 className="h-8 w-8 text-green-600 animate-spin" strokeWidth={2.5} />
-                    <span className="text-sm font-medium text-gray-700 dark:text-white">Loading restaurants...</span>
                   </div>
                 </motion.div>
               )}

@@ -813,7 +813,6 @@ export default function SearchResults() {
         {loadingRestaurants && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <span className="ml-3 text-gray-600">Loading restaurants...</span>
           </div>
         )}
 

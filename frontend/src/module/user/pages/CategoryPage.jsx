@@ -861,9 +861,8 @@ export default function CategoryPage() {
             {/* Loading Overlay */}
             {isLoadingFilterResults && (
               <div className="absolute inset-0 bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg min-h-[400px]">
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center justify-center">
                   <Loader2 className="h-8 w-8 text-green-600 animate-spin" strokeWidth={2.5} />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Loading restaurants...</span>
                 </div>
               </div>
             )}
