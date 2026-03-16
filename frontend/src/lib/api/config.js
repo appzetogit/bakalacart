@@ -24,6 +24,23 @@ if (!rawApiBaseUrl) {
   }
 }
 
+// Web production override:
+// For hosted web domains, always use the canonical backend host explicitly.
+try {
+  const host = window.location.hostname.toLowerCase();
+  const isHostedWebDomain =
+    host === 'bakala.com' ||
+    host === 'www.bakala.com' ||
+    host === 'bakalaa.com' ||
+    host === 'www.bakalaa.com';
+
+  if (import.meta.env.MODE === 'production' && isHostedWebDomain) {
+    rawApiBaseUrl = 'https://bakalaa.com/api';
+  }
+} catch {
+  // Ignore host detection errors and keep existing base URL fallback.
+}
+
 // Normalize URL - fix common issues like double slashes, missing protocols
 if (rawApiBaseUrl && typeof rawApiBaseUrl === 'string') {
   // Remove leading/trailing whitespace

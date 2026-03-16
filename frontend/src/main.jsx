@@ -290,25 +290,36 @@ if ('requestIdleCallback' in window) {
 
 // rootElement already defined above for theme setup
 
-// Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web
+// Determine which router to use: HashRouter for Capacitor/Native, BrowserRouter for Web.
+// Force hosted production domains to stay BrowserRouter so URLs remain `/auth/sign-in` (no `#/`).
+const hostname = window.location.hostname.toLowerCase();
+const isHostedWebDomain =
+  hostname === 'bakala.com' ||
+  hostname === 'www.bakala.com' ||
+  hostname === 'bakalaa.com' ||
+  hostname === 'www.bakalaa.com';
+
 // Improved detection for various mobile webview environments
 const isNativeApp =
-  !!window.Capacitor ||
-  window.location.protocol === 'file:' ||
-  window.location.protocol === 'capacitor:' ||
-  window.location.protocol === 'ionic:' ||
-  /Capacitor/i.test(navigator.userAgent) ||
-  /Ionic/i.test(navigator.userAgent) ||
-  // Catch Android/iOS webviews (wv is present in Chrome-based webviews for Android)
-  /wv\)/i.test(navigator.userAgent) ||
-  /WebView/i.test(navigator.userAgent) ||
-  // Many local webview servers use localhost without a port or with a fixed port
-  (window.location.hostname === 'localhost' && (window.location.port === '' || window.location.port === '8080' || window.location.port === '8100')) ||
-  // Check for specialized bridges
-  !!(window.webkit && window.webkit.messageHandlers) ||
-  !!window.androidBridge ||
-  !!window.AndroidBridge ||
-  !!window.JSBridge;
+  !isHostedWebDomain &&
+  (
+    !!window.Capacitor ||
+    window.location.protocol === 'file:' ||
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'ionic:' ||
+    /Capacitor/i.test(navigator.userAgent) ||
+    /Ionic/i.test(navigator.userAgent) ||
+    // Catch Android/iOS webviews (wv is present in Chrome-based webviews for Android)
+    /wv\)/i.test(navigator.userAgent) ||
+    /WebView/i.test(navigator.userAgent) ||
+    // Many local webview servers use localhost without a port or with a fixed port
+    (window.location.hostname === 'localhost' && (window.location.port === '' || window.location.port === '8080' || window.location.port === '8100')) ||
+    // Check for specialized bridges
+    !!(window.webkit && window.webkit.messageHandlers) ||
+    !!window.androidBridge ||
+    !!window.AndroidBridge ||
+    !!window.JSBridge
+  );
 
 // Log environment for troubleshooting - helps identify why refresh might be failing in webviews
 if (import.meta.env.DEV) {
