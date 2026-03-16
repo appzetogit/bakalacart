@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
-import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X } from "lucide-react"
+import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import AnimatedPage from "../components/AnimatedPage"
@@ -445,12 +445,20 @@ export default function Under250() {
 
   // Check if should show grayscale (only when user is out of service)
   const shouldShowGrayscale = isOutOfService
+  const categorySkeletons = Array.from({ length: 6 })
+  const restaurantSkeletons = Array.from({ length: 6 })
 
   return (
 
     <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       {/* Banner Section with Navbar */}
       <div className="relative w-full overflow-hidden min-h-[39vh] lg:min-h-[50vh] md:pt-16">
+        {loadingBanner && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-green-50 to-orange-50 dark:from-[#111827] dark:to-[#1f2937]">
+            <Loader2 className="h-8 w-8 text-green-600 animate-spin" strokeWidth={2.5} />
+          </div>
+        )}
+
         {/* Banner Image */}
         {bannerImage && (
           <div className="absolute top-0 left-0 right-0 bottom-0 z-0">
@@ -531,7 +539,14 @@ export default function Under250() {
                  </span>
                </motion.div>
              </div>
-            {categories.map((category, index) => {
+            {loadingCategories ? categorySkeletons.map((_, index) => (
+              <div key={`category-skeleton-${index}`} className="flex-shrink-0 animate-pulse">
+                <div className="flex flex-col items-center gap-2 w-[62px] sm:w-24 md:w-28">
+                  <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gray-200 dark:bg-gray-800" />
+                  <div className="h-3 sm:h-4 w-12 sm:w-16 rounded bg-gray-200 dark:bg-gray-800" />
+                </div>
+              </div>
+            )) : categories.map((category, index) => {
               const isActive = activeCategory === category.id
               const categorySlug = category.slug || category.name.toLowerCase().replace(/\s+/g, '-')
               return (
@@ -614,8 +629,40 @@ export default function Under250() {
 
         {/* Restaurant Menu Sections */}
         {loadingRestaurants ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+          <div className="space-y-4 py-4">
+            <div className="flex justify-center items-center py-4">
+              <motion.div
+                className="relative h-14 w-14"
+                initial={{ opacity: 0.8, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.25 }}
+              >
+                <motion.div
+                  className="absolute left-1.5 top-1.5 h-11 w-11 rounded-full border-[5px] border-transparent border-r-blue-600 border-b-blue-600 dark:border-r-blue-500 dark:border-b-blue-500"
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 1.35, repeat: Infinity, ease: "linear" }}
+                />
+              </motion.div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+              {restaurantSkeletons.map((_, index) => (
+                <div
+                  key={`restaurant-skeleton-${index}`}
+                  className="overflow-hidden rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] animate-pulse"
+                >
+                  <div className="h-36 sm:h-40 md:h-44 bg-gray-200 dark:bg-gray-800" />
+                  <div className="space-y-3 p-4">
+                    <div className="h-5 w-3/4 rounded bg-gray-200 dark:bg-gray-800" />
+                    <div className="h-4 w-1/3 rounded bg-gray-200 dark:bg-gray-800" />
+                    <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-800" />
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="h-4 w-16 rounded bg-gray-200 dark:bg-gray-800" />
+                      <div className="h-9 w-20 rounded-full bg-gray-200 dark:bg-gray-800" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : sortedAndFilteredRestaurants.length === 0 ? (
           <div className="flex justify-center items-center py-12">

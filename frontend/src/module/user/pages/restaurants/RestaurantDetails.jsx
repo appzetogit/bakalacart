@@ -5,7 +5,6 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { restaurantAPI } from "@/lib/api"
 import { API_BASE_URL } from "@/lib/api/config"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
 import { useLocation } from "../../hooks/useLocation"
 import { useZone } from "../../hooks/useZone"
 import {
@@ -1324,7 +1323,11 @@ export default function RestaurantDetails() {
       <AnimatedPage>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="flex items-center justify-center">
-            <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+            <motion.div
+              className="h-5 w-5 rounded-full border-[3px] border-transparent border-r-blue-600 border-b-blue-600 dark:border-r-blue-500 dark:border-b-blue-500"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+            />
           </div>
         </div>
       </AnimatedPage>
@@ -2113,7 +2116,11 @@ export default function RestaurantDetails() {
           ) : (
             // menuSections is empty — menu still loading, show spinner preloader
             <div className="min-h-[200px] flex items-center justify-center">
-              <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+              <motion.div
+                className="h-5 w-5 rounded-full border-[3px] border-transparent border-r-blue-600 border-b-blue-600 dark:border-r-blue-500 dark:border-b-blue-500"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+              />
             </div>
           )}
         </div>
