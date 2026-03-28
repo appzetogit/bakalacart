@@ -20,7 +20,7 @@ export default function FoodApproval() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState("")
-  const [processing, setProcessing] = useState(false)
+  const [processingId, setProcessingId] = useState(null)
 
   // Fetch pending food approval requests
   const fetchFoodRequests = async () => {
@@ -60,18 +60,25 @@ export default function FoodApproval() {
 
   // Handle approve food item
   const handleApprove = async (request) => {
+    const id = request._id || request.id
     try {
-      setProcessing(true)
-      await adminAPI.approveFoodItem(request._id || request.id)
+      setProcessingId(id)
+      await adminAPI.approveFoodItem(id)
       toast.success('Food item approved successfully')
-      await fetchFoodRequests()
+      
+      // Update local state immediately for instant feedback
+      setFoodRequests(prev => prev.filter(req => (req._id || req.id) !== id))
+      
       setShowDetailModal(false)
       setSelectedRequest(null)
+      
+      // Still fetch in background to sync everything
+      fetchFoodRequests()
     } catch (error) {
       console.error('Error approving food item:', error)
       toast.error(error?.response?.data?.message || 'Failed to approve food item')
     } finally {
-      setProcessing(false)
+      setProcessingId(null)
     }
   }
 
@@ -82,20 +89,27 @@ export default function FoodApproval() {
       return
     }
 
+    const id = selectedRequest._id || selectedRequest.id
     try {
-      setProcessing(true)
-      await adminAPI.rejectFoodItem(selectedRequest._id || selectedRequest.id, rejectReason)
+      setProcessingId(id)
+      await adminAPI.rejectFoodItem(id, rejectReason)
       toast.success('Food item rejected')
-      await fetchFoodRequests()
+      
+      // Update local state immediately
+      setFoodRequests(prev => prev.filter(req => (req._id || req.id) !== id))
+      
       setShowRejectModal(false)
       setShowDetailModal(false)
       setSelectedRequest(null)
       setRejectReason("")
+      
+      // Sync in background
+      fetchFoodRequests()
     } catch (error) {
       console.error('Error rejecting food item:', error)
       toast.error(error?.response?.data?.message || 'Failed to reject food item')
     } finally {
-      setProcessing(false)
+      setProcessingId(null)
     }
   }
 
@@ -240,15 +254,19 @@ export default function FoodApproval() {
                               </button>
                               <button
                                 onClick={() => handleApprove(request)}
-                                disabled={processing}
+                                disabled={processingId === (request._id || request.id)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Approve"
                               >
-                                <CheckCircle2 className="w-4 h-4" />
+                                {processingId === (request._id || request.id) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-4 h-4" />
+                                )}
                               </button>
                               <button
                                 onClick={() => handleRejectClick(request)}
-                                disabled={processing}
+                                disabled={processingId === (request._id || request.id)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Reject"
                               >
@@ -390,10 +408,10 @@ export default function FoodApproval() {
             <button
               type="button"
               onClick={() => handleApprove(selectedRequest)}
-              disabled={processing}
+              disabled={processingId !== null}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {processing ? "Processing..." : "Approve"}
+              {processingId !== null ? "Processing..." : "Approve"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -441,10 +459,10 @@ export default function FoodApproval() {
               <button
                 type="button"
                 onClick={handleReject}
-                disabled={processing || !rejectReason.trim()}
+                disabled={processingId !== null || !rejectReason.trim()}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {processing ? "Processing..." : "Reject"}
+                {processingId !== null ? "Processing..." : "Reject"}
               </button>
             </DialogFooter>
           </div>

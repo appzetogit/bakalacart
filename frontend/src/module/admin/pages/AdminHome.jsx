@@ -311,7 +311,7 @@ export default function AdminHome() {
               helper="Rolling 12 months"
               icon={<ShoppingBag className="h-5 w-5 text-emerald-600" />}
               accent="bg-emerald-200/40"
-              onClick={() => navigate('/admin/transaction-report')}
+              onClick={() => navigate('/admin/transaction-report?view=gross')}
             />
             <MetricCard
               title="Commission earned"
@@ -359,7 +359,7 @@ export default function AdminHome() {
               helper={`Comm ₹${commissionTotal.toFixed(0)} + Plat ₹${platformFeeTotal.toFixed(0)} + Del ₹${deliveryFeeTotal.toFixed(0)} + GST ₹${gstTotal.toFixed(0)}`}
               icon={<DollarSign className="h-5 w-5 text-green-600" />}
               accent="bg-green-200/40"
-              onClick={() => navigate('/admin/transaction-report')}
+              onClick={() => navigate('/admin/transaction-report?view=total')}
             />
             <MetricCard
               title="Total restaurants"

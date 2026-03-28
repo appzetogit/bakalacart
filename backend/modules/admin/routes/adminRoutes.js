@@ -31,7 +31,9 @@ import {
   getAllOffers,
   getRestaurantAnalytics,
   getCustomerWalletReport,
-  toggleRestaurantOpen
+  toggleRestaurantOpen,
+  getAllAddons,
+  getAllFoods
 } from '../controllers/adminController.js';
 import {
   getBusinessSettings,
@@ -332,6 +334,10 @@ router.patch('/restaurants/:id/open-status', toggleRestaurantOpen); // Manual st
 router.post('/restaurants/:id/send-credentials', sendRestaurantCredentialsEmail);
 router.post('/restaurants/:id/send-email', sendRestaurantEmail);
 router.delete('/restaurants/:id', deleteRestaurant);
+
+// Addons Management
+router.get('/addons', getAllAddons);
+router.get('/foods', getAllFoods);
 
 // Category Management
 router.get('/categories', getCategories);

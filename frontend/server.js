@@ -1,4 +1,8 @@
 import express from 'express';
+import dns from 'dns';
+
+// Fix DNS resolution issues
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';

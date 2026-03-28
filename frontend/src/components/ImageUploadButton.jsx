@@ -52,9 +52,16 @@ export default function ImageUploadButton({
     return file
   }
 
+  // Generate unique IDs for this instance to avoid overlaps
+  const instanceId = useRef(Math.random().toString(36).substr(2, 9))
+  const cameraInputId = `camera-upload-${instanceId.current}`
+  const galleryInputId = `gallery-upload-${instanceId.current}`
+
   // Handle file selection from input
   const handleFileInputChange = async (e, source) => {
     const files = e.target.files
+    console.log(`📸 File selection from ${source}:`, files?.length, 'files selected')
+    
     if (!files || files.length === 0) {
       e.target.value = '' // Reset input
       return
@@ -75,7 +82,7 @@ export default function ImageUploadButton({
         }
 
         if (validFiles.length > 0) {
-          onFileSelect(multiple ? validFiles : validFiles[0])
+          onFileSelect(validFiles)
         }
       } else {
         // Process single file
@@ -100,6 +107,7 @@ export default function ImageUploadButton({
     // CRITICAL: When Flutter is not available, trigger file input synchronously
     // to preserve the user gesture (browsers block programmatic file input after async)
     if (!isFlutterAvailable()) {
+      console.log('📸 Flutter not available, using standard camera input')
       cameraInputRef.current?.click()
       return
     }
@@ -111,8 +119,10 @@ export default function ImageUploadButton({
         { source: 'camera', accept, multiple, quality: 0.8 },
         () => {
           if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            console.log('📸 Mobile browser detected, showing menu fallback')
             setShowSourceMenu(true)
           } else {
+            console.log('📸 Desktop fallback to camera input')
             cameraInputRef.current?.click()
           }
         }
@@ -141,6 +151,7 @@ export default function ImageUploadButton({
     // CRITICAL: When Flutter is not available, trigger file input synchronously
     // to preserve the user gesture (browsers block programmatic file input after async)
     if (!isFlutterAvailable()) {
+      console.log('📸 Flutter not available, using standard gallery input')
       galleryInputRef.current?.click()
       return
     }
@@ -148,13 +159,18 @@ export default function ImageUploadButton({
     try {
       setIsProcessing(true)
 
+      // We explicitly state source is gallery
       const files = await openGalleryWithFallback(
-        { accept, multiple, quality: 1.0 },
-        () => galleryInputRef.current?.click()
+        { accept, multiple, quality: 1.0, source: 'gallery' },
+        () => {
+          console.log('📸 Gallery handler fallback triggered')
+          galleryInputRef.current?.click()
+        }
       )
 
       if (files) {
         if (multiple && Array.isArray(files)) {
+          console.log('✅ Received multiple files from gallery')
           const validFiles = []
           for (const file of files) {
             const processed = await processFile(file)
@@ -166,13 +182,12 @@ export default function ImageUploadButton({
             onFileSelect(validFiles)
           }
         } else {
+          console.log('✅ Received single file from gallery')
           const processed = await processFile(files)
           if (processed) {
             onFileSelect(processed)
           }
         }
-      } else if (galleryInputRef.current) {
-        galleryInputRef.current.click()
       }
     } catch (error) {
       console.error('Error opening gallery:', error)
@@ -197,7 +212,7 @@ export default function ImageUploadButton({
 
   return (
     <div className="relative">
-      {/* Hidden file inputs */}
+      {/* Hidden file inputs with unique IDs */}
       <input
         ref={cameraInputRef}
         type="file"
@@ -206,17 +221,18 @@ export default function ImageUploadButton({
         multiple={multiple}
         onChange={(e) => handleFileInputChange(e, 'camera')}
         className="hidden"
-        id="camera-upload-input"
+        id={cameraInputId}
         disabled={disabled || isProcessing}
       />
       <input
         ref={galleryInputRef}
         type="file"
-        accept={accept}
+        // Use more specific accept for gallery to help some browsers distinguish
+        accept={accept === 'image/*' ? 'image/png, image/jpeg, image/jpg, image/webp' : accept}
         multiple={multiple}
         onChange={(e) => handleFileInputChange(e, 'gallery')}
         className="hidden"
-        id="gallery-upload-input"
+        id={galleryInputId}
         disabled={disabled || isProcessing}
       />
 

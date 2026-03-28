@@ -1,4 +1,7 @@
 import Order from '../../order/models/Order.js';
+import OrderSettlement from '../../order/models/OrderSettlement.js';
+import Delivery from '../../delivery/models/Delivery.js';
+import DeliveryWallet from '../../delivery/models/DeliveryWallet.js';
 import { successResponse, errorResponse } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/middleware/asyncHandler.js';
 import mongoose from 'mongoose';
@@ -1098,8 +1101,18 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const limitNum = parseInt(limit);
 
-    console.log('📊 Transaction Report: Parallelizing find, count, and aggregation...');
-    const [orders, total, aggregateResult] = await Promise.all([
+    // Build filters specifically matching Dashboard boxes (replicated from getDashboardStats)
+    const dashboardMatch = {};
+    if (query.createdAt) dashboardMatch.createdAt = query.createdAt;
+    if (query.restaurantId) dashboardMatch.restaurantId = query.restaurantId;
+    if (query.zoneId) dashboardMatch.zoneId = query.zoneId;
+
+    // Fetch valid delivery partner IDs (Exactly like Dashboard Line 240)
+    const validDeliveryPartners = await Delivery.find({}).select('_id').lean();
+    const validDeliveryIds = validDeliveryPartners.map(d => d._id);
+
+    console.log('📊 Transaction Report: Cloning Dashboard Stats Calculation...');
+    const [orders, total, aggregateStats, walletStats, missingStats, settlementStats] = await Promise.all([
       Order.find(query)
         .populate('userId', 'name email phone')
         .populate('restaurantId', 'name slug')
@@ -1108,180 +1121,97 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         .skip(skip)
         .lean(),
       Order.countDocuments(query),
+      // 1. Basic Stats (Completed/Refunded totals)
       Order.aggregate([
         { $match: query },
         {
           $group: {
             _id: null,
-            totalCompleted: {
-              $sum: {
-                $cond: [
-                  { $and: [{ $eq: ["$status", "delivered"] }, { $eq: ["$payment.status", "completed"] }] },
-                  { $ifNull: ["$pricing.total", 0] },
-                  0
-                ]
-              }
-            },
-            totalRefunded: {
-              $sum: {
-                $cond: [
-                  { $or: [{ $eq: ["$payment.status", "refunded"] }, { $eq: ["$status", "cancelled"] }] },
-                  { $ifNull: ["$pricing.total", 0] },
-                  0
-                ]
-              }
-            },
-            estimatedDeliveryEarnings: {
-              $sum: {
-                $cond: [
-                  { $eq: ["$status", "delivered"] },
-                  { $multiply: [{ $ifNull: ["$pricing.deliveryFee", 0] }, 0.8] },
-                  0
-                ]
-              }
-            },
-            cashTotal: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$status", "delivered"] },
-                      { $eq: ["$payment.status", "completed"] },
-                      {
-                        $or: [
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }
-                        ]
-                      }
-                    ]
-                  },
-                  { $ifNull: ["$pricing.total", 0] },
-                  0
-                ]
-              }
-            },
-            onlineTotal: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$status", "delivered"] },
-                      { $eq: ["$payment.status", "completed"] },
-                      {
-                        $or: [
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }
-                        ]
-                      }
-                    ]
-                  },
-                  { $ifNull: ["$pricing.total", 0] },
-                  0
-                ]
-              }
-            },
-            cashCount: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$status", "delivered"] },
-                      { $eq: ["$payment.status", "completed"] },
-                      {
-                        $or: [
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }
-                        ]
-                      }
-                    ]
-                  },
-                  1,
-                  0
-                ]
-              }
-            },
-            onlineCount: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$status", "delivered"] },
-                      { $eq: ["$payment.status", "completed"] },
-                      {
-                        $or: [
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] },
-                          { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }
-                        ]
-                      }
-                    ]
-                  },
-                  1,
-                  0
-                ]
-              }
-            }
+            totalCompleted: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "delivered"] }, { $ne: ["$deliveredAt", null] }] }, { $ifNull: ["$pricing.total", 0] }, 0] } },
+            totalRefunded: { $sum: { $cond: [{ $or: [{ $eq: ["$payment.status", "refunded"] }, { $eq: ["$status", "cancelled"] }] }, { $ifNull: ["$pricing.total", 0] }, 0] } },
+            cashTotal: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "delivered"] }, { $ne: ["$deliveredAt", null] }, { $or: [{ $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }] }] }, { $ifNull: ["$pricing.total", 0] }, 0] } },
+            onlineTotal: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "delivered"] }, { $ne: ["$deliveredAt", null] }, { $or: [{ $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }] }] }, { $ifNull: ["$pricing.total", 0] }, 0] } },
+            cashCount: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "delivered"] }, { $ne: ["$deliveredAt", null] }, { $or: [{ $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cash_on_delivery"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "cod"] }] }] }, 1, 0] } },
+            onlineCount: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "delivered"] }, { $ne: ["$deliveredAt", null] }, { $or: [{ $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "razorpay"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "online"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "card"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "wallet"] }, { $eq: [{ $toLower: { $ifNull: ["$payment.method", ""] } }, "upi"] }] }] }, 1, 0] } }
           }
+        }
+      ]),
+      // 2. Wallet Payouts (Dashboard 'DELIVERY FEE' component)
+      DeliveryWallet.aggregate([
+        { $unwind: '$transactions' },
+        { 
+          $match: { 
+            deliveryId: { $in: validDeliveryIds },
+            'transactions.type': 'payment', 
+            'transactions.status': 'Completed',
+            ...(dashboardMatch.createdAt ? { 'transactions.createdAt': dashboardMatch.createdAt } : {})
+          } 
+        },
+        { $group: { _id: null, total: { $sum: '$transactions.amount' }, orderIds: { $push: '$transactions.orderId' } } }
+      ]),
+      // 3. Missing Delivery Orders (Dashboard 'DELIVERY FEE' missing component)
+      Order.aggregate([
+        { 
+          $match: { 
+            status: 'delivered', 
+            ...(dashboardMatch.createdAt ? { deliveredAt: dashboardMatch.createdAt } : {}),
+            deliveryPartnerId: { $in: validDeliveryIds }
+          } 
+        },
+        { $group: { _id: null, total: { $sum: '$pricing.deliveryFee' }, allOrderIds: { $push: '$_id' } } }
+      ]),
+      // 4. Commission / PlatFee / GST (Dashboard boxes exactly)
+      OrderSettlement.aggregate([
+        { $match: dashboardMatch },
+        { 
+          $group: { 
+            _id: null, 
+            comm: { $sum: "$adminEarning.commission" },
+            plat: { $sum: "$adminEarning.platformFee" },
+            gst: { $sum: "$adminEarning.gst" },
+            rest: { $sum: "$restaurantEarning.netEarning" },
+            rid: { $sum: "$deliveryPartnerEarning.totalEarning" }
+          } 
         }
       ])
     ]);
 
-    const summaryStats = aggregateResult[0] || { 
-      totalCompleted: 0, 
-      totalRefunded: 0, 
-      estimatedDeliveryEarnings: 0,
-      cashTotal: 0,
-      onlineTotal: 0,
-      cashCount: 0,
-      onlineCount: 0
+    // Calculate Dashboard-aligned Delivery Fee (replicated logic)
+    const walletTotal = walletStats[0]?.total || 0;
+    const processedOrderIds = new Set((walletStats[0]?.orderIds || []).map(id => id?.toString()).filter(Boolean));
+    const allDeliveredOrders = missingStats[0]?.allOrderIds || [];
+    
+    // Fetch individual delivery fees for orders NOT in wallet (exactly like dashboard)
+    const missingOrdersData = await Order.find({
+      _id: { $in: allDeliveredOrders, $nin: Array.from(processedOrderIds).filter(id => mongoose.Types.ObjectId.isValid(id)) }
+    }).select('pricing.deliveryFee').lean();
+    
+    const missingTotal = missingOrdersData.reduce((sum, o) => sum + (o.pricing?.deliveryFee || 0), 0);
+    const dashboardDeliveryFee = walletTotal + missingTotal;
+
+    const summaryStats = aggregateStats[0] || { totalCompleted: 0, totalRefunded: 0, cashTotal: 0, onlineTotal: 0, cashCount: 0, onlineCount: 0 };
+    const settleStats = settlementStats[0] || { comm: 0, plat: 0, gst: 0, rest: 0, rid: 0 };
+
+    // Final Revenue Breakdown (Perfect 100% sync with Dashboard)
+    const adminEarning = (settleStats.comm || 0) + 
+                         (settleStats.plat || 0) + 
+                         (settleStats.gst || 0) + 
+                         dashboardDeliveryFee;
+
+    const restaurantEarning = settleStats.rest || 0;
+    const deliverymanEarning = settleStats.rid || 0;
+
+    const summary = {
+      completedTransaction: summaryStats.totalCompleted || 0,
+      refundedTransaction: summaryStats.totalRefunded || 0,
+      adminEarning: adminEarning,
+      restaurantEarning: restaurantEarning,
+      deliverymanEarning: deliverymanEarning,
+      cashTotal: summaryStats.cashTotal || 0,
+      onlineTotal: summaryStats.onlineTotal || 0,
+      cashCount: summaryStats.cashCount || 0,
+      onlineCount: summaryStats.onlineCount || 0
     };
-
-    // Get admin earning from AdminCommission
-    const AdminCommission = (await import('../models/AdminCommission.js')).default;
-
-    // Build date query for summary stats
-    const summaryDateQuery = {};
-    if (fromDate || toDate) {
-      summaryDateQuery.orderDate = {};
-      if (fromDate) {
-        const startDate = new Date(fromDate);
-        startDate.setHours(0, 0, 0, 0);
-        summaryDateQuery.orderDate.$gte = startDate;
-      }
-      if (toDate) {
-        const endDate = new Date(toDate);
-        endDate.setHours(23, 59, 59, 999);
-        summaryDateQuery.orderDate.$lte = endDate;
-      }
-    }
-
-    // Build restaurant filter for summary
-    let summaryRestaurantQuery = {};
-    if (restaurantIdFilter) { // Use the pre-fetched filter
-      summaryRestaurantQuery.restaurantId = restaurantIdFilter;
-    }
-
-    const adminCommissionQuery = {
-      status: 'completed',
-      ...summaryDateQuery
-    };
-
-    // Add restaurant filter to admin commission query if relevant
-    if (summaryRestaurantQuery.restaurantId) {
-      adminCommissionQuery.restaurantId = summaryRestaurantQuery.restaurantId;
-    }
-
-    const adminCommissions = await AdminCommission.find(adminCommissionQuery).lean();
-    const adminEarning = adminCommissions.reduce((sum, comm) => sum + (comm.commissionAmount || 0), 0);
-    const restaurantEarning = adminCommissions.reduce((sum, comm) => sum + (comm.restaurantEarning || 0), 0);
-    const deliverymanEarning = summaryStats.estimatedDeliveryEarnings;
 
     // Transform orders to match frontend format
     const transformedTransactions = orders.map((order, index) => {

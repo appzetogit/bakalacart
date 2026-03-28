@@ -22,6 +22,8 @@ export default function Customers() {
     sortBy: "",
     chooseFirst: "",
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(50)
 
   const filteredCustomers = useMemo(() => {
     let result = [...customers]
@@ -89,8 +91,8 @@ export default function Customers() {
       try {
         setLoading(true)
         const params = {
-          limit: 1000, // Get all customers
-          offset: 0,
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage,
           ...(searchQuery && { search: searchQuery }),
           ...(filters.status && { status: filters.status }),
           ...(filters.joiningDate && { joiningDate: filters.joiningDate }),
@@ -118,7 +120,12 @@ export default function Customers() {
     }
 
     fetchCustomers()
-  }, [searchQuery, filters.status, filters.joiningDate, filters.sortBy])
+  }, [searchQuery, filters.status, filters.joiningDate, filters.sortBy, currentPage, itemsPerPage])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, filters.status, filters.joiningDate, filters.sortBy, itemsPerPage])
 
   const handleToggleStatus = async (customerId) => {
     try {
@@ -447,6 +454,54 @@ export default function Customers() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {!loading && customers.length > 0 && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-6">
+              <div className="text-sm text-slate-600">
+                Showing <span className="font-semibold text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-semibold text-slate-900">{Math.min(currentPage * itemsPerPage, totalCustomers)}</span> of <span className="font-semibold text-slate-900">{totalCustomers}</span> customers
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(Math.min(5, Math.ceil(totalCustomers / itemsPerPage)))].map((_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 text-sm font-medium rounded-lg transition-all ${currentPage === pageNum
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                          : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                  {Math.ceil(totalCustomers / itemsPerPage) > 5 && (
+                    <span className="px-2 text-slate-400">...</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalCustomers / itemsPerPage)))}
+                  disabled={currentPage === Math.ceil(totalCustomers / itemsPerPage) || totalCustomers === 0}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

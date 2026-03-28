@@ -20,8 +20,9 @@ export const authenticateAdmin = async (req, res, next) => {
     // Verify token
     const decoded = jwtService.verifyAccessToken(token);
 
-    // Ensure token is for admin role
-    if (decoded.role !== 'admin') {
+    // Ensure token is for an admin role (support all admin role types)
+    const adminRoles = ['super_admin', 'admin', 'moderator'];
+    if (!adminRoles.includes(decoded.role)) {
       return errorResponse(res, 403, 'Access denied. Admin access required.');
     }
 

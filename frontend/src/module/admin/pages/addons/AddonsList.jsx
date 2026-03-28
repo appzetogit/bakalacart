@@ -10,60 +10,34 @@ export default function AddonsList() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
 
-  // Fetch all addons from all restaurants
+  // Fetch all addons across all restaurants
   useEffect(() => {
     const fetchAllAddons = async () => {
       try {
         setLoading(true)
         
-        // First, fetch all restaurants
-        const restaurantsResponse = await adminAPI.getRestaurants({ limit: 1000 })
-        const restaurants = restaurantsResponse?.data?.data?.restaurants || 
-                          restaurantsResponse?.data?.restaurants || 
-                          []
+        // Fetch all addons in one shot using the new admin endpoint
+        const response = await adminAPI.getAllAddons()
+        const rawAddons = response?.data?.data?.addons || []
         
-        if (restaurants.length === 0) {
-          setAddons([])
-          setLoading(false)
-          return
-        }
-
-        // Fetch addons for each restaurant
-        const allAddons = []
+        // Map addons with necessary information for the UI
+        const mappedAddons = rawAddons.map((addon) => ({
+          id: addon.id || addon._id,
+          _id: addon._id,
+          name: addon.name || "Unnamed Addon",
+          image: addon.image || (addon.images && addon.images[0]) || "https://via.placeholder.com/40",
+          price: addon.price || 0,
+          description: addon.description || "",
+          isAvailable: addon.isAvailable !== false,
+          approvalStatus: addon.approvalStatus || 'pending',
+          restaurantId: addon.restaurantId,
+          restaurantName: addon.restaurantName || "Unknown Restaurant",
+          originalAddon: addon // Keep original addon data
+        }))
         
-        for (const restaurant of restaurants) {
-          try {
-            const restaurantId = restaurant._id || restaurant.id
-            const addonsResponse = await restaurantAPI.getAddonsByRestaurantId(restaurantId)
-            const restaurantAddons = addonsResponse?.data?.data?.addons || 
-                                    addonsResponse?.data?.addons || 
-                                    []
-            
-            // Map addons with restaurant information
-            restaurantAddons.forEach((addon) => {
-              allAddons.push({
-                id: addon.id || `${restaurantId}-${addon.name}`,
-                _id: addon._id,
-                name: addon.name || "Unnamed Addon",
-                image: addon.image || addon.images?.[0] || "https://via.placeholder.com/40",
-                price: addon.price || 0,
-                description: addon.description || "",
-                isAvailable: addon.isAvailable !== false,
-                approvalStatus: addon.approvalStatus || 'pending',
-                restaurantId: restaurantId,
-                restaurantName: restaurant.name || "Unknown Restaurant",
-                originalAddon: addon // Keep original addon data
-              })
-            })
-          } catch (error) {
-            // Silently skip restaurants that don't have addons or have errors
-            console.warn(`Failed to fetch addons for restaurant ${restaurant._id || restaurant.id}:`, error.message)
-          }
-        }
-        
-        setAddons(allAddons)
+        setAddons(mappedAddons)
       } catch (error) {
-        console.error("Error fetching addons:", error)
+        console.error("Error fetching all addons:", error)
         toast.error("Failed to load addons from restaurants")
         setAddons([])
       } finally {

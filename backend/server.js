@@ -1,4 +1,8 @@
 import express from 'express';
+import dns from 'dns';
+// Set DNS servers early to fix MongoDB Atlas connection issues
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';

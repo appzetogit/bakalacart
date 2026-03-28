@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import winston from 'winston';
+import dns from 'dns';
+
+// Set DNS servers to fix MongoDB Atlas connection issues
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const logger = winston.createLogger({
   level: 'info',

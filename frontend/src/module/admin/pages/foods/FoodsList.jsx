@@ -54,120 +54,76 @@ export default function FoodsList() {
     fetchCategories()
   }, [])
 
-  // Fetch all foods from all restaurants
-  const fetchAllFoods = async () => {
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [serverStats, setServerStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 })
+
+  // Fetch all foods across all restaurants
+  const fetchAllFoods = async (pageNum = 1, append = false) => {
     try {
-      setLoading(true)
+      if (pageNum === 1) setLoading(true)
+      else setDeleting(true) // Using deleting state as a mini-loader for "Load More"
 
-      // First, fetch all restaurants
-      const restaurantsResponse = await adminAPI.getRestaurants({ limit: 1000 })
-      const restaurants = restaurantsResponse?.data?.data?.restaurants ||
-        restaurantsResponse?.data?.restaurants ||
-        []
+      // Fetch all foods in one shot using the new admin endpoint
+      const response = await adminAPI.getAllFoods({ page: pageNum, limit: 100 })
+      const rawFoods = response?.data?.data?.foods || []
+      const stats = response?.data?.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0 }
+      
+      setServerStats(stats)
 
-      if (restaurants.length === 0) {
-        setFoods([])
-        setLoading(false)
-        return
+      // Map foods with necessary information for the UI
+      const mappedFoods = rawFoods.map((food) => ({
+        id: food.id || food._id,
+        _id: food._id,
+        name: food.name || "Unnamed Item",
+        image: food.image || "https://via.placeholder.com/40",
+        priority: "Normal",
+        status: food.isAvailable !== false && food.approvalStatus !== 'rejected',
+        restaurantId: food.restaurantId,
+        restaurantName: food.restaurantName || "Unknown Restaurant",
+        sectionName: food.sectionName || "Unknown Section",
+        subsectionName: food.subsectionName,
+        categoryId: food.categoryId,
+        price: food.price || 0,
+        foodType: food.foodType || "Non-Veg",
+        approvalStatus: (food.approvalStatus || 'pending').toLowerCase(),
+        isAvailable: food.isAvailable !== false,
+        itemSizeQuantity: food.itemSizeQuantity,
+        itemSizeUnit: food.itemSizeUnit,
+        servesInfo: food.servesInfo,
+        description: food.description,
+        originalItem: food // Keep original addon data
+      }))
+
+      if (append) {
+        setFoods(prev => [...prev, ...mappedFoods])
+      } else {
+        setFoods(mappedFoods)
       }
-
-      // Fetch menu for each restaurant in parallel with batching
-      const batchSize = 10
-      const allFoods = []
-
-      for (let i = 0; i < restaurants.length; i += batchSize) {
-        const batch = restaurants.slice(i, i + batchSize)
-        const batchPromises = batch.map(async (restaurant) => {
-          try {
-            const restaurantId = restaurant._id || restaurant.id
-            const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
-            const menu = menuResponse?.data?.data?.menu || menuResponse?.data?.menu
-
-            const restaurantFoods = []
-            if (menu && menu.sections) {
-              menu.sections.forEach((section) => {
-                if (section.items && Array.isArray(section.items)) {
-                  section.items.forEach((item) => {
-                    restaurantFoods.push({
-                      id: item.id || `${restaurantId}-${section.id}-${item.name}`,
-                      _id: item._id,
-                      name: item.name || "Unnamed Item",
-                      image: item.image || item.images?.[0] || "https://via.placeholder.com/40",
-                      priority: "Normal",
-                      status: item.isAvailable !== false && item.approvalStatus !== 'rejected',
-                      restaurantId: restaurantId,
-                      restaurantName: restaurant.name || "Unknown Restaurant",
-                      sectionName: section.name || "Unknown Section",
-                      categoryId: section.id,
-                      price: item.price || 0,
-                      foodType: item.foodType || "Non-Veg",
-                      approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
-                      isAvailable: item.isAvailable !== false,
-                      itemSizeQuantity: item.itemSizeQuantity,
-                      itemSizeUnit: item.itemSizeUnit,
-                      servesInfo: item.servesInfo,
-                      description: item.description,
-                      originalItem: item
-                    })
-                  })
-                }
-
-                if (section.subsections && Array.isArray(section.subsections)) {
-                  section.subsections.forEach((subsection) => {
-                    if (subsection.items && Array.isArray(subsection.items)) {
-                      subsection.items.forEach((item) => {
-                        restaurantFoods.push({
-                          id: item.id || `${restaurantId}-${section.id}-${subsection.id}-${item.name}`,
-                          _id: item._id,
-                          name: item.name || "Unnamed Item",
-                          image: item.image || item.images?.[0] || "https://via.placeholder.com/40",
-                          priority: "Normal",
-                          status: item.isAvailable !== false && item.approvalStatus !== 'rejected',
-                          restaurantId: restaurantId,
-                          restaurantName: restaurant.name || "Unknown Restaurant",
-                          sectionName: section.name || "Unknown Section",
-                          subsectionName: subsection.name || "Unknown Subsection",
-                          categoryId: section.id,
-                          price: item.price || 0,
-                          foodType: item.foodType || "Non-Veg",
-                          approvalStatus: (item.approvalStatus || 'pending').toLowerCase(),
-                          isAvailable: item.isAvailable !== false,
-                          itemSizeQuantity: item.itemSizeQuantity,
-                          itemSizeUnit: item.itemSizeUnit,
-                          servesInfo: item.servesInfo,
-                          description: item.description,
-                          originalItem: item
-                        })
-                      })
-                    }
-                  })
-                }
-              })
-            }
-            return restaurantFoods
-          } catch (err) {
-            console.error(`Error fetching menu for restaurant ${restaurant.name}:`, err)
-            return []
-          }
-        })
-
-        const batchResults = await Promise.all(batchPromises)
-        allFoods.push(...batchResults.flat())
-      }
-
-      setFoods(allFoods)
+      
+      setHasMore(mappedFoods.length === 100)
     } catch (error) {
-      console.error("Error fetching foods:", error)
-      toast.error("Failed to load foods from restaurants")
-      setFoods([])
+      console.error("Error fetching all foods:", error)
+      const errorMsg = error.response?.data?.message || error.message || "Unknown error"
+      const status = error.response?.status
+      toast.error(`Failed to load foods (${status || 'Network Error'}): ${errorMsg}`)
+      // Only reset if it's the first page
+      if (pageNum === 1) setFoods([])
     } finally {
       setLoading(false)
+      setDeleting(false)
     }
   }
 
   useEffect(() => {
-    fetchAllFoods()
+    fetchAllFoods(1, false)
   }, [])
+
+  const loadMore = () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchAllFoods(nextPage, true)
+  }
 
   // Format ID to FOOD format (e.g., FOOD519399)
   const formatFoodId = (id) => {
@@ -268,7 +224,7 @@ export default function FoodsList() {
     }
 
     return result
-  }, [foods, searchQuery, selectedRestaurant, selectedFoodType, selectedApprovalStatus, selectedAvailability])
+  }, [foods, searchQuery, selectedRestaurant, selectedCategory, selectedFoodType, selectedApprovalStatus, selectedAvailability])
 
   // Reset all filters
   const resetFilters = () => {
@@ -294,7 +250,6 @@ export default function FoodsList() {
     try {
       setDeleting(true)
       // Note: Admin deletion logic would typically involve a specific admin endpoint
-      // For now, we simulate success for UI demonstration or need to implement backend
       toast.info("Delete functionality needs specific admin endpoint")
       setFoods(foods.filter(f => f.id !== id))
       toast.success("Food item removed from list")
@@ -309,7 +264,6 @@ export default function FoodsList() {
   // Approval handler
   const handleApprove = async (foodId) => {
     try {
-      // Assuming adminAPI has an approveFoodItem method that takes foodId
       const response = await adminAPI.approveFoodItem(foodId)
       if (response.data?.success) {
         toast.success("Food item approved successfully")
@@ -327,7 +281,6 @@ export default function FoodsList() {
   // Reject handler
   const handleReject = async (foodId, reason = "Doesn't meet quality standards") => {
     try {
-      // Assuming adminAPI has a rejectFoodItem method that takes foodId and reason
       const response = await adminAPI.rejectFoodItem(foodId, reason)
       if (response.data?.success) {
         toast.success("Food item rejected")
@@ -344,11 +297,9 @@ export default function FoodsList() {
 
   const handleToggleAvailability = async (food) => {
     try {
-      // Use the restaurantId stored in the food object during fetch
       const response = await adminAPI.toggleRestaurantMenuItem(food.restaurantId, food.id);
       if (response.data?.success) {
         toast.success(response.data.message);
-        // Update local state
         setFoods(foods.map(f => f.id === food.id ? { ...f, isAvailable: response.data.data.isAvailable } : f));
       }
     } catch (error) {
@@ -370,12 +321,12 @@ export default function FoodsList() {
 
   const stats = useMemo(() => {
     return {
-      total: foods.length,
-      pending: foods.filter(f => f.approvalStatus === 'pending').length,
-      rejected: foods.filter(f => f.approvalStatus === 'rejected').length,
-      approved: foods.filter(f => f.approvalStatus === 'approved').length,
+      total: serverStats.total || foods.length,
+      pending: serverStats.pending || 0,
+      rejected: serverStats.rejected || 0,
+      approved: serverStats.approved || 0,
     }
-  }, [foods])
+  }, [foods, serverStats])
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen space-y-8">
@@ -407,7 +358,7 @@ export default function FoodsList() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+              <p className="text-2xl font-bold text-slate-900">{stat.value.toLocaleString()}</p>
             </div>
           </div>
         ))}
@@ -675,6 +626,26 @@ export default function FoodsList() {
             </tbody>
           </table>
         </div>
+        
+        {hasMore && (
+          <div className="p-6 border-t border-slate-100 flex justify-center bg-slate-50/50">
+            <Button 
+              onClick={loadMore} 
+              disabled={deleting}
+              variant="outline" 
+              className="px-8 py-2 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 font-semibold transition-all shadow-sm flex items-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading More...
+                </>
+              ) : (
+                "Load More Foods"
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* View Food Dialog */}

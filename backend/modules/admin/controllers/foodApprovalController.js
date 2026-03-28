@@ -20,107 +20,130 @@ const logger = winston.createLogger({
  */
 export const getPendingFoodApprovals = asyncHandler(async (req, res) => {
   try {
-    const menus = await Menu.find({ isActive: true })
-      .populate('restaurant', 'name restaurantId')
-      .lean();
-
-    const pendingRequests = [];
-
-    // Iterate through all menus and extract pending items
-    for (const menu of menus) {
-      if (!menu.restaurant) continue;
-
-      // Check items in sections
-      for (const section of menu.sections || []) {
-        for (const item of section.items || []) {
-          if (item.approvalStatus === 'pending') {
-            pendingRequests.push({
-              _id: item.id,
-              id: item.id,
-              itemName: item.name,
-              category: item.category || '',
-              restaurantId: menu.restaurant.restaurantId,
-              restaurantName: menu.restaurant.name,
-              restaurantMongoId: menu.restaurant._id,
-              sectionName: section.name,
-              sectionId: section.id,
-              price: item.price,
-              foodType: item.foodType,
-              description: item.description,
-              image: item.image || (item.images && item.images[0]) || '',
-              images: Array.isArray(item.images) && item.images.length > 0 
-                ? item.images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-                : [],
-              requestedAt: item.requestedAt || menu.createdAt,
-              item: item // Full item data
-            });
-          }
+    // Use aggregation to find pending items efficiently across ALL menus (active or not)
+    const pipeline = [
+      {
+        // Project only the fields we need to reduce memory
+        $project: {
+          restaurant: 1,
+          isActive: 1,
+          sections: 1,
+          addons: 1,
+          createdAt: 1
         }
-
-        // Check items in subsections
-        for (const subsection of section.subsections || []) {
-          for (const item of subsection.items || []) {
-            if (item.approvalStatus === 'pending') {
-              pendingRequests.push({
-                _id: item.id,
-                id: item.id,
-                itemName: item.name,
-                category: item.category || '',
-                restaurantId: menu.restaurant.restaurantId,
-                restaurantName: menu.restaurant.name,
-                restaurantMongoId: menu.restaurant._id,
-                sectionName: section.name,
-                sectionId: section.id,
-                subsectionName: subsection.name,
-                subsectionId: subsection.id,
-                price: item.price,
-                foodType: item.foodType,
-                description: item.description,
-                image: item.image || (item.images && item.images[0]) || '',
-                images: Array.isArray(item.images) && item.images.length > 0 
-                  ? item.images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-                  : [],
-                requestedAt: item.requestedAt || menu.createdAt,
-                item: item // Full item data
-              });
+      },
+      {
+        // Unwind sections first
+        $unwind: { path: '$sections', preserveNullAndEmptyArrays: true }
+      },
+      {
+        // Handle subsections by branching (or just unwind)
+        $facet: {
+          itemsFromSections: [
+            { $unwind: '$sections.items' },
+            { $match: { 'sections.items.approvalStatus': 'pending' } },
+            {
+              $project: {
+                _id: '$sections.items.id',
+                id: '$sections.items.id',
+                itemName: '$sections.items.name',
+                category: '$sections.items.category',
+                sectionName: '$sections.name',
+                sectionId: '$sections.id',
+                price: '$sections.items.price',
+                foodType: '$sections.items.foodType',
+                description: '$sections.items.description',
+                image: { $ifNull: [ '$sections.items.image', { $arrayElemAt: ['$sections.items.images', 0] } ] },
+                requestedAt: { $ifNull: [ '$sections.items.requestedAt', '$createdAt' ] },
+                restaurantId: '$restaurant',
+                item: '$sections.items'
+              }
             }
-          }
+          ],
+          itemsFromSubsections: [
+            { $unwind: '$sections.subsections' },
+            { $unwind: '$sections.subsections.items' },
+            { $match: { 'sections.subsections.items.approvalStatus': 'pending' } },
+            {
+              $project: {
+                _id: '$sections.subsections.items.id',
+                id: '$sections.subsections.items.id',
+                itemName: '$sections.subsections.items.name',
+                category: '$sections.subsections.items.category',
+                sectionName: '$sections.name',
+                sectionId: '$sections.id',
+                subsectionName: '$sections.subsections.name',
+                subsectionId: '$sections.subsections.id',
+                price: '$sections.subsections.items.price',
+                foodType: '$sections.subsections.items.foodType',
+                description: '$sections.subsections.items.description',
+                image: { $ifNull: [ '$sections.subsections.items.image', { $arrayElemAt: ['$sections.subsections.items.images', 0] } ] },
+                requestedAt: { $ifNull: [ '$sections.subsections.items.requestedAt', '$createdAt' ] },
+                restaurantId: '$restaurant',
+                item: '$sections.subsections.items'
+              }
+            }
+          ],
+          addons: [
+            { $unwind: '$addons' },
+            { $match: { 'addons.approvalStatus': 'pending' } },
+            {
+              $project: {
+                _id: '$addons.id',
+                id: '$addons.id',
+                itemName: '$addons.name',
+                category: { $literal: 'Add-on' },
+                type: { $literal: 'addon' },
+                price: '$addons.price',
+                description: '$addons.description',
+                image: { $ifNull: [ '$addons.image', { $arrayElemAt: ['$addons.images', 0] } ] },
+                requestedAt: { $ifNull: [ '$addons.requestedAt', '$createdAt' ] },
+                restaurantId: '$restaurant',
+                item: '$addons'
+              }
+            }
+          ]
         }
-      }
+      },
+      {
+        // Combine results
+        $project: {
+          all: { $concatArrays: ['$itemsFromSections', '$itemsFromSubsections', '$addons'] }
+        }
+      },
+      { $unwind: '$all' },
+      { $replaceRoot: { newRoot: '$all' } }
+    ];
 
-      // Check add-ons
-      for (const addon of menu.addons || []) {
-        if (addon.approvalStatus === 'pending') {
-          pendingRequests.push({
-            _id: addon.id,
-            id: addon.id,
-            itemName: addon.name,
-            category: 'Add-on',
-            type: 'addon', // Mark as addon
-            restaurantId: menu.restaurant.restaurantId,
-            restaurantName: menu.restaurant.name,
-            restaurantMongoId: menu.restaurant._id,
-            price: addon.price,
-            description: addon.description,
-            image: addon.image || (addon.images && addon.images[0]) || '',
-            images: Array.isArray(addon.images) && addon.images.length > 0 
-              ? addon.images.filter(img => img && typeof img === 'string' && img.trim() !== '')
-              : [],
-            requestedAt: addon.requestedAt || menu.createdAt,
-            item: addon // Full addon data
-          });
-        }
-      }
-    }
+    const results = await Menu.aggregate(pipeline);
+
+    // Populate restaurant information for each request
+    const pendingRequests = await Restaurant.populate(results, {
+      path: 'restaurantId',
+      select: 'name restaurantId'
+    });
+
+    // Map the results back to the expected format (handling populated restaurant)
+    const formattedRequests = pendingRequests
+      .filter(req => req.restaurantId) // Skip if restaurant not found
+      .map(req => ({
+        ...req,
+        restaurantName: req.restaurantId.name,
+        restaurantMongoId: req.restaurantId._id,
+        restaurantId: req.restaurantId.restaurantId,
+        images: Array.isArray(req.item.images) ? req.item.images.filter(img => img) : []
+      }));
 
     // Sort by requested date (newest first)
-    pendingRequests.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+    formattedRequests.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
-    logger.info(`Fetched ${pendingRequests.length} pending food approval requests`);
+    const finalRequests = formattedRequests;
+
+    logger.info(`Fetched ${finalRequests.length} pending food approval requests`);
 
     return successResponse(res, 200, 'Pending food approvals retrieved successfully', {
-      requests: pendingRequests,
-      total: pendingRequests.length
+      requests: finalRequests,
+      total: finalRequests.length
     });
   } catch (error) {
     logger.error(`Error fetching pending food approvals: ${error.message}`, { error: error.stack });
@@ -137,42 +160,47 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const adminId = req.user._id;
 
-    const menus = await Menu.find({ isActive: true }).lean();
+    // Search for the menu containing the item/addon directly in DB
+    // This is MUCH faster than fetching all menus and looping
+    const menuDoc = await Menu.findOne({
+      $or: [
+        { "addons.id": id },
+        { "sections.items.id": id },
+        { "sections.subsections.items.id": id }
+      ]
+    });
+
+    if (!menuDoc) {
+      return errorResponse(res, 404, 'Food item or add-on not found in any menu');
+    }
+
     let foundItem = null;
-    let foundMenu = null;
     let foundSection = null;
     let foundSubsection = null;
-    let itemIndex = -1;
-    let isAddon = false; // Flag to track if this is an addon
+    let isAddon = false;
 
-    // Search for the item/addon across all menus
-    for (const menu of menus) {
-      // Check add-ons first
-      itemIndex = (menu.addons || []).findIndex(addon => addon.id === id);
-      if (itemIndex !== -1) {
-        foundItem = menu.addons[itemIndex];
-        foundMenu = menu;
-        isAddon = true;
-        break;
-      }
-
-      // Check items in sections
-      for (const section of menu.sections || []) {
+    // Find the specific item in the document to identify its location (section/subsection)
+    // Check add-ons first
+    const addon = (menuDoc.addons || []).find(a => String(a.id) === String(id));
+    if (addon) {
+      foundItem = addon;
+      isAddon = true;
+    } else {
+      // Check sections
+      for (const section of menuDoc.sections || []) {
         // Check items in section
-        itemIndex = section.items.findIndex(item => item.id === id);
-        if (itemIndex !== -1) {
-          foundItem = section.items[itemIndex];
-          foundMenu = menu;
+        const item = section.items.find(i => String(i.id) === String(id));
+        if (item) {
+          foundItem = item;
           foundSection = section;
           break;
         }
 
         // Check items in subsections
         for (const subsection of section.subsections || []) {
-          itemIndex = subsection.items.findIndex(item => item.id === id);
-          if (itemIndex !== -1) {
-            foundItem = subsection.items[itemIndex];
-            foundMenu = menu;
+          const subItem = subsection.items.find(i => String(i.id) === String(id));
+          if (subItem) {
+            foundItem = subItem;
             foundSection = section;
             foundSubsection = subsection;
             break;
@@ -180,32 +208,18 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
         }
         if (foundItem) break;
       }
-      if (foundItem) break;
     }
 
     if (!foundItem) {
-      return errorResponse(res, 404, 'Food item or add-on not found');
+      return errorResponse(res, 404, 'Food item or add-on not found (ID mismatch)');
     }
 
     if (foundItem.approvalStatus === 'approved') {
       return errorResponse(res, 400, 'Food item is already approved');
     }
 
-    // Update the item's approval status - Use direct document update for reliability
-    console.log(`[APPROVE] ==========================================`);
-    console.log(`[APPROVE] Approving item ${id} in menu ${foundMenu._id}`);
-    console.log(`[APPROVE] Found in section: ${foundSection?.name} (id: ${foundSection?.id})`);
-    console.log(`[APPROVE] Found in subsection: ${foundSubsection?.name || 'none'} (id: ${foundSubsection?.id || 'none'})`);
-    console.log(`[APPROVE] Item name: ${foundItem.name}`);
-    console.log(`[APPROVE] Current status: ${foundItem.approvalStatus}`);
-
-    // Get the actual Mongoose document (not lean) and update directly
-    console.log(`[APPROVE] Fetching menu document for direct update...`);
-    const menu = await Menu.findById(foundMenu._id);
-    if (!menu) {
-      console.error(`[APPROVE] ❌ Menu not found: ${foundMenu._id}`);
-      return errorResponse(res, 404, 'Menu not found');
-    }
+    const menu = menuDoc; // Use the document we already found
+    console.log(`[APPROVE] Menu document found: ${menu._id}, sections count: ${menu.sections?.length || 0}, addons count: ${menu.addons?.length || 0}`);
 
     console.log(`[APPROVE] Menu document found, sections count: ${menu.sections?.length || 0}, addons count: ${menu.addons?.length || 0}`);
 
@@ -359,7 +373,7 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
     
     // Force a fresh query to verify the save
     console.log(`[APPROVE] Verifying save by querying database...`);
-    const savedMenu = await Menu.findById(foundMenu._id).lean();
+    const savedMenu = await Menu.findById(menu._id).lean();
     const savedItem = savedMenu.sections
       .flatMap(s => [
         ...(s.items || []),
@@ -386,7 +400,7 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
     logger.info(`Food item approved: ${id}`, {
       approvedBy: adminId,
       itemName: foundItem.name,
-      restaurantId: foundMenu.restaurant
+      restaurantId: menu.restaurant
     });
 
     return successResponse(res, 200, 'Food item approved successfully', {
@@ -395,7 +409,7 @@ export const approveFoodItem = asyncHandler(async (req, res) => {
       approvalStatus: savedItem.approvalStatus,
       approvedAt: savedItem.approvedAt,
       approvedBy: savedItem.approvedBy,
-      restaurantId: foundMenu.restaurant,
+      restaurantId: menu.restaurant,
       message: 'Food item has been approved and is now visible to users (if toggle is ON)'
     });
   } catch (error) {
@@ -418,41 +432,41 @@ export const rejectFoodItem = asyncHandler(async (req, res) => {
       return errorResponse(res, 400, 'Rejection reason is required');
     }
 
-    const menus = await Menu.find({ isActive: true }).lean();
+    // Search for the menu containing the item/addon directly in DB
+    const menuDoc = await Menu.findOne({
+      $or: [
+        { "addons.id": id },
+        { "sections.items.id": id },
+        { "sections.subsections.items.id": id }
+      ]
+    });
+
+    if (!menuDoc) {
+      return errorResponse(res, 404, 'Food item or add-on not found in any menu');
+    }
+
     let foundItem = null;
-    let foundMenu = null;
     let foundSection = null;
     let foundSubsection = null;
-    let isAddon = false; // Flag to track if this is an addon
+    let isAddon = false;
 
-    // Search for the item/addon across all menus
-    for (const menu of menus) {
-      // Check add-ons first
-      const addonIndex = (menu.addons || []).findIndex(addon => addon.id === id);
-      if (addonIndex !== -1) {
-        foundItem = menu.addons[addonIndex];
-        foundMenu = menu;
-        isAddon = true;
-        break;
-      }
-
-      // Check items in sections
-      for (const section of menu.sections || []) {
-        // Check items in section
-        const itemIndex = section.items.findIndex(item => item.id === id);
-        if (itemIndex !== -1) {
-          foundItem = section.items[itemIndex];
-          foundMenu = menu;
+    // Find location in document
+    const addon = (menuDoc.addons || []).find(a => String(a.id) === String(id));
+    if (addon) {
+      foundItem = addon;
+      isAddon = true;
+    } else {
+      for (const section of menuDoc.sections || []) {
+        const item = section.items.find(i => String(i.id) === String(id));
+        if (item) {
+          foundItem = item;
           foundSection = section;
           break;
         }
-
-        // Check items in subsections
         for (const subsection of section.subsections || []) {
-          const itemIndex = subsection.items.findIndex(item => item.id === id);
-          if (itemIndex !== -1) {
-            foundItem = subsection.items[itemIndex];
-            foundMenu = menu;
+          const subItem = subsection.items.find(i => String(i.id) === String(id));
+          if (subItem) {
+            foundItem = subItem;
             foundSection = section;
             foundSubsection = subsection;
             break;
@@ -460,29 +474,18 @@ export const rejectFoodItem = asyncHandler(async (req, res) => {
         }
         if (foundItem) break;
       }
-      if (foundItem) break;
     }
 
     if (!foundItem) {
-      return errorResponse(res, 404, 'Food item or add-on not found');
+      return errorResponse(res, 404, 'Food item or add-on not found (ID mismatch)');
     }
 
     if (foundItem.approvalStatus === 'rejected') {
       return errorResponse(res, 400, 'Food item is already rejected');
     }
 
-    // Update the item's approval status - Use direct document update for reliability
-    console.log(`[REJECT] ==========================================`);
-    console.log(`[REJECT] Rejecting item ${id} in menu ${foundMenu._id}`);
-    console.log(`[REJECT] Found in section: ${foundSection?.name} (id: ${foundSection?.id})`);
-    console.log(`[REJECT] Found in subsection: ${foundSubsection?.name || 'none'} (id: ${foundSubsection?.id || 'none'})`);
-    console.log(`[REJECT] Item name: ${foundItem.name}`);
-    console.log(`[REJECT] Current status: ${foundItem.approvalStatus}`);
-    console.log(`[REJECT] Rejection reason: ${reason}`);
-
-    // Get the actual Mongoose document (not lean) and update directly
-    console.log(`[REJECT] Fetching menu document for direct update...`);
-    const menu = await Menu.findById(foundMenu._id);
+    const menu = menuDoc;
+    console.log(`[REJECT] Menu document found: ${menu._id}, sections count: ${menu.sections?.length || 0}, addons count: ${menu.addons?.length || 0}`);
     if (!menu) {
       console.error(`[REJECT] ❌ Menu not found: ${foundMenu._id}`);
       return errorResponse(res, 404, 'Menu not found');
@@ -645,7 +648,7 @@ export const rejectFoodItem = asyncHandler(async (req, res) => {
     
     // Force a fresh query to verify the save
     console.log(`[REJECT] Verifying save by querying database...`);
-    const savedMenu = await Menu.findById(foundMenu._id).lean();
+    const savedMenu = await Menu.findById(menu._id).lean();
     const savedItem = savedMenu.sections
       .flatMap(s => [
         ...(s.items || []),
@@ -673,7 +676,7 @@ export const rejectFoodItem = asyncHandler(async (req, res) => {
       rejectedBy: adminId,
       itemName: foundItem.name,
       reason: reason.trim(),
-      restaurantId: foundMenu.restaurant
+      restaurantId: menu.restaurant
     });
 
     return successResponse(res, 200, 'Food item rejected successfully', {
@@ -682,7 +685,7 @@ export const rejectFoodItem = asyncHandler(async (req, res) => {
       approvalStatus: savedItem.approvalStatus,
       rejectionReason: savedItem.rejectionReason,
       rejectedAt: savedItem.rejectedAt,
-      restaurantId: foundMenu.restaurant,
+      restaurantId: menu.restaurant,
       message: 'Food item has been rejected and will not be visible to users'
     });
   } catch (error) {

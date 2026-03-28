@@ -1622,6 +1622,16 @@ export const adminAPI = {
     return apiClient.patch(`/admin/restaurants/${restaurantId}/menu/item/${itemId}/toggle`);
   },
 
+  // Addons Management
+  getAllAddons: (params = {}) => {
+    return apiClient.get('/admin/addons', { params });
+  },
+
+  // Foods Management
+  getAllFoods: (params = {}) => {
+    return apiClient.get('/admin/foods', { params });
+  },
+
   // Feedback Experience Management
   createFeedbackExperience: (data) => {
     return apiClient.post(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE, data);
