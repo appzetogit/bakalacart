@@ -121,6 +121,8 @@ export default function RestaurantsList() {
               ? restaurant.cuisines[0]
               : (restaurant.cuisine || "N/A"),
             status: restaurant.isActive !== false, // Default to true if not set
+            isRestaurantOpen: restaurant.isRestaurantOpen,
+            isAcceptingOrders: restaurant.isAcceptingOrders,
             rating: restaurant.ratings?.average || restaurant.rating || 0,
             logo: restaurant.profileImage?.url || restaurant.logo || "https://via.placeholder.com/40",
             // Preserve original restaurant data for details modal
