@@ -272,17 +272,45 @@ const orderSchema = new mongoose.Schema({
       sparse: true
     }
   },
+  // Administrative tracking (Top Level)
+  acceptedByAdmin: { type: Boolean, default: false },
+  acceptedByAdminAt: { type: Date },
+  acceptedByAdminId: { type: String },
+
+  reassignedByAdmin: { type: Boolean, default: false },
+  reassignedByAdminAt: { type: Date },
+  reassignedByAdminId: { type: String },
+
   assignmentInfo: {
     restaurantId: String,
     distance: Number, // Distance in km
     assignedBy: {
       type: String,
-      enum: ['zone_match', 'nearest_distance', 'manual', 'nearest_available', 'delivery_accept']
+      enum: ['zone_match', 'nearest_distance', 'manual', 'nearest_available', 'delivery_accept', 'auto_on_accept']
     },
     zoneId: String,
     zoneName: String,
     deliveryPartnerId: String,
-    assignedAt: Date
+    assignedAt: Date,
+
+    // Track delivery partners who were notified about this order
+    priorityDeliveryPartnerIds: [String],
+
+    // Admin action tracking (Inside assignmentInfo)
+    acceptedByAdmin: { type: Boolean, default: false },
+    acceptedByAdminAt: { type: Date },
+    acceptedByAdminId: { type: String },
+
+    rejectedByAdmin: { type: String },
+    rejectedByAdminAt: { type: Date },
+
+    pickedUpByAdmin: { type: Boolean, default: false },
+    pickedUpByAdminAt: { type: Date },
+    pickedUpByAdminId: { type: String },
+
+    deliveredByAdmin: { type: Boolean, default: false },
+    deliveredByAdminAt: { type: Date },
+    deliveredByAdminId: { type: String }
   },
   // Track delivery partners who denied/rejected this order
   deniedDeliveryPartners: [{
