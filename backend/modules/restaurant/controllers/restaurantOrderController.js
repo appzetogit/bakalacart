@@ -371,8 +371,68 @@ export const acceptOrder = asyncHandler(async (req, res) => {
       }
     }
 
-    // Note: Delivery boy assignment is now handled by admin through Order Assign page
-    // No automatic delivery boy notification/assignment when restaurant accepts order
+    // --- NEW: Notify Delivery Partners ---
+    try {
+      // Populate order for delivery notification
+      const populatedOrderForDelivery = await Order.findById(order._id)
+        .populate('userId', 'name phone')
+        .populate('restaurantId', 'name location address phone ownerPhone')
+        .lean();
+
+      if (populatedOrderForDelivery && populatedOrderForDelivery.restaurantId) {
+        const restaurantLoc = populatedOrderForDelivery.restaurantId.location;
+        if (restaurantLoc && restaurantLoc.coordinates && restaurantLoc.coordinates.length >= 2) {
+          const [restaurantLng, restaurantLat] = restaurantLoc.coordinates;
+          const mongoId = restaurant._id?.toString();
+
+          // If already assigned to a delivery partner, notify them specifically
+          if (populatedOrderForDelivery.deliveryPartnerId) {
+            const { notifyDeliveryBoyNewOrder } = await import('../../order/services/deliveryNotificationService.js');
+            const deliveryPartnerId = populatedOrderForDelivery.deliveryPartnerId._id || populatedOrderForDelivery.deliveryPartnerId;
+            await notifyDeliveryBoyNewOrder(populatedOrderForDelivery, deliveryPartnerId);
+            console.log(`✅ Order accepted notification sent to assigned delivery partner: ${deliveryPartnerId}`);
+          } else {
+            // Otherwise find and notify all nearby available delivery partners
+            const { findNearestDeliveryBoys } = await import('../../order/services/deliveryAssignmentService.js');
+            const { notifyMultipleDeliveryBoys } = await import('../../order/services/deliveryNotificationService.js');
+
+            console.log(`🔍 Searching for delivery partners to notify for order ${order.orderId}...`);
+            const nearbyBoys = await findNearestDeliveryBoys(
+              restaurantLat,
+              restaurantLng,
+              mongoId,
+              20, // 20km radius
+              10  // Top 10 nearest
+            );
+
+            if (nearbyBoys && nearbyBoys.length > 0) {
+              const deliveryPartnerIds = nearbyBoys.map(db => db.deliveryPartnerId);
+
+              // Store notified partners in assignment info for tracking
+              await Order.findByIdAndUpdate(order._id, {
+                $set: {
+                  'assignmentInfo.priorityDeliveryPartnerIds': deliveryPartnerIds,
+                  'assignmentInfo.assignedBy': 'auto_on_accept',
+                  'assignmentInfo.assignedAt': new Date()
+                }
+              });
+
+              await notifyMultipleDeliveryBoys(populatedOrderForDelivery, deliveryPartnerIds, 'priority');
+              console.log(`✅ Order accepted notification sent to ${deliveryPartnerIds.length} nearby delivery partners`);
+            } else {
+              console.log(`⚠️ No nearby delivery partners found to notify for order ${order.orderId}`);
+            }
+          }
+        }
+      }
+    } catch (deliveryNotifError) {
+      console.error('❌ Error sending delivery partner notification on accept:', deliveryNotifError);
+      console.error(deliveryNotifError.stack);
+      // We don't fail the main request even if notification fails
+    }
+
+    // Note: Delivery boy assignment (binding) is still handled by admin through Order Assign page
+    // We are only sending notifications/alerts to available delivery boys here
 
     return successResponse(res, 200, 'Order accepted successfully', {
       order
