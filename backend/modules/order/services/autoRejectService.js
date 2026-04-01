@@ -143,7 +143,8 @@ export async function processAutoRejectOrders() {
               cancelledOrder.cancellationReason = '';
               cancelledOrder.cancelledBy = undefined;
               cancelledOrder.cancelledAt = undefined;
-              cancelledOrder.note = (cancelledOrder.note || '') + ' [System: Recovery verified payment]';
+              // Re-confirmed order doesn't need system text in customer-facing note
+              // cancelledOrder.note = (cancelledOrder.note || '') + ' [System: Recovery verified payment]';
               if (!cancelledOrder.tracking) cancelledOrder.tracking = {};
               cancelledOrder.tracking.confirmed = { status: true, timestamp: new Date() };
 

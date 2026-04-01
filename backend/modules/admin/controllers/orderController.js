@@ -8,6 +8,20 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 
 /**
+ * Filter out system messages from the customer notes
+ * @param {string} note 
+ * @returns {string|null}
+ */
+const cleanCustomerNote = (note) => {
+  if (!note) return null;
+  // Specific system messages to remove
+  let cleaned = note.replace(/\[System:\s*Recovery\s*verified\s*payment\]/gi, '').trim();
+  // If only spaces or empty quotes remain, return null
+  if (!cleaned || cleaned === '""' || cleaned === '"' || cleaned === "''" || cleaned === "'") return null;
+  return cleaned;
+};
+
+/**
  * Get all orders for admin
  * GET /api/admin/orders
  * Query params: status, page, limit, search, fromDate, toDate, restaurant, paymentStatus
@@ -489,7 +503,7 @@ export const getOrders = asyncHandler(async (req, res) => {
         deliveryPartnerPhone: order.deliveryPartnerId?.phone || null,
         estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
         deliveredAt: order.deliveredAt,
-        note: order.note || null,
+        note: cleanCustomerNote(order.note),
         cancellationReason: order.cancellationReason || null,
         cancelledAt: order.cancelledAt || null,
         cancelledBy: order.cancelledBy || null,
@@ -552,6 +566,10 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
     if (!order) {
       return errorResponse(res, 404, 'Order not found');
+    }
+
+    if (order && order.note) {
+      order.note = cleanCustomerNote(order.note);
     }
 
     return successResponse(res, 200, 'Order retrieved successfully', {
@@ -764,7 +782,7 @@ export const getSearchingDeliverymanOrders = asyncHandler(async (req, res) => {
         updatedAt: order.updatedAt,
         status: order.status,
         pricing: order.pricing || {},
-        note: order.note || null
+        note: cleanCustomerNote(order.note)
       };
     });
 
@@ -997,7 +1015,7 @@ export const getOngoingOrders = asyncHandler(async (req, res) => {
         pricing: order.pricing || {},
         deliveryPartnerName: order.deliveryPartnerId?.name || null,
         deliveryPartnerPhone: order.deliveryPartnerId?.phone || null,
-        note: order.note || null
+        note: cleanCustomerNote(order.note)
       };
     });
 
@@ -1255,7 +1273,7 @@ export const getTransactionReport = asyncHandler(async (req, res) => {
         deliveryCharge: deliveryCharge,
         orderAmount: orderAmount,
         paymentMethod: paymentMethod,
-        note: order.note || null
+        note: cleanCustomerNote(order.note)
       };
     });
 
@@ -2235,7 +2253,7 @@ export const getOrdersForAssignment = asyncHandler(async (req, res) => {
         items: order.items || [],
         address: order.address || {},
         deliveryAddressDetails: order.deliveryAddressDetails || '',
-        note: order.note || '',
+        note: cleanCustomerNote(order.note),
         paymentMethod: order.payment?.method || 'unknown',
         deliveryPartnerName: order.deliveryPartnerId?.name || null,
         deliveryPartnerId: order.deliveryPartnerId?._id?.toString() || order.deliveryPartnerId?.toString() || null,
