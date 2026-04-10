@@ -1,4 +1,4 @@
-import { useSearchParams, Link, useNavigate } from "react-router-dom"
+import { useSearchParams, Link, useNavigate, useNavigationType } from "react-router-dom"
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react"
 import { cn, getResilientImageUrl, normalizeImages } from "@/lib/utils"
 import { createPortal } from "react-dom"
@@ -585,6 +585,41 @@ export default function Home() {
     }
   }, [heroBannerImages.length])
 
+  const navigationType = useNavigationType()
+
+  // Manual scroll restoration logic
+  useEffect(() => {
+    const handleScroll = () => {
+      // Save position in sessionStorage to persist across navigations
+      if (window.scrollY > 100) { // Only save if we've scrolled a bit
+        sessionStorage.setItem('home_page_scroll', window.scrollY.toString())
+      }
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('home_page_scroll')
+      if (savedScroll) {
+        // Wait for components to mount and data to load from cache
+        setTimeout(() => {
+          window.scrollTo({
+            top: parseInt(savedScroll, 10),
+            behavior: 'instant'
+          })
+          // Also try to sync with Lenis if it's initialized
+          import('@/lib/utils/lazyLenis').then(({ getLenis }) => {
+            const lenis = getLenis()
+            if (lenis) {
+              lenis.scrollTo(parseInt(savedScroll, 10), { immediate: true })
+            }
+          })
+        }, 350)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [navigationType])
+
   // Lenis smooth scrolling initialization - lazy loaded
   useEffect(() => {
     let lenisInstance = null
@@ -599,6 +634,12 @@ export default function Home() {
         smoothWheel: true,
         smoothTouch: true,
       })
+
+      // If we're restoring scroll, tell Lenis to go there immediately
+      const savedScroll = sessionStorage.getItem('home_page_scroll')
+      if (navigationType === 'POP' && savedScroll && lenisInstance) {
+        lenisInstance.scrollTo(parseInt(savedScroll, 10), { immediate: true })
+      }
     }
 
     // Defer Lenis initialization to avoid blocking initial render

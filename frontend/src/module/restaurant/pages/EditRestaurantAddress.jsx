@@ -138,16 +138,31 @@ export default function EditRestaurantAddress() {
     setShowSelectOptionDialog(true)
   }
 
+  const [manualAddress, setManualAddress] = useState("")
+
   // Handle Proceed to update
   const handleProceedUpdate = async () => {
     try {
-      // For now, we'll update the location in the database
-      // In a real scenario, you might want to handle FSSAI update flow separately
       if (selectedOption === "update_address") {
-        // For major address update, you might want to navigate to a form
-        // For now, we'll just show a message
-        alert("For major address updates, FSSAI verification may be required. Please contact support.")
-        setShowSelectOptionDialog(false)
+        if (!manualAddress.trim()) {
+          alert("Please enter the new address.")
+          return
+        }
+
+        const updatedLocation = {
+          ...location,
+          formattedAddress: manualAddress.trim()
+        }
+
+        const response = await restaurantAPI.updateProfile({ location: updatedLocation })
+        
+        if (response?.data?.data?.restaurant) {
+          setLocation(updatedLocation)
+          window.dispatchEvent(new Event("addressUpdated"))
+          setShowSelectOptionDialog(false)
+          setManualAddress("")
+          navigate(-1)
+        }
         return
       } else {
         // Minor correction - update location coordinates
@@ -302,30 +317,42 @@ export default function EditRestaurantAddress() {
       >
         <div className=" space-y-0">
           {/* Option 1: Update outlet address */}
-          <button
-            onClick={() => setSelectedOption("update_address")}
-            className="w-full flex items-start justify-between py-4 border-b border-dashed border-gray-300"
-          >
-            <div className="flex-1 text-left">
-              <p className="text-base font-semibold text-gray-900 mb-1">
-                Update outlet address (FSSAI required)
-              </p>
-              <p className="text-sm text-gray-500">{address}</p>
-            </div>
-            <div className="ml-4 shrink-0">
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  selectedOption === "update_address"
-                    ? "border-black bg-black"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedOption === "update_address" && (
-                  <div className="w-2 h-2 rounded-full bg-white"></div>
-                )}
+          <div className="border-b border-dashed border-gray-300 py-4">
+            <button
+              onClick={() => setSelectedOption("update_address")}
+              className="w-full flex items-start justify-between"
+            >
+              <div className="flex-1 text-left">
+                <p className="text-base font-semibold text-gray-900 mb-1">
+                  Update outlet address (FSSAI required)
+                </p>
+                <p className="text-sm text-gray-500">{address}</p>
               </div>
-            </div>
-          </button>
+              <div className="ml-4 shrink-0">
+                <div
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedOption === "update_address"
+                      ? "border-black bg-black"
+                      : "border-gray-300"
+                  }`}
+                >
+                  {selectedOption === "update_address" && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+              </div>
+            </button>
+            {selectedOption === "update_address" && (
+              <div className="mt-3">
+                <textarea
+                  value={manualAddress}
+                  onChange={(e) => setManualAddress(e.target.value)}
+                  placeholder="Type new restaurant address manually..."
+                  className="w-full h-24 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Option 2: Minor correction */}
           <button
