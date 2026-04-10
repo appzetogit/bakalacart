@@ -17,7 +17,9 @@ import {
   ArrowLeft,
   Trash2,
   RefreshCw,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 // Removed foodManagement - now using backend API directly
@@ -1015,6 +1017,54 @@ export default function HubMenu() {
     setSelectedCategory(null)
   }
 
+  const handleMoveCategory = async (direction) => {
+    if (!selectedCategory) return
+
+    const currentIndex = menuData.findIndex(section => section.id === selectedCategory.id)
+    if (currentIndex === -1) return
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+
+    if (targetIndex < 0 || targetIndex >= menuData.length) {
+      toast.error(`Cannot move category further ${direction}`)
+      return
+    }
+
+    const newMenuData = [...menuData]
+    const [movedCategory] = newMenuData.splice(currentIndex, 1)
+    newMenuData.splice(targetIndex, 0, movedCategory)
+
+    // Update local state - the auto-save useEffect will handle backend update
+    setMenuData(newMenuData)
+    setIsCategoryOptionsOpen(false)
+    toast.success(`Category moved ${direction}`)
+  }
+
+  const handleMoveItem = async (group, item, direction) => {
+    const currentIndex = group.items.findIndex(i => i.id === item.id)
+    if (currentIndex === -1) return
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= group.items.length) {
+      toast.error(`Cannot move item further ${direction}`)
+      return
+    }
+
+    const updatedSections = menuData.map(section => {
+      if (section.id === group.id) {
+        const newItems = [...section.items]
+        const [movedItem] = newItems.splice(currentIndex, 1)
+        newItems.splice(targetIndex, 0, movedItem)
+        return { ...section, items: newItems }
+      }
+      return section
+    })
+
+    setMenuData(updatedSections)
+    toast.success(`Item moved ${direction}`)
+    // Auto-save useEffect will handle the API call
+  }
+
   // Scroll to category
   const scrollToCategory = (categoryId) => {
     const element = document.getElementById(`group-${categoryId}`)
@@ -1416,12 +1466,30 @@ export default function HubMenu() {
                             </div>
 
                             {/* Action buttons - below image */}
-                            <div className="flex items-center justify-center gap-3 mt-4">
+                            <div className="flex items-center justify-center gap-6 mt-4 border-t border-gray-50 pt-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleMoveItem(group, item, 'up')}
+                                  disabled={group.items.indexOf(item) === 0}
+                                  className="p-1.5 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-4 h-4 text-gray-600" />
+                                </button>
+                                <button
+                                  onClick={() => handleMoveItem(group, item, 'down')}
+                                  disabled={group.items.indexOf(item) === group.items.length - 1}
+                                  className="p-1.5 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-4 h-4 text-gray-600" />
+                                </button>
+                              </div>
                               <button
                                 onClick={() => navigate(`/restaurant/hub-menu/item/${item.id}`, { state: { item, groupId: group.id } })}
-                                className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-medium"
+                                className="flex items-center gap-1.5 bg-transparent text-gray-700 text-sm font-semibold hover:text-black transition-colors"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-4 h-4" />
                                 <span>Edit</span>
                               </button>
                             </div>
@@ -1642,7 +1710,7 @@ export default function HubMenu() {
                       <span className="text-sm font-medium text-gray-900">I will turn it on myself</span>
                     </label>
                     <p className="text-xs text-gray-500 ml-8">
-                      This item will not be visible to customers on the Zomato app till you switch it on.
+                      This item will not be visible to customers on the Bakalaa app till you switch it on.
                     </p>
                   </div>
                 </div>
@@ -1789,7 +1857,25 @@ export default function HubMenu() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      onClick={() => handleMoveCategory('up')}
+                      disabled={menuData.findIndex(s => s.id === selectedCategory.id) === 0}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                      <span>Move Up</span>
+                    </button>
+                    <button
+                      onClick={() => handleMoveCategory('down')}
+                      disabled={menuData.findIndex(s => s.id === selectedCategory.id) === menuData.length - 1}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                      <span>Move Down</span>
+                    </button>
+                  </div>
                   <button
                     onClick={handleEditCategory}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors"

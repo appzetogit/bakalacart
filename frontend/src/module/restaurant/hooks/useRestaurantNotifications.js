@@ -6,7 +6,7 @@ import alertSound from '@/assets/audio/restaurant aacept ringtone.mp3';
 import { addRestaurantNotification } from '../utils/notifications';
 
 const isDev = import.meta.env.DEV;
-const devLog = (...a) => { if (isDev) devLog(...a); };
+const devLog = (...a) => { if (isDev) console.log(...a); };
 
 /**
  * Hook for restaurant to receive real-time order notifications with sound

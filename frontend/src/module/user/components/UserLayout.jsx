@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "react-router-dom"
+import { Outlet, useLocation, useNavigationType } from "react-router-dom"
 import { useEffect, useState, createContext, useContext, useRef, useCallback, useMemo } from "react"
 import { ProfileProvider } from "../context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
@@ -101,7 +101,6 @@ function LocationSelectorProvider({ children }) {
     </LocationSelectorContext.Provider>
   )
 }
-
 export default function UserLayout() {
   const location = useLocation()
   const { isMaintenanceMode, loading } = useMaintenanceMode("user")
@@ -110,12 +109,15 @@ export default function UserLayout() {
   // Track previous pathname to prevent unnecessary scrolls
   const prevPathnameRef = useRef(location.pathname)
   const scrollTimeoutRef = useRef(null)
+  const navigationType = useNavigationType()
 
   useEffect(() => {
     // Only scroll if pathname actually changed (not just search params or hash)
     const pathnameChanged = location.pathname !== prevPathnameRef.current
     
-    if (pathnameChanged) {
+    // Only scroll to top on PUSH navigation (forward)
+    // Keep scroll position on POP (back button) to allow browser/Lenis scroll restoration
+    if (pathnameChanged && navigationType === 'PUSH') {
       prevPathnameRef.current = location.pathname
       
       // Clear any existing scroll timeout
@@ -130,6 +132,9 @@ export default function UserLayout() {
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
         }
       }, 100)
+    } else if (pathnameChanged) {
+      // Still update the ref even if we don't scroll
+      prevPathnameRef.current = location.pathname
     }
 
     return () => {
@@ -137,7 +142,7 @@ export default function UserLayout() {
         clearTimeout(scrollTimeoutRef.current)
       }
     }
-  }, [location.pathname]) // Only depend on pathname, not search or hash
+  }, [location.pathname, navigationType]) // Depend on both pathname and type
 
   // Register FCM Token on mount if user is logged in
   useEffect(() => {

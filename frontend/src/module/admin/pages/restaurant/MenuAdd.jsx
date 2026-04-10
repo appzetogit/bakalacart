@@ -13,7 +13,9 @@ import {
   Save,
   Edit2,
   Trash2,
-  Minus
+  Minus,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react"
 import { adminAPI, restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -602,6 +604,78 @@ export default function MenuAdd() {
     }
   };
 
+  const handleMoveSection = async (sectionId, direction) => {
+    if (!menu || !menu.sections || !selectedRestaurant?._id) return;
+
+    const currentIndex = menu.sections.findIndex(s => s.id === sectionId);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= menu.sections.length) return;
+
+    const updatedSections = [...menu.sections];
+    const [movedSection] = updatedSections.splice(currentIndex, 1);
+    updatedSections.splice(targetIndex, 0, movedSection);
+
+    try {
+      setLoading(true);
+      const updateResponse = await adminAPI.updateRestaurantMenu(selectedRestaurant._id, {
+        sections: updatedSections
+      });
+
+      if (updateResponse.data?.success) {
+        toast.success("Category order updated");
+        fetchMenu(); // Refresh menu
+      } else {
+        toast.error("Failed to update category order");
+      }
+    } catch (error) {
+      console.error("Error moving category:", error);
+      toast.error("Failed to update category order");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveItem = async (sectionId, itemId, direction) => {
+    if (!menu || !menu.sections || !selectedRestaurant?._id) return;
+
+    const updatedSections = menu.sections.map(sec => {
+      if (sec.id === sectionId) {
+        const currentIndex = sec.items.findIndex(i => i.id === itemId);
+        if (currentIndex === -1) return sec;
+
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= sec.items.length) return sec;
+
+        const newItems = [...sec.items];
+        const [movedItem] = newItems.splice(currentIndex, 1);
+        newItems.splice(targetIndex, 0, movedItem);
+        return { ...sec, items: newItems };
+      }
+      return sec;
+    });
+
+    try {
+      setLoading(true);
+      const updateResponse = await adminAPI.updateRestaurantMenu(selectedRestaurant._id, {
+        sections: updatedSections
+      });
+
+      if (updateResponse.data?.success) {
+        toast.success("Dish order updated");
+        fetchMenu(); // Refresh menu
+      } else {
+        toast.error("Failed to update dish order");
+      }
+    } catch (error) {
+      console.error("Error moving dish:", error);
+      toast.error("Failed to update dish order");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredRestaurants = restaurants.filter(restaurant =>
     restaurant.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
     restaurant.ownerName?.toLowerCase().includes(searchQuery.trim().toLowerCase())
@@ -731,6 +805,26 @@ export default function MenuAdd() {
                           </button>
                         </div>
 
+                        {/* Order Controls */}
+                        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleMoveSection(section.id, 'up')}
+                            disabled={menu.sections.indexOf(section) === 0}
+                            className="p-1 hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Move Up"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5 text-gray-600" />
+                          </button>
+                          <button
+                            onClick={() => handleMoveSection(section.id, 'down')}
+                            disabled={menu.sections.indexOf(section) === menu.sections.length - 1}
+                            className="p-1 hover:bg-white rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Move Down"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5 text-gray-600" />
+                          </button>
+                        </div>
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -798,6 +892,26 @@ export default function MenuAdd() {
                                     <span className={`text-[8px] font-bold uppercase tracking-tight ${item.isAvailable !== false ? "text-blue-600" : "text-gray-400"}`}>
                                       {item.isAvailable !== false ? "On" : "Off"}
                                     </span>
+                                  </div>
+                                  
+                                  {/* Item Order Controls */}
+                                  <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-0.5">
+                                    <button
+                                      onClick={() => handleMoveItem(section.id, item.id, 'up')}
+                                      disabled={section.items.indexOf(item) === 0}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                      title="Move Up"
+                                    >
+                                      <ArrowUp className="w-3 h-3 text-gray-600" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleMoveItem(section.id, item.id, 'down')}
+                                      disabled={section.items.indexOf(item) === section.items.length - 1}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                      title="Move Down"
+                                    >
+                                      <ArrowDown className="w-3 h-3 text-gray-600" />
+                                    </button>
                                   </div>
 
                                   <div className="text-sm font-semibold text-gray-900">

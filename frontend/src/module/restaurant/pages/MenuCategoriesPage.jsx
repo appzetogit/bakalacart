@@ -9,7 +9,9 @@ import {
   Trash2, 
   GripVertical,
   Loader2,
-  Check
+  Check,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react"
 import { restaurantAPI } from "@/lib/api"
 import { toast } from "sonner"
@@ -114,6 +116,35 @@ export default function MenuCategoriesPage() {
     }
   }
 
+  const handleMoveCategory = async (index, direction) => {
+    const newCategories = [...categories]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    
+    if (targetIndex < 0 || targetIndex >= newCategories.length) return
+    
+    // Swap items
+    const [movedItem] = newCategories.splice(index, 1)
+    newCategories.splice(targetIndex, 0, movedItem)
+    
+    // Update state immediately
+    setCategories(newCategories)
+    
+    try {
+      // Backend expects array of { id, order }
+      const reorderData = newCategories.map((cat, idx) => ({
+        id: cat._id || cat.id,
+        order: idx + 1
+      }))
+      
+      await restaurantAPI.reorderCategories(reorderData)
+      toast.success('Category order updated')
+    } catch (error) {
+      console.error('Error reordering categories:', error)
+      toast.error('Failed to update order')
+      fetchCategories() // Revert
+    }
+  }
+
   const handleToggleActive = async (category) => {
     try {
       await restaurantAPI.updateCategory(category._id || category.id, {
@@ -173,7 +204,22 @@ export default function MenuCategoriesPage() {
                 className="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3 flex-1">
-                  <GripVertical className="w-5 h-5 text-gray-400" />
+                  <div className="flex flex-col gap-1 items-center">
+                    <button
+                      onClick={() => handleMoveCategory(categories.indexOf(category), 'up')}
+                      disabled={categories.indexOf(category) === 0}
+                      className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={() => handleMoveCategory(categories.indexOf(category), 'down')}
+                      disabled={categories.indexOf(category) === categories.length - 1}
+                      className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5 text-gray-500" />
+                    </button>
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-900">{category.name}</h3>
