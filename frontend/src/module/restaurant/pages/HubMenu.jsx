@@ -23,13 +23,14 @@ import {
 } from "lucide-react"
 import BottomNavOrders from "../components/BottomNavOrders"
 // Removed foodManagement - now using backend API directly
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useNavigationType } from "react-router-dom"
 import { restaurantAPI, uploadAPI } from "@/lib/api"
 import { toast } from "sonner"
 import { openCameraWithFallback, openGalleryWithFallback } from "@/lib/utils/flutterCamera"
 
 export default function HubMenu() {
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
   const [loadingMenu, setLoadingMenu] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -84,20 +85,51 @@ export default function HubMenu() {
     ? restaurantData.cuisines.join(", ")
     : ""
 
-  // Handle scroll to change title
+  // Manual scroll restoration logic
+  const isRestoringRef = useRef(false)
+  
+  // Handle scroll to change title and save position
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY || document.documentElement.scrollTop
       // Change title when scrolled more than 80px for smoother transition
       setIsScrolled(scrollPosition > 80)
+
+      // Save position in sessionStorage to persist across navigations
+      if (!isRestoringRef.current) {
+        sessionStorage.setItem('hub_menu_scroll', scrollPosition.toString())
+      }
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('hub_menu_scroll')
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        // Multiple attempts to ensure it sticks during dynamic content loading
+        window.scrollTo({ top: targetScroll, behavior: 'instant' });
+        
+        [50, 150, 300, 600].forEach(delay => {
+          setTimeout(() => {
+            window.scrollTo({ top: targetScroll, behavior: 'instant' })
+            if (delay === 600) isRestoringRef.current = false
+          }, delay)
+        })
+      }
+    } else {
+      isRestoringRef.current = false
     }
 
     // Initial check
     handleScroll()
 
     window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      isRestoringRef.current = false
+    }
+  }, [navigationType])
 
   // Calculate filter counts from menu data
   const calculateFilterCounts = useMemo(() => {

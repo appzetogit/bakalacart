@@ -482,9 +482,9 @@ apiClient.interceptors.response.use(
           noTokenError._isAuthError = true;
           onRefreshFailed(expectedRole, noTokenError); // Clears manager.isRefreshing
           
-          // PERMANENT FIX: Restaurant, Delivery, and Admin modules should NOT auto-logout
+          // PERMANENT FIX: User, Restaurant, Delivery, and Admin modules should NOT auto-logout
           // They will handle token refresh through their own mechanisms
-          if (expectedRole === 'restaurant' || expectedRole === 'delivery' || expectedRole === 'admin') {
+          if (expectedRole === 'user' || expectedRole === 'restaurant' || expectedRole === 'delivery' || expectedRole === 'admin') {
             if (import.meta.env.DEV) {
               console.log(`[Axios Interceptor] Skipping auto-logout for module '${expectedRole}' (permanent fix)`);
             }
@@ -720,9 +720,9 @@ apiClient.interceptors.response.use(
           throw refreshError;
         }
 
-        // PERMANENT FIX: Restaurant, Delivery, and Admin should NOT auto-logout for other errors
+        // PERMANENT FIX: User, Restaurant, Delivery, and Admin should NOT auto-logout for other errors
         // (network errors, signature mismatches, etc.) - but WILL logout if token missing from DB
-        if (expectedRole === 'restaurant' || expectedRole === 'delivery' || expectedRole === 'admin') {
+        if (expectedRole === 'user' || expectedRole === 'restaurant' || expectedRole === 'delivery' || expectedRole === 'admin') {
           if (import.meta.env.DEV) {
             console.log(`[Axios Interceptor] Refresh failed for ${expectedRole}, but NOT logging out (permanent fix)`, {
               error: refreshError.message,

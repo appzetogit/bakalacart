@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigationType } from "react-router-dom"
+import { useRef, useEffect } from "react"
 
 import { ArrowLeft, Clock, MapPin, Heart, Star } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
@@ -75,6 +76,45 @@ const restaurants = [
 
 export default function Restaurants() {
   const { addFavorite, removeFavorite, isFavorite } = useProfile()
+  const navigationType = useNavigationType()
+  const isRestoringRef = useRef(false)
+
+  // Manual scroll restoration logic
+  useEffect(() => {
+    const handleScroll = () => {
+      // Don't save if we are currently performing a restoration jump
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      sessionStorage.setItem('all_restaurants_scroll', currentScroll.toString())
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('all_restaurants_scroll')
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        // Immediate and delayed attempts for robust restoration
+        window.scrollTo({ top: targetScroll, behavior: 'instant' });
+        
+        [50, 150, 300, 600].forEach(delay => {
+          setTimeout(() => {
+            window.scrollTo({ top: targetScroll, behavior: 'instant' })
+            if (delay === 600) isRestoringRef.current = false
+          }, delay)
+        })
+      }
+    } else {
+      isRestoringRef.current = false
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      isRestoringRef.current = false
+    }
+  }, [navigationType])
 
   return (
     <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 dark:from-[#0a0a0a] via-white dark:via-[#0a0a0a] to-orange-50/20 dark:to-[#0a0a0a]">

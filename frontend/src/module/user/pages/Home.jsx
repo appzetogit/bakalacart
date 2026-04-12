@@ -588,36 +588,65 @@ export default function Home() {
   const navigationType = useNavigationType()
 
   // Manual scroll restoration logic
+  const isRestoringRef = useRef(false)
+  
   useEffect(() => {
     const handleScroll = () => {
-      // Save position in sessionStorage to persist across navigations
-      if (window.scrollY > 100) { // Only save if we've scrolled a bit
-        sessionStorage.setItem('home_page_scroll', window.scrollY.toString())
-      }
+      // Don't save if we are currently performing a restoration jump
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      // Always save position in sessionStorage to persist across navigations
+      // Only skip if it's 0 and we just mounted (handled by isRestoringRef)
+      sessionStorage.setItem('home_page_scroll', currentScroll.toString())
     }
 
     if (navigationType === 'POP') {
       const savedScroll = sessionStorage.getItem('home_page_scroll')
       if (savedScroll) {
-        // Wait for components to mount and data to load from cache
-        setTimeout(() => {
-          window.scrollTo({
-            top: parseInt(savedScroll, 10),
-            behavior: 'instant'
-          })
-          // Also try to sync with Lenis if it's initialized
-          import('@/lib/utils/lazyLenis').then(({ getLenis }) => {
-            const lenis = getLenis()
-            if (lenis) {
-              lenis.scrollTo(parseInt(savedScroll, 10), { immediate: true })
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        // Immediate scroll attempt - browser may have already restored some, but we enforce it
+        window.scrollTo({
+          top: targetScroll,
+          behavior: 'instant'
+        })
+        
+        // Sync with Lenis if it's already initialized
+        import('@/lib/utils/lazyLenis').then(({ getLenis }) => {
+          const lenis = getLenis()
+          if (lenis) {
+            lenis.scrollTo(targetScroll, { immediate: true })
+          }
+        })
+
+        // Multiple follow-up attempts to handle dynamic layout shifts and slow rendering
+        // 50ms, 150ms, 300ms, 600ms
+        [50, 150, 300, 600].forEach((delay) => {
+          setTimeout(() => {
+            window.scrollTo({
+              top: targetScroll,
+              behavior: 'instant'
+            })
+            
+            // On the last attempt, allow scroll saving again
+            if (delay === 600) {
+              isRestoringRef.current = false
             }
-          })
-        }, 350)
+          }, delay)
+        })
       }
+    } else {
+      // For PUSH/REPLACE, reset saving flag
+      isRestoringRef.current = false
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      isRestoringRef.current = false
+    }
   }, [navigationType])
 
   // Lenis smooth scrolling initialization - lazy loaded

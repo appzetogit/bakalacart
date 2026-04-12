@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
-import { useSearchParams, Link, useNavigate } from "react-router-dom"
+import { useSearchParams, Link, useNavigate, useNavigationType } from "react-router-dom"
 import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,8 @@ export default function SearchResults() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get("q") || ""
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
+  const isRestoringRef = useRef(false)
   const { location } = useLocation()
   const { zoneId, isOutOfService } = useZone(location)
   const [searchQuery, setSearchQuery] = useState(query)
@@ -113,6 +115,43 @@ export default function SearchResults() {
 
     fetchCategories()
   }, [])
+
+  // Manual scroll restoration logic
+  useEffect(() => {
+    const handleScroll = () => {
+      // Don't save if we are currently performing a restoration jump
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      sessionStorage.setItem('search_results_scroll', currentScroll.toString())
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('search_results_scroll')
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        // Immediate and delayed attempts for robust restoration
+        window.scrollTo({ top: targetScroll, behavior: 'instant' });
+        
+        [50, 150, 300, 600].forEach(delay => {
+          setTimeout(() => {
+            window.scrollTo({ top: targetScroll, behavior: 'instant' })
+            if (delay === 600) isRestoringRef.current = false
+          }, delay)
+        })
+      }
+    } else {
+      isRestoringRef.current = false
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      isRestoringRef.current = false
+    }
+  }, [navigationType])
 
   // Helper function to check if menu has dishes matching category keywords
   const checkCategoryInMenu = (menu, categoryId) => {
