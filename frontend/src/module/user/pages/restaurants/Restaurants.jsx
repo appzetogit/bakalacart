@@ -1,5 +1,7 @@
 import { Link, useNavigationType } from "react-router-dom"
 import { useRef, useEffect } from "react"
+import { Link, useNavigationType } from "react-router-dom"
+import { useRef, useEffect } from "react"
 
 import { ArrowLeft, Clock, MapPin, Heart, Star } from "lucide-react"
 import AnimatedPage from "../../components/AnimatedPage"
