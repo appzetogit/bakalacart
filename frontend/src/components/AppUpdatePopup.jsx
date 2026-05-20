@@ -126,13 +126,6 @@ export default function AppUpdatePopup({ appKey }) {
         <div className="mt-6 flex gap-3">
           <button
             type="button"
-            onClick={handleClose}
-            className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Later
-          </button>
-          <button
-            type="button"
             onClick={handleUpdate}
             className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
           >
