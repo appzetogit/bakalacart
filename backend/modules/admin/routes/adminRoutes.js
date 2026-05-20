@@ -40,6 +40,10 @@ import {
   updateBusinessSettings
 } from '../controllers/businessSettingsController.js';
 import {
+  getUpdatePageSettings,
+  updateUpdatePageSettings
+} from '../controllers/updatePageSettingsController.js';
+import {
   getCategories,
   getCategoryById,
   createCategory,
@@ -590,6 +594,10 @@ router.put('/business-settings', uploadMiddleware.fields([
   { name: 'favicon', maxCount: 1 }
 ]), updateBusinessSettings);
 
+// Update Page Settings Management
+router.get('/update-page', getUpdatePageSettings);
+router.put('/update-page', updateUpdatePageSettings);
+
 // Settlement Routes
 router.get('/settlements/order/:orderId', getOrderSettlementDetails);
 router.get('/settlements/restaurants', getRestaurantSettlements);
@@ -612,4 +620,3 @@ router.post('/withdrawal/:id/approve', approveWithdrawalRequest);
 router.post('/withdrawal/:id/reject', rejectWithdrawalRequest);
 
 export default router;
-

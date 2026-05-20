@@ -1,11 +1,59 @@
-import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useRef } from "react"
+import { useNavigate, useNavigationType } from "react-router-dom"
 import { motion } from "framer-motion"
 import Lenis from "lenis"
 import { ArrowLeft, Home, Heart, ShoppingBag, Menu, ChefHat } from "lucide-react"
 
 export default function CategoriesPage() {
   const navigate = useNavigate()
+
+  const navigationType = useNavigationType()
+  const isRestoringRef = useRef(false)
+  const mountTimeRef = useRef(Date.now())
+
+  useEffect(() => {
+    // Force browser to allow us to handle restoration manually
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const handleScroll = () => {
+      // Don't save if we are currently performing a restoration jump
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      
+      // Defensive check for mount-time resets
+      if (currentScroll === 0 && (Date.now() - mountTimeRef.current < 500)) return;
+
+      sessionStorage.setItem('usermain_categories_scroll', currentScroll.toString())
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('usermain_categories_scroll')
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        const restore = () => {
+          window.scrollTo({ top: targetScroll, behavior: 'instant' })
+        }
+        
+        restore();
+        [10, 30, 80, 150, 300, 500, 800, 1200, 2000, 3000].forEach(delay => {
+          setTimeout(() => {
+            restore()
+            if (delay === 3000) isRestoringRef.current = false
+          }, delay)
+        })
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [navigationType])
 
   useEffect(() => {
     // Initialize Lenis for smooth scrolling

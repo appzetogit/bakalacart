@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { useRestaurantNotifications } from "../hooks/useRestaurantNotifications"
 import RestaurantNavbar from "./RestaurantNavbar"
 import notificationSound from "@/assets/audio/restaurant aacept ringtone.mp3"
+import AppUpdatePopup from "@/components/AppUpdatePopup"
 
 /**
  * Global Restaurant Layout to handle notifications and sound across all pages
@@ -120,6 +121,7 @@ export default function RestaurantLayout() {
             <div className="pb-16 lg:pb-0">
                 <Outlet />
             </div>
+            <AppUpdatePopup appKey="restaurant" />
 
             {/* New Order Overlay Popup */}
             <AnimatePresence>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react"
-import { useParams, Link, useNavigate } from "react-router-dom"
+import { useParams, Link, useNavigate, useNavigationType } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Star, Clock, Search, SlidersHorizontal, ChevronDown, Bookmark, BadgePercent, MapPin, ArrowDownUp, Timer, IndianRupee, UtensilsCrossed, ShieldCheck, X, Loader2 } from "lucide-react"
@@ -45,6 +45,61 @@ export default function CategoryPage() {
   const filterSectionRefs = useRef({})
   const rightContentRef = useRef(null)
   const categoryScrollRef = useRef(null)
+  
+  // Scroll restoration logic
+  const navigationType = useNavigationType()
+  const isRestoringRef = useRef(false)
+  const mountTimeRef = useRef(Date.now())
+  const scrollKey = `category_page_scroll_${category || 'all'}`
+
+  useEffect(() => {
+    // Force browser to allow us to handle restoration manually
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const handleScroll = () => {
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      // Defensive check for mount-time resets
+      if (currentScroll === 0 && (Date.now() - mountTimeRef.current < 500)) return;
+
+      sessionStorage.setItem(scrollKey, currentScroll.toString())
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem(scrollKey)
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        let attempts = 0;
+        const maxAttempts = 60;
+        
+        const interval = setInterval(() => {
+          attempts++;
+          window.scrollTo({ top: targetScroll, behavior: 'instant' });
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            isRestoringRef.current = false;
+          }
+        }, 100);
+        
+        return () => clearInterval(interval);
+      }
+    } else {
+      isRestoringRef.current = false
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [navigationType, scrollKey])
+
+
 
   // State for categories from admin
   const [categories, setCategories] = useState([])

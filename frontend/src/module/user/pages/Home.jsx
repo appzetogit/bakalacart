@@ -589,15 +589,26 @@ export default function Home() {
 
   // Manual scroll restoration logic
   const isRestoringRef = useRef(false)
+  // Track mount time to ignore browser-induced scroll resets
+  const mountTimeRef = useRef(Date.now());
   
   useEffect(() => {
+    // Force browser to allow us to handle restoration manually
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
     const handleScroll = () => {
       // Don't save if we are currently performing a restoration jump
       if (isRestoringRef.current) return
       
       const currentScroll = window.scrollY || window.pageYOffset
-      // Always save position in sessionStorage to persist across navigations
-      // Only skip if it's 0 and we just mounted (handled by isRestoringRef)
+      
+      // CRITICAL: Defensive check - if scroll is 0 and we just mounted within 500ms, 
+      // don't overwrite a potentially valid saved scroll position with 0.
+      // This happens when the browser/router resets scroll on component mount.
+      if (currentScroll === 0 && (Date.now() - mountTimeRef.current < 500)) return;
+
       sessionStorage.setItem('home_page_scroll', currentScroll.toString())
     }
 
@@ -607,45 +618,42 @@ export default function Home() {
         isRestoringRef.current = true
         const targetScroll = parseInt(savedScroll, 10)
         
-        // Immediate scroll attempt - browser may have already restored some, but we enforce it
-        window.scrollTo({
-          top: targetScroll,
-          behavior: 'instant'
-        })
+        // Stubborn restoration: Keep jumping to the target for 6 seconds
+        // to fight against any late-loading content or browser resets.
+        let attempts = 0;
+        const maxAttempts = 60; // 6 seconds at 100ms
         
-        // Sync with Lenis if it's already initialized
-        import('@/lib/utils/lazyLenis').then(({ getLenis }) => {
-          const lenis = getLenis()
-          if (lenis) {
-            lenis.scrollTo(targetScroll, { immediate: true })
-          }
-        })
-
-        // Multiple follow-up attempts to handle dynamic layout shifts and slow rendering
-        // 50ms, 150ms, 300ms, 600ms
-        [50, 150, 300, 600].forEach((delay) => {
-          setTimeout(() => {
-            window.scrollTo({
-              top: targetScroll,
-              behavior: 'instant'
-            })
+        const interval = setInterval(() => {
+          attempts++;
+          
+          // Perform the jump
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: targetScroll, behavior: 'instant' });
             
-            // On the last attempt, allow scroll saving again
-            if (delay === 600) {
-              isRestoringRef.current = false
-            }
-          }, delay)
-        })
+            // Sync with Lenis if available
+            import('@/lib/utils/lazyLenis').then(({ getLenis }) => {
+              const l = getLenis();
+              if (l) l.scrollTo(targetScroll, { immediate: true });
+            }).catch(() => {});
+          }
+
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            isRestoringRef.current = false;
+          }
+        }, 100);
+        
+        return () => {
+          clearInterval(interval);
+        }
       }
     } else {
-      // For PUSH/REPLACE, reset saving flag
       isRestoringRef.current = false
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
-      isRestoringRef.current = false
     }
   }, [navigationType])
 
@@ -667,7 +675,13 @@ export default function Home() {
       // If we're restoring scroll, tell Lenis to go there immediately
       const savedScroll = sessionStorage.getItem('home_page_scroll')
       if (navigationType === 'POP' && savedScroll && lenisInstance) {
-        lenisInstance.scrollTo(parseInt(savedScroll, 10), { immediate: true })
+        const targetScroll = parseInt(savedScroll, 10)
+        lenisInstance.scrollTo(targetScroll, { immediate: true })
+        
+        // Double check after a small delay to ensure it stuck
+        setTimeout(() => {
+          if (lenisInstance) lenisInstance.scrollTo(targetScroll, { immediate: true })
+        }, 50)
       }
     }
 
@@ -1222,6 +1236,8 @@ export default function Home() {
   useEffect(() => {
     fetchRestaurants(appliedFilters)
   }, [appliedFilters, fetchRestaurants])
+
+
 
   // Recalculate distances when user location updates
   useEffect(() => {

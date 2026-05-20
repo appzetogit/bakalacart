@@ -13,6 +13,7 @@ import { getModuleToken } from "@/lib/utils/auth"
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode"
 import MaintenanceModeScreen from "@/components/MaintenanceModeScreen"
 import MaintenanceBanner from "@/components/MaintenanceBanner"
+import AppUpdatePopup from "@/components/AppUpdatePopup"
 
 // Create SearchOverlay context with default value
 const SearchOverlayContext = createContext({
@@ -114,10 +115,11 @@ export default function UserLayout() {
   useEffect(() => {
     // Only scroll if pathname actually changed (not just search params or hash)
     const pathnameChanged = location.pathname !== prevPathnameRef.current
+    const currentNavType = navigationType;
     
     // Only scroll to top on PUSH navigation (forward)
     // Keep scroll position on POP (back button) to allow browser/Lenis scroll restoration
-    if (pathnameChanged && navigationType === 'PUSH') {
+    if (pathnameChanged && currentNavType === 'PUSH') {
       prevPathnameRef.current = location.pathname
       
       // Clear any existing scroll timeout
@@ -127,14 +129,19 @@ export default function UserLayout() {
       
       // Debounce scroll to prevent rapid scrolling in Flutter WebView
       scrollTimeoutRef.current = setTimeout(() => {
-        // Only scroll if we're not at the top already
-        if (window.scrollY > 0 || window.pageYOffset > 0) {
+        // Only scroll if we are definitely doing a PUSH navigation
+        if (typeof window !== 'undefined' && currentNavType === 'PUSH') {
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
         }
-      }, 100)
+      }, 150)
     } else if (pathnameChanged) {
-      // Still update the ref even if we don't scroll
+      // For POP (Back button), we do NOTHING. We let the page's own restoration handle it.
       prevPathnameRef.current = location.pathname
+      
+      // CRITICAL: Ensure no lingering scroll-to-top timeouts fire during POP
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
     }
 
     return () => {
@@ -197,6 +204,7 @@ export default function UserLayout() {
                     <Outlet />
                   </main>
                   {showBottomNav && <BottomNavigation />}
+                  <AppUpdatePopup appKey="user" />
                 </LocationSelectorProvider>
               </SearchOverlayProvider>
             </OrdersProvider>

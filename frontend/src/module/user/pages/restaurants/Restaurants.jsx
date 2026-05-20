@@ -78,14 +78,23 @@ export default function Restaurants() {
   const { addFavorite, removeFavorite, isFavorite } = useProfile()
   const navigationType = useNavigationType()
   const isRestoringRef = useRef(false)
+  const mountTimeRef = useRef(Date.now())
 
   // Manual scroll restoration logic
   useEffect(() => {
+    // Force browser to allow us to handle restoration manually
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
     const handleScroll = () => {
       // Don't save if we are currently performing a restoration jump
       if (isRestoringRef.current) return
       
       const currentScroll = window.scrollY || window.pageYOffset
+      // Defensive check for mount-time resets
+      if (currentScroll === 0 && (Date.now() - mountTimeRef.current < 500)) return;
+
       sessionStorage.setItem('all_restaurants_scroll', currentScroll.toString())
     }
 
@@ -95,15 +104,21 @@ export default function Restaurants() {
         isRestoringRef.current = true
         const targetScroll = parseInt(savedScroll, 10)
         
-        // Immediate and delayed attempts for robust restoration
-        window.scrollTo({ top: targetScroll, behavior: 'instant' });
+        // Stubborn restoration: Keep jumping for 6 seconds
+        let attempts = 0;
+        const maxAttempts = 60;
         
-        [50, 150, 300, 600].forEach(delay => {
-          setTimeout(() => {
-            window.scrollTo({ top: targetScroll, behavior: 'instant' })
-            if (delay === 600) isRestoringRef.current = false
-          }, delay)
-        })
+        const interval = setInterval(() => {
+          attempts++;
+          window.scrollTo({ top: targetScroll, behavior: 'instant' });
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            isRestoringRef.current = false;
+          }
+        }, 100);
+        
+        return () => clearInterval(interval);
       }
     } else {
       isRestoringRef.current = false
@@ -112,7 +127,6 @@ export default function Restaurants() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
-      isRestoringRef.current = false
     }
   }, [navigationType])
 

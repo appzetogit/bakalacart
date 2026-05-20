@@ -112,6 +112,7 @@ import JoinUsPageSetup from "../pages/system/JoinUsPageSetup";
 import AnalyticsScript from "../pages/system/AnalyticsScript";
 import AISetup from "../pages/system/AISetup";
 import AppWebSettings from "../pages/system/AppWebSettings";
+import UpdatePage from "../pages/system/UpdatePage";
 import NotificationChannels from "../pages/system/NotificationChannels";
 import LandingPageSettings from "../pages/system/LandingPageSettings";
 import PageMetaData from "../pages/system/PageMetaData";
@@ -302,6 +303,7 @@ export default function AdminRouter() {
         <Route path="3rd-party-configurations/analytics" element={<AnalyticsScript />} />
         <Route path="3rd-party-configurations/ai" element={<AISetup />} />
         <Route path="app-web-settings" element={<AppWebSettings />} />
+        <Route path="update-page" element={<UpdatePage />} />
         <Route path="notification-channels" element={<NotificationChannels />} />
         {/* Landing Page Settings */}
         <Route path="landing-page-settings/admin" element={<LandingPageSettings type="admin" />} />

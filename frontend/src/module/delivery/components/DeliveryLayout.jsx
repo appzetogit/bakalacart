@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import BottomNavigation from "./BottomNavigation"
 import { getUnreadDeliveryNotificationCount } from "../utils/deliveryNotifications"
 import { useDeliveryNotifications } from "../hooks/useDeliveryNotifications"
+import AppUpdatePopup from "@/components/AppUpdatePopup"
 
 export default function DeliveryLayout({ 
   children, 
@@ -50,6 +51,7 @@ export default function DeliveryLayout({
   return (
     <>
       {children}
+      <AppUpdatePopup appKey="delivery" />
       {showBottomNav && (
         <BottomNavigation
           showGig={showGig}

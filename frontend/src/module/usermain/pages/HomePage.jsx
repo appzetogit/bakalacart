@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useNavigationType } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import Toast from "../components/Toast"
@@ -26,6 +26,10 @@ import OptimizedImage from "@/components/OptimizedImage"
 
 export default function HomePage() {
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
+  const isRestoringRef = useRef(false)
+  const mountTimeRef = useRef(Date.now())
+  
   const { location, loading: locationLoading } = useLocation()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
@@ -35,6 +39,55 @@ export default function HomePage() {
     return saved ? JSON.parse(saved) : []
   })
   const [toast, setToast] = useState({ show: false, message: '' })
+
+  // Scroll restoration logic
+  useEffect(() => {
+    // Force browser to allow us to handle restoration manually
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const handleScroll = () => {
+      // Don't save if we are currently performing a restoration jump
+      if (isRestoringRef.current) return
+      
+      const currentScroll = window.scrollY || window.pageYOffset
+      
+      // Defensive check for mount-time resets
+      if (currentScroll === 0 && (Date.now() - mountTimeRef.current < 500)) return;
+
+      sessionStorage.setItem('usermain_home_page_scroll', currentScroll.toString())
+    }
+
+    if (navigationType === 'POP') {
+      const savedScroll = sessionStorage.getItem('usermain_home_page_scroll')
+      if (savedScroll) {
+        isRestoringRef.current = true
+        const targetScroll = parseInt(savedScroll, 10)
+        
+        let attempts = 0;
+        const maxAttempts = 60; // 6 seconds at 100ms
+        
+        const interval = setInterval(() => {
+          attempts++;
+          
+          window.scrollTo({ top: targetScroll, behavior: 'instant' })
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(interval)
+            isRestoringRef.current = false
+          }
+        }, 100);
+        
+        return () => clearInterval(interval)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [navigationType])
 
   // Function to extract location parts for display
   // Main location: First 2 parts only (e.g., "Mama Loca, G-2")

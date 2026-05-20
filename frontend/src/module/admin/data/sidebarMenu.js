@@ -329,6 +329,12 @@ export const sidebarMenuData = [
     items: [
       {
         type: "link",
+        label: "Update Page",
+        path: "/admin/update-page",
+        icon: "Smartphone",
+      },
+      {
+        type: "link",
         label: "ENV Setup",
         path: "/admin/system-addons",
         icon: "Plus",
